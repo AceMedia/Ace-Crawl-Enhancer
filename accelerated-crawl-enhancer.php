@@ -249,6 +249,7 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
         }
     }
     
@@ -627,7 +628,64 @@ class AceCrawlEnhancer {
             ];
         }
         
+        // AI-powered recommendations if available
+        if ($this->is_ai_enabled()) {
+            $ai_recommendations = $this->get_ai_recommendations($post);
+            if (!is_wp_error($ai_recommendations)) {
+                $recommendations = array_merge($recommendations, $ai_recommendations);
+            }
+        }
+        
         return $recommendations;
+    }
+    
+    /**
+     * Check if AI features are enabled
+     */
+    private function is_ai_enabled() {
+        $options = get_option('ace_seo_options', []);
+        $ai_settings = $options['ai'] ?? [];
+        
+        return !empty($ai_settings['openai_api_key']) && 
+               ($ai_settings['ai_content_analysis'] ?? 0);
+    }
+    
+    /**
+     * Get AI-powered recommendations
+     */
+    private function get_ai_recommendations($post) {
+        if (!class_exists('AceSEOApiHelper')) {
+            return [];
+        }
+        
+        $prompt = "Analyze this content for SEO improvements:\n\n";
+        $prompt .= "Title: " . $post->post_title . "\n";
+        $prompt .= "Content: " . wp_trim_words(strip_tags($post->post_content), 200) . "\n\n";
+        $prompt .= "Provide 3-5 specific, actionable SEO recommendations in this format:\n";
+        $prompt .= "- [Recommendation text]\n";
+        $prompt .= "Focus on: keyword optimization, content structure, readability, and technical SEO.";
+        
+        $response = AceSEOApiHelper::make_openai_request($prompt);
+        
+        if (is_wp_error($response)) {
+            return [];
+        }
+        
+        // Parse AI response into recommendations array
+        $lines = explode("\n", $response);
+        $ai_recommendations = [];
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (strpos($line, '- ') === 0) {
+                $ai_recommendations[] = [
+                    'type' => 'ai',
+                    'text' => substr($line, 2), // Remove "- " prefix
+                ];
+            }
+        }
+        
+        return $ai_recommendations;
     }
     
     /**

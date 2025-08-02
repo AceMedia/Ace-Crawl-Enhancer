@@ -27,6 +27,17 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['advanced']['xml_sitemap'] = isset($_POST['xml_sitemap']) ? 1 : 0;
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
+    // Update AI/Performance settings
+    $options['ai']['openai_api_key'] = sanitize_text_field($_POST['openai_api_key'] ?? '');
+    $options['ai']['ai_content_analysis'] = isset($_POST['ai_content_analysis']) ? 1 : 0;
+    $options['ai']['ai_keyword_suggestions'] = isset($_POST['ai_keyword_suggestions']) ? 1 : 0;
+    $options['ai']['ai_content_optimization'] = isset($_POST['ai_content_optimization']) ? 1 : 0;
+    
+    $options['performance']['pagespeed_api_key'] = sanitize_text_field($_POST['pagespeed_api_key'] ?? '');
+    $options['performance']['pagespeed_monitoring'] = isset($_POST['pagespeed_monitoring']) ? 1 : 0;
+    $options['performance']['pagespeed_alerts'] = isset($_POST['pagespeed_alerts']) ? 1 : 0;
+    $options['performance']['core_web_vitals'] = isset($_POST['core_web_vitals']) ? 1 : 0;
+    
     update_option('ace_seo_options', $options);
     
     echo '<div class="notice notice-success"><p>Settings saved successfully!</p></div>';
@@ -36,6 +47,8 @@ $options = get_option('ace_seo_options', []);
 $general = $options['general'] ?? [];
 $social = $options['social'] ?? [];
 $advanced = $options['advanced'] ?? [];
+$ai = $options['ai'] ?? [];
+$performance = $options['performance'] ?? [];
 ?>
 
 <div class="wrap">
@@ -181,6 +194,118 @@ $advanced = $options['advanced'] ?? [];
                 </table>
             </div>
             
+            <!-- AI Integration Settings -->
+            <div class="ace-seo-settings-section">
+                <h2>AI-Powered Features</h2>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="openai_api_key">OpenAI API Key</label>
+                        </th>
+                        <td>
+                            <input type="password" id="openai_api_key" name="openai_api_key" value="<?php echo esc_attr($ai['openai_api_key'] ?? ''); ?>" class="regular-text">
+                            <button type="button" class="button" onclick="togglePasswordVisibility('openai_api_key')">Show/Hide</button>
+                            <button type="button" class="button test-api-connection" data-api="openai">Test Connection</button>
+                            <div id="openai-test-result" class="api-test-result" style="margin-top: 5px;"></div>
+                            <p class="description">
+                                Your OpenAI API key for AI-powered content analysis and optimization. 
+                                <a href="https://platform.openai.com/api-keys" target="_blank">Get your API key here</a>.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">AI Content Analysis</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_content_analysis" value="1" <?php checked($ai['ai_content_analysis'] ?? 0, 1); ?>>
+                                Enable AI-powered content analysis
+                            </label>
+                            <p class="description">Get intelligent SEO recommendations and content quality insights using AI.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">AI Keyword Suggestions</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_keyword_suggestions" value="1" <?php checked($ai['ai_keyword_suggestions'] ?? 0, 1); ?>>
+                                Enable AI keyword suggestions
+                            </label>
+                            <p class="description">Get smart keyword recommendations based on your content and industry trends.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">AI Content Optimization</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_content_optimization" value="1" <?php checked($ai['ai_content_optimization'] ?? 0, 1); ?>>
+                                Enable AI content optimization suggestions
+                            </label>
+                            <p class="description">Receive AI-generated suggestions to improve your content for better search rankings.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Performance Monitoring Settings -->
+            <div class="ace-seo-settings-section">
+                <h2>Performance Monitoring</h2>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="pagespeed_api_key">PageSpeed Insights API Key</label>
+                        </th>
+                        <td>
+                            <input type="password" id="pagespeed_api_key" name="pagespeed_api_key" value="<?php echo esc_attr($performance['pagespeed_api_key'] ?? ''); ?>" class="regular-text">
+                            <button type="button" class="button" onclick="togglePasswordVisibility('pagespeed_api_key')">Show/Hide</button>
+                            <button type="button" class="button test-api-connection" data-api="pagespeed">Test Connection</button>
+                            <div id="pagespeed-test-result" class="api-test-result" style="margin-top: 5px;"></div>
+                            <p class="description">
+                                Your Google PageSpeed Insights API key for performance monitoring. 
+                                <a href="https://developers.google.com/speed/docs/insights/v5/get-started" target="_blank">Get your API key here</a>.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">PageSpeed Monitoring</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="pagespeed_monitoring" value="1" <?php checked($performance['pagespeed_monitoring'] ?? 0, 1); ?>>
+                                Enable automatic PageSpeed monitoring
+                            </label>
+                            <p class="description">Automatically monitor your site's performance and Core Web Vitals.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">Performance Alerts</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="pagespeed_alerts" value="1" <?php checked($performance['pagespeed_alerts'] ?? 0, 1); ?>>
+                                Send performance alerts
+                            </label>
+                            <p class="description">Get notified when your site's performance drops below acceptable thresholds.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">Core Web Vitals</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="core_web_vitals" value="1" <?php checked($performance['core_web_vitals'] ?? 1, 1); ?>>
+                                Track Core Web Vitals
+                            </label>
+                            <p class="description">Monitor LCP, FID, and CLS metrics that directly impact SEO rankings.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
             <!-- Yoast Migration -->
             <div class="ace-seo-settings-section">
                 <h2>Yoast SEO Compatibility</h2>
@@ -219,6 +344,12 @@ $advanced = $options['advanced'] ?? [];
 </div>
 
 <script>
+function togglePasswordVisibility(fieldId) {
+    const field = document.getElementById(fieldId);
+    const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+    field.setAttribute('type', type);
+}
+
 jQuery(document).ready(function($) {
     $('.ace-seo-image-select').on('click', function(e) {
         e.preventDefault();
@@ -245,6 +376,64 @@ jQuery(document).ready(function($) {
             
             mediaUploader.open();
         }
+    });
+    
+    // API Key validation feedback
+    $('#openai_api_key').on('blur', function() {
+        const apiKey = $(this).val();
+        if (apiKey && !apiKey.startsWith('sk-')) {
+            $(this).after('<span class="ace-api-warning" style="color: #d63384; font-size: 12px; margin-left: 5px;">⚠️ OpenAI API keys typically start with "sk-"</span>');
+        } else {
+            $('.ace-api-warning').remove();
+        }
+    });
+    
+    // Test API connections
+    $('.test-api-connection').on('click', function(e) {
+        e.preventDefault();
+        const button = $(this);
+        const apiType = button.data('api');
+        const originalText = button.text();
+        const resultDiv = $('#' + apiType + '-test-result');
+        
+        let apiKey;
+        if (apiType === 'openai') {
+            apiKey = $('#openai_api_key').val();
+        } else if (apiType === 'pagespeed') {
+            apiKey = $('#pagespeed_api_key').val();
+        }
+        
+        if (!apiKey) {
+            resultDiv.html('<span style="color: #d63384;">⚠️ Please enter an API key first</span>');
+            return;
+        }
+        
+        button.text('Testing...').prop('disabled', true);
+        resultDiv.html('<span style="color: #666;">🔄 Testing connection...</span>');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'ace_seo_test_api',
+                api_type: apiType,
+                api_key: apiKey,
+                nonce: '<?php echo wp_create_nonce('ace_seo_api_test'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    resultDiv.html('<span style="color: #28a745;">✅ ' + response.data.message + '</span>');
+                } else {
+                    resultDiv.html('<span style="color: #d63384;">❌ ' + response.data.message + '</span>');
+                }
+            },
+            error: function() {
+                resultDiv.html('<span style="color: #d63384;">❌ Connection test failed</span>');
+            },
+            complete: function() {
+                button.text(originalText).prop('disabled', false);
+            }
+        });
     });
 });
 </script>
@@ -301,5 +490,42 @@ jQuery(document).ready(function($) {
 .notice.inline {
     margin: 10px 0;
     padding: 8px 12px;
+}
+
+.api-test-result {
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.test-api-connection {
+    margin-left: 5px;
+}
+
+.test-api-connection:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ace-seo-settings-section {
+    position: relative;
+}
+
+.ace-seo-settings-section[data-requires-api="true"] {
+    opacity: 0.7;
+}
+
+.ace-seo-settings-section[data-requires-api="true"]::before {
+    content: "🔑 Requires API key configuration";
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
 }
 </style>

@@ -76,7 +76,42 @@ class AceSEOActivator {
      * Set default plugin options
      */
     private static function set_default_options() {
-        // General settings
+        // Unified settings structure
+        if ( ! get_option( 'ace_seo_options' ) ) {
+            $default_options = array(
+                'general' => array(
+                    'separator' => '|',
+                    'site_name' => get_bloginfo( 'name' ),
+                    'home_title' => '',
+                    'home_description' => get_bloginfo( 'description' ),
+                ),
+                'social' => array(
+                    'facebook_app_id' => '',
+                    'twitter_username' => '',
+                    'default_image' => '',
+                ),
+                'advanced' => array(
+                    'breadcrumbs' => 1,
+                    'xml_sitemap' => 1,
+                    'clean_permalinks' => 0,
+                ),
+                'ai' => array(
+                    'openai_api_key' => '',
+                    'ai_content_analysis' => 0,
+                    'ai_keyword_suggestions' => 0,
+                    'ai_content_optimization' => 0,
+                ),
+                'performance' => array(
+                    'pagespeed_api_key' => '',
+                    'pagespeed_monitoring' => 0,
+                    'pagespeed_alerts' => 0,
+                    'core_web_vitals' => 1,
+                ),
+            );
+            update_option( 'ace_seo_options', $default_options );
+        }
+        
+        // Legacy settings for backward compatibility
         if ( ! get_option( 'ace_seo_settings' ) ) {
             $default_settings = array(
                 'site_name' => get_bloginfo( 'name' ),
