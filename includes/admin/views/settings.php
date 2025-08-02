@@ -32,6 +32,7 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['ai']['ai_content_analysis'] = isset($_POST['ai_content_analysis']) ? 1 : 0;
     $options['ai']['ai_keyword_suggestions'] = isset($_POST['ai_keyword_suggestions']) ? 1 : 0;
     $options['ai']['ai_content_optimization'] = isset($_POST['ai_content_optimization']) ? 1 : 0;
+    $options['ai']['ai_web_search'] = isset($_POST['ai_web_search']) ? 1 : 0;
     
     $options['performance']['pagespeed_api_key'] = sanitize_text_field($_POST['pagespeed_api_key'] ?? '');
     $options['performance']['pagespeed_monitoring'] = isset($_POST['pagespeed_monitoring']) ? 1 : 0;
@@ -247,6 +248,17 @@ $performance = $options['performance'] ?? [];
                             <p class="description">Receive AI-generated suggestions to improve your content for better search rankings.</p>
                         </td>
                     </tr>
+                    
+                    <tr>
+                        <th scope="row">AI Web Search Enhancement</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_web_search" value="1" <?php checked($ai['ai_web_search'] ?? 0, 1); ?>>
+                                Enable web search for enhanced AI suggestions
+                            </label>
+                            <p class="description">Allow AI to search the web for current trends and best practices to provide more informed suggestions. Requires focus keywords to be provided.</p>
+                        </td>
+                    </tr>
                 </table>
             </div>
             
@@ -421,17 +433,24 @@ jQuery(document).ready(function($) {
                 nonce: '<?php echo wp_create_nonce('ace_seo_api_test'); ?>'
             },
             success: function(response) {
+                console.log('API Test Response:', response); // Debug log
+                
                 if (response.success) {
-                    resultDiv.html('<span style="color: #28a745;">✅ ' + response.data.message + '</span>');
+                    resultDiv.html('<span style="color: #28a745;">✅ ' + response.message + '</span>');
                 } else {
-                    resultDiv.html('<span style="color: #d63384;">❌ ' + response.data.message + '</span>');
+                    const errorMessage = response.message || 'Connection test failed';
+                    resultDiv.html('<span style="color: #d63384;">❌ ' + errorMessage + '</span>');
                 }
             },
-            error: function() {
-                resultDiv.html('<span style="color: #d63384;">❌ Connection test failed</span>');
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', xhr, status, error); // Debug log
+                resultDiv.html('<span style="color: #d63384;">❌ Connection test failed: ' + error + '</span>');
             },
             complete: function() {
-                button.text(originalText).prop('disabled', false);
+                // Ensure button is always re-enabled
+                setTimeout(function() {
+                    button.text(originalText).prop('disabled', false);
+                }, 100);
             }
         });
     });

@@ -6,6 +6,10 @@
     'use strict';
 
     const AceSeo = {
+        currentModal: null,
+        selectedSuggestion: null,
+        aiData: {},
+        
         init: function() {
             this.bindEvents();
             this.initTabs();
@@ -13,6 +17,7 @@
             this.initImageSelectors();
             this.initRealTimeAnalysis();
             this.initPageSpeed();
+            this.initAiAssistant();
             this.updatePreviews();
             
             // Initial analysis
@@ -48,6 +53,21 @@
             // PageSpeed events
             $('#ace-test-performance').on('click', this.testPageSpeed.bind(this));
             $('#ace-simulate-performance').on('click', () => this.testPageSpeed('mobile', true));
+            
+            // AI Assistant events
+            $(document).on('click', '.ace-ai-button', this.handleAiButtonClick.bind(this));
+            $(document).on('click', '.ace-modal-close, .ace-modal-overlay', this.closeModal.bind(this));
+            $(document).on('click', '.ace-ai-suggestion-item', this.selectSuggestion.bind(this));
+            $(document).on('click', '#ace-ai-apply-suggestion', this.applySuggestion.bind(this));
+            
+            // Content Analysis events
+            $('#ace-analyze-content').on('click', this.handleAnalyzeContent.bind(this));
+            $('#ace-get-topic-suggestions').on('click', this.handleTopicSuggestions.bind(this));
+            $('#ace-improve-content').on('click', this.handleImproveContent.bind(this));
+            
+            // Comprehensive AI Analysis (sidebar)
+            $('#ace-analyze-all-content').on('click', this.handleComprehensiveAnalysis.bind(this));
+            
             $('#ace-test-mobile').on('click', () => this.testPageSpeed('mobile'));
             $('#ace-test-desktop').on('click', () => this.testPageSpeed('desktop'));
             $('#ace-view-full-report').on('click', this.viewFullReport.bind(this));
@@ -696,6 +716,951 @@
             const currentUrl = window.location.origin + '/' + $('#post_name').val() || window.location.href;
             const pagespeedUrl = `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(currentUrl)}`;
             window.open(pagespeedUrl, '_blank');
+        },
+
+        // AI Assistant Functions
+        initAiAssistant: function() {
+            // Initialize AI functionality if available
+            this.currentModal = null;
+            this.selectedSuggestion = null;
+            this.aiData = {};
+        },
+
+        handleAiButtonClick: function(e) {
+            e.preventDefault();
+            const $button = $(e.currentTarget);
+            const action = $button.data('action');
+            
+            if ($button.hasClass('loading')) {
+                return;
+            }
+            
+            this.setButtonLoading($button, true);
+            
+            // Get current content data
+            const contentData = this.getContentData();
+            
+            switch (action) {
+                case 'generate_titles':
+                    this.generateTitles(contentData, $button);
+                    break;
+                case 'generate_descriptions':
+                    this.generateDescriptions(contentData, $button);
+                    break;
+                case 'generate_keywords':
+                    this.generateKeywords(contentData, $button);
+                    break;
+                case 'analyze_content':
+                    this.analyzeContent(contentData, $button);
+                    break;
+                case 'improve_content':
+                    this.improveContent(contentData, $button);
+                    break;
+                case 'suggest_topics':
+                    this.suggestTopics(contentData, $button);
+                    break;
+                default:
+                    this.setButtonLoading($button, false);
+                    console.warn('Unknown AI action:', action);
+            }
+        },
+
+        getContentData: function() {
+            const content = this.getContentText();
+            const title = $('#yoast_wpseo_title').val() || $('input[name="post_title"]').val() || $('#title').val() || '';
+            const focusKeyword = $('#yoast_wpseo_focuskw').val() || '';
+            
+            return {
+                content: content,
+                current_title: title,
+                focus_keyword: focusKeyword,
+                nonce: $('#ace_seo_ai_nonce').val()
+            };
+        },
+
+        generateTitles: function(contentData, $button) {
+            console.log('Generating titles with data:', contentData); // Debug log
+            
+            $.post(ajaxurl, {
+                action: 'ace_seo_generate_titles',
+                ...contentData
+            })
+            .done((response) => {
+                console.log('Titles response:', response); // Debug log
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showTitleSuggestions(response.data.titles);
+                } else {
+                    this.showAiError(response.data || 'Failed to generate titles');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateDescriptions: function(contentData, $button) {
+            $.post(ajaxurl, {
+                action: 'ace_seo_generate_descriptions',
+                ...contentData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showDescriptionSuggestions(response.data.descriptions);
+                } else {
+                    this.showAiError(response.data || 'Failed to generate descriptions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateKeywords: function(contentData, $button) {
+            $.post(ajaxurl, {
+                action: 'ace_seo_generate_keywords',
+                ...contentData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showKeywordSuggestions(response.data.keywords);
+                } else {
+                    this.showAiError(response.data || 'Failed to generate keywords');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        analyzeContent: function(contentData, $button) {
+            // Show loading state in sidebar
+            this.showAnalysisLoading(true);
+            
+            $.post(ajaxurl, {
+                action: 'ace_seo_analyze_content',
+                ...contentData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                
+                if (response.success) {
+                    this.populateContentAnalysis(response.data.analysis);
+                } else {
+                    this.showAnalysisError(response.data || 'Failed to analyze content');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                this.showAnalysisError('Network error occurred');
+            });
+        },
+
+        improveContent: function(contentData, $button) {
+            // Show loading state in sidebar
+            this.showAnalysisLoading(true);
+            
+            $.post(ajaxurl, {
+                action: 'ace_seo_improve_content',
+                ...contentData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                
+                if (response.success) {
+                    this.populateContentImprovements(response.data.improvements);
+                } else {
+                    this.showAnalysisError(response.data || 'Failed to get improvement suggestions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                this.showAnalysisError('Network error occurred');
+            });
+        },
+
+        suggestTopics: function(contentData, $button) {
+            // Show loading state in sidebar
+            this.showAnalysisLoading(true);
+            
+            $.post(ajaxurl, {
+                action: 'ace_seo_suggest_topics',
+                ...contentData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                
+                if (response.success) {
+                    this.populateTopicSuggestions(response.data.suggestions);
+                } else {
+                    this.showAnalysisError(response.data || 'Failed to generate topic suggestions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAnalysisLoading(false);
+                this.showAnalysisError('Network error occurred');
+            });
+        },
+
+        showTitleSuggestions: function(titles) {
+            console.log('Showing title suggestions:', titles); // Debug log
+            
+            let html = '<div class="ace-ai-suggestions-list">';
+            
+            titles.forEach((titleData, index) => {
+                // Handle both old format (string) and new format (object)
+                const title = typeof titleData === 'string' ? titleData : titleData.title;
+                const reason = typeof titleData === 'object' ? titleData.reason : (index === 0 ? 'AI recommended best option' : 'Alternative suggestion');
+                const isRecommended = index === 0;
+                
+                const charCount = title.length;
+                const charClass = charCount <= 60 ? 'optimal' : charCount <= 70 ? 'warning' : 'error';
+                
+                html += `
+                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(title)}" data-type="title">
+                        ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
+                        <div class="ace-ai-suggestion-text">${this.escapeHtml(title)}</div>
+                        <div class="ace-ai-suggestion-reason">${this.escapeHtml(reason)}</div>
+                        <div class="ace-ai-suggestion-meta">
+                            <span class="ace-ai-char-count ${charClass}">${charCount} characters</span>
+                            <span class="ace-ai-score">${charCount <= 60 ? '✓ Optimal' : charCount <= 70 ? '⚠ Long' : '❌ Too long'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            this.showModal('AI Title Suggestions', html, 'title');
+        },
+
+        showDescriptionSuggestions: function(descriptions) {
+            let html = '<div class="ace-ai-suggestions-list">';
+            
+            descriptions.forEach((descData, index) => {
+                // Handle both old format (string) and new format (object)
+                const description = typeof descData === 'string' ? descData : descData.description;
+                const reason = typeof descData === 'object' ? descData.reason : (index === 0 ? 'AI recommended best option' : 'Alternative suggestion');
+                const isRecommended = index === 0;
+                
+                const charCount = description.length;
+                const charClass = charCount >= 120 && charCount <= 160 ? 'optimal' : charCount < 120 ? 'warning' : 'error';
+                
+                html += `
+                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(description)}" data-type="description">
+                        ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
+                        <div class="ace-ai-suggestion-text">${this.escapeHtml(description)}</div>
+                        <div class="ace-ai-suggestion-reason">${this.escapeHtml(reason)}</div>
+                        <div class="ace-ai-suggestion-meta">
+                            <span class="ace-ai-char-count ${charClass}">${charCount} characters</span>
+                            <span class="ace-ai-score">${charCount >= 120 && charCount <= 160 ? '✓ Optimal' : charCount < 120 ? '⚠ Too short' : '❌ Too long'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            this.showModal('AI Meta Description Suggestions', html, 'description');
+        },
+
+        showKeywordSuggestions: function(keywords) {
+            let html = '<div class="ace-ai-suggestions-list">';
+            
+            keywords.forEach((keyword, index) => {
+                html += `
+                    <div class="ace-ai-suggestion-item" data-suggestion="${this.escapeHtml(keyword)}" data-type="keyword">
+                        <div class="ace-ai-suggestion-title">Keyword ${index + 1}</div>
+                        <p class="ace-ai-suggestion-text">${this.escapeHtml(keyword)}</p>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            this.showModal('AI Keyword Suggestions', html, 'keyword');
+        },
+
+        showContentAnalysis: function(analysis) {
+            let html = '<div class="ace-ai-analysis-results">';
+            
+            Object.keys(analysis).forEach(category => {
+                const categoryTitle = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const suggestions = Array.isArray(analysis[category]) ? analysis[category] : [analysis[category]];
+                
+                html += `
+                    <div class="ace-ai-analysis-item">
+                        <span class="dashicons dashicons-analytics"></span>
+                        <div class="ace-ai-analysis-content">
+                            <h5>${categoryTitle}</h5>
+                            <ul>
+                `;
+                
+                suggestions.forEach(suggestion => {
+                    if (suggestion && suggestion.trim()) {
+                        html += `<li>${this.escapeHtml(suggestion)}</li>`;
+                    }
+                });
+                
+                html += `
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            this.showModal('AI Content Analysis', html, 'analysis');
+        },
+
+        showContentImprovements: function(improvements) {
+            let html = '<div class="ace-ai-improvements-list">';
+            
+            improvements.forEach((improvement, index) => {
+                html += `
+                    <div class="ace-ai-improvement-item">
+                        <span class="dashicons dashicons-lightbulb"></span>
+                        <strong>Improvement ${index + 1}:</strong> ${this.escapeHtml(improvement)}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            this.showModal('AI Content Improvements', html, 'improvements');
+        },
+
+        showTopicSuggestions: function(suggestions) {
+            let html = '';
+            
+            if (suggestions.topics && suggestions.topics.length > 0) {
+                html += `
+                    <div class="ace-ai-topics-section">
+                        <h4><span class="dashicons dashicons-lightbulb"></span> Related Topics</h4>
+                        <ul class="ace-ai-topic-list">
+                `;
+                suggestions.topics.forEach(topic => {
+                    html += `<li class="ace-ai-topic-item">${this.escapeHtml(topic)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.questions && suggestions.questions.length > 0) {
+                html += `
+                    <div class="ace-ai-questions-section">
+                        <h4><span class="dashicons dashicons-editor-help"></span> People Also Ask</h4>
+                        <ul class="ace-ai-question-list">
+                `;
+                suggestions.questions.forEach(question => {
+                    html += `<li class="ace-ai-question-item">${this.escapeHtml(question)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.keywords && suggestions.keywords.length > 0) {
+                html += `
+                    <div class="ace-ai-keywords-section">
+                        <h4><span class="dashicons dashicons-search"></span> Related Keywords</h4>
+                        <ul class="ace-ai-keyword-list">
+                `;
+                suggestions.keywords.forEach(keyword => {
+                    html += `<li class="ace-ai-keyword-item">${this.escapeHtml(keyword)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            this.showModal('AI Topic Suggestions', html, 'topics');
+        },
+
+        // Sidebar analysis functions
+        showAnalysisLoading: function(show) {
+            const $loading = $('#ace-analysis-loading');
+            const $results = $('#ace-ai-analysis-results');
+            const $status = $('#ace-analysis-status');
+            
+            if (show) {
+                $loading.show();
+                $results.show();
+                $status.hide();
+                // Switch to content analysis tab
+                this.switchToAnalysisTab();
+            } else {
+                $loading.hide();
+            }
+        },
+
+        showAnalysisError: function(message) {
+            const $content = $('#ace-analysis-content');
+            $content.html(`
+                <div class="ace-analysis-error">
+                    <span class="dashicons dashicons-warning"></span>
+                    <p>${this.escapeHtml(message)}</p>
+                </div>
+            `);
+        },
+
+        switchToAnalysisTab: function() {
+            // Switch to the content analysis tab
+            $('.ace-seo-tab-item').removeClass('active');
+            $('.ace-seo-tab-content').removeClass('active');
+            $('[data-tab="content-analysis"]').addClass('active');
+            $('#tab-content-analysis').addClass('active');
+        },
+
+        populateContentAnalysis: function(analysis) {
+            const $content = $('#ace-analysis-content');
+            const $results = $('#ace-ai-analysis-results');
+            
+            let html = '<div class="ace-analysis-categories">';
+            
+            Object.keys(analysis).forEach(category => {
+                const categoryTitle = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const suggestions = Array.isArray(analysis[category]) ? analysis[category] : [analysis[category]];
+                
+                html += `
+                    <div class="ace-analysis-category">
+                        <h5 class="ace-analysis-category-title">
+                            <span class="dashicons dashicons-analytics"></span>
+                            ${categoryTitle}
+                        </h5>
+                        <div class="ace-analysis-category-content">
+                `;
+                
+                suggestions.forEach(suggestion => {
+                    if (suggestion && suggestion.trim()) {
+                        html += `<div class="ace-analysis-suggestion">${this.escapeHtml(suggestion)}</div>`;
+                    }
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            $content.html(html);
+            $results.show();
+            $('#ace-analysis-status').hide();
+            
+            // Update analysis score indicator
+            this.updateAnalysisScore('good');
+        },
+
+        populateContentImprovements: function(improvements) {
+            const $list = $('#ace-improvements-list');
+            const $container = $('#ace-content-improvements');
+            
+            let html = '';
+            
+            improvements.forEach((improvement, index) => {
+                html += `
+                    <div class="ace-improvement-item">
+                        <div class="ace-improvement-number">${index + 1}</div>
+                        <div class="ace-improvement-content">
+                            <span class="dashicons dashicons-lightbulb"></span>
+                            ${this.escapeHtml(improvement)}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            $list.html(html);
+            $container.show();
+            $('#ace-analysis-status').hide();
+            
+            // Switch to analysis tab and scroll to improvements
+            this.switchToAnalysisTab();
+        },
+
+        populateTopicSuggestions: function(suggestions) {
+            const $content = $('#ace-topic-content');
+            const $container = $('#ace-topic-suggestions');
+            
+            let html = '';
+            
+            if (suggestions.topics && suggestions.topics.length > 0) {
+                html += '<div class="ace-topic-section"><h6>Related Topics</h6><ul>';
+                suggestions.topics.forEach(topic => {
+                    html += `<li>${this.escapeHtml(topic)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.questions && suggestions.questions.length > 0) {
+                html += '<div class="ace-topic-section"><h6>People Also Ask</h6><ul>';
+                suggestions.questions.forEach(question => {
+                    html += `<li>${this.escapeHtml(question)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.keywords && suggestions.keywords.length > 0) {
+                html += '<div class="ace-topic-section"><h6>Long-tail Keywords</h6><ul>';
+                suggestions.keywords.forEach(keyword => {
+                    html += `<li>${this.escapeHtml(keyword)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            $content.html(html);
+            $container.show();
+            $('#ace-analysis-status').hide();
+            
+            // Switch to analysis tab and scroll to topics
+            this.switchToAnalysisTab();
+        },
+
+        updateAnalysisScore: function(rating) {
+            const $score = $('#ace-ai-analysis-score');
+            const scoreText = rating === 'good' ? '✓' : rating === 'needs-improvement' ? '!' : '—';
+            $score.text(scoreText).removeClass('good needs-improvement poor').addClass(rating);
+        },
+
+        // Content Analysis Button Handlers
+        handleAnalyzeContent: function(e) {
+            e.preventDefault();
+            const $button = $(e.currentTarget);
+            
+            if ($button.hasClass('loading')) {
+                return;
+            }
+            
+            this.setButtonLoading($button, true);
+            const contentData = this.getContentData();
+            this.analyzeContent(contentData, $button);
+        },
+
+        handleTopicSuggestions: function(e) {
+            e.preventDefault();
+            const $button = $(e.currentTarget);
+            
+            if ($button.hasClass('loading')) {
+                return;
+            }
+            
+            this.setButtonLoading($button, true);
+            const contentData = this.getContentData();
+            this.suggestTopics(contentData, $button);
+        },
+
+        handleImproveContent: function(e) {
+            e.preventDefault();
+            const $button = $(e.currentTarget);
+            
+            if ($button.hasClass('loading')) {
+                return;
+            }
+            
+            this.setButtonLoading($button, true);
+            const contentData = this.getContentData();
+            this.improveContent(contentData, $button);
+        },
+
+        handleComprehensiveAnalysis: function(e) {
+            e.preventDefault();
+            const $button = $(e.currentTarget);
+            
+            if ($button.hasClass('loading')) {
+                return;
+            }
+            
+            // Show loading state in sidebar
+            this.showSidebarLoading(true);
+            this.setButtonLoading($button, true);
+            
+            const contentData = this.getContentData();
+            
+            // Perform all three analyses in sequence
+            this.performComprehensiveAnalysis(contentData, $button);
+        },
+
+        performComprehensiveAnalysis: function(contentData, $button) {
+            let analysisResults = {
+                contentAnalysis: null,
+                topicSuggestions: null,
+                contentImprovements: null
+            };
+            
+            let completedRequests = 0;
+            const totalRequests = 3;
+            
+            const checkCompletion = () => {
+                completedRequests++;
+                if (completedRequests === totalRequests) {
+                    this.setButtonLoading($button, false);
+                    this.showSidebarLoading(false);
+                    this.displayComprehensiveResults(analysisResults);
+                }
+            };
+            
+            // 1. Content Analysis
+            $.post(ajaxurl, {
+                action: 'ace_seo_analyze_content',
+                ...contentData
+            })
+            .done((response) => {
+                if (response.success) {
+                    analysisResults.contentAnalysis = response.data.analysis;
+                }
+                checkCompletion();
+            })
+            .fail(() => {
+                checkCompletion();
+            });
+            
+            // 2. Topic Suggestions
+            $.post(ajaxurl, {
+                action: 'ace_seo_suggest_topics',
+                ...contentData
+            })
+            .done((response) => {
+                if (response.success) {
+                    analysisResults.topicSuggestions = response.data.suggestions;
+                }
+                checkCompletion();
+            })
+            .fail(() => {
+                checkCompletion();
+            });
+            
+            // 3. Content Improvements
+            $.post(ajaxurl, {
+                action: 'ace_seo_improve_content',
+                ...contentData
+            })
+            .done((response) => {
+                if (response.success) {
+                    analysisResults.contentImprovements = response.data.improvements;
+                }
+                checkCompletion();
+            })
+            .fail(() => {
+                checkCompletion();
+            });
+        },
+
+        showSidebarLoading: function(show) {
+            const $loading = $('#ace-analysis-loading');
+            const $results = $('#ace-analysis-results');
+            const $error = $('#ace-analysis-error');
+            
+            if (show) {
+                $loading.show();
+                $results.hide();
+                $error.hide();
+            } else {
+                $loading.hide();
+            }
+        },
+
+        displayComprehensiveResults: function(results) {
+            const $results = $('#ace-analysis-results');
+            
+            // Show results container
+            $results.show();
+            
+            // 1. Display Content Analysis
+            if (results.contentAnalysis) {
+                this.populateContentAnalysisSidebar(results.contentAnalysis);
+                $('#ace-content-analysis-section').show();
+            }
+            
+            // 2. Display Topic Suggestions
+            if (results.topicSuggestions) {
+                this.populateTopicSuggestionsSidebar(results.topicSuggestions);
+                $('#ace-topic-ideas-section').show();
+            }
+            
+            // 3. Display Content Improvements
+            if (results.contentImprovements) {
+                this.populateContentImprovementsSidebar(results.contentImprovements);
+                $('#ace-content-improvements-section').show();
+            }
+            
+            // If all failed, show error
+            if (!results.contentAnalysis && !results.topicSuggestions && !results.contentImprovements) {
+                this.showSidebarError('All analysis requests failed. Please try again.');
+            }
+        },
+
+        populateContentAnalysisSidebar: function(analysis) {
+            const $content = $('#ace-content-analysis-content');
+            let html = '';
+            
+            Object.keys(analysis).forEach(category => {
+                const categoryTitle = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const suggestions = Array.isArray(analysis[category]) ? analysis[category] : [analysis[category]];
+                
+                html += `<div style="margin-bottom: 10px;"><strong>${categoryTitle}:</strong>`;
+                
+                if (suggestions.length > 0) {
+                    html += '<ol style="margin: 5px 0 0 15px;">';
+                    suggestions.forEach(suggestion => {
+                        if (suggestion && suggestion.trim()) {
+                            html += `<li style="font-size: 13px; margin-bottom: 3px;">${this.escapeHtml(suggestion)}</li>`;
+                        }
+                    });
+                    html += '</ol>';
+                }
+                
+                html += '</div>';
+            });
+            
+            $content.html(html);
+        },
+
+        populateTopicSuggestionsSidebar: function(suggestions) {
+            const $content = $('#ace-topic-ideas-content');
+            let html = '';
+            
+            if (suggestions.topics && suggestions.topics.length > 0) {
+                html += '<div style="margin-bottom: 10px;"><strong>Related Topics:</strong><ul style="margin: 5px 0 0 15px;">';
+                suggestions.topics.forEach(topic => {
+                    html += `<li style="font-size: 13px; margin-bottom: 3px;">${this.escapeHtml(topic)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.questions && suggestions.questions.length > 0) {
+                html += '<div style="margin-bottom: 10px;"><strong>People Also Ask:</strong><ul style="margin: 5px 0 0 15px;">';
+                suggestions.questions.forEach(question => {
+                    html += `<li style="font-size: 13px; margin-bottom: 3px;">${this.escapeHtml(question)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (suggestions.keywords && suggestions.keywords.length > 0) {
+                html += '<div style="margin-bottom: 10px;"><strong>Keywords:</strong><ul style="margin: 5px 0 0 15px;">';
+                suggestions.keywords.forEach(keyword => {
+                    html += `<li style="font-size: 13px; margin-bottom: 3px;">${this.escapeHtml(keyword)}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            $content.html(html);
+        },
+
+        populateContentImprovementsSidebar: function(improvements) {
+            const $content = $('#ace-content-improvements-content');
+            let html = '<ol style="margin: 0; padding-left: 20px;">';
+            
+            improvements.forEach((improvement) => {
+                html += `<li style="font-size: 13px; margin-bottom: 8px; line-height: 1.4;">${this.escapeHtml(improvement)}</li>`;
+            });
+            
+            html += '</ol>';
+            $content.html(html);
+        },
+
+        showSidebarError: function(message) {
+            $('#ace-analysis-error-message').text(message);
+            $('#ace-analysis-error').show();
+        },
+
+        showModal: function(title, content, type) {
+            console.log('Showing modal:', title, type); // Debug log
+            
+            const $modal = $('#ace-ai-suggestions-modal');
+            console.log('Modal element found:', $modal.length); // Debug log
+            
+            // Fallback: If modal doesn't exist, use browser prompt for simple selections
+            if ($modal.length === 0) {
+                console.log('Modal not found, using fallback'); // Debug log
+                this.showModalFallback(title, content, type);
+                return;
+            }
+            
+            const $title = $('#ace-ai-modal-title');
+            const $content = $('#ace-ai-suggestions-content');
+            const $applyButton = $('#ace-ai-apply-suggestion');
+            
+            $title.text(title);
+            $content.html(content);
+            
+            // Hide apply button - clicking suggestions will apply directly
+            $applyButton.hide();
+            
+            $modal.show();
+            console.log('Modal shown'); // Debug log
+            this.currentModal = type;
+            this.selectedSuggestion = null;
+        },
+
+        showModalFallback: function(title, content, type) {
+            // Extract suggestions from HTML content
+            const tempDiv = $('<div>').html(content);
+            const suggestions = [];
+            
+            tempDiv.find('.ace-ai-suggestion-item').each(function() {
+                const suggestion = $(this).data('suggestion');
+                if (suggestion) {
+                    suggestions.push(suggestion);
+                }
+            });
+            
+            if (suggestions.length === 0) {
+                alert('No suggestions generated. Please try again.');
+                return;
+            }
+            
+            // For keywords, auto-apply the first (best) suggestion
+            if (type === 'keyword' && suggestions.length > 0) {
+                $('#yoast_wpseo_focuskw').val(suggestions[0]).trigger('input');
+                this.showSuccessMessage('Best AI keyword applied: ' + suggestions[0]);
+                return;
+            }
+            
+            // For titles and descriptions, show selection
+            let message = title + '\n\nChoose an option:\n\n';
+            suggestions.forEach((suggestion, index) => {
+                message += `${index + 1}. ${suggestion}\n\n`;
+            });
+            message += 'Enter the number of your choice (1-' + suggestions.length + '):';
+            
+            const choice = prompt(message);
+            const choiceIndex = parseInt(choice) - 1;
+            
+            if (choiceIndex >= 0 && choiceIndex < suggestions.length) {
+                const selectedText = suggestions[choiceIndex];
+                
+                switch (type) {
+                    case 'title':
+                        $('#yoast_wpseo_title').val(selectedText).trigger('input');
+                        break;
+                    case 'description':
+                        $('#yoast_wpseo_metadesc').val(selectedText).trigger('input');
+                        break;
+                }
+                
+                this.showSuccessMessage('AI suggestion applied successfully!');
+            }
+        },
+
+        closeModal: function(e) {
+            if (e.target === e.currentTarget) {
+                $('#ace-ai-suggestions-modal').hide();
+                this.currentModal = null;
+                this.selectedSuggestion = null;
+            }
+        },
+
+        selectSuggestion: function(e) {
+            const $item = $(e.currentTarget);
+            const suggestion = $item.data('suggestion');
+            const type = $item.data('type');
+            
+            console.log('Suggestion clicked:', suggestion, type); // Debug log
+            
+            // Apply suggestion immediately
+            switch (type) {
+                case 'title':
+                    $('#yoast_wpseo_title').val(suggestion).trigger('input');
+                    break;
+                case 'description':
+                    $('#yoast_wpseo_metadesc').val(suggestion).trigger('input');
+                    break;
+                case 'keyword':
+                    $('#yoast_wpseo_focuskw').val(suggestion).trigger('input');
+                    break;
+            }
+            
+            // Close modal
+            this.closeModal({ target: $('#ace-ai-suggestions-modal')[0], currentTarget: $('#ace-ai-suggestions-modal')[0] });
+            
+            // Show success message
+            this.showSuccessMessage('AI suggestion applied successfully!');
+        },
+
+        applySuggestion: function() {
+            console.log('Applying suggestion:', this.selectedSuggestion); // Debug log
+            
+            if (!this.selectedSuggestion) {
+                console.log('No suggestion selected'); // Debug log
+                return;
+            }
+            
+            const { text, type } = this.selectedSuggestion;
+            console.log('Applying:', type, text); // Debug log
+            
+            switch (type) {
+                case 'title':
+                    console.log('Setting title field'); // Debug log
+                    $('#yoast_wpseo_title').val(text).trigger('input');
+                    break;
+                case 'description':
+                    console.log('Setting description field'); // Debug log
+                    $('#yoast_wpseo_metadesc').val(text).trigger('input');
+                    break;
+                case 'keyword':
+                    console.log('Setting keyword field'); // Debug log
+                    $('#yoast_wpseo_focuskw').val(text).trigger('input');
+                    break;
+            }
+            
+            this.closeModal({ target: $('#ace-ai-suggestions-modal')[0], currentTarget: $('#ace-ai-suggestions-modal')[0] });
+            
+            // Show success message
+            this.showSuccessMessage('AI suggestion applied successfully!');
+        },
+
+        setButtonLoading: function($button, loading) {
+            if (loading) {
+                $button.addClass('loading');
+                $button.find('.ace-ai-button-text').hide();
+                $button.find('.ace-ai-loading').show();
+                $button.prop('disabled', true);
+            } else {
+                $button.removeClass('loading');
+                $button.find('.ace-ai-button-text').show();
+                $button.find('.ace-ai-loading').hide();
+                $button.prop('disabled', false);
+            }
+        },
+
+        showAiError: function(message) {
+            const $content = $('#ace-ai-suggestions-content');
+            $content.html(`
+                <div style="text-align: center; padding: 40px 20px;">
+                    <span class="dashicons dashicons-warning" style="font-size: 48px; color: #dc3232; margin-bottom: 16px;"></span>
+                    <h3 style="color: #dc3232; margin-bottom: 8px;">AI Request Failed</h3>
+                    <p style="color: #666;">${this.escapeHtml(message)}</p>
+                    <p style="font-size: 12px; color: #999; margin-top: 16px;">
+                        Make sure your OpenAI API key is configured correctly in the settings.
+                    </p>
+                </div>
+            `);
+            
+            this.showModal('AI Error', '', 'error');
+        },
+
+        showSuccessMessage: function(message) {
+            // Create temporary success notification
+            const $notification = $('<div class="notice notice-success is-dismissible" style="position: fixed; top: 32px; right: 20px; z-index: 100001; min-width: 300px;"><p>' + message + '</p></div>');
+            $('body').append($notification);
+            
+            setTimeout(() => {
+                $notification.fadeOut(() => $notification.remove());
+            }, 3000);
+        },
+
+        escapeHtml: function(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         },
 
         debounce: function(func, wait) {

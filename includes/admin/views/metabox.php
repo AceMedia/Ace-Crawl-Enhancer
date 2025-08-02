@@ -59,22 +59,24 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
     <!-- SEO Tab -->
     <div class="ace-seo-tab-content active" id="tab-general">
         <!-- Focus Keyword -->
+                <!-- Focus Keyword -->
         <div class="ace-seo-field">
             <label for="yoast_wpseo_focuskw" class="ace-seo-label">
-                <strong>Focus Keyword</strong>
-                <span class="ace-seo-help">?</span>
+                Focus Keyword
+                <span class="ace-seo-help" title="The main keyword you want this content to rank for">?</span>
             </label>
-            <input 
-                type="text" 
-                id="yoast_wpseo_focuskw" 
-                name="yoast_wpseo_focuskw" 
-                value="<?php echo esc_attr($focus_keyword); ?>"
-                class="ace-seo-input"
-                placeholder="Enter your focus keyword"
-            >
-            <p class="ace-seo-description">
-                The main keyword you want this content to rank for in search engines.
-            </p>
+            <div class="ace-seo-input-group">
+                <input type="text" 
+                       id="yoast_wpseo_focuskw" 
+                       name="yoast_wpseo_focuskw" 
+                       value="<?php echo esc_attr($focus_keyword); ?>" 
+                       class="ace-seo-input"
+                       placeholder="Enter your focus keyword">
+                <?php echo AceSEOAiAssistant::render_ai_buttons('keyword'); ?>
+            </div>
+            <div class="ace-seo-description">
+                Choose the main keyword you want this content to rank for in search engines.
+            </div>
         </div>
 
         <!-- Google Preview -->
@@ -97,15 +99,18 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                 <strong>SEO Title</strong>
                 <span class="ace-seo-counter" id="title-counter">0 / 60</span>
             </label>
-            <input 
-                type="text" 
-                id="yoast_wpseo_title" 
-                name="yoast_wpseo_title" 
-                value="<?php echo esc_attr($seo_title); ?>"
-                class="ace-seo-input"
-                placeholder="<?php echo esc_attr($post->post_title); ?>"
-                maxlength="60"
-            >
+            <div class="ace-seo-input-group">
+                <input 
+                    type="text" 
+                    id="yoast_wpseo_title" 
+                    name="yoast_wpseo_title" 
+                    value="<?php echo esc_attr($seo_title); ?>"
+                    class="ace-seo-input"
+                    placeholder="<?php echo esc_attr($post->post_title); ?>"
+                    maxlength="60"
+                >
+                <?php echo AceSEOAiAssistant::render_ai_buttons('title'); ?>
+            </div>
             <div class="ace-seo-progress-bar">
                 <div class="ace-seo-progress-fill" id="title-progress"></div>
             </div>
@@ -120,14 +125,19 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                 <strong>Meta Description</strong>
                 <span class="ace-seo-counter" id="description-counter">0 / 160</span>
             </label>
-            <textarea 
-                id="yoast_wpseo_metadesc" 
-                name="yoast_wpseo_metadesc" 
-                class="ace-seo-textarea"
-                placeholder="Enter a compelling description for search engines"
-                maxlength="160"
-                rows="3"
-            ><?php echo esc_textarea($meta_description); ?></textarea>
+            <div class="ace-seo-textarea-group">
+                <textarea 
+                    id="yoast_wpseo_metadesc" 
+                    name="yoast_wpseo_metadesc" 
+                    class="ace-seo-textarea"
+                    placeholder="Enter a compelling description for search engines"
+                    maxlength="160"
+                    rows="3"
+                ><?php echo esc_textarea($meta_description); ?></textarea>
+                <div class="ace-seo-textarea-buttons">
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('description'); ?>
+                </div>
+            </div>
             <div class="ace-seo-progress-bar">
                 <div class="ace-seo-progress-fill" id="description-progress"></div>
             </div>
@@ -165,6 +175,28 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                 <!-- Results will be populated by JavaScript -->
             </div>
         </div>
+
+        <!-- AI Content Analysis -->
+        <?php if (AceSEOAiAssistant::is_ai_available()): ?>
+        <div class="ace-ai-analysis" id="ace-ai-analysis">
+            <h4>
+                <span class="dashicons dashicons-admin-generic"></span>
+                AI Content Analysis
+                <span class="ace-ai-beta-badge">BETA</span>
+            </h4>
+            <p class="ace-seo-description">
+                Get AI-powered insights and suggestions to improve your content's SEO and readability.
+            </p>
+            <div class="ace-ai-actions">
+                <?php echo AceSEOAiAssistant::render_ai_buttons('analysis'); ?>
+                <?php echo AceSEOAiAssistant::render_ai_buttons('improve'); ?>
+                <?php echo AceSEOAiAssistant::render_ai_buttons('topics'); ?>
+            </div>
+            <div class="ace-ai-results" id="ace-ai-analysis-results" style="display: none;">
+                <!-- AI analysis results will be populated here -->
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Readability Tab -->
@@ -551,3 +583,11 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
 <!-- Hidden fields for scores -->
 <input type="hidden" id="yoast_wpseo_linkdex" name="yoast_wpseo_linkdex" value="<?php echo esc_attr(AceCrawlEnhancer::get_meta_value($post_id, 'linkdex')); ?>">
 <input type="hidden" id="yoast_wpseo_content_score" name="yoast_wpseo_content_score" value="<?php echo esc_attr(AceCrawlEnhancer::get_meta_value($post_id, 'content_score')); ?>">
+
+<!-- AI Nonce for AJAX requests -->
+<input type="hidden" id="ace_seo_ai_nonce" value="<?php echo wp_create_nonce('ace_seo_ai_nonce'); ?>">
+
+<?php 
+// Render AI suggestions modal
+AceSEOAiAssistant::render_suggestions_modal(); 
+?>

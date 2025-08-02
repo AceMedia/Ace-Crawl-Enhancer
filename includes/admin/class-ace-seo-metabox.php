@@ -41,6 +41,18 @@ class AceSEOMetabox {
                 'normal',
                 'high'
             );
+            
+            // Add AI Analysis sidebar metabox
+            if ( AceSEOApiHelper::is_ai_enabled() ) {
+                add_meta_box(
+                    'ace-seo-ai-analysis',
+                    'AI Content Analysis',
+                    array( $this, 'render_ai_analysis_metabox' ),
+                    $post_type,
+                    'side',
+                    'default'
+                );
+            }
         }
     }
     
@@ -55,6 +67,74 @@ class AceSEOMetabox {
         include ACE_SEO_PATH . 'includes/admin/views/metabox.php';
     }
     
+    /**
+     * Render the AI Analysis sidebar metabox
+     */
+    public function render_ai_analysis_metabox( $post ) {
+        // Add nonce for AI requests
+        wp_nonce_field( 'ace_seo_ai_nonce', 'ace_seo_ai_nonce_field' );
+        ?>
+        <div id="ace-ai-analysis-sidebar">
+            <div class="ace-ai-analysis-actions">
+                <button type="button" class="button button-primary button-large" id="ace-analyze-all-content" style="width: 100%; margin-bottom: 10px;">
+                    <span class="dashicons dashicons-analytics" style="margin-top: 3px;"></span>
+                    Analyze Content with AI
+                </button>
+                <p class="description">Get comprehensive AI analysis including SEO insights, topic ideas, and content improvements.</p>
+            </div>
+            
+            <!-- Loading State -->
+            <div class="ace-analysis-loading" id="ace-analysis-loading" style="display: none;">
+                <div class="ace-spinner" style="margin: 20px auto; display: block;"></div>
+                <p style="text-align: center; margin: 10px 0;">Analyzing content with AI...</p>
+            </div>
+            
+            <!-- Analysis Results -->
+            <div class="ace-analysis-results" id="ace-analysis-results" style="display: none;">
+                
+                <!-- Content Analysis Section -->
+                <div class="ace-analysis-section" id="ace-content-analysis-section">
+                    <h4 style="margin: 15px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                        <span class="dashicons dashicons-analytics"></span>
+                        Content Analysis
+                    </h4>
+                    <div id="ace-content-analysis-content"></div>
+                </div>
+                
+                <!-- Topic Ideas Section -->
+                <div class="ace-analysis-section" id="ace-topic-ideas-section" style="display: none;">
+                    <h4 style="margin: 15px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                        <span class="dashicons dashicons-lightbulb"></span>
+                        Topic Ideas
+                    </h4>
+                    <div id="ace-topic-ideas-content"></div>
+                </div>
+                
+                <!-- Content Improvements Section -->
+                <div class="ace-analysis-section" id="ace-content-improvements-section" style="display: none;">
+                    <h4 style="margin: 15px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                        <span class="dashicons dashicons-edit"></span>
+                        Improvements
+                    </h4>
+                    <div id="ace-content-improvements-content"></div>
+                </div>
+                
+            </div>
+            
+            <!-- Error State -->
+            <div class="ace-analysis-error" id="ace-analysis-error" style="display: none;">
+                <div style="background: #fff2f2; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                    <span class="dashicons dashicons-warning" style="color: #721c24;"></span>
+                    <span id="ace-analysis-error-message" style="color: #721c24;">Analysis failed</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI Nonce for AJAX requests -->
+        <input type="hidden" id="ace_seo_ai_nonce" value="<?php echo wp_create_nonce('ace_seo_ai_nonce'); ?>">
+        <?php
+    }
+
     /**
      * Save meta fields
      */

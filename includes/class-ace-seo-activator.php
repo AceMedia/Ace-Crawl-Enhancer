@@ -100,6 +100,7 @@ class AceSEOActivator {
                     'ai_content_analysis' => 0,
                     'ai_keyword_suggestions' => 0,
                     'ai_content_optimization' => 0,
+                    'ai_web_search' => 0,
                 ),
                 'performance' => array(
                     'pagespeed_api_key' => '',
