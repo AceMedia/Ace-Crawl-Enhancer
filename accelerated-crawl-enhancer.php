@@ -203,12 +203,10 @@ class AceCrawlEnhancer {
      */
     private function init_hooks() {
         add_action('init', [$this, 'init']);
-        add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
         add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
         add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
         add_action('save_post', [$this, 'save_post_meta']);
         add_action('wp_head', [$this, 'output_head_tags']);
-        add_action('admin_menu', [$this, 'admin_menu']);
         add_action('rest_api_init', [$this, 'register_rest_routes']);
         add_filter('query_vars', [$this, 'add_query_vars']);
         
@@ -425,78 +423,10 @@ class AceCrawlEnhancer {
     }
     
     /**
-     * Admin scripts and styles
-     */
-    public function admin_scripts($hook) {
-        global $post_type;
-        
-        if ($hook === 'post.php' || $hook === 'post-new.php') {
-            wp_enqueue_script(
-                'ace-seo-admin',
-                ACE_SEO_URL . 'assets/js/admin.js',
-                ['jquery', 'wp-api'],
-                ACE_SEO_VERSION,
-                true
-            );
-            
-            wp_enqueue_style(
-                'ace-seo-admin',
-                ACE_SEO_URL . 'assets/css/admin.css',
-                [],
-                ACE_SEO_VERSION
-            );
-            
-            wp_localize_script('ace-seo-admin', 'aceSeoAdmin', [
-                'nonce' => wp_create_nonce('wp_rest'),
-                'restUrl' => rest_url('ace-seo/v1/'),
-                'postId' => get_the_ID(),
-            ]);
-        }
-    }
-    
-    /**
      * Frontend scripts
      */
     public function frontend_scripts() {
         // Frontend scripts if needed
-    }
-    
-    /**
-     * Add admin menu
-     */
-    public function admin_menu() {
-        add_menu_page(
-            'Ace SEO',
-            'Ace SEO',
-            'manage_options',
-            'ace-seo',
-            [$this, 'admin_page'],
-            'dashicons-search',
-            30
-        );
-        
-        add_submenu_page(
-            'ace-seo',
-            'SEO Settings',
-            'Settings',
-            'manage_options',
-            'ace-seo-settings',
-            [$this, 'settings_page']
-        );
-    }
-    
-    /**
-     * Admin page
-     */
-    public function admin_page() {
-        include ACE_SEO_PATH . 'includes/admin/views/dashboard.php';
-    }
-    
-    /**
-     * Settings page
-     */
-    public function settings_page() {
-        include ACE_SEO_PATH . 'includes/admin/views/settings.php';
     }
     
     /**

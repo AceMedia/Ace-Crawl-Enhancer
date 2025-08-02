@@ -177,7 +177,7 @@ class AceSEOMetabox {
         wp_enqueue_media();
         
         // Localize script with data
-        wp_localize_script( 'ace-seo-admin', 'aceSeoData', array(
+        wp_localize_script( 'ace-seo-admin', 'aceSeoAdmin', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
             'nonce' => wp_create_nonce( 'wp_rest' ),
