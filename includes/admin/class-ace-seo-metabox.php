@@ -181,6 +181,7 @@ class AceSEOMetabox {
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
             'nonce' => wp_create_nonce( 'wp_rest' ),
+            'performanceNonce' => wp_create_nonce( 'ace_seo_performance_test' ),
             'postId' => get_the_ID(),
             'strings' => array(
                 'analyzing' => __( 'Analyzing...', 'ace-seo' ),

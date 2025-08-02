@@ -581,3 +581,316 @@
         border: 2px solid #000;
     }
 }
+
+/* PageSpeed/Performance Styles */
+.ace-seo-performance-section h4 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.ace-performance-status {
+    background: #f7f7f7;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.ace-performance-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ace-performance-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ace-performance-icon {
+    font-size: 24px;
+}
+
+.ace-performance-text {
+    font-size: 14px;
+    color: #666;
+    flex: 1;
+    text-align: left;
+}
+
+.ace-performance-results {
+    background: #fff;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.ace-performance-scores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.ace-score-item {
+    text-align: center;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #e1e1e1;
+}
+
+.ace-score-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.ace-score-value {
+    font-size: 24px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.ace-score-value.excellent { color: #0f7b0f; }
+.ace-score-value.good { color: #8b6914; }
+.ace-score-value.ok { color: #d73502; }
+.ace-score-value.poor { color: #c7254e; }
+.ace-score-value.bad { color: #d73502; }
+
+.ace-core-web-vitals h5 {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.ace-cwv-metrics {
+    display: grid;
+    gap: 12px;
+}
+
+.ace-cwv-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e1e1e1;
+}
+
+.ace-cwv-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #23282d;
+}
+
+.ace-cwv-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+}
+
+.ace-cwv-rating {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.ace-cwv-rating.rating-good {
+    background: #d4edda;
+    color: #155724;
+}
+
+.ace-cwv-rating.rating-needs-improvement {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.ace-cwv-rating.rating-poor {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.ace-performance-recommendations h5 {
+    margin: 24px 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.ace-recommendation-item {
+    padding: 16px;
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    background: #fff;
+}
+
+.ace-recommendation-item h6 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.ace-recommendation-item p {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.ace-savings {
+    display: inline-block;
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.ace-performance-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e1e1e1;
+}
+
+.ace-performance-history h5 {
+    margin: 24px 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #23282d;
+}
+
+.ace-performance-timeline {
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    padding: 16px;
+    background: #f9f9f9;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+/* Tab Score Indicators for Performance */
+#ace-performance-score.excellent { 
+    background: #0f7b0f; 
+    color: white; 
+}
+
+#ace-performance-score.good { 
+    background: #8b6914; 
+    color: white; 
+}
+
+#ace-performance-score.ok { 
+    background: #d73502; 
+    color: white; 
+}
+
+#ace-performance-score.poor,
+#ace-performance-score.bad { 
+    background: #c7254e; 
+    color: white; 
+}
+
+/* Responsive Design for Performance Section */
+@media (max-width: 768px) {
+    .ace-performance-scores {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .ace-performance-actions {
+        flex-direction: column;
+    }
+    
+    .ace-cwv-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
+/* Local Development Notice Styles */
+.ace-local-dev-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 20px;
+    margin: 10px 0;
+}
+
+.ace-local-dev-notice h4 {
+    margin: 0 0 12px 0;
+    color: #856404;
+    font-size: 16px;
+}
+
+.ace-local-dev-notice p {
+    margin: 0 0 12px 0;
+    color: #856404;
+    line-height: 1.4;
+}
+
+.ace-local-dev-notice ul {
+    margin: 0 0 16px 20px;
+    color: #856404;
+}
+
+.ace-local-dev-notice li {
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+
+.ace-local-dev-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ace-local-dev-actions .button {
+    background: #856404;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.ace-local-dev-actions .button:hover {
+    background: #6c4e03;
+    color: white;
+}
+
+/* Simulation Notice Styles */
+.ace-simulation-notice {
+    background: #e1f5fe;
+    border: 1px solid #4fc3f7;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.ace-simulation-notice p {
+    margin: 0;
+    color: #0277bd;
+    font-size: 13px;
+}

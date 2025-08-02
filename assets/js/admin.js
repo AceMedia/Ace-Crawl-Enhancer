@@ -12,6 +12,7 @@
             this.initCounters();
             this.initImageSelectors();
             this.initRealTimeAnalysis();
+            this.initPageSpeed();
             this.updatePreviews();
             
             // Initial analysis
@@ -43,6 +44,13 @@
             $('#yoast_wpseo_opengraph-description').on('input', () => this.updateCounter('og-description', 300));
             $('#yoast_wpseo_twitter-title').on('input', () => this.updateCounter('twitter-title', 70));
             $('#yoast_wpseo_twitter-description').on('input', () => this.updateCounter('twitter-description', 200));
+            
+            // PageSpeed events
+            $('#ace-test-performance').on('click', this.testPageSpeed.bind(this));
+            $('#ace-simulate-performance').on('click', () => this.testPageSpeed('mobile', true));
+            $('#ace-test-mobile').on('click', () => this.testPageSpeed('mobile'));
+            $('#ace-test-desktop').on('click', () => this.testPageSpeed('desktop'));
+            $('#ace-view-full-report').on('click', this.viewFullReport.bind(this));
         },
 
         initTabs: function() {
@@ -472,6 +480,224 @@
             return words.join(' ') + (words.length === 25 ? '...' : '');
         },
 
+        // PageSpeed functionality
+        initPageSpeed: function() {
+            this.loadExistingPageSpeedData();
+        },
+
+        loadExistingPageSpeedData: function() {
+            const postId = aceSeoAdmin.postId;
+            if (!postId) return;
+
+            $.ajax({
+                url: aceSeoAdmin.restUrl + 'performance/' + postId,
+                method: 'GET',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', aceSeoAdmin.nonce);
+                },
+                success: (response) => {
+                    this.displayPageSpeedData(response);
+                },
+                error: (xhr) => {
+                    if (xhr.status === 404) {
+                        this.showNoDataMessage();
+                    }
+                }
+            });
+        },
+
+        testPageSpeed: function(strategy = 'mobile', simulate = false) {
+            const $button = simulate ? $('#ace-simulate-performance') : $('#ace-test-performance');
+            const $status = $('#ace-performance-status');
+            
+            // Show loading state
+            $button.prop('disabled', true);
+            if (simulate) {
+                $button.text('Generating...');
+                $status.find('.ace-performance-text').text('Generating sample performance data...');
+            } else {
+                $button.text('Testing...');
+                $status.find('.ace-performance-text').text('Running PageSpeed test...');
+            }
+            
+            const currentUrl = window.location.origin + '/' + $('#post_name').val() || window.location.href;
+            
+            $.ajax({
+                url: aceSeoAdmin.ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'ace_seo_test_pagespeed',
+                    url: currentUrl,
+                    strategy: strategy,
+                    simulate: simulate,
+                    nonce: aceSeoAdmin.performanceNonce
+                },
+                success: (response) => {
+                    if (response.success) {
+                        this.displayPageSpeedData(response.data);
+                        this.updatePerformanceScore(response.data.performance_score);
+                        
+                        if (response.data.is_simulated) {
+                            this.showSimulationNotice(response.data.simulation_note);
+                        }
+                    } else {
+                        if (response.data && response.data.is_local) {
+                            this.showLocalDevelopmentMessage(response.data);
+                        } else {
+                            this.showErrorMessage(response.data.message || 'Test failed');
+                        }
+                    }
+                },
+                error: () => {
+                    this.showErrorMessage('Network error during test');
+                },
+                complete: () => {
+                    $button.prop('disabled', false);
+                    if (simulate) {
+                        $button.text('📊 Simulate Data');
+                    } else {
+                        $button.text('Test Performance');
+                    }
+                }
+            });
+        },
+
+        displayPageSpeedData: function(data) {
+            const $results = $('#ace-performance-results');
+            const $status = $('#ace-performance-status');
+            
+            // Hide status, show results
+            $status.hide();
+            $results.show();
+            
+            // Update scores
+            $('#performance-score').text(data.performance_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.performance_score));
+            $('#accessibility-score').text(data.accessibility_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.accessibility_score));
+            $('#best-practices-score').text(data.best_practices_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.best_practices_score));
+            $('#seo-score').text(data.seo_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.seo_score));
+            
+            // Update Core Web Vitals
+            if (data.core_web_vitals) {
+                const cwv = data.core_web_vitals;
+                
+                if (cwv.lcp) {
+                    $('#lcp-value').text(cwv.lcp.displayValue);
+                    $('#lcp-rating').text(cwv.lcp.rating).attr('class', 'ace-cwv-rating rating-' + cwv.lcp.rating);
+                }
+                
+                if (cwv.fid) {
+                    $('#fid-value').text(cwv.fid.displayValue);
+                    $('#fid-rating').text(cwv.fid.rating).attr('class', 'ace-cwv-rating rating-' + cwv.fid.rating);
+                }
+                
+                if (cwv.cls) {
+                    $('#cls-value').text(cwv.cls.displayValue);
+                    $('#cls-rating').text(cwv.cls.rating).attr('class', 'ace-cwv-rating rating-' + cwv.cls.rating);
+                }
+            }
+            
+            // Update recommendations
+            this.displayRecommendations(data.opportunities || []);
+            
+            // Update tab score
+            this.updatePerformanceScore(data.performance_score);
+        },
+
+        displayRecommendations: function(opportunities) {
+            const $list = $('#performance-recommendations-list');
+            $list.empty();
+            
+            if (opportunities.length === 0) {
+                $list.append('<p>No specific recommendations available.</p>');
+                return;
+            }
+            
+            opportunities.forEach(opportunity => {
+                const savings = opportunity.savings_ms > 1000 
+                    ? Math.round(opportunity.savings_ms / 1000 * 10) / 10 + 's'
+                    : opportunity.savings_ms + 'ms';
+                    
+                $list.append(`
+                    <div class="ace-recommendation-item">
+                        <h6>${opportunity.title}</h6>
+                        <p>${opportunity.description}</p>
+                        <span class="ace-savings">Potential savings: ${savings}</span>
+                    </div>
+                `);
+            });
+        },
+
+        updatePerformanceScore: function(score) {
+            const $scoreElement = $('#ace-performance-score');
+            const scoreClass = this.getScoreClass(score);
+            
+            $scoreElement.text(score + '%').attr('class', 'ace-seo-tab-score ' + scoreClass);
+        },
+
+        getScoreClass: function(score) {
+            if (score >= 90) return 'excellent';
+            if (score >= 70) return 'good';
+            if (score >= 50) return 'ok';
+            if (score >= 30) return 'poor';
+            return 'bad';
+        },
+
+        showNoDataMessage: function() {
+            const $status = $('#ace-performance-status');
+            $status.find('.ace-performance-text').text('No performance data available. Click "Test Performance" to analyze this page.');
+        },
+
+        showErrorMessage: function(message) {
+            const $status = $('#ace-performance-status');
+            $status.find('.ace-performance-text').text('Error: ' + message);
+        },
+
+        showLocalDevelopmentMessage: function(data) {
+            const $status = $('#ace-performance-status');
+            const $results = $('#ace-performance-results');
+            
+            // Hide results, show status with helpful message
+            $results.hide();
+            $status.show();
+            
+            let message = '<div class="ace-local-dev-notice">';
+            message += '<h4>🔧 Local Development Detected</h4>';
+            message += '<p>PageSpeed Insights requires a publicly accessible URL. Here are your options:</p>';
+            message += '<ul>';
+            
+            if (data.suggestions) {
+                data.suggestions.forEach(suggestion => {
+                    message += '<li>' + suggestion + '</li>';
+                });
+            }
+            
+            message += '</ul>';
+            message += '<div class="ace-local-dev-actions">';
+            message += '<button type="button" class="button" onclick="aceShowNgrokInstructions()">📋 Setup ngrok Instructions</button>';
+            message += '<button type="button" class="button" onclick="aceShowLighthouseInstructions()">🚀 Use Lighthouse Locally</button>';
+            message += '</div>';
+            message += '</div>';
+            
+            $status.html(message);
+        },
+
+        showSimulationNotice: function(note) {
+            const $results = $('#ace-performance-results');
+            
+            // Add simulation notice to results
+            const notice = '<div class="ace-simulation-notice">' +
+                          '<p><strong>ℹ️ Simulated Data:</strong> ' + note + '</p>' +
+                          '</div>';
+            
+            $results.prepend(notice);
+        },
+
+        viewFullReport: function() {
+            const currentUrl = window.location.origin + '/' + $('#post_name').val() || window.location.href;
+            const pagespeedUrl = `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(currentUrl)}`;
+            window.open(pagespeedUrl, '_blank');
+        },
+
         debounce: function(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -483,6 +709,45 @@
                 timeout = setTimeout(later, wait);
             };
         }
+    };
+
+    // Global functions for local development help
+    window.aceShowNgrokInstructions = function() {
+        const instructions = `
+🔧 Expose Local Site with ngrok:
+
+1. Install ngrok: https://ngrok.com/download
+2. Run your local server on port 80 or 443
+3. In terminal: ngrok http 80
+4. Copy the public URL (e.g., https://abc123.ngrok.io)
+5. Test that URL in PageSpeed Insights
+6. Use that URL for testing in this plugin
+
+💡 Tip: ngrok free tier has limitations, but works great for testing!
+        `;
+        
+        alert(instructions);
+    };
+
+    window.aceShowLighthouseInstructions = function() {
+        const instructions = `
+🚀 Use Lighthouse Locally:
+
+1. Open Chrome DevTools (F12)
+2. Go to "Lighthouse" tab
+3. Select "Performance" audit
+4. Click "Generate report"
+5. Get Core Web Vitals data instantly!
+
+Alternative - Lighthouse CLI:
+1. npm install -g lighthouse
+2. lighthouse http://localhost:3000 --output html
+3. Open the generated HTML report
+
+💡 This gives you the same metrics as PageSpeed Insights!
+        `;
+        
+        alert(instructions);
     };
 
     // Initialize when DOM is ready

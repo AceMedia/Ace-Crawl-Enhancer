@@ -48,6 +48,11 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                 <span class="ace-seo-tab-icon">⚙️</span>
                 <span class="ace-seo-tab-label">Advanced</span>
             </li>
+            <li class="ace-seo-tab-item" data-tab="performance">
+                <span class="ace-seo-tab-icon">⚡</span>
+                <span class="ace-seo-tab-label">Performance</span>
+                <span class="ace-seo-tab-score" id="ace-performance-score">—</span>
+            </li>
         </ul>
     </div>
 
@@ -437,6 +442,108 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
             <p class="ace-seo-description">
                 Title to use in breadcrumb navigation. Leave empty to use the post title.
             </p>
+        </div>
+    </div>
+
+    <!-- Performance Tab -->
+    <div class="ace-seo-tab-content" id="tab-performance">
+        <div class="ace-seo-performance-section">
+            <h4>Page Performance Analysis</h4>
+            <p class="ace-seo-description">
+                Page performance affects SEO rankings and user experience. Use PageSpeed Insights to analyze and optimize your page.
+            </p>
+            
+            <!-- Performance Status -->
+            <div class="ace-performance-status" id="ace-performance-status">
+                <div class="ace-performance-indicator">
+                    <span class="ace-performance-icon">⚡</span>
+                    <span class="ace-performance-text">No performance data available</span>
+                    <div class="ace-performance-buttons">
+                        <button type="button" class="ace-btn ace-btn-primary" id="ace-test-performance">
+                            Test Performance
+                        </button>
+                        <button type="button" class="ace-btn ace-btn-secondary" id="ace-simulate-performance" title="Generate sample data for local development">
+                            📊 Simulate Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance Results -->
+            <div class="ace-performance-results" id="ace-performance-results" style="display: none;">
+                <div class="ace-performance-scores">
+                    <div class="ace-score-item">
+                        <div class="ace-score-label">Performance</div>
+                        <div class="ace-score-value" id="performance-score">—</div>
+                    </div>
+                    <div class="ace-score-item">
+                        <div class="ace-score-label">Accessibility</div>
+                        <div class="ace-score-value" id="accessibility-score">—</div>
+                    </div>
+                    <div class="ace-score-item">
+                        <div class="ace-score-label">Best Practices</div>
+                        <div class="ace-score-value" id="best-practices-score">—</div>
+                    </div>
+                    <div class="ace-score-item">
+                        <div class="ace-score-label">SEO</div>
+                        <div class="ace-score-value" id="seo-score">—</div>
+                    </div>
+                </div>
+                
+                <!-- Core Web Vitals -->
+                <div class="ace-core-web-vitals">
+                    <h5>Core Web Vitals</h5>
+                    <div class="ace-cwv-metrics">
+                        <div class="ace-cwv-item">
+                            <div class="ace-cwv-label">Largest Contentful Paint (LCP)</div>
+                            <div class="ace-cwv-value" id="lcp-value">—</div>
+                            <div class="ace-cwv-rating" id="lcp-rating"></div>
+                        </div>
+                        <div class="ace-cwv-item">
+                            <div class="ace-cwv-label">First Input Delay (FID)</div>
+                            <div class="ace-cwv-value" id="fid-value">—</div>
+                            <div class="ace-cwv-rating" id="fid-rating"></div>
+                        </div>
+                        <div class="ace-cwv-item">
+                            <div class="ace-cwv-label">Cumulative Layout Shift (CLS)</div>
+                            <div class="ace-cwv-value" id="cls-value">—</div>
+                            <div class="ace-cwv-rating" id="cls-rating"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance Recommendations -->
+                <div class="ace-performance-recommendations">
+                    <h5>Performance Recommendations</h5>
+                    <div id="performance-recommendations-list">
+                        <!-- Recommendations will be populated via JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Performance Actions -->
+                <div class="ace-performance-actions">
+                    <button type="button" class="ace-btn ace-btn-secondary" id="ace-test-mobile">
+                        Test Mobile
+                    </button>
+                    <button type="button" class="ace-btn ace-btn-secondary" id="ace-test-desktop">
+                        Test Desktop
+                    </button>
+                    <button type="button" class="ace-btn ace-btn-link" id="ace-view-full-report">
+                        View Full Report
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Performance History -->
+            <div class="ace-performance-history" id="ace-performance-history">
+                <h5>Performance History</h5>
+                <p class="ace-seo-description">
+                    Track performance changes over time to monitor optimization efforts.
+                </p>
+                <div class="ace-performance-timeline" id="performance-timeline">
+                    <!-- Timeline will be populated via JavaScript -->
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -250,6 +250,8 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard.php';
         }
     }
     
@@ -553,6 +555,26 @@ class AceCrawlEnhancer {
         }
         $total_checks += 10;
         
+        // Include PageSpeed performance data if available
+        $performance_data = get_post_meta($post->ID, '_ace_seo_pagespeed_report', true);
+        if (!empty($performance_data) && isset($performance_data['mobile']['performance_score'])) {
+            $performance_score = $performance_data['mobile']['performance_score'];
+            
+            // Add performance score to SEO calculation (0-20 points based on performance)
+            if ($performance_score >= 90) {
+                $score += 20; // Excellent performance
+            } elseif ($performance_score >= 70) {
+                $score += 15; // Good performance
+            } elseif ($performance_score >= 50) {
+                $score += 10; // Average performance
+            } elseif ($performance_score >= 30) {
+                $score += 5; // Poor performance
+            }
+            // 0 points for very poor performance (< 30)
+            
+            $total_checks += 20;
+        }
+        
         return round(($score / $total_checks) * 100);
     }
     
@@ -626,6 +648,58 @@ class AceCrawlEnhancer {
                 'type' => 'warning',
                 'text' => 'Content is quite short. Consider adding more content for better SEO.',
             ];
+        }
+        
+        // PageSpeed performance recommendations
+        $performance_data = get_post_meta($post->ID, '_ace_seo_pagespeed_report', true);
+        if (!empty($performance_data)) {
+            $mobile_score = $performance_data['mobile']['performance_score'] ?? 0;
+            
+            if ($mobile_score < 30) {
+                $recommendations[] = [
+                    'type' => 'error',
+                    'text' => 'Page performance is very poor (Score: ' . $mobile_score . '%). This severely impacts SEO and user experience.',
+                ];
+            } elseif ($mobile_score < 50) {
+                $recommendations[] = [
+                    'type' => 'warning',
+                    'text' => 'Page performance is poor (Score: ' . $mobile_score . '%). Consider optimizing images and reducing server response time.',
+                ];
+            } elseif ($mobile_score < 70) {
+                $recommendations[] = [
+                    'type' => 'warning',
+                    'text' => 'Page performance could be improved (Score: ' . $mobile_score . '%). This affects SEO rankings.',
+                ];
+            } elseif ($mobile_score >= 90) {
+                $recommendations[] = [
+                    'type' => 'good',
+                    'text' => 'Excellent page performance (Score: ' . $mobile_score . '%)! This positively impacts SEO.',
+                ];
+            }
+            
+            // Core Web Vitals specific recommendations
+            $cwv = $performance_data['mobile']['core_web_vitals'] ?? array();
+            
+            if (isset($cwv['lcp']) && $cwv['lcp']['rating'] === 'poor') {
+                $recommendations[] = [
+                    'type' => 'warning',
+                    'text' => 'Largest Contentful Paint (LCP) is poor: ' . $cwv['lcp']['displayValue'] . '. Optimize images and server response.',
+                ];
+            }
+            
+            if (isset($cwv['fid']) && $cwv['fid']['rating'] === 'poor') {
+                $recommendations[] = [
+                    'type' => 'warning',
+                    'text' => 'First Input Delay (FID) is poor: ' . $cwv['fid']['displayValue'] . '. Reduce JavaScript execution time.',
+                ];
+            }
+            
+            if (isset($cwv['cls']) && $cwv['cls']['rating'] === 'poor') {
+                $recommendations[] = [
+                    'type' => 'warning',
+                    'text' => 'Cumulative Layout Shift (CLS) is high: ' . $cwv['cls']['displayValue'] . '. Set dimensions for images and ads.',
+                ];
+            }
         }
         
         // AI-powered recommendations if available
