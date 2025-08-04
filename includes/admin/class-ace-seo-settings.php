@@ -20,6 +20,7 @@ class AceSEOSettings {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+        add_action( 'wp_ajax_ace_seo_migrate_yoast', array( $this, 'ajax_migrate_yoast_data' ) );
     }
     
     /**
@@ -129,20 +130,97 @@ class AceSEOSettings {
      * Render tools page
      */
     public function render_tools_page() {
-        echo '<div class="wrap">';
-        echo '<h1>Ace SEO Tools</h1>';
-        echo '<div class="card">';
-        echo '<h2>Coming Soon</h2>';
-        echo '<p>Advanced SEO tools and utilities will be available in future updates.</p>';
-        echo '<ul>';
-        echo '<li>Bulk SEO optimization</li>';
-        echo '<li>Content analysis reports</li>';
-        echo '<li>Broken link checker</li>';
-        echo '<li>Redirect manager</li>';
-        echo '<li>SEO audit tool</li>';
-        echo '</ul>';
-        echo '</div>';
-        echo '</div>';
+        // Handle migration request
+        if (isset($_POST['migrate_yoast_data']) && wp_verify_nonce($_POST['_wpnonce'], 'ace_seo_migrate_yoast')) {
+            $migrated = AceCrawlEnhancer::bulk_migrate_yoast_data();
+            echo '<div class="notice notice-success"><p><strong>Migration Complete:</strong> Migrated ' . $migrated . ' fields from Yoast SEO.</p></div>';
+        }
+        
+        ?>
+        <div class="wrap">
+            <h1>Ace SEO Tools</h1>
+            
+            <!-- Migration Tool -->
+            <div class="card">
+                <h2>Data Migration</h2>
+                <h3>Migrate from Yoast SEO</h3>
+                <p>If you have existing Yoast SEO data, you can migrate it to Ace SEO. This will copy your SEO titles, meta descriptions, focus keywords, and other settings while preserving your original Yoast data.</p>
+                
+                <?php
+                global $wpdb;
+                $yoast_posts_count = $wpdb->get_var($wpdb->prepare("
+                    SELECT COUNT(DISTINCT post_id) 
+                    FROM {$wpdb->postmeta} 
+                    WHERE meta_key LIKE %s
+                ", '_yoast_wpseo_%'));
+                
+                $ace_posts_count = $wpdb->get_var($wpdb->prepare("
+                    SELECT COUNT(DISTINCT post_id) 
+                    FROM {$wpdb->postmeta} 
+                    WHERE meta_key LIKE %s
+                ", '_ace_seo_%'));
+                ?>
+                
+                <p><strong>Status:</strong></p>
+                <ul>
+                    <li>Posts with Yoast SEO data: <?php echo $yoast_posts_count; ?></li>
+                    <li>Posts with Ace SEO data: <?php echo $ace_posts_count; ?></li>
+                </ul>
+                
+                <?php if ($yoast_posts_count > 0): ?>
+                    <form method="post" action="">
+                        <?php wp_nonce_field('ace_seo_migrate_yoast'); ?>
+                        <input type="submit" name="migrate_yoast_data" class="button button-primary" value="Migrate Yoast SEO Data" onclick="return confirm('This will migrate SEO data from Yoast to Ace SEO. This is safe and won\'t delete your Yoast data. Continue?');">
+                    </form>
+                <?php else: ?>
+                    <p><em>No Yoast SEO data found to migrate.</em></p>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Coming Soon Tools -->
+            <div class="card">
+                <h2>Coming Soon</h2>
+                <p>Additional SEO tools and utilities will be available in future updates:</p>
+                <ul>
+                    <li>Bulk SEO optimization</li>
+                    <li>Content analysis reports</li>
+                    <li>Broken link checker</li>
+                    <li>Redirect manager</li>
+                    <li>SEO audit tool</li>
+                    <li>Sitemap management</li>
+                    <li>Schema markup tools</li>
+                </ul>
+            </div>
+        </div>
+        
+        <style>
+        .card {
+            max-width: none;
+            margin: 20px 0;
+        }
+        .card h3 {
+            margin-top: 0;
+        }
+        </style>
+        <?php
+    }
+    
+    /**
+     * AJAX handler for Yoast data migration
+     */
+    public function ajax_migrate_yoast_data() {
+        // Security check
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_migrate_yoast')) {
+            wp_send_json_error('Insufficient permissions or invalid nonce');
+            return;
+        }
+        
+        $migrated = AceCrawlEnhancer::bulk_migrate_yoast_data();
+        
+        wp_send_json_success(array(
+            'migrated' => $migrated,
+            'message' => sprintf('Successfully migrated %d SEO fields from Yoast SEO.', $migrated)
+        ));
     }
     
     /**

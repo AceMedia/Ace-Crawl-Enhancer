@@ -976,13 +976,30 @@
         },
 
         showKeywordSuggestions: function(keywords) {
+            console.log('Showing keyword suggestions:', keywords); // Debug log
+            
             let html = '<div class="ace-ai-suggestions-list">';
             
-            keywords.forEach((keyword, index) => {
+            keywords.forEach((keywordData, index) => {
+                // Handle both old format (string) and new format (object)
+                const keyword = typeof keywordData === 'string' ? keywordData : keywordData.keyword;
+                const reason = typeof keywordData === 'object' ? keywordData.reason : (index === 0 ? 'AI recommended best option' : 'Alternative suggestion');
+                const isRecommended = index === 0;
+                
+                // Simple keyword analysis
+                const wordCount = keyword.split(' ').length;
+                const keywordType = wordCount === 1 ? 'Primary' : wordCount <= 3 ? 'Long-tail' : 'Extended';
+                const difficultyLevel = wordCount === 1 ? 'High' : wordCount <= 2 ? 'Medium' : 'Low';
+                
                 html += `
-                    <div class="ace-ai-suggestion-item" data-suggestion="${this.escapeHtml(keyword)}" data-type="keyword">
-                        <div class="ace-ai-suggestion-title">Keyword ${index + 1}</div>
-                        <p class="ace-ai-suggestion-text">${this.escapeHtml(keyword)}</p>
+                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(keyword)}" data-type="keyword">
+                        ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
+                        <div class="ace-ai-suggestion-text">${this.escapeHtml(keyword)}</div>
+                        <div class="ace-ai-suggestion-reason">${this.escapeHtml(reason)}</div>
+                        <div class="ace-ai-suggestion-meta">
+                            <span class="ace-ai-keyword-type">${keywordType} Keyword</span>
+                            <span class="ace-ai-difficulty">Difficulty: ${difficultyLevel}</span>
+                        </div>
                     </div>
                 `;
             });

@@ -34,9 +34,9 @@ define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
 define('ACE_SEO_BASENAME', plugin_basename(__FILE__));
 
-// Yoast compatibility - use same meta prefix for seamless transition
-define('ACE_SEO_META_PREFIX', '_yoast_wpseo_');
-define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_');
+// Plugin-specific meta keys - no longer use Yoast keys for storage
+define('ACE_SEO_META_PREFIX', '_ace_seo_');
+define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibility with existing templates
 
 /**
  * Main plugin class
@@ -182,6 +182,13 @@ class AceCrawlEnhancer {
     ];
     
     /**
+     * Get meta fields array
+     */
+    public static function get_meta_fields() {
+        return self::$meta_fields;
+    }
+    
+    /**
      * Get single instance
      */
     public static function get_instance() {
@@ -204,8 +211,6 @@ class AceCrawlEnhancer {
     private function init_hooks() {
         add_action('init', [$this, 'init']);
         add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
-        add_action('add_meta_boxes', [$this, 'add_meta_boxes']);
-        add_action('save_post', [$this, 'save_post_meta']);
         add_action('wp_head', [$this, 'output_head_tags']);
         add_action('rest_api_init', [$this, 'register_rest_routes']);
         add_filter('query_vars', [$this, 'add_query_vars']);
@@ -218,6 +223,10 @@ class AceCrawlEnhancer {
         add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 50);
         add_action('wp_head', [$this, 'output_meta_description'], 1);
         add_action('wp_head', [$this, 'output_canonical'], 2);
+        
+        // Auto-migrate Yoast data when post is loaded in admin
+        add_action('load-post.php', [$this, 'maybe_migrate_post_data']);
+        add_action('load-post-new.php', [$this, 'maybe_migrate_post_data']);
         add_action('wp_head', [$this, 'output_robots_meta'], 3);
         add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
         add_action('wp_head', [$this, 'output_twitter_tags'], 11);
@@ -332,87 +341,24 @@ class AceCrawlEnhancer {
     }
     
     /**
-     * Add meta boxes
-     */
-    public function add_meta_boxes() {
-        $post_types = get_post_types(['public' => true]);
-        
-        foreach ($post_types as $post_type) {
-            add_meta_box(
-                'ace-seo-metabox',
-                'Ace SEO',
-                [$this, 'render_metabox'],
-                $post_type,
-                'normal',
-                'high'
-            );
-        }
-    }
-    
-    /**
-     * Render meta box
-     */
-    public function render_metabox($post) {
-        wp_nonce_field('ace_seo_metabox', 'ace_seo_metabox_nonce');
-        
-        // Include metabox template
-        include ACE_SEO_PATH . 'includes/admin/views/metabox.php';
-    }
-    
-    /**
-     * Save post meta
-     */
-    public function save_post_meta($post_id) {
-        // Security checks
-        if (!isset($_POST['ace_seo_metabox_nonce']) || 
-            !wp_verify_nonce($_POST['ace_seo_metabox_nonce'], 'ace_seo_metabox')) {
-            return;
-        }
-        
-        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
-            return;
-        }
-        
-        if (!current_user_can('edit_post', $post_id)) {
-            return;
-        }
-        
-        // Save meta fields
-        foreach (self::$meta_fields as $group => $fields) {
-            foreach ($fields as $key => $field) {
-                $form_key = ACE_SEO_FORM_PREFIX . $key;
-                
-                if (isset($_POST[$form_key])) {
-                    $value = $_POST[$form_key];
-                    
-                    // Special handling for checkboxes
-                    if ($field['type'] === 'checkbox') {
-                        $value = $value === 'on' ? 'true' : 'false';
-                    }
-                    
-                    // Special handling for multiselect
-                    if ($field['type'] === 'multiselect' && is_array($value)) {
-                        $value = implode(',', $value);
-                    }
-                    
-                    // Save meta
-                    update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, $value);
-                } else {
-                    // Handle unchecked checkboxes
-                    if ($field['type'] === 'checkbox') {
-                        update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, 'false');
-                    }
-                }
-            }
-        }
-    }
-    
-    /**
-     * Get meta value with fallback to default
+     * Get meta value with fallback to default and Yoast migration
      */
     public static function get_meta_value($post_id, $key) {
+        // First try to get plugin-specific meta
         $value = get_post_meta($post_id, ACE_SEO_META_PREFIX . $key, true);
         
+        // If no plugin meta exists, check for Yoast data and migrate it
+        if (empty($value)) {
+            $yoast_value = get_post_meta($post_id, '_yoast_wpseo_' . $key, true);
+            
+            if (!empty($yoast_value)) {
+                // Migrate Yoast data to plugin meta
+                update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, $yoast_value);
+                $value = $yoast_value;
+            }
+        }
+        
+        // If still empty, try default value
         if (empty($value)) {
             // Find default value
             foreach (self::$meta_fields as $group => $fields) {
@@ -424,6 +370,92 @@ class AceCrawlEnhancer {
         }
         
         return $value;
+    }
+    
+    /**
+     * Migrate Yoast SEO data for a specific post
+     */
+    public static function migrate_yoast_data($post_id) {
+        $migrated_count = 0;
+        
+        foreach (self::$meta_fields as $group => $fields) {
+            foreach ($fields as $key => $field) {
+                // Check if plugin meta already exists
+                $plugin_value = get_post_meta($post_id, ACE_SEO_META_PREFIX . $key, true);
+                
+                if (empty($plugin_value)) {
+                    // Check for Yoast data
+                    $yoast_value = get_post_meta($post_id, '_yoast_wpseo_' . $key, true);
+                    
+                    if (!empty($yoast_value)) {
+                        update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, $yoast_value);
+                        $migrated_count++;
+                    }
+                }
+            }
+        }
+        
+        // Handle special fields
+        $cornerstone = get_post_meta($post_id, '_yoast_wpseo_is_cornerstone', true);
+        if (!empty($cornerstone) && empty(get_post_meta($post_id, ACE_SEO_META_PREFIX . 'is_cornerstone', true))) {
+            update_post_meta($post_id, ACE_SEO_META_PREFIX . 'is_cornerstone', $cornerstone);
+            $migrated_count++;
+        }
+        
+        return $migrated_count;
+    }
+    
+    /**
+     * Bulk migrate all Yoast SEO data
+     */
+    public static function bulk_migrate_yoast_data() {
+        global $wpdb;
+        
+        // Get all posts that have Yoast meta
+        $yoast_posts = $wpdb->get_col($wpdb->prepare("
+            SELECT DISTINCT post_id 
+            FROM {$wpdb->postmeta} 
+            WHERE meta_key LIKE %s
+        ", '_yoast_wpseo_%'));
+        
+        $total_migrated = 0;
+        
+        foreach ($yoast_posts as $post_id) {
+            $migrated = self::migrate_yoast_data($post_id);
+            $total_migrated += $migrated;
+        }
+        
+        return $total_migrated;
+    }
+    
+    /**
+     * Maybe migrate post data when loading post in admin
+     */
+    public function maybe_migrate_post_data() {
+        global $post;
+        
+        if (!is_admin() || !$post || !$post->ID) {
+            return;
+        }
+        
+        // Check if we've already migrated this post recently (to avoid repeated migrations)
+        $migration_check = get_post_meta($post->ID, '_ace_seo_migration_check', true);
+        
+        // If no migration check or it's been more than a day, check for migration
+        if (empty($migration_check) || (time() - $migration_check) > DAY_IN_SECONDS) {
+            $migrated = self::migrate_yoast_data($post->ID);
+            
+            // Mark this post as checked (whether or not anything was migrated)
+            update_post_meta($post->ID, '_ace_seo_migration_check', time());
+            
+            if ($migrated > 0) {
+                add_action('admin_notices', function() use ($migrated) {
+                    echo '<div class="notice notice-info is-dismissible">';
+                    echo '<p><strong>Ace SEO:</strong> Migrated ' . $migrated . ' SEO fields from Yoast SEO for this post.</p>';
+                    echo '</div>';
+                });
+            }
+        }
     }
     
     /**

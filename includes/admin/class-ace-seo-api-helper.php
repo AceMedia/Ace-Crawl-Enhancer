@@ -164,6 +164,28 @@ class AceSEOApiHelper {
     }
     
     /**
+     * Test basic OpenAI connection with a simple prompt
+     */
+    public static function test_basic_openai_connection() {
+        $api_key = self::get_openai_key();
+        
+        if ( empty( $api_key ) ) {
+            return new WP_Error( 'no_api_key', 'OpenAI API key not configured' );
+        }
+        
+        // Simple test prompt
+        $test_prompt = "Say 'Hello, this is a test' in exactly those words.";
+        
+        $result = self::make_openai_request( $test_prompt, 'gpt-3.5-turbo', false );
+        
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+        
+        return 'OpenAI API connection successful. Response: ' . substr( $result, 0, 100 );
+    }
+    
+    /**
      * Get PageSpeed API key from settings
      */
     public static function get_pagespeed_key() {
@@ -207,93 +229,120 @@ class AceSEOApiHelper {
     }
     
     /**
-     * Make OpenAI API request
+     * Make OpenAI API request with model fallback
      */
-    public static function make_openai_request( $prompt, $model = 'gpt-4o-mini', $enable_web_search = false ) {
+    public static function make_openai_request( $prompt, $model = 'gpt-3.5-turbo', $enable_web_search = false ) {
         $api_key = self::get_openai_key();
         
         if ( empty( $api_key ) ) {
             return new WP_Error( 'no_api_key', 'OpenAI API key not configured' );
         }
         
-        $request_body = array(
-            'model' => $model,
-            'messages' => array(
-                array(
-                    'role' => 'user',
-                    'content' => $prompt
-                )
-            ),
-            'max_tokens' => 1000,
-            'temperature' => 0.7,
-        );
+        // Try primary model first, then fallback models
+        $models_to_try = array( $model );
+        if ( $model !== 'gpt-3.5-turbo' ) {
+            $models_to_try[] = 'gpt-3.5-turbo';
+        }
+        if ( ! in_array( 'gpt-4', $models_to_try ) ) {
+            $models_to_try[] = 'gpt-4';
+        }
         
-        // Add web search tool if enabled
-        if ( $enable_web_search ) {
-            $request_body['tools'] = array(
-                array(
-                    'type' => 'web_search'
-                )
+        $last_error = null;
+        
+        foreach ( $models_to_try as $current_model ) {
+            $request_body = array(
+                'model' => $current_model,
+                'messages' => array(
+                    array(
+                        'role' => 'user',
+                        'content' => $enable_web_search ? "Use your knowledge to provide current and relevant information. " . $prompt : $prompt
+                    )
+                ),
+                'max_tokens' => 1000,
+                'temperature' => 0.7,
             );
-        }
-        
-        $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode( $request_body ),
-            'timeout' => 45, // Increased timeout for web search requests
-        ) );
-        
-        if ( is_wp_error( $response ) ) {
-            return $response;
-        }
-        
-        $response_code = wp_remote_retrieve_response_code( $response );
-        
-        // Check for HTTP errors
-        if ( $response_code !== 200 ) {
-            return new WP_Error( 'api_error', 'OpenAI API returned HTTP ' . $response_code );
-        }
-        
-        $body = wp_remote_retrieve_body( $response );
-        $data = json_decode( $body, true );
-        
-        // Check for API errors first
-        if ( isset( $data['error'] ) ) {
-            $error = $data['error'];
-            $error_type = $error['type'] ?? 'unknown';
-            $error_message = $error['message'] ?? 'OpenAI API error';
             
-            // Provide user-friendly error messages
-            switch ( $error_type ) {
-                case 'insufficient_quota':
-                    $friendly_message = 'OpenAI quota exceeded. Please add billing details at https://platform.openai.com/settings/organization/billing';
-                    break;
-                case 'invalid_api_key':
-                    $friendly_message = 'Invalid OpenAI API key. Please check your key in the settings.';
-                    break;
-                case 'model_not_found':
-                    $friendly_message = 'AI model not available. Please try again later.';
-                    break;
-                case 'rate_limit_exceeded':
-                    $friendly_message = 'Too many requests. Please wait a moment and try again.';
-                    break;
-                default:
-                    $friendly_message = 'OpenAI API error: ' . $error_message;
+            $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+                'headers' => array(
+                    'Authorization' => 'Bearer ' . $api_key,
+                    'Content-Type' => 'application/json',
+                ),
+                'body' => json_encode( $request_body ),
+                'timeout' => 45,
+            ) );
+            
+            if ( is_wp_error( $response ) ) {
+                $last_error = $response;
+                continue; // Try next model
             }
             
-            return new WP_Error( 'api_error', $friendly_message );
+            $response_code = wp_remote_retrieve_response_code( $response );
+            
+            if ( $response_code !== 200 ) {
+                $body = wp_remote_retrieve_body( $response );
+                $error_data = json_decode( $body, true );
+                
+                // If it's a model not found error, try the next model
+                if ( isset( $error_data['error']['type'] ) && $error_data['error']['type'] === 'model_not_found' ) {
+                    continue;
+                }
+                
+                // Get detailed error information
+                if ( isset( $error_data['error']['message'] ) ) {
+                    $last_error = new WP_Error( 'api_error', 'OpenAI API error: ' . $error_data['error']['message'] );
+                } else {
+                    $last_error = new WP_Error( 'api_error', 'OpenAI API returned HTTP ' . $response_code );
+                }
+                continue; // Try next model
+            }
+            
+            $body = wp_remote_retrieve_body( $response );
+            $data = json_decode( $body, true );
+            
+            // Check for API errors
+            if ( isset( $data['error'] ) ) {
+                $error = $data['error'];
+                $error_type = $error['type'] ?? 'unknown';
+                $error_message = $error['message'] ?? 'OpenAI API error';
+                
+                // If it's a model not found error, try the next model
+                if ( $error_type === 'model_not_found' ) {
+                    continue;
+                }
+                
+                // Provide user-friendly error messages
+                switch ( $error_type ) {
+                    case 'insufficient_quota':
+                        $friendly_message = 'OpenAI quota exceeded. Please add billing details at https://platform.openai.com/settings/organization/billing';
+                        break;
+                    case 'invalid_api_key':
+                        $friendly_message = 'Invalid OpenAI API key. Please check your key in the settings.';
+                        break;
+                    case 'rate_limit_exceeded':
+                        $friendly_message = 'Too many requests. Please wait a moment and try again.';
+                        break;
+                    default:
+                        $friendly_message = 'OpenAI API error: ' . $error_message;
+                }
+                
+                $last_error = new WP_Error( 'api_error', $friendly_message );
+                continue; // Try next model
+            }
+            
+            if ( isset( $data['choices'][0]['message']['content'] ) ) {
+                return $data['choices'][0]['message']['content'];
+            }
+            
+            // If we got here, the response was successful but malformed
+            $last_error = new WP_Error( 'api_error', 'Invalid API response format' );
         }
         
-        if ( isset( $data['choices'][0]['message']['content'] ) ) {
-            return $data['choices'][0]['message']['content'];
+        // If we tried all models and none worked, return the last error
+        if ( $last_error ) {
+            return $last_error;
         }
         
-        // Log the actual response for debugging
-        error_log( 'ACE SEO: Invalid OpenAI API response: ' . print_r( $data, true ) );
-        return new WP_Error( 'api_error', 'Invalid API response: ' . ( isset( $data ) ? json_encode( $data ) : 'No response data' ) );
+        return new WP_Error( 'api_error', 'All AI models failed to respond' );
     }
     
     /**
@@ -374,7 +423,7 @@ class AceSEOApiHelper {
             $prompt .= "Put the BEST title first. Keep reasons to one short sentence. Return ONLY the JSON, nothing else.";
         }
         
-        $response = self::make_openai_request( $prompt, 'gpt-4o-mini', $enable_search );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
         
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -492,7 +541,7 @@ class AceSEOApiHelper {
             $prompt .= "Put the BEST description first. Keep reasons to one short sentence. Return ONLY the JSON, nothing else.";
         }
         
-        $response = self::make_openai_request( $prompt, 'gpt-4o-mini', $enable_search );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
         
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -607,7 +656,7 @@ class AceSEOApiHelper {
             $prompt .= "And so on for each category. Keep suggestions specific and actionable.";
         }
         
-        $response = self::make_openai_request( $prompt, 'gpt-4o-mini', $enable_search );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
         
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -650,7 +699,7 @@ class AceSEOApiHelper {
         
         // Enable web search if setting is enabled and focus keyword is provided
         $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
-        $response = self::make_openai_request( $prompt, 'gpt-4o-mini', $enable_search );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
         
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -691,7 +740,7 @@ class AceSEOApiHelper {
         
         // Enable web search if setting is enabled and focus keyword is provided
         $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
-        $response = self::make_openai_request( $prompt, 'gpt-4o-mini', $enable_search );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
         
         if ( is_wp_error( $response ) ) {
             return $response;
@@ -826,6 +875,165 @@ class AceSEOApiHelper {
         }
         
         return $suggestions;
+    }
+    
+    /**
+     * Generate keyword suggestions with reasons (similar to titles/descriptions format)
+     */
+    public static function generate_keyword_suggestions( $post_content, $post_title = '' ) {
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $prompt = "Based on this content, suggest 5 potential focus keywords for SEO optimization:\n\n";
+        if ( ! empty( $post_title ) ) {
+            $prompt .= "Title: " . $post_title . "\n";
+        }
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        
+        $prompt .= "Analyze the content and suggest keywords that:\n";
+        $prompt .= "- Match the content's main topic and intent\n";
+        $prompt .= "- Have good search volume potential\n";
+        $prompt .= "- Are not too competitive for ranking\n";
+        $prompt .= "- Include a mix of primary and long-tail keywords\n";
+        $prompt .= "- Are commercially viable if applicable\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format (no markdown, no code blocks):\n";
+        $prompt .= '{"keywords":[{"keyword":"Best keyword here","reason":"Brief explanation of why this is the top choice"},{"keyword":"Second keyword","reason":"Brief explanation"},{"keyword":"Third keyword","reason":"Brief explanation"},{"keyword":"Fourth keyword","reason":"Brief explanation"},{"keyword":"Fifth keyword","reason":"Brief explanation"}]}' . "\n\n";
+        $prompt .= "Put the BEST keyword first based on SEO potential. Keep reasons to one short sentence. Return ONLY the JSON, nothing else.";
+        
+        // Enable web search if setting is enabled
+        $enable_search = self::is_ai_web_search_enabled();
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        // Clean the response - remove any markdown formatting
+        $response = trim( $response );
+        // Find the JSON object - look for first { and last }
+        $start = strpos( $response, '{' );
+        $end = strrpos( $response, '}' );
+        if ( $start !== false && $end !== false && $end > $start ) {
+            $response = substr( $response, $start, $end - $start + 1 );
+        }
+        $response = trim( $response );
+        
+        // Parse JSON response
+        $data = json_decode( $response, true );
+        
+        if ( json_last_error() !== JSON_ERROR_NONE || ! isset( $data['keywords'] ) ) {
+            // Fallback: try to extract keywords from malformed response
+            $fallback_keywords = self::extract_keywords_fallback( $response, $post_content );
+            if ( ! empty( $fallback_keywords ) ) {
+                return $fallback_keywords;
+            }
+            
+            // Final fallback: generate simple keywords based on content analysis
+            return self::generate_simple_keywords( $post_content, $post_title );
+        }
+        
+        // Ensure we have valid keyword structures
+        $valid_keywords = array();
+        foreach ( $data['keywords'] as $keyword_data ) {
+            if ( isset( $keyword_data['keyword'] ) && isset( $keyword_data['reason'] ) ) {
+                $valid_keywords[] = array(
+                    'keyword' => $keyword_data['keyword'],
+                    'reason' => $keyword_data['reason']
+                );
+            }
+        }
+        
+        // Limit to 5 keywords
+        return array_slice( $valid_keywords, 0, 5 );
+    }
+    
+    /**
+     * Extract keywords fallback when JSON parsing fails
+     */
+    private static function extract_keywords_fallback( $response, $post_content ) {
+        $keywords = array();
+        
+        // Try to find keyword patterns in the response
+        $lines = explode( "\n", $response );
+        $count = 0;
+        
+        foreach ( $lines as $line ) {
+            $line = trim( $line );
+            
+            // Skip empty lines and JSON artifacts
+            if ( empty( $line ) || strpos( $line, '{' ) !== false || strpos( $line, '}' ) !== false ) {
+                continue;
+            }
+            
+            // Look for various keyword patterns
+            if ( preg_match( '/^(\d+\.?\s*)?([^-:]+?)[\s-:]+(.+)$/', $line, $matches ) ) {
+                $keywords[] = array(
+                    'keyword' => trim( $matches[2] ),
+                    'reason' => trim( $matches[3] )
+                );
+                $count++;
+            } elseif ( ! empty( $line ) && $count < 5 ) {
+                // Simple keyword without reason
+                $keywords[] = array(
+                    'keyword' => $line,
+                    'reason' => 'Relevant to content topic'
+                );
+                $count++;
+            }
+            
+            if ( $count >= 5 ) {
+                break;
+            }
+        }
+        
+        return $keywords;
+    }
+    
+    /**
+     * Generate simple keywords as final fallback
+     */
+    private static function generate_simple_keywords( $post_content, $post_title = '' ) {
+        $keywords = array();
+        
+        // Extract potential keywords from title and content
+        $text = $post_title . ' ' . strip_tags( $post_content );
+        $words = str_word_count( strtolower( $text ), 1 );
+        
+        // Filter out common words
+        $stop_words = array( 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'this', 'that', 'these', 'those', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'cannot', 'not' );
+        $words = array_diff( $words, $stop_words );
+        
+        // Count word frequency
+        $word_counts = array_count_values( $words );
+        arsort( $word_counts );
+        
+        $top_words = array_slice( array_keys( $word_counts ), 0, 3 );
+        
+        foreach ( $top_words as $word ) {
+            if ( strlen( $word ) > 3 ) { // Only words longer than 3 characters
+                $keywords[] = array(
+                    'keyword' => $word,
+                    'reason' => 'Frequently mentioned in content'
+                );
+            }
+        }
+        
+        // Add some generic keywords if we don't have enough
+        while ( count( $keywords ) < 5 ) {
+            $generic_keywords = array(
+                array( 'keyword' => 'main topic', 'reason' => 'Primary subject matter' ),
+                array( 'keyword' => 'guide', 'reason' => 'Educational content' ),
+                array( 'keyword' => 'tips', 'reason' => 'Helpful information' ),
+                array( 'keyword' => 'best practices', 'reason' => 'Expert advice' ),
+                array( 'keyword' => 'how to', 'reason' => 'Instructional content' )
+            );
+            
+            $keywords[] = $generic_keywords[ count( $keywords ) ];
+        }
+        
+        return array_slice( $keywords, 0, 5 );
     }
 }
 

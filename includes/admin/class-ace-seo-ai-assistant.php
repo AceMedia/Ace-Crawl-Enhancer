@@ -43,12 +43,18 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI suggestions' );
         }
         
+        // Debug logging
+        error_log( 'ACE SEO: Generating titles for keyword: ' . $focus_keyword );
+        error_log( 'ACE SEO: Content length: ' . strlen( $post_content ) );
+        
         $titles = AceSEOApiHelper::generate_seo_titles( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $titles ) ) {
+            error_log( 'ACE SEO: Title generation error: ' . $titles->get_error_message() );
             wp_send_json_error( $titles->get_error_message() );
         }
         
+        error_log( 'ACE SEO: Successfully generated ' . count( $titles ) . ' titles' );
         wp_send_json_success( array( 'titles' => $titles ) );
     }
     
@@ -70,12 +76,17 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI suggestions' );
         }
         
+        // Debug logging
+        error_log( 'ACE SEO: Generating descriptions for keyword: ' . $focus_keyword );
+        
         $descriptions = AceSEOApiHelper::generate_meta_descriptions( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $descriptions ) ) {
+            error_log( 'ACE SEO: Description generation error: ' . $descriptions->get_error_message() );
             wp_send_json_error( $descriptions->get_error_message() );
         }
         
+        error_log( 'ACE SEO: Successfully generated ' . count( $descriptions ) . ' descriptions' );
         wp_send_json_success( array( 'descriptions' => $descriptions ) );
     }
     
@@ -176,23 +187,17 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for keyword suggestions' );
         }
         
-        $prompt = "Based on this content, suggest 5 potential focus keywords for SEO:\n\n";
-        $prompt .= "Title: " . $current_title . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
-        $prompt .= "Provide keywords in order of SEO potential:\n";
-        $prompt .= "1. Best primary keyword (1-3 words)\n";
-        $prompt .= "2-5. Alternative keywords (mix of short and long-tail)\n\n";
-        $prompt .= "Return ONLY the keywords, one per line, without numbering.";
+        // Debug logging
+        error_log( 'ACE SEO: Generating keywords for content length: ' . strlen( $post_content ) );
         
-        $response = AceSEOApiHelper::make_openai_request( $prompt );
+        $keywords = AceSEOApiHelper::generate_keyword_suggestions( $post_content, $current_title );
         
-        if ( is_wp_error( $response ) ) {
-            wp_send_json_error( $response->get_error_message() );
+        if ( is_wp_error( $keywords ) ) {
+            error_log( 'ACE SEO: Keyword generation error: ' . $keywords->get_error_message() );
+            wp_send_json_error( $keywords->get_error_message() );
         }
         
-        $keywords = array_filter( array_map( 'trim', explode( "\n", $response ) ) );
-        $keywords = array_slice( $keywords, 0, 5 );
-        
+        error_log( 'ACE SEO: Successfully generated ' . count( $keywords ) . ' keywords' );
         wp_send_json_success( array( 'keywords' => $keywords ) );
     }
     

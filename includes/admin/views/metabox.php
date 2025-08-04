@@ -9,7 +9,7 @@ $focus_keyword = AceCrawlEnhancer::get_meta_value($post_id, 'focuskw');
 $seo_title = AceCrawlEnhancer::get_meta_value($post_id, 'title');
 $meta_description = AceCrawlEnhancer::get_meta_value($post_id, 'metadesc');
 $canonical = AceCrawlEnhancer::get_meta_value($post_id, 'canonical');
-$is_cornerstone = AceCrawlEnhancer::get_meta_value($post_id, 'is_cornerstone') === 'true';
+$is_cornerstone = AceCrawlEnhancer::get_meta_value($post_id, 'is_cornerstone') === '1';
 
 // Social meta
 $og_title = AceCrawlEnhancer::get_meta_value($post_id, 'opengraph-title');

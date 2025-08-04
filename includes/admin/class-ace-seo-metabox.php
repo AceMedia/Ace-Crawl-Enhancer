@@ -156,18 +156,14 @@ class AceSEOMetabox {
         // Get meta fields from main class
         $meta_fields = AceCrawlEnhancer::get_meta_fields();
         
-        // Save each meta field
-        foreach ( $meta_fields as $field_key => $field_config ) {
-            $meta_key = '_yoast_wpseo_' . $field_key;
-            $input_name = 'yoast_wpseo_' . str_replace( '_', '-', $field_key );
-            
-            if ( isset( $_POST[ $input_name ] ) ) {
-                $value = $_POST[ $input_name ];
+        // Save each meta field using plugin-specific keys
+        foreach ( $meta_fields as $group => $fields ) {
+            foreach ( $fields as $field_key => $field_config ) {
+                $input_name = 'yoast_wpseo_' . $field_key;
                 
-                // Handle arrays (like advanced robots settings)
-                if ( is_array( $value ) ) {
-                    $value = implode( ',', array_map( 'sanitize_text_field', $value ) );
-                } else {
+                if ( isset( $_POST[ $input_name ] ) ) {
+                    $value = $_POST[ $input_name ];
+                    
                     // Sanitize based on field type
                     switch ( $field_config['type'] ) {
                         case 'url':
@@ -177,20 +173,27 @@ class AceSEOMetabox {
                             $value = sanitize_textarea_field( $value );
                             break;
                         case 'checkbox':
-                            $value = $value ? '1' : '0';
+                            $value = ($value === 'on' || $value === '1' || $value === 'true') ? '1' : '0';
+                            break;
+                        case 'multiselect':
+                            if ( is_array( $value ) ) {
+                                $value = implode( ',', array_map( 'sanitize_text_field', $value ) );
+                            } else {
+                                $value = sanitize_text_field( $value );
+                            }
                             break;
                         default:
                             $value = sanitize_text_field( $value );
                             break;
                     }
-                }
-                
-                // Save the meta value
-                update_post_meta( $post_id, $meta_key, $value );
-            } else {
-                // Handle unchecked checkboxes
-                if ( $field_config['type'] === 'checkbox' ) {
-                    update_post_meta( $post_id, $meta_key, '0' );
+                    
+                    // Save to plugin-specific meta key
+                    update_post_meta( $post_id, '_ace_seo_' . $field_key, $value );
+                } else {
+                    // Handle unchecked checkboxes
+                    if ( $field_config['type'] === 'checkbox' ) {
+                        update_post_meta( $post_id, '_ace_seo_' . $field_key, '0' );
+                    }
                 }
             }
         }
@@ -205,17 +208,15 @@ class AceSEOMetabox {
     private function handle_special_fields( $post_id ) {
         // Handle cornerstone content
         if ( isset( $_POST['yoast_wpseo_is_cornerstone'] ) ) {
-            update_post_meta( $post_id, '_yoast_wpseo_is_cornerstone', 'true' );
+            update_post_meta( $post_id, '_ace_seo_is_cornerstone', '1' );
         } else {
-            update_post_meta( $post_id, '_yoast_wpseo_is_cornerstone', 'false' );
+            update_post_meta( $post_id, '_ace_seo_is_cornerstone', '0' );
         }
         
-        // Handle advanced robots settings
+        // Handle advanced robots settings (if they come as array)
         if ( isset( $_POST['yoast_wpseo_meta-robots-adv'] ) && is_array( $_POST['yoast_wpseo_meta-robots-adv'] ) ) {
             $robots_adv = array_map( 'sanitize_text_field', $_POST['yoast_wpseo_meta-robots-adv'] );
-            update_post_meta( $post_id, '_yoast_wpseo_meta-robots-adv', implode( ',', $robots_adv ) );
-        } else {
-            update_post_meta( $post_id, '_yoast_wpseo_meta-robots-adv', '' );
+            update_post_meta( $post_id, '_ace_seo_meta-robots-adv', implode( ',', $robots_adv ) );
         }
     }
     
