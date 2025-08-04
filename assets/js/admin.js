@@ -22,7 +22,7 @@
             
             // Initial analysis
             setTimeout(() => {
-                this.performSeoAnalysis();
+                this.performClientSideAnalysis(); // Use client-side for immediate feedback
                 this.performReadabilityAnalysis();
             }, 1000);
         },
@@ -31,23 +31,37 @@
             // Tab switching
             $(document).on('click', '.ace-seo-tab-item', this.switchTab);
             
-            // Real-time updates
-            $('#yoast_wpseo_title, #yoast_wpseo_metadesc, #yoast_wpseo_focuskw').on('input', this.debounce(this.updateAnalysis.bind(this), 500));
+            // Real-time SEO analysis - only for title and meta description with longer debounce
+            $('#yoast_wpseo_title, #yoast_wpseo_metadesc').on('input', this.debounce(this.updateSeoAnalysisOnly.bind(this), 1500));
             
-            // Preview updates
+            // Also trigger analysis on focus to ensure it runs
+            $('#yoast_wpseo_title, #yoast_wpseo_metadesc').on('focus', this.updateSeoAnalysisOnly.bind(this));
+            
+            // Force analysis on page ready
+            $(document).ready(() => {
+                setTimeout(() => {
+                    this.performClientSideAnalysis();
+                }, 500);
+            });
+            
+            // Preview updates - these should remain responsive
             $('#yoast_wpseo_title').on('input', this.updateGooglePreview.bind(this));
             $('#yoast_wpseo_metadesc').on('input', this.updateGooglePreview.bind(this));
             
-            // Listen for post title changes to update previews
+            // Listen for post title changes to update previews and counters
             $('#title, .editor-post-title__input, input[name="post_title"]').on('input', this.debounce(() => {
                 this.updateGooglePreview();
                 this.updateFacebookPreview();
                 this.updateTwitterPreview();
+                // Update counters since title template might change
+                this.updateCounter('title', 60);
             }, 300));
             
-            // Listen for content changes to update meta description placeholder
+            // Listen for content changes to update meta description placeholder and counter
             $(document).on('input', '#content, .editor-rich-text__tinymce, .wp-block-post-content', this.debounce(() => {
                 this.updateMetaDescriptionPlaceholder();
+                // Update counter since meta description placeholder might change
+                this.updateCounter('description', 160);
             }, 500));
             
             // Social preview updates
@@ -154,11 +168,46 @@
             
             if (!$input.length || !$counter.length) return;
             
-            const currentLength = $input.val().length;
+            let currentLength = $input.val().length;
+            let displayText = currentLength + ' / ' + maxLength;
+            
+            // For main SEO title and description, show effective length if field is empty
+            if (field === 'title' && currentLength === 0) {
+                const postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
+                
+                if (aceSeoAdmin.titleTemplate) {
+                    const effectiveTitle = this.processTemplate(aceSeoAdmin.titleTemplate, {
+                        title: postTitle,
+                        site_name: aceSeoAdmin.siteName,
+                        sep: aceSeoAdmin.separator,
+                        excerpt: this.getExcerpt()
+                    });
+                    currentLength = effectiveTitle.length;
+                    displayText = '0 (' + currentLength + ') / ' + maxLength;
+                } else {
+                    currentLength = postTitle.length;
+                    displayText = '0 (' + currentLength + ') / ' + maxLength;
+                }
+            } else if (field === 'description' && currentLength === 0) {
+                const excerpt = this.getExcerpt();
+                let effectiveDesc = '';
+                
+                if (excerpt) {
+                    effectiveDesc = excerpt;
+                } else if (aceSeoAdmin.postContent) {
+                    effectiveDesc = aceSeoAdmin.postContent + '...';
+                }
+                
+                if (effectiveDesc) {
+                    currentLength = effectiveDesc.length;
+                    displayText = '0 (' + currentLength + ') / ' + maxLength;
+                }
+            }
+            
             const percentage = (currentLength / maxLength) * 100;
             
             // Update counter text
-            $counter.text(currentLength + ' / ' + maxLength);
+            $counter.text(displayText);
             
             // Update counter color
             $counter.removeClass('warning error');
@@ -232,27 +281,164 @@
             this.updatePreviews();
         },
 
+        // New method for SEO-only updates (no readability analysis)
+        updateSeoAnalysisOnly: function() {
+            // Always use client-side analysis for real-time updates
+            this.performClientSideAnalysis();
+            this.updatePreviews();
+        },
+
         performSeoAnalysis: function() {
-            const postId = aceSeoAdmin.postId;
+            // Always use client-side analysis for consistency
+            console.log('performSeoAnalysis called - using client-side analysis');
+            this.performClientSideAnalysis();
+        },
+
+        performClientSideAnalysis: function() {
+            $('.ace-seo-analysis-loading').hide();
             
-            if (!postId) return;
+            // Get actual field values
+            const titleFieldValue = $('#yoast_wpseo_title').val() || '';
+            const metaDescFieldValue = $('#yoast_wpseo_metadesc').val() || '';
             
-            $('.ace-seo-analysis-loading').show();
-            $('.ace-seo-analysis-results').hide();
-            
-            $.ajax({
-                url: aceSeoAdmin.restUrl + 'analyze/' + postId,
-                method: 'GET',
-                beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', aceSeoAdmin.nonce);
-                },
-                success: (data) => {
-                    this.displaySeoResults(data);
-                },
-                error: (xhr, status, error) => {
-                    console.error('SEO Analysis Error:', error);
-                    this.displaySeoError();
+            // Calculate effective title (what would actually be displayed)
+            let effectiveTitle = titleFieldValue;
+            if (!titleFieldValue) {
+                // Get post title from multiple sources
+                const postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
+                
+                // Use template system if available
+                if (aceSeoAdmin.titleTemplate) {
+                    effectiveTitle = this.processTemplate(aceSeoAdmin.titleTemplate, {
+                        title: postTitle,
+                        site_name: aceSeoAdmin.siteName,
+                        sep: aceSeoAdmin.separator,
+                        excerpt: this.getExcerpt()
+                    });
+                } else {
+                    effectiveTitle = postTitle;
                 }
+            }
+            
+            // Calculate effective meta description (what would actually be displayed)
+            let effectiveMetaDesc = metaDescFieldValue;
+            if (!metaDescFieldValue) {
+                // Use excerpt/content as placeholder
+                const excerpt = this.getExcerpt();
+                if (excerpt) {
+                    effectiveMetaDesc = excerpt;
+                } else if (aceSeoAdmin.postContent) {
+                    effectiveMetaDesc = aceSeoAdmin.postContent + '...';
+                } else {
+                    effectiveMetaDesc = '';
+                }
+            }
+            
+            console.log('Client-side analysis - Title field:', titleFieldValue, 'Effective title:', effectiveTitle, 'Length:', effectiveTitle.length);
+            console.log('Client-side analysis - Meta field:', metaDescFieldValue, 'Effective meta:', effectiveMetaDesc, 'Length:', effectiveMetaDesc.length);
+            
+            const recommendations = [];
+            let score = 100;
+            
+            // Title analysis - use effective title for length calculations
+            if (!titleFieldValue && effectiveTitle.length === 0) {
+                recommendations.push({
+                    type: 'warning',
+                    text: 'SEO title is empty. Add a title to improve your SEO.'
+                });
+                score -= 20;
+            } else if (effectiveTitle.length > 60) {
+                if (titleFieldValue) {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'SEO title is too long. Keep it under 60 characters.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Generated SEO title is too long (' + effectiveTitle.length + ' chars). Consider setting a custom title.'
+                    });
+                }
+                score -= 10;
+            } else if (effectiveTitle.length < 30) {
+                if (titleFieldValue) {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'SEO title is quite short. Consider adding more descriptive words.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Generated SEO title is short (' + effectiveTitle.length + ' chars). Consider setting a custom title.'
+                    });
+                }
+                score -= 5;
+            } else {
+                if (titleFieldValue) {
+                    recommendations.push({
+                        type: 'good',
+                        text: 'SEO title length is good.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'good',
+                        text: 'Generated SEO title length is good (' + effectiveTitle.length + ' chars).'
+                    });
+                }
+            }
+            
+            // Meta description analysis - use effective meta description for length calculations
+            if (!metaDescFieldValue && effectiveMetaDesc.length === 0) {
+                recommendations.push({
+                    type: 'warning',
+                    text: 'Meta description is empty. Add a description to improve your SEO.'
+                });
+                score -= 15;
+            } else if (effectiveMetaDesc.length > 160) {
+                if (metaDescFieldValue) {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Meta description is too long. Keep it under 160 characters.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Generated meta description is too long (' + effectiveMetaDesc.length + ' chars). Consider setting a custom description.'
+                    });
+                }
+                score -= 10;
+            } else if (effectiveMetaDesc.length < 120) {
+                if (metaDescFieldValue) {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Meta description is quite short. Consider adding more details.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'warning',
+                        text: 'Generated meta description is short (' + effectiveMetaDesc.length + ' chars). Consider setting a custom description.'
+                    });
+                }
+                score -= 5;
+            } else {
+                if (metaDescFieldValue) {
+                    recommendations.push({
+                        type: 'good',
+                        text: 'Meta description length is good.'
+                    });
+                } else {
+                    recommendations.push({
+                        type: 'good',
+                        text: 'Generated meta description length is good (' + effectiveMetaDesc.length + ' chars).'
+                    });
+                }
+            }
+            
+            console.log('Client-side analysis results:', {seo_score: Math.max(0, score), recommendations: recommendations});
+            
+            this.displaySeoResults({
+                seo_score: Math.max(0, score),
+                recommendations: recommendations
             });
         },
 

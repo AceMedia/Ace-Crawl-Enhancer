@@ -119,7 +119,18 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
             </p>
         </div>
 
-        <!-- Meta Description -->
+<?php
+// Helper function to create safe placeholder text under character limit
+function ace_seo_safe_placeholder($content, $max_chars = 155) {
+    $trimmed = wp_trim_words(strip_tags($content), 15); // Use fewer words
+    if (strlen($trimmed) > $max_chars) {
+        $trimmed = substr($trimmed, 0, $max_chars - 3) . '...';
+    }
+    return $trimmed;
+}
+?>
+
+<!-- Meta Description -->
         <div class="ace-seo-field">
             <label for="yoast_wpseo_metadesc" class="ace-seo-label">
                 <strong>Meta Description</strong>
@@ -130,7 +141,7 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                     id="yoast_wpseo_metadesc" 
                     name="yoast_wpseo_metadesc" 
                     class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr(wp_trim_words(strip_tags($post->post_content), 25)); ?>"
+                    placeholder="<?php echo esc_attr(ace_seo_safe_placeholder($post->post_content, 155)); ?>"
                     maxlength="160"
                     rows="3"
                 ><?php echo esc_textarea($meta_description); ?></textarea>
@@ -166,7 +177,7 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
 
         <!-- SEO Analysis -->
         <div class="ace-seo-analysis" id="ace-seo-analysis">
-            <h4>SEO Analysis</h4>
+            <h4>SEO Analysis <button type="button" onclick="AceSeo.performClientSideAnalysis()" style="font-size: 10px; margin-left: 10px;">Test Analysis</button></h4>
             <div class="ace-seo-analysis-loading">
                 <span class="ace-seo-spinner"></span>
                 Analyzing content...
@@ -275,7 +286,7 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                     id="yoast_wpseo_opengraph-description" 
                     name="yoast_wpseo_opengraph-description" 
                     class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr($meta_description ?: wp_trim_words(strip_tags($post->post_content), 25)); ?>"
+                    placeholder="<?php echo esc_attr($meta_description ?: ace_seo_safe_placeholder($post->post_content, 295)); ?>"
                     maxlength="300"
                     rows="3"
                 ><?php echo esc_textarea($og_description); ?></textarea>
@@ -350,7 +361,7 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                     id="yoast_wpseo_twitter-description" 
                     name="yoast_wpseo_twitter-description" 
                     class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: wp_trim_words(strip_tags($post->post_content), 25)); ?>"
+                    placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: ace_seo_safe_placeholder($post->post_content, 195)); ?>"
                     maxlength="200"
                     rows="3"
                 ><?php echo esc_textarea($twitter_description); ?></textarea>

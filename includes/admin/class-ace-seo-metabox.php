@@ -250,7 +250,7 @@ class AceSEOMetabox {
             'ace-seo-admin',
             ACE_SEO_URL . 'assets/js/admin.js',
             array( 'jquery', 'wp-api' ),
-            ACE_SEO_VERSION,
+            ACE_SEO_VERSION . '.' . time(), // Add timestamp for cache busting during development
             true
         );
         
