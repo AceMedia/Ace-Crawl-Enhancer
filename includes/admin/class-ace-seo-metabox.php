@@ -284,6 +284,13 @@ class AceSEOMetabox {
         $templates = $options['templates'] ?? [];
         $general = $options['general'] ?? [];
         
+        // Get featured image for social media defaults
+        $featured_image_url = '';
+        if ($post) {
+            $featured_image_id = get_post_thumbnail_id($post->ID);
+            $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured_image_id, 'large') : '';
+        }
+        
         wp_localize_script( 'ace-seo-admin', 'aceSeoAdmin', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
@@ -293,6 +300,7 @@ class AceSEOMetabox {
             'postTitle' => $post ? $post->post_title : '',
             'postContent' => $post ? wp_trim_words( strip_tags( $post->post_content ), 25 ) : '',
             'postType' => $post ? $post->post_type : 'post',
+            'featuredImage' => $featured_image_url,
             'titleTemplate' => $post ? ($templates['title_template_' . $post->post_type] ?? '{title} {sep} {site_name}') : '{title} {sep} {site_name}',
             'metaTemplate' => $post ? ($templates['meta_template_' . $post->post_type] ?? '{excerpt}') : '{excerpt}',
             'siteName' => $general['site_name'] ?? get_bloginfo('name'),

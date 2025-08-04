@@ -18,6 +18,7 @@
             this.initRealTimeAnalysis();
             this.initPageSpeed();
             this.initAiAssistant();
+            this.initSocialDefaults();
             this.updatePreviews();
             
             // Initial analysis
@@ -67,6 +68,9 @@
             // Social preview updates
             $('#yoast_wpseo_opengraph-title, #yoast_wpseo_opengraph-description, #yoast_wpseo_opengraph-image').on('input', this.updateFacebookPreview.bind(this));
             $('#yoast_wpseo_twitter-title, #yoast_wpseo_twitter-description, #yoast_wpseo_twitter-image').on('input', this.updateTwitterPreview.bind(this));
+            
+            // When Facebook image changes, also update Twitter preview (since Twitter can use Facebook image as fallback)
+            $('#yoast_wpseo_opengraph-image').on('input', this.updateTwitterPreview.bind(this));
             
             // Character counters
             $('#yoast_wpseo_title').on('input', () => this.updateCounter('title', 60));
@@ -692,13 +696,16 @@
             }
             
             const image = $('#yoast_wpseo_opengraph-image').val();
+            const featuredImage = $('#yoast_wpseo_opengraph-image').data('featured-image');
             
             $('#facebook-preview-title').text(title);
             $('#facebook-preview-description').text(description);
             
             const $imageContainer = $('#facebook-preview-image');
-            if (image) {
-                $imageContainer.html(`<img src="${image}" alt="Facebook preview">`);
+            const imageToShow = image || featuredImage;
+            if (imageToShow) {
+                const altText = image ? 'Facebook preview' : 'Facebook preview (featured image)';
+                $imageContainer.html(`<img src="${imageToShow}" alt="${altText}">`);
             } else {
                 $imageContainer.html('<div class="ace-seo-placeholder-image">📷</div>');
             }
@@ -750,13 +757,24 @@
             }
             
             const image = $('#yoast_wpseo_twitter-image').val() || $('#yoast_wpseo_opengraph-image').val();
+            const featuredImage = $('#yoast_wpseo_twitter-image').data('featured-image');
+            const facebookImage = $('#yoast_wpseo_twitter-image').data('facebook-image');
             
             $('#twitter-preview-title').text(title);
             $('#twitter-preview-description').text(description);
             
             const $imageContainer = $('#twitter-preview-image');
-            if (image) {
-                $imageContainer.html(`<img src="${image}" alt="Twitter preview">`);
+            const imageToShow = image || facebookImage || featuredImage;
+            if (imageToShow) {
+                let altText = 'Twitter preview';
+                if (!$('#yoast_wpseo_twitter-image').val()) {
+                    if (facebookImage) {
+                        altText = 'Twitter preview (Facebook image)';
+                    } else if (featuredImage) {
+                        altText = 'Twitter preview (featured image)';
+                    }
+                }
+                $imageContainer.html(`<img src="${imageToShow}" alt="${altText}">`);
             } else {
                 $imageContainer.html('<div class="ace-seo-placeholder-image">📷</div>');
             }
@@ -1048,6 +1066,15 @@
             this.currentModal = null;
             this.selectedSuggestion = null;
             this.aiData = {};
+        },
+
+        initSocialDefaults: function() {
+            // Set up featured image data for social media defaults
+            if (aceSeoAdmin.featuredImage) {
+                // Set data attributes for Facebook and Twitter image fields
+                $('#yoast_wpseo_opengraph-image').attr('data-featured-image', aceSeoAdmin.featuredImage);
+                $('#yoast_wpseo_twitter-image').attr('data-featured-image', aceSeoAdmin.featuredImage);
+            }
         },
 
         handleAiButtonClick: function(e) {
