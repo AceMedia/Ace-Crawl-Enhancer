@@ -250,15 +250,18 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <strong>Facebook Title</strong>
                     <span class="ace-seo-counter" id="og-title-counter">0 / 95</span>
                 </label>
-                <input 
-                    type="text" 
-                    id="yoast_wpseo_opengraph-title" 
-                    name="yoast_wpseo_opengraph-title" 
-                    value="<?php echo esc_attr($og_title); ?>"
-                    class="ace-seo-input"
-                    placeholder="<?php echo esc_attr($seo_title ?: $post->post_title); ?>"
-                    maxlength="95"
-                >
+                <div class="ace-seo-input-group">
+                    <input 
+                        type="text" 
+                        id="yoast_wpseo_opengraph-title" 
+                        name="yoast_wpseo_opengraph-title" 
+                        value="<?php echo esc_attr($og_title); ?>"
+                        class="ace-seo-input"
+                        placeholder="<?php echo esc_attr($seo_title ?: $post->post_title); ?>"
+                        maxlength="95"
+                    >
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_title'); ?>
+                </div>
             </div>
 
             <div class="ace-seo-field">
@@ -266,14 +269,19 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <strong>Facebook Description</strong>
                     <span class="ace-seo-counter" id="og-description-counter">0 / 300</span>
                 </label>
-                <textarea 
-                    id="yoast_wpseo_opengraph-description" 
-                    name="yoast_wpseo_opengraph-description" 
-                    class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr($meta_description ?: ace_seo_safe_placeholder($post->post_content, 295)); ?>"
-                    maxlength="300"
-                    rows="3"
-                ><?php echo esc_textarea($og_description); ?></textarea>
+                <div class="ace-seo-textarea-group">
+                    <textarea 
+                        id="yoast_wpseo_opengraph-description" 
+                        name="yoast_wpseo_opengraph-description" 
+                        class="ace-seo-textarea"
+                        placeholder="<?php echo esc_attr($meta_description ?: ace_seo_safe_placeholder($post->post_content, 295)); ?>"
+                        maxlength="300"
+                        rows="3"
+                    ><?php echo esc_textarea($og_description); ?></textarea>
+                    <div class="ace-seo-textarea-buttons">
+                        <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_description'); ?>
+                    </div>
+                </div>
             </div>
 
             <div class="ace-seo-field">
@@ -333,15 +341,18 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <strong>Twitter Title</strong>
                     <span class="ace-seo-counter" id="twitter-title-counter">0 / 70</span>
                 </label>
-                <input 
-                    type="text" 
-                    id="yoast_wpseo_twitter-title" 
-                    name="yoast_wpseo_twitter-title" 
-                    value="<?php echo esc_attr($twitter_title); ?>"
-                    class="ace-seo-input"
-                    placeholder="<?php echo esc_attr($og_title ?: $seo_title ?: $post->post_title); ?>"
-                    maxlength="70"
-                >
+                <div class="ace-seo-input-group">
+                    <input 
+                        type="text" 
+                        id="yoast_wpseo_twitter-title" 
+                        name="yoast_wpseo_twitter-title" 
+                        value="<?php echo esc_attr($twitter_title); ?>"
+                        class="ace-seo-input"
+                        placeholder="<?php echo esc_attr($og_title ?: $seo_title ?: $post->post_title); ?>"
+                        maxlength="70"
+                    >
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_title'); ?>
+                </div>
             </div>
 
             <div class="ace-seo-field">
@@ -349,14 +360,19 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <strong>Twitter Description</strong>
                     <span class="ace-seo-counter" id="twitter-description-counter">0 / 200</span>
                 </label>
-                <textarea 
-                    id="yoast_wpseo_twitter-description" 
-                    name="yoast_wpseo_twitter-description" 
-                    class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: ace_seo_safe_placeholder($post->post_content, 195)); ?>"
-                    maxlength="200"
-                    rows="3"
-                ><?php echo esc_textarea($twitter_description); ?></textarea>
+                <div class="ace-seo-textarea-group">
+                    <textarea 
+                        id="yoast_wpseo_twitter-description" 
+                        name="yoast_wpseo_twitter-description" 
+                        class="ace-seo-textarea"
+                        placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: ace_seo_safe_placeholder($post->post_content, 195)); ?>"
+                        maxlength="200"
+                        rows="3"
+                    ><?php echo esc_textarea($twitter_description); ?></textarea>
+                    <div class="ace-seo-textarea-buttons">
+                        <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_description'); ?>
+                    </div>
+                </div>
             </div>
 
             <div class="ace-seo-field">

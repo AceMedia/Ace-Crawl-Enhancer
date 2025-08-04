@@ -23,6 +23,12 @@ class AceSEOAiAssistant {
         add_action( 'wp_ajax_ace_seo_suggest_topics', array( $this, 'ajax_suggest_topics' ) );
         add_action( 'wp_ajax_ace_seo_improve_content', array( $this, 'ajax_improve_content' ) );
         add_action( 'wp_ajax_ace_seo_generate_keywords', array( $this, 'ajax_generate_keywords' ) );
+        
+        // Social media AI handlers
+        add_action( 'wp_ajax_ace_seo_generate_facebook_titles', array( $this, 'ajax_generate_facebook_titles' ) );
+        add_action( 'wp_ajax_ace_seo_generate_facebook_descriptions', array( $this, 'ajax_generate_facebook_descriptions' ) );
+        add_action( 'wp_ajax_ace_seo_generate_twitter_titles', array( $this, 'ajax_generate_twitter_titles' ) );
+        add_action( 'wp_ajax_ace_seo_generate_twitter_descriptions', array( $this, 'ajax_generate_twitter_descriptions' ) );
     }
     
     /**
@@ -202,6 +208,129 @@ class AceSEOAiAssistant {
     }
     
     /**
+     * AJAX handler for generating Facebook titles
+     */
+    public function ajax_generate_facebook_titles() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $seo_title = sanitize_text_field( $_POST['seo_title'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        // Use SEO title as base if available, otherwise current title
+        $base_title = $seo_title ?: $current_title;
+        
+        $titles = AceSEOApiHelper::generate_facebook_titles( $post_content, $focus_keyword, $base_title );
+        
+        if ( is_wp_error( $titles ) ) {
+            wp_send_json_error( $titles->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'titles' => $titles ) );
+    }
+    
+    /**
+     * AJAX handler for generating Facebook descriptions
+     */
+    public function ajax_generate_facebook_descriptions() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $meta_description = sanitize_text_field( $_POST['meta_description'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        $descriptions = AceSEOApiHelper::generate_facebook_descriptions( $post_content, $focus_keyword, $current_title, $meta_description );
+        
+        if ( is_wp_error( $descriptions ) ) {
+            wp_send_json_error( $descriptions->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'descriptions' => $descriptions ) );
+    }
+    
+    /**
+     * AJAX handler for generating Twitter titles
+     */
+    public function ajax_generate_twitter_titles() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $seo_title = sanitize_text_field( $_POST['seo_title'] ?? '' );
+        $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        // Use Facebook title as base if available, otherwise SEO title, otherwise current title
+        $base_title = $facebook_title ?: $seo_title ?: $current_title;
+        
+        $titles = AceSEOApiHelper::generate_twitter_titles( $post_content, $focus_keyword, $base_title );
+        
+        if ( is_wp_error( $titles ) ) {
+            wp_send_json_error( $titles->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'titles' => $titles ) );
+    }
+    
+    /**
+     * AJAX handler for generating Twitter descriptions
+     */
+    public function ajax_generate_twitter_descriptions() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $meta_description = sanitize_text_field( $_POST['meta_description'] ?? '' );
+        $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        // Use Facebook description as base if available, otherwise meta description
+        $base_description = $facebook_description ?: $meta_description;
+        
+        $descriptions = AceSEOApiHelper::generate_twitter_descriptions( $post_content, $focus_keyword, $current_title, $base_description );
+        
+        if ( is_wp_error( $descriptions ) ) {
+            wp_send_json_error( $descriptions->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'descriptions' => $descriptions ) );
+    }
+    
+    /**
      * Get AI assistance status for current user
      */
     public static function is_ai_available() {
@@ -234,6 +363,30 @@ class AceSEOAiAssistant {
                 'text' => 'AI Keywords',
                 'icon' => 'search',
                 'tooltip' => 'Suggest focus keywords using AI'
+            ),
+            'facebook_title' => array(
+                'action' => 'generate_facebook_titles',
+                'text' => 'AI Titles',
+                'icon' => 'facebook',
+                'tooltip' => 'Generate AI-powered Facebook titles'
+            ),
+            'facebook_description' => array(
+                'action' => 'generate_facebook_descriptions',
+                'text' => 'AI Descriptions',
+                'icon' => 'facebook-alt',
+                'tooltip' => 'Generate compelling Facebook descriptions'
+            ),
+            'twitter_title' => array(
+                'action' => 'generate_twitter_titles',
+                'text' => 'AI Titles',
+                'icon' => 'twitter',
+                'tooltip' => 'Generate AI-powered Twitter titles'
+            ),
+            'twitter_description' => array(
+                'action' => 'generate_twitter_descriptions',
+                'text' => 'AI Descriptions',
+                'icon' => 'twitter-alt',
+                'tooltip' => 'Generate compelling Twitter descriptions'
             ),
             'analysis' => array(
                 'action' => 'analyze_content',

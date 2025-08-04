@@ -1053,6 +1053,244 @@ class AceSEOApiHelper {
         
         return array_slice( $keywords, 0, 5 );
     }
+    
+    /**
+     * Generate Facebook-specific titles
+     */
+    public static function generate_facebook_titles( $post_content, $focus_keyword = '', $base_title = '' ) {
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for engaging Facebook content and viral posts related to '" . $focus_keyword . "' to understand what drives engagement.";
+        }
+        
+        $prompt = "Generate 5 compelling Facebook titles optimized for social media engagement." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Base Title: " . $base_title . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        
+        $prompt .= "Create Facebook titles that:\n";
+        $prompt .= "- Are optimized for social media engagement and sharing\n";
+        $prompt .= "- Include the focus keyword naturally if provided\n";
+        $prompt .= "- Keep under 95 characters for optimal display\n";
+        $prompt .= "- Are compelling and encourage clicks and shares\n";
+        $prompt .= "- Use engaging language that works well on Facebook\n";
+        $prompt .= "- Consider emotional triggers and social proof\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"titles":[{"title":"Best Facebook title here","reason":"Brief explanation"},{"title":"Second title","reason":"Brief explanation"},{"title":"Third title","reason":"Brief explanation"},{"title":"Fourth title","reason":"Brief explanation"},{"title":"Fifth title","reason":"Brief explanation"}]}' . "\n\n";
+        $prompt .= "Focus on social media engagement. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        return self::parse_titles_response( $response );
+    }
+    
+    /**
+     * Generate Facebook-specific descriptions
+     */
+    public static function generate_facebook_descriptions( $post_content, $focus_keyword = '', $base_title = '', $meta_description = '' ) {
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for engaging Facebook post descriptions and high-performing social content for '" . $focus_keyword . "'.";
+        }
+        
+        $prompt = "Generate 3 compelling Facebook descriptions optimized for social engagement." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Title: " . $base_title . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Meta Description: " . $meta_description . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        
+        $prompt .= "Create Facebook descriptions that:\n";
+        $prompt .= "- Are optimized for social media engagement\n";
+        $prompt .= "- Include the focus keyword naturally if provided\n";
+        $prompt .= "- Keep between 150-300 characters\n";
+        $prompt .= "- Encourage engagement, clicks, and shares\n";
+        $prompt .= "- Use social-friendly language and tone\n";
+        $prompt .= "- Include calls-to-action when appropriate\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"descriptions":[{"description":"Best Facebook description here","reason":"Brief explanation"},{"description":"Second description","reason":"Brief explanation"},{"description":"Third description","reason":"Brief explanation"}]}' . "\n\n";
+        $prompt .= "Focus on social media engagement. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        return self::parse_descriptions_response( $response );
+    }
+    
+    /**
+     * Generate Twitter-specific titles
+     */
+    public static function generate_twitter_titles( $post_content, $focus_keyword = '', $base_title = '' ) {
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for trending Twitter content and viral tweets related to '" . $focus_keyword . "'.";
+        }
+        
+        $prompt = "Generate 5 compelling Twitter titles optimized for the platform." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Base Title: " . $base_title . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        
+        $prompt .= "Create Twitter titles that:\n";
+        $prompt .= "- Are optimized for Twitter engagement and retweets\n";
+        $prompt .= "- Include the focus keyword naturally if provided\n";
+        $prompt .= "- Keep under 70 characters to allow room for handles/hashtags\n";
+        $prompt .= "- Are punchy and attention-grabbing\n";
+        $prompt .= "- Work well with Twitter's fast-paced environment\n";
+        $prompt .= "- Consider trending topics and Twitter culture\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"titles":[{"title":"Best Twitter title here","reason":"Brief explanation"},{"title":"Second title","reason":"Brief explanation"},{"title":"Third title","reason":"Brief explanation"},{"title":"Fourth title","reason":"Brief explanation"},{"title":"Fifth title","reason":"Brief explanation"}]}' . "\n\n";
+        $prompt .= "Focus on Twitter engagement. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        return self::parse_titles_response( $response );
+    }
+    
+    /**
+     * Generate Twitter-specific descriptions
+     */
+    public static function generate_twitter_descriptions( $post_content, $focus_keyword = '', $base_title = '', $base_description = '' ) {
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for engaging Twitter content and high-performing tweets for '" . $focus_keyword . "'.";
+        }
+        
+        $prompt = "Generate 3 compelling Twitter descriptions optimized for the platform." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Title: " . $base_title . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Base Description: " . $base_description . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        
+        $prompt .= "Create Twitter descriptions that:\n";
+        $prompt .= "- Are optimized for Twitter engagement and retweets\n";
+        $prompt .= "- Include the focus keyword naturally if provided\n";
+        $prompt .= "- Keep between 120-200 characters\n";
+        $prompt .= "- Are concise and impactful\n";
+        $prompt .= "- Work well with Twitter's character limits\n";
+        $prompt .= "- Include relevant hashtags or mentions when appropriate\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"descriptions":[{"description":"Best Twitter description here","reason":"Brief explanation"},{"description":"Second description","reason":"Brief explanation"},{"description":"Third description","reason":"Brief explanation"}]}' . "\n\n";
+        $prompt .= "Focus on Twitter engagement. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        return self::parse_descriptions_response( $response );
+    }
+    
+    /**
+     * Parse titles response (reuse existing logic)
+     */
+    private static function parse_titles_response( $response ) {
+        // Clean the response - remove any markdown formatting
+        $response = trim( $response );
+        $start = strpos( $response, '{' );
+        $end = strrpos( $response, '}' );
+        if ( $start !== false && $end !== false && $end > $start ) {
+            $response = substr( $response, $start, $end - $start + 1 );
+        }
+        $response = trim( $response );
+        
+        $data = json_decode( $response, true );
+        
+        if ( json_last_error() !== JSON_ERROR_NONE || ! isset( $data['titles'] ) ) {
+            return array(
+                array( 'title' => 'AI-Generated Title 1', 'reason' => 'Fallback title' ),
+                array( 'title' => 'AI-Generated Title 2', 'reason' => 'Fallback title' ),
+                array( 'title' => 'AI-Generated Title 3', 'reason' => 'Fallback title' )
+            );
+        }
+        
+        $valid_titles = array();
+        foreach ( $data['titles'] as $title_data ) {
+            if ( isset( $title_data['title'] ) && isset( $title_data['reason'] ) ) {
+                $valid_titles[] = array(
+                    'title' => $title_data['title'],
+                    'reason' => $title_data['reason']
+                );
+            }
+        }
+        
+        return array_slice( $valid_titles, 0, 5 );
+    }
+    
+    /**
+     * Parse descriptions response (reuse existing logic)
+     */
+    private static function parse_descriptions_response( $response ) {
+        // Clean the response - remove any markdown formatting
+        $response = trim( $response );
+        $start = strpos( $response, '{' );
+        $end = strrpos( $response, '}' );
+        if ( $start !== false && $end !== false && $end > $start ) {
+            $response = substr( $response, $start, $end - $start + 1 );
+        }
+        $response = trim( $response );
+        
+        $data = json_decode( $response, true );
+        
+        if ( json_last_error() !== JSON_ERROR_NONE || ! isset( $data['descriptions'] ) ) {
+            return array(
+                array( 'description' => 'AI-Generated Description 1', 'reason' => 'Fallback description' ),
+                array( 'description' => 'AI-Generated Description 2', 'reason' => 'Fallback description' ),
+                array( 'description' => 'AI-Generated Description 3', 'reason' => 'Fallback description' )
+            );
+        }
+        
+        $valid_descriptions = array();
+        foreach ( $data['descriptions'] as $desc_data ) {
+            if ( isset( $desc_data['description'] ) && isset( $desc_data['reason'] ) ) {
+                $valid_descriptions[] = array(
+                    'description' => $desc_data['description'],
+                    'reason' => $desc_data['reason']
+                );
+            }
+        }
+        
+        return array_slice( $valid_descriptions, 0, 3 );
+    }
 }
 
 // Initialize the API helper

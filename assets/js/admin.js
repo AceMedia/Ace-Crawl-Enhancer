@@ -1110,6 +1110,18 @@
                 case 'suggest_topics':
                     this.suggestTopics(contentData, $button);
                     break;
+                case 'generate_facebook_titles':
+                    this.generateFacebookTitles(contentData, $button);
+                    break;
+                case 'generate_facebook_descriptions':
+                    this.generateFacebookDescriptions(contentData, $button);
+                    break;
+                case 'generate_twitter_titles':
+                    this.generateTwitterTitles(contentData, $button);
+                    break;
+                case 'generate_twitter_descriptions':
+                    this.generateTwitterDescriptions(contentData, $button);
+                    break;
                 default:
                     this.setButtonLoading($button, false);
                     console.warn('Unknown AI action:', action);
@@ -1132,7 +1144,7 @@
         generateTitles: function(contentData, $button) {
             console.log('Generating titles with data:', contentData); // Debug log
             
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_titles',
                 ...contentData
             })
@@ -1152,7 +1164,7 @@
         },
 
         generateDescriptions: function(contentData, $button) {
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_descriptions',
                 ...contentData
             })
@@ -1171,7 +1183,7 @@
         },
 
         generateKeywords: function(contentData, $button) {
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_keywords',
                 ...contentData
             })
@@ -1189,11 +1201,114 @@
             });
         },
 
+        generateFacebookTitles: function(contentData, $button) {
+            // Add current Facebook title to the data
+            const facebookData = {
+                ...contentData,
+                facebook_title: $('#yoast_wpseo_opengraph-title').val(),
+                seo_title: $('#yoast_wpseo_title').val()
+            };
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_facebook_titles',
+                ...facebookData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showTitleSuggestions(response.data.titles, 'facebook');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Facebook titles');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateFacebookDescriptions: function(contentData, $button) {
+            const facebookData = {
+                ...contentData,
+                facebook_description: $('#yoast_wpseo_opengraph-description').val(),
+                meta_description: $('#yoast_wpseo_metadesc').val()
+            };
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_facebook_descriptions',
+                ...facebookData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showDescriptionSuggestions(response.data.descriptions, 'facebook');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Facebook descriptions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateTwitterTitles: function(contentData, $button) {
+            const twitterData = {
+                ...contentData,
+                twitter_title: $('#yoast_wpseo_twitter-title').val(),
+                facebook_title: $('#yoast_wpseo_opengraph-title').val(),
+                seo_title: $('#yoast_wpseo_title').val()
+            };
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_twitter_titles',
+                ...twitterData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showTitleSuggestions(response.data.titles, 'twitter');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Twitter titles');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateTwitterDescriptions: function(contentData, $button) {
+            const twitterData = {
+                ...contentData,
+                twitter_description: $('#yoast_wpseo_twitter-description').val(),
+                facebook_description: $('#yoast_wpseo_opengraph-description').val(),
+                meta_description: $('#yoast_wpseo_metadesc').val()
+            };
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_twitter_descriptions',
+                ...twitterData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    this.showDescriptionSuggestions(response.data.descriptions, 'twitter');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Twitter descriptions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
         analyzeContent: function(contentData, $button) {
             // Show loading state in sidebar
             this.showAnalysisLoading(true);
             
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_analyze_content',
                 ...contentData
             })
@@ -1218,7 +1333,7 @@
             // Show loading state in sidebar
             this.showAnalysisLoading(true);
             
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_improve_content',
                 ...contentData
             })
@@ -1243,7 +1358,7 @@
             // Show loading state in sidebar
             this.showAnalysisLoading(true);
             
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_suggest_topics',
                 ...contentData
             })
@@ -1264,8 +1379,24 @@
             });
         },
 
-        showTitleSuggestions: function(titles) {
-            console.log('Showing title suggestions:', titles); // Debug log
+        showTitleSuggestions: function(titles, platform) {
+            console.log('Showing title suggestions:', titles, 'Platform:', platform); // Debug log
+            
+            // Determine the title type and character limits based on platform
+            let titleType, charLimit, modalTitle;
+            if (platform === 'facebook') {
+                titleType = 'facebook_title';
+                charLimit = 95;
+                modalTitle = 'AI Facebook Title Suggestions';
+            } else if (platform === 'twitter') {
+                titleType = 'twitter_title';
+                charLimit = 70;
+                modalTitle = 'AI Twitter Title Suggestions';
+            } else {
+                titleType = 'title';
+                charLimit = 60;
+                modalTitle = 'AI Title Suggestions';
+            }
             
             let html = '<div class="ace-ai-suggestions-list">';
             
@@ -1276,16 +1407,16 @@
                 const isRecommended = index === 0;
                 
                 const charCount = title.length;
-                const charClass = charCount <= 60 ? 'optimal' : charCount <= 70 ? 'warning' : 'error';
+                const charClass = charCount <= charLimit ? 'optimal' : charCount <= charLimit + 10 ? 'warning' : 'error';
                 
                 html += `
-                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(title)}" data-type="title">
+                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(title)}" data-type="${titleType}">
                         ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
                         <div class="ace-ai-suggestion-text">${this.escapeHtml(title)}</div>
                         <div class="ace-ai-suggestion-reason">${this.escapeHtml(reason)}</div>
                         <div class="ace-ai-suggestion-meta">
                             <span class="ace-ai-char-count ${charClass}">${charCount} characters</span>
-                            <span class="ace-ai-score">${charCount <= 60 ? '✓ Optimal' : charCount <= 70 ? '⚠ Long' : '❌ Too long'}</span>
+                            <span class="ace-ai-score">${charCount <= charLimit ? '✓ Optimal' : charCount <= charLimit + 10 ? '⚠ Long' : '❌ Too long'}</span>
                         </div>
                     </div>
                 `;
@@ -1293,10 +1424,29 @@
             
             html += '</div>';
             
-            this.showModal('AI Title Suggestions', html, 'title');
+            this.showModal(modalTitle, html, titleType);
         },
 
-        showDescriptionSuggestions: function(descriptions) {
+        showDescriptionSuggestions: function(descriptions, platform) {
+            // Determine the description type and character limits based on platform
+            let descType, charLimit, modalTitle, optimalMin;
+            if (platform === 'facebook') {
+                descType = 'facebook_description';
+                charLimit = 300;
+                optimalMin = 150;
+                modalTitle = 'AI Facebook Description Suggestions';
+            } else if (platform === 'twitter') {
+                descType = 'twitter_description';
+                charLimit = 200;
+                optimalMin = 100;
+                modalTitle = 'AI Twitter Description Suggestions';
+            } else {
+                descType = 'description';
+                charLimit = 160;
+                optimalMin = 120;
+                modalTitle = 'AI Meta Description Suggestions';
+            }
+            
             let html = '<div class="ace-ai-suggestions-list">';
             
             descriptions.forEach((descData, index) => {
@@ -1306,16 +1456,16 @@
                 const isRecommended = index === 0;
                 
                 const charCount = description.length;
-                const charClass = charCount >= 120 && charCount <= 160 ? 'optimal' : charCount < 120 ? 'warning' : 'error';
+                const charClass = charCount >= optimalMin && charCount <= charLimit ? 'optimal' : charCount < optimalMin ? 'warning' : 'error';
                 
                 html += `
-                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(description)}" data-type="description">
+                    <div class="ace-ai-suggestion-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(description)}" data-type="${descType}">
                         ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
                         <div class="ace-ai-suggestion-text">${this.escapeHtml(description)}</div>
                         <div class="ace-ai-suggestion-reason">${this.escapeHtml(reason)}</div>
                         <div class="ace-ai-suggestion-meta">
                             <span class="ace-ai-char-count ${charClass}">${charCount} characters</span>
-                            <span class="ace-ai-score">${charCount >= 120 && charCount <= 160 ? '✓ Optimal' : charCount < 120 ? '⚠ Too short' : '❌ Too long'}</span>
+                            <span class="ace-ai-score">${charCount >= optimalMin && charCount <= charLimit ? '✓ Optimal' : charCount < optimalMin ? '⚠ Too short' : '❌ Too long'}</span>
                         </div>
                     </div>
                 `;
@@ -1323,7 +1473,7 @@
             
             html += '</div>';
             
-            this.showModal('AI Meta Description Suggestions', html, 'description');
+            this.showModal(modalTitle, html, descType);
         },
 
         showKeywordSuggestions: function(keywords) {
@@ -1764,7 +1914,7 @@
             };
             
             // 1. Content Analysis
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_analyze_content',
                 ...contentData
             })
@@ -1779,7 +1929,7 @@
             });
             
             // 2. Topic Suggestions
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_suggest_topics',
                 ...contentData
             })
@@ -1794,7 +1944,7 @@
             });
             
             // 3. Content Improvements
-            $.post(ajaxurl, {
+            $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_improve_content',
                 ...contentData
             })
@@ -2035,6 +2185,26 @@
                 case 'keyword':
                     $('#yoast_wpseo_focuskw').val(suggestion).trigger('input');
                     break;
+                case 'facebook_title':
+                    $('#yoast_wpseo_opengraph-title').val(suggestion).trigger('input');
+                    // Also update Facebook preview
+                    this.updateFacebookPreview();
+                    break;
+                case 'facebook_description':
+                    $('#yoast_wpseo_opengraph-description').val(suggestion).trigger('input');
+                    // Also update Facebook preview
+                    this.updateFacebookPreview();
+                    break;
+                case 'twitter_title':
+                    $('#yoast_wpseo_twitter-title').val(suggestion).trigger('input');
+                    // Also update Twitter preview
+                    this.updateTwitterPreview();
+                    break;
+                case 'twitter_description':
+                    $('#yoast_wpseo_twitter-description').val(suggestion).trigger('input');
+                    // Also update Twitter preview
+                    this.updateTwitterPreview();
+                    break;
             }
             
             // Close modal
@@ -2067,6 +2237,26 @@
                 case 'keyword':
                     console.log('Setting keyword field'); // Debug log
                     $('#yoast_wpseo_focuskw').val(text).trigger('input');
+                    break;
+                case 'facebook_title':
+                    console.log('Setting Facebook title field'); // Debug log
+                    $('#yoast_wpseo_opengraph-title').val(text).trigger('input');
+                    this.updateFacebookPreview();
+                    break;
+                case 'facebook_description':
+                    console.log('Setting Facebook description field'); // Debug log
+                    $('#yoast_wpseo_opengraph-description').val(text).trigger('input');
+                    this.updateFacebookPreview();
+                    break;
+                case 'twitter_title':
+                    console.log('Setting Twitter title field'); // Debug log
+                    $('#yoast_wpseo_twitter-title').val(text).trigger('input');
+                    this.updateTwitterPreview();
+                    break;
+                case 'twitter_description':
+                    console.log('Setting Twitter description field'); // Debug log
+                    $('#yoast_wpseo_twitter-description').val(text).trigger('input');
+                    this.updateTwitterPreview();
                     break;
             }
             
