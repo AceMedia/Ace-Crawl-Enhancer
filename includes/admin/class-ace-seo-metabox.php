@@ -258,12 +258,15 @@ class AceSEOMetabox {
         wp_enqueue_media();
         
         // Localize script with data
+        global $post;
         wp_localize_script( 'ace-seo-admin', 'aceSeoAdmin', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
             'nonce' => wp_create_nonce( 'wp_rest' ),
             'performanceNonce' => wp_create_nonce( 'ace_seo_performance_test' ),
             'postId' => get_the_ID(),
+            'postTitle' => $post ? $post->post_title : '',
+            'postContent' => $post ? wp_trim_words( strip_tags( $post->post_content ), 25 ) : '',
             'strings' => array(
                 'analyzing' => __( 'Analyzing...', 'ace-seo' ),
                 'excellent' => __( 'Excellent', 'ace-seo' ),

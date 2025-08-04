@@ -130,7 +130,7 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
                     id="yoast_wpseo_metadesc" 
                     name="yoast_wpseo_metadesc" 
                     class="ace-seo-textarea"
-                    placeholder="Enter a compelling description for search engines"
+                    placeholder="<?php echo esc_attr(wp_trim_words(strip_tags($post->post_content), 25)); ?>"
                     maxlength="160"
                     rows="3"
                 ><?php echo esc_textarea($meta_description); ?></textarea>

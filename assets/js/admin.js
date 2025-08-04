@@ -38,6 +38,18 @@
             $('#yoast_wpseo_title').on('input', this.updateGooglePreview.bind(this));
             $('#yoast_wpseo_metadesc').on('input', this.updateGooglePreview.bind(this));
             
+            // Listen for post title changes to update previews
+            $('#title, .editor-post-title__input, input[name="post_title"]').on('input', this.debounce(() => {
+                this.updateGooglePreview();
+                this.updateFacebookPreview();
+                this.updateTwitterPreview();
+            }, 300));
+            
+            // Listen for content changes to update meta description placeholder
+            $(document).on('input', '#content, .editor-rich-text__tinymce, .wp-block-post-content', this.debounce(() => {
+                this.updateMetaDescriptionPlaceholder();
+            }, 500));
+            
             // Social preview updates
             $('#yoast_wpseo_opengraph-title, #yoast_wpseo_opengraph-description, #yoast_wpseo_opengraph-image').on('input', this.updateFacebookPreview.bind(this));
             $('#yoast_wpseo_twitter-title, #yoast_wpseo_twitter-description, #yoast_wpseo_twitter-image').on('input', this.updateTwitterPreview.bind(this));
@@ -426,10 +438,14 @@
             this.updateGooglePreview();
             this.updateFacebookPreview();
             this.updateTwitterPreview();
+            this.updateMetaDescriptionPlaceholder();
         },
 
         updateGooglePreview: function() {
-            const title = $('#yoast_wpseo_title').val() || $('#title').val() || 'Untitled';
+            // Get the post title from multiple sources, with reliable fallback from PHP
+            let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
+            
+            const title = $('#yoast_wpseo_title').val() || postTitle;
             const description = $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
             
             $('#preview-title').text(title);
@@ -437,7 +453,10 @@
         },
 
         updateFacebookPreview: function() {
-            const title = $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || $('#title').val() || 'Untitled';
+            // Get the post title from multiple sources, with reliable fallback from PHP
+            let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
+            
+            const title = $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || postTitle;
             const description = $('#yoast_wpseo_opengraph-description').val() || $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
             const image = $('#yoast_wpseo_opengraph-image').val();
             
@@ -453,7 +472,10 @@
         },
 
         updateTwitterPreview: function() {
-            const title = $('#yoast_wpseo_twitter-title').val() || $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || $('#title').val() || 'Untitled';
+            // Get the post title from multiple sources, with reliable fallback from PHP
+            let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
+            
+            const title = $('#yoast_wpseo_twitter-title').val() || $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || postTitle;
             const description = $('#yoast_wpseo_twitter-description').val() || $('#yoast_wpseo_opengraph-description').val() || $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
             const image = $('#yoast_wpseo_twitter-image').val() || $('#yoast_wpseo_opengraph-image').val();
             
@@ -496,8 +518,23 @@
 
         getExcerpt: function() {
             const content = this.getContentText();
-            const words = content.split(/\s+/).slice(0, 25);
-            return words.join(' ') + (words.length === 25 ? '...' : '');
+            if (content) {
+                const words = content.split(/\s+/).slice(0, 25);
+                return words.join(' ') + (words.length === 25 ? '...' : '');
+            }
+            
+            // Fallback to excerpt from PHP if available
+            if (aceSeoAdmin.postContent) {
+                return aceSeoAdmin.postContent + '...';
+            }
+            
+            return '';
+        },
+
+        updateMetaDescriptionPlaceholder: function() {
+            const excerpt = this.getExcerpt();
+            const placeholder = excerpt || aceSeoAdmin.postContent + '...' || 'Enter a compelling description for search engines';
+            $('#yoast_wpseo_metadesc').attr('placeholder', placeholder);
         },
 
         // PageSpeed functionality
