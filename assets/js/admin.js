@@ -445,8 +445,27 @@
             // Get the post title from multiple sources, with reliable fallback from PHP
             let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
             
-            const title = $('#yoast_wpseo_title').val() || postTitle;
-            const description = $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
+            const customTitle = $('#yoast_wpseo_title').val();
+            let title;
+            
+            if (customTitle) {
+                title = customTitle;
+            } else {
+                // Use template system
+                title = this.processTemplate(aceSeoAdmin.titleTemplate, {
+                    title: postTitle,
+                    site_name: aceSeoAdmin.siteName,
+                    sep: aceSeoAdmin.separator,
+                    excerpt: this.getExcerpt()
+                });
+            }
+            
+            const description = $('#yoast_wpseo_metadesc').val() || this.processTemplate(aceSeoAdmin.metaTemplate, {
+                title: postTitle,
+                site_name: aceSeoAdmin.siteName,
+                sep: aceSeoAdmin.separator,
+                excerpt: this.getExcerpt()
+            });
             
             $('#preview-title').text(title);
             $('#preview-description').text(description);
@@ -456,8 +475,41 @@
             // Get the post title from multiple sources, with reliable fallback from PHP
             let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
             
-            const title = $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || postTitle;
-            const description = $('#yoast_wpseo_opengraph-description').val() || $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
+            const customOgTitle = $('#yoast_wpseo_opengraph-title').val();
+            const customSeoTitle = $('#yoast_wpseo_title').val();
+            
+            let title;
+            if (customOgTitle) {
+                title = customOgTitle;
+            } else if (customSeoTitle) {
+                title = customSeoTitle;
+            } else {
+                // Use template system
+                title = this.processTemplate(aceSeoAdmin.titleTemplate, {
+                    title: postTitle,
+                    site_name: aceSeoAdmin.siteName,
+                    sep: aceSeoAdmin.separator,
+                    excerpt: this.getExcerpt()
+                });
+            }
+            
+            const customOgDesc = $('#yoast_wpseo_opengraph-description').val();
+            const customMetaDesc = $('#yoast_wpseo_metadesc').val();
+            
+            let description;
+            if (customOgDesc) {
+                description = customOgDesc;
+            } else if (customMetaDesc) {
+                description = customMetaDesc;
+            } else {
+                description = this.processTemplate(aceSeoAdmin.metaTemplate, {
+                    title: postTitle,
+                    site_name: aceSeoAdmin.siteName,
+                    sep: aceSeoAdmin.separator,
+                    excerpt: this.getExcerpt()
+                });
+            }
+            
             const image = $('#yoast_wpseo_opengraph-image').val();
             
             $('#facebook-preview-title').text(title);
@@ -475,8 +527,47 @@
             // Get the post title from multiple sources, with reliable fallback from PHP
             let postTitle = $('#title').val() || $('.editor-post-title__input').val() || $('input[name="post_title"]').val() || aceSeoAdmin.postTitle || 'Untitled';
             
-            const title = $('#yoast_wpseo_twitter-title').val() || $('#yoast_wpseo_opengraph-title').val() || $('#yoast_wpseo_title').val() || postTitle;
-            const description = $('#yoast_wpseo_twitter-description').val() || $('#yoast_wpseo_opengraph-description').val() || $('#yoast_wpseo_metadesc').val() || this.getExcerpt();
+            const customTwitterTitle = $('#yoast_wpseo_twitter-title').val();
+            const customOgTitle = $('#yoast_wpseo_opengraph-title').val();
+            const customSeoTitle = $('#yoast_wpseo_title').val();
+            
+            let title;
+            if (customTwitterTitle) {
+                title = customTwitterTitle;
+            } else if (customOgTitle) {
+                title = customOgTitle;
+            } else if (customSeoTitle) {
+                title = customSeoTitle;
+            } else {
+                // Use template system
+                title = this.processTemplate(aceSeoAdmin.titleTemplate, {
+                    title: postTitle,
+                    site_name: aceSeoAdmin.siteName,
+                    sep: aceSeoAdmin.separator,
+                    excerpt: this.getExcerpt()
+                });
+            }
+            
+            const customTwitterDesc = $('#yoast_wpseo_twitter-description').val();
+            const customOgDesc = $('#yoast_wpseo_opengraph-description').val();
+            const customMetaDesc = $('#yoast_wpseo_metadesc').val();
+            
+            let description;
+            if (customTwitterDesc) {
+                description = customTwitterDesc;
+            } else if (customOgDesc) {
+                description = customOgDesc;
+            } else if (customMetaDesc) {
+                description = customMetaDesc;
+            } else {
+                description = this.processTemplate(aceSeoAdmin.metaTemplate, {
+                    title: postTitle,
+                    site_name: aceSeoAdmin.siteName,
+                    sep: aceSeoAdmin.separator,
+                    excerpt: this.getExcerpt()
+                });
+            }
+            
             const image = $('#yoast_wpseo_twitter-image').val() || $('#yoast_wpseo_opengraph-image').val();
             
             $('#twitter-preview-title').text(title);
@@ -535,6 +626,21 @@
             const excerpt = this.getExcerpt();
             const placeholder = excerpt || aceSeoAdmin.postContent + '...' || 'Enter a compelling description for search engines';
             $('#yoast_wpseo_metadesc').attr('placeholder', placeholder);
+        },
+
+        processTemplate: function(template, variables) {
+            let result = template;
+            
+            // Replace each variable
+            for (const [key, value] of Object.entries(variables)) {
+                const placeholder = '{' + key + '}';
+                result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value || '');
+            }
+            
+            // Clean up extra spaces and trim
+            result = result.replace(/\s+/g, ' ').trim();
+            
+            return result;
         },
 
         // PageSpeed functionality

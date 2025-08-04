@@ -802,10 +802,142 @@ class AceCrawlEnhancer {
         $seo_title = self::get_meta_value($post->ID, 'title');
         
         if (empty($seo_title)) {
-            return $post->post_title;
+            // Use template system
+            return $this->process_title_template($post);
         }
         
         return $seo_title;
+    }
+    
+    /**
+     * Process title template for a post
+     */
+    private function process_title_template($post) {
+        $options = get_option('ace_seo_options', []);
+        $templates = $options['templates'] ?? [];
+        
+        $template_key = 'title_template_' . $post->post_type;
+        $template = $templates[$template_key] ?? '{title} {sep} {site_name}';
+        
+        return $this->replace_template_variables($template, $post);
+    }
+    
+    /**
+     * Process title template for special pages (archive, search, author)
+     */
+    private function process_special_page_title() {
+        $options = get_option('ace_seo_options', []);
+        $templates = $options['templates'] ?? [];
+        
+        $template = '{archive_title} {sep} {site_name}'; // Default fallback
+        
+        if (is_search()) {
+            $template = $templates['title_template_search'] ?? 'Search results for "{search_term}" {sep} {site_name}';
+        } elseif (is_author()) {
+            $template = $templates['title_template_author'] ?? 'Articles by {author_name} {sep} {site_name}';
+        } elseif (is_category()) {
+            $template = $templates['title_template_category'] ?? '{category_name} archives {sep} {site_name}';
+        } elseif (is_tag()) {
+            $template = $templates['title_template_tag'] ?? '{tag_name} archives {sep} {site_name}';
+        } elseif (is_date()) {
+            $template = $templates['title_template_date'] ?? '{date_archive} archives {sep} {site_name}';
+        } elseif (is_archive()) {
+            $template = $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
+        }
+        
+        return $this->replace_template_variables($template);
+    }
+    
+    /**
+     * Replace template variables with actual values
+     */
+    private function replace_template_variables($template, $post = null) {
+        $options = get_option('ace_seo_options', []);
+        $general = $options['general'] ?? [];
+        
+        $variables = [
+            '{site_name}' => $general['site_name'] ?? get_bloginfo('name'),
+            '{sep}' => ' ' . ($general['separator'] ?? '|') . ' ',
+        ];
+        
+        // Add post-specific variables if post is provided
+        if ($post) {
+            $variables['{title}'] = $post->post_title;
+            $variables['{excerpt}'] = $this->get_post_excerpt($post);
+            $variables['{author}'] = get_the_author_meta('display_name', $post->post_author);
+            $variables['{date}'] = get_the_date('', $post);
+            $variables['{category}'] = $this->get_primary_category($post);
+            $variables['{tag}'] = $this->get_primary_tag($post);
+        }
+        
+        // Add special page variables
+        if (is_archive()) {
+            $variables['{archive_title}'] = get_the_archive_title();
+        }
+        
+        if (is_search()) {
+            $variables['{search_term}'] = get_search_query();
+        }
+        
+        if (is_author()) {
+            $author = get_queried_object();
+            $variables['{author_name}'] = $author ? $author->display_name : '';
+        }
+        
+        if (is_category()) {
+            $category = get_queried_object();
+            $variables['{category_name}'] = $category ? $category->name : '';
+        }
+        
+        if (is_tag()) {
+            $tag = get_queried_object();
+            $variables['{tag_name}'] = $tag ? $tag->name : '';
+        }
+        
+        if (is_date()) {
+            if (is_year()) {
+                $variables['{date_archive}'] = get_query_var('year');
+            } elseif (is_month()) {
+                $variables['{date_archive}'] = get_query_var('monthnum') . '/' . get_query_var('year');
+            } elseif (is_day()) {
+                $variables['{date_archive}'] = get_query_var('day') . '/' . get_query_var('monthnum') . '/' . get_query_var('year');
+            }
+        }
+        
+        return str_replace(array_keys($variables), array_values($variables), $template);
+    }
+    
+    /**
+     * Get post excerpt for templates
+     */
+    private function get_post_excerpt($post) {
+        if (!empty($post->post_excerpt)) {
+            return wp_trim_words($post->post_excerpt, 25);
+        } else {
+            return wp_trim_words(strip_tags($post->post_content), 25);
+        }
+    }
+    
+    /**
+     * Get primary category for post
+     */
+    private function get_primary_category($post) {
+        $categories = get_the_category($post->ID);
+        if (!empty($categories)) {
+            return $categories[0]->name;
+        }
+        return '';
+    }
+    
+    /**
+     * Get primary tag for post
+     */
+    private function get_primary_tag($post) {
+        $tags = get_the_tags($post->ID);
+        if (!empty($tags)) {
+            return $tags[0]->name;
+        }
+        return '';
     }
     
     /**
@@ -815,15 +947,24 @@ class AceCrawlEnhancer {
         $meta_desc = self::get_meta_value($post->ID, 'metadesc');
         
         if (empty($meta_desc)) {
-            // Generate from excerpt or content
-            if (!empty($post->post_excerpt)) {
-                return wp_trim_words($post->post_excerpt, 25);
-            } else {
-                return wp_trim_words(strip_tags($post->post_content), 25);
-            }
+            // Use template system
+            return $this->process_meta_template($post);
         }
         
         return $meta_desc;
+    }
+    
+    /**
+     * Process meta description template for a post
+     */
+    private function process_meta_template($post) {
+        $options = get_option('ace_seo_options', []);
+        $templates = $options['templates'] ?? [];
+        
+        $template_key = 'meta_template_' . $post->post_type;
+        $template = $templates[$template_key] ?? '{excerpt}';
+        
+        return $this->replace_template_variables($template, $post);
     }
     
     /**
@@ -835,6 +976,15 @@ class AceCrawlEnhancer {
             $seo_title = $this->get_seo_title($post);
             if (!empty($seo_title)) {
                 $title_parts['title'] = $seo_title;
+            }
+        } elseif (is_search() || is_archive() || is_author()) {
+            // Handle special pages (search, archive, author)
+            $special_title = $this->process_special_page_title();
+            if (!empty($special_title)) {
+                // Replace the entire title with our processed template
+                $title_parts = [
+                    'title' => $special_title
+                ];
             }
         }
         
@@ -943,6 +1093,17 @@ class AceCrawlEnhancer {
             // OG URL
             echo '<meta property="og:url" content="' . esc_url(get_permalink($post)) . '">' . "\n";
             echo '<meta property="og:type" content="article">' . "\n";
+        } elseif (is_search() || is_archive() || is_author()) {
+            // Handle special pages
+            $og_title = $this->process_special_page_title();
+            if (!empty($og_title)) {
+                echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+            }
+            
+            // OG URL for special pages
+            $current_url = home_url(add_query_arg(null, null));
+            echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
+            echo '<meta property="og:type" content="website">' . "\n";
         }
     }
     
@@ -980,6 +1141,14 @@ class AceCrawlEnhancer {
             }
             if (!empty($twitter_image)) {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
+            }
+        } elseif (is_search() || is_archive() || is_author()) {
+            // Handle special pages
+            echo '<meta name="twitter:card" content="summary">' . "\n";
+            
+            $twitter_title = $this->process_special_page_title();
+            if (!empty($twitter_title)) {
+                echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
         }
     }

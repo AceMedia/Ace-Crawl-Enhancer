@@ -17,6 +17,18 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['general']['home_title'] = sanitize_text_field($_POST['home_title'] ?? '');
     $options['general']['home_description'] = sanitize_textarea_field($_POST['home_description'] ?? '');
     
+    // Update title templates for each post type
+    $post_types = get_post_types(['public' => true], 'objects');
+    foreach ($post_types as $post_type) {
+        if ($post_type->name === 'attachment') continue;
+        
+        $template_key = 'title_template_' . $post_type->name;
+        $meta_template_key = 'meta_template_' . $post_type->name;
+        
+        $options['templates'][$template_key] = sanitize_text_field($_POST[$template_key] ?? '');
+        $options['templates'][$meta_template_key] = sanitize_textarea_field($_POST[$meta_template_key] ?? '');
+    }
+    
     // Update social settings
     $options['social']['facebook_app_id'] = sanitize_text_field($_POST['facebook_app_id'] ?? '');
     $options['social']['twitter_username'] = sanitize_text_field($_POST['twitter_username'] ?? '');
@@ -32,7 +44,6 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['ai']['ai_content_analysis'] = isset($_POST['ai_content_analysis']) ? 1 : 0;
     $options['ai']['ai_keyword_suggestions'] = isset($_POST['ai_keyword_suggestions']) ? 1 : 0;
     $options['ai']['ai_content_optimization'] = isset($_POST['ai_content_optimization']) ? 1 : 0;
-    $options['ai']['ai_web_search'] = isset($_POST['ai_web_search']) ? 1 : 0;
     
     $options['performance']['pagespeed_api_key'] = sanitize_text_field($_POST['pagespeed_api_key'] ?? '');
     $options['performance']['pagespeed_monitoring'] = isset($_POST['pagespeed_monitoring']) ? 1 : 0;
@@ -50,6 +61,122 @@ $social = $options['social'] ?? [];
 $advanced = $options['advanced'] ?? [];
 $ai = $options['ai'] ?? [];
 $performance = $options['performance'] ?? [];
+$templates = $options['templates'] ?? [];
+
+// Get default templates
+$default_templates = [
+    'post' => '{title} {sep} {site_name}',
+    'page' => '{title} {sep} {site_name}',
+];
+
+// Archive, search, and author templates
+$special_templates = [
+    'archive' => '{archive_title} {sep} {site_name}',
+    'search' => 'Search Results for "{search_term}" {sep} {site_name}',
+    'author' => '{author_name} {sep} {site_name}',
+    'category' => '{category_name} Archive {sep} {site_name}',
+    'tag' => '{tag_name} Archive {sep} {site_name}',
+    'date' => '{date_archive} Archive {sep} {site_name}'
+];
+
+// Get sample data for each post type
+$post_type_samples = [];
+$available_post_types = get_post_types(['public' => true], 'objects');
+foreach ($available_post_types as $post_type_obj) {
+    if ($post_type_obj->name === 'attachment') continue;
+    
+    $latest_post = get_posts([
+        'numberposts' => 1, 
+        'post_status' => 'publish', 
+        'post_type' => $post_type_obj->name
+    ]);
+    
+    if ($latest_post) {
+        $post = $latest_post[0];
+        $categories = get_the_category($post->ID);
+        $tags = get_the_tags($post->ID);
+        
+        $post_type_samples[$post_type_obj->name] = [
+            'title' => $post->post_title,
+            'excerpt' => $post->post_excerpt ?: wp_trim_words(strip_tags($post->post_content), 25),
+            'author' => get_the_author_meta('display_name', $post->post_author),
+            'date' => get_the_date('F j, Y', $post),
+            'category' => $categories ? $categories[0]->name : '',
+            'tag' => $tags ? $tags[0]->name : ''
+        ];
+    } else {
+        // Fallback sample data
+        $post_type_samples[$post_type_obj->name] = [
+            'title' => 'Sample ' . $post_type_obj->labels->singular_name,
+            'excerpt' => 'This is a sample excerpt for ' . strtolower($post_type_obj->labels->singular_name) . ' content...',
+            'author' => 'Author Name',
+            'date' => date('F j, Y'),
+            'category' => 'Sample Category',
+            'tag' => 'Sample Tag'
+        ];
+    }
+}
+
+// Add sample data for special templates
+$post_type_samples['archive'] = [
+    'title' => 'Blog Archive',
+    'excerpt' => 'Browse all posts in our blog archive',
+    'author' => 'Various Authors',
+    'date' => date('F j, Y'),
+    'category' => 'All Categories',
+    'tag' => 'All Tags',
+    'archive_title' => 'Blog Archive'
+];
+
+$post_type_samples['search'] = [
+    'title' => 'Search Results',
+    'excerpt' => 'Search results for your query',
+    'author' => '',
+    'date' => date('F j, Y'),
+    'category' => '',
+    'tag' => '',
+    'search_term' => 'sample search'
+];
+
+$post_type_samples['author'] = [
+    'title' => 'Author Archive',
+    'excerpt' => 'Posts by this author',
+    'author' => 'shane',
+    'date' => date('F j, Y'),
+    'category' => '',
+    'tag' => '',
+    'author_name' => 'shane'
+];
+
+$post_type_samples['category'] = [
+    'title' => 'Category Archive',
+    'excerpt' => 'Posts in this category',
+    'author' => '',
+    'date' => date('F j, Y'),
+    'category' => 'Uncategorized',
+    'tag' => '',
+    'category_name' => 'Uncategorized'
+];
+
+$post_type_samples['tag'] = [
+    'title' => 'Tag Archive',
+    'excerpt' => 'Posts with this tag',
+    'author' => '',
+    'date' => date('F j, Y'),
+    'category' => '',
+    'tag' => 'Sample Tag',
+    'tag_name' => 'Sample Tag'
+];
+
+$post_type_samples['date'] = [
+    'title' => 'Date Archive',
+    'excerpt' => 'Posts from this time period',
+    'author' => '',
+    'date' => date('F j, Y'),
+    'category' => '',
+    'tag' => '',
+    'date_archive' => date('F Y')
+];
 ?>
 
 <div class="wrap">
@@ -112,6 +239,146 @@ $performance = $options['performance'] ?? [];
                             <p class="description">Meta description for your homepage.</p>
                         </td>
                     </tr>
+                </table>
+            </div>
+            
+            <!-- Title Templates -->
+            <div class="ace-seo-settings-section">
+                <h2>Title & Meta Templates</h2>
+                <p>Configure default title and meta description templates for each post type. These templates will be used when no custom SEO title or meta description is set.</p>
+                
+                <div class="ace-seo-template-variables">
+                    <h4>Available Variables:</h4>
+                    <div class="ace-seo-variables-grid">
+                        <div class="ace-seo-variable">
+                            <code>{title}</code>
+                            <span>Post/Page title</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{site_name}</code>
+                            <span>Site name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{sep}</code>
+                            <span>Title separator</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{excerpt}</code>
+                            <span>Post excerpt</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{author}</code>
+                            <span>Post author</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{date}</code>
+                            <span>Publish date</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{category}</code>
+                            <span>Primary category</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{tag}</code>
+                            <span>First tag</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <table class="form-table">
+                    <?php 
+                    $post_types = get_post_types(['public' => true], 'objects');
+                    foreach ($post_types as $post_type):
+                        if ($post_type->name === 'attachment') continue;
+                        
+                        $title_template_key = 'title_template_' . $post_type->name;
+                        $current_title_template = $templates[$title_template_key] ?? ($default_templates[$post_type->name] ?? '{title} {sep} {site_name}');
+                    ?>
+                    <tr>
+                        <th scope="row">
+                            <label for="<?php echo esc_attr($title_template_key); ?>"><?php echo esc_html($post_type->labels->singular_name); ?> Title</label>
+                        </th>
+                        <td>
+                            <input type="text" 
+                                   id="<?php echo esc_attr($title_template_key); ?>" 
+                                   name="<?php echo esc_attr($title_template_key); ?>" 
+                                   value="<?php echo esc_attr($current_title_template); ?>" 
+                                   class="large-text ace-seo-template-input" 
+                                   data-default="<?php echo esc_attr($default_templates[$post_type->name] ?? '{title} {sep} {site_name}'); ?>"
+                                   data-post-type="<?php echo esc_attr($post_type->name); ?>">
+                            <p class="description">Title template for <?php echo esc_html(strtolower($post_type->labels->name)); ?>.</p>
+                            <div class="ace-seo-template-preview" id="preview_<?php echo esc_attr($title_template_key); ?>"></div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
+            </div>
+            
+            <!-- Archive & Special Page Templates -->
+            <div class="ace-seo-settings-section">
+                <h2>Archive & Special Page Templates</h2>
+                <p class="description">Configure title templates for archive pages, search results, and author pages.</p>
+                
+                <div class="ace-seo-variables">
+                    <h4>Available Variables (in addition to those above):</h4>
+                    <div class="ace-seo-variables-grid">
+                        <div class="ace-seo-variable">
+                            <code>{archive_title}</code>
+                            <span>Archive page title</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{search_term}</code>
+                            <span>Search query</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{author_name}</code>
+                            <span>Author display name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{category_name}</code>
+                            <span>Category name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{tag_name}</code>
+                            <span>Tag name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{date_archive}</code>
+                            <span>Date archive title</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <table class="form-table">
+                    <?php foreach ($special_templates as $template_key => $default_template): 
+                        $template_name = 'title_template_' . $template_key;
+                        $current_template = $templates[$template_name] ?? $default_template;
+                        $labels = [
+                            'archive' => 'General Archive',
+                            'search' => 'Search Results',
+                            'author' => 'Author Pages',
+                            'category' => 'Category Archives',
+                            'tag' => 'Tag Archives',
+                            'date' => 'Date Archives'
+                        ];
+                    ?>
+                    <tr>
+                        <th scope="row">
+                            <label for="<?php echo esc_attr($template_name); ?>"><?php echo esc_html($labels[$template_key]); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" 
+                                   id="<?php echo esc_attr($template_name); ?>" 
+                                   name="<?php echo esc_attr($template_name); ?>" 
+                                   value="<?php echo esc_attr($current_template); ?>" 
+                                   class="large-text ace-seo-template-input" 
+                                   data-default="<?php echo esc_attr($default_template); ?>"
+                                   data-post-type="<?php echo esc_attr($template_key); ?>">
+                            <p class="description">Title template for <?php echo esc_html(strtolower($labels[$template_key])); ?>.</p>
+                            <div class="ace-seo-template-preview" id="preview_<?php echo esc_attr($template_name); ?>"></div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
                 </table>
             </div>
             
@@ -246,17 +513,6 @@ $performance = $options['performance'] ?? [];
                                 Enable AI content optimization suggestions
                             </label>
                             <p class="description">Receive AI-generated suggestions to improve your content for better search rankings.</p>
-                        </td>
-                    </tr>
-                    
-                    <tr>
-                        <th scope="row">AI Web Search Enhancement</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="ai_web_search" value="1" <?php checked($ai['ai_web_search'] ?? 0, 1); ?>>
-                                Enable web search for enhanced AI suggestions
-                            </label>
-                            <p class="description">Allow AI to search the web for current trends and best practices to provide more informed suggestions. Requires focus keywords to be provided.</p>
                         </td>
                     </tr>
                 </table>
@@ -454,6 +710,59 @@ jQuery(document).ready(function($) {
             }
         });
     });
+    
+    // Template preview functionality
+    $('.ace-seo-template-input').on('input', function() {
+        const input = $(this);
+        const template = input.val();
+        const previewId = 'preview_' + input.attr('id');
+        const previewDiv = $('#' + previewId);
+        const postType = input.data('post-type') || 'post';
+        
+        if (template) {
+            const preview = processTemplatePreview(template, postType);
+            previewDiv.html('<strong>Preview:</strong> ' + preview).show();
+        } else {
+            previewDiv.hide();
+        }
+    });
+    
+    // Process template for preview
+    function processTemplatePreview(template, postType) {
+        // Post-type specific sample data
+        const sampleData = <?php echo json_encode($post_type_samples); ?>;
+        const currentTypeData = sampleData[postType] || sampleData['post'];
+        
+        const variables = {
+            '{title}': currentTypeData.title,
+            '{site_name}': '<?php echo esc_js($general['site_name'] ?? get_bloginfo('name')); ?>',
+            '{sep}': '<?php echo esc_js($general['separator'] ?? '|'); ?>',
+            '{excerpt}': currentTypeData.excerpt,
+            '{author}': currentTypeData.author,
+            '{date}': currentTypeData.date,
+            '{category}': currentTypeData.category,
+            '{tag}': currentTypeData.tag,
+            // Special template variables
+            '{archive_title}': currentTypeData.archive_title || currentTypeData.title,
+            '{search_term}': currentTypeData.search_term || '',
+            '{author_name}': currentTypeData.author_name || currentTypeData.author,
+            '{category_name}': currentTypeData.category_name || currentTypeData.category,
+            '{tag_name}': currentTypeData.tag_name || currentTypeData.tag,
+            '{date_archive}': currentTypeData.date_archive || currentTypeData.date
+        };
+        
+        let result = template;
+        for (const [key, value] of Object.entries(variables)) {
+            result = result.replace(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value || '');
+        }
+        
+        result = result.replace(/\s+/g, ' ').trim();
+        
+        return result;
+    }
+    
+    // Initialize previews
+    $('.ace-seo-template-input').trigger('input');
 });
 </script>
 
@@ -546,5 +855,67 @@ jQuery(document).ready(function($) {
     border-radius: 4px;
     font-size: 11px;
     font-weight: 500;
+}
+
+/* Title Template Styles */
+.ace-seo-template-variables {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 15px 0 25px 0;
+}
+
+.ace-seo-template-variables h4 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 14px;
+}
+
+.ace-seo-variables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.ace-seo-variable {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.ace-seo-variable code {
+    background: #e9ecef;
+    color: #d63384;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.ace-seo-variable span {
+    color: #6c757d;
+    font-size: 11px;
+}
+
+.ace-seo-template-input {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.ace-seo-template-preview {
+    margin-top: 8px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-left: 3px solid #007cba;
+    font-size: 12px;
+    color: #495057;
+    border-radius: 0 4px 4px 0;
+    font-style: italic;
 }
 </style>

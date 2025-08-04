@@ -259,6 +259,10 @@ class AceSEOMetabox {
         
         // Localize script with data
         global $post;
+        $options = get_option('ace_seo_options', []);
+        $templates = $options['templates'] ?? [];
+        $general = $options['general'] ?? [];
+        
         wp_localize_script( 'ace-seo-admin', 'aceSeoAdmin', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
@@ -267,6 +271,11 @@ class AceSEOMetabox {
             'postId' => get_the_ID(),
             'postTitle' => $post ? $post->post_title : '',
             'postContent' => $post ? wp_trim_words( strip_tags( $post->post_content ), 25 ) : '',
+            'postType' => $post ? $post->post_type : 'post',
+            'titleTemplate' => $post ? ($templates['title_template_' . $post->post_type] ?? '{title} {sep} {site_name}') : '{title} {sep} {site_name}',
+            'metaTemplate' => $post ? ($templates['meta_template_' . $post->post_type] ?? '{excerpt}') : '{excerpt}',
+            'siteName' => $general['site_name'] ?? get_bloginfo('name'),
+            'separator' => $general['separator'] ?? '|',
             'strings' => array(
                 'analyzing' => __( 'Analyzing...', 'ace-seo' ),
                 'excellent' => __( 'Excellent', 'ace-seo' ),
