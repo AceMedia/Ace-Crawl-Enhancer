@@ -724,21 +724,32 @@ class AceSEOApiHelper {
             $search_context = " First, search for high-performing content and optimization strategies for '" . $focus_keyword . "' to understand what improvements work best.";
         }
         
-        $prompt = "Analyze this content and provide specific improvement suggestions." . $search_context . "\n\n";
+        $prompt = "Analyze this article content and provide specific writing and content SEO improvement suggestions." . $search_context . "\n\n";
         $prompt .= "Content Details:\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
         $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 400 ) . "\n\n";
         
-        $prompt .= "Based on current content marketing trends and successful optimization strategies, provide 8-10 specific, actionable suggestions for improving this content. Focus on:\n";
-        $prompt .= "- Where to include the focus keyword naturally based on current best practices\n";
-        $prompt .= "- How to improve content flow and structure for modern audiences\n";
-        $prompt .= "- What sections or points to add based on trending topics\n";
-        $prompt .= "- How to make it more engaging using current successful strategies\n";
-        $prompt .= "- SEO optimization opportunities based on latest algorithm preferences\n\n";
+        $prompt .= "Provide 8-10 specific, actionable suggestions for improving this article's content and writing. Focus ONLY on:\n";
+        $prompt .= "- Natural keyword placement and usage within the article text\n";
+        $prompt .= "- Content structure improvements (headings, paragraphs, flow)\n";
+        $prompt .= "- Writing style and readability enhancements\n";
+        $prompt .= "- Additional content topics or sections to add to the article\n";
+        $prompt .= "- Improving user engagement through better writing\n";
+        $prompt .= "- Content gaps that should be filled\n";
+        $prompt .= "- Better introduction and conclusion suggestions\n\n";
         
-        $prompt .= "Return as a numbered list with clear, actionable suggestions based on current market insights. For example:\n";
-        $prompt .= "1. Add the focus keyword to the first paragraph naturally\n";
-        $prompt .= "2. Include subheadings to break up long sections\n";
+        $prompt .= "DO NOT suggest technical implementations like:\n";
+        $prompt .= "- Schema markup or structured data\n";
+        $prompt .= "- Meta tags or HTML code\n";
+        $prompt .= "- Server configurations or monitoring\n";
+        $prompt .= "- External tools or plugins\n";
+        $prompt .= "- Analytics or tracking setup\n\n";
+        
+        $prompt .= "Focus only on what can be improved in the actual article content and writing style.\n";
+        $prompt .= "Return as a numbered list with clear, actionable content writing suggestions. For example:\n";
+        $prompt .= "1. Add the focus keyword naturally in the first paragraph\n";
+        $prompt .= "2. Break up the third paragraph into two shorter ones for better readability\n";
+        $prompt .= "3. Add a section about [specific topic] to provide more comprehensive coverage\n";
         $prompt .= "And so on...";
         
         // Enable web search if setting is enabled and focus keyword is provided
