@@ -86,11 +86,6 @@
             $(document).on('click', '.ace-ai-suggestion-item', this.selectSuggestion.bind(this));
             $(document).on('click', '#ace-ai-apply-suggestion', this.applySuggestion.bind(this));
             
-            // Content Analysis events
-            $('#ace-analyze-content').on('click', this.handleAnalyzeContent.bind(this));
-            $('#ace-get-topic-suggestions').on('click', this.handleTopicSuggestions.bind(this));
-            $('#ace-improve-content').on('click', this.handleImproveContent.bind(this));
-            
             // Comprehensive AI Analysis (sidebar)
             $('#ace-analyze-all-content').on('click', this.handleComprehensiveAnalysis.bind(this));
             
@@ -1433,22 +1428,19 @@
         // Sidebar analysis functions
         showAnalysisLoading: function(show) {
             const $loading = $('#ace-analysis-loading');
-            const $results = $('#ace-ai-analysis-results');
-            const $status = $('#ace-analysis-status');
+            const $results = $('#ace-analysis-results');
             
             if (show) {
                 $loading.show();
-                $results.show();
-                $status.hide();
-                // Switch to content analysis tab
-                this.switchToAnalysisTab();
+                $results.hide();
             } else {
                 $loading.hide();
+                $results.show();
             }
         },
 
         showAnalysisError: function(message) {
-            const $content = $('#ace-analysis-content');
+            const $content = $('#ace-content-analysis-content');
             $content.html(`
                 <div class="ace-analysis-error">
                     <span class="dashicons dashicons-warning"></span>
@@ -1458,16 +1450,12 @@
         },
 
         switchToAnalysisTab: function() {
-            // Switch to the content analysis tab
-            $('.ace-seo-tab-item').removeClass('active');
-            $('.ace-seo-tab-content').removeClass('active');
-            $('[data-tab="content-analysis"]').addClass('active');
-            $('#tab-content-analysis').addClass('active');
+            // No longer needed - analysis is shown in sidebar
         },
 
         populateContentAnalysis: function(analysis) {
-            const $content = $('#ace-analysis-content');
-            const $results = $('#ace-ai-analysis-results');
+            const $content = $('#ace-content-analysis-content');
+            const $section = $('#ace-content-analysis-section');
             
             let html = '<div class="ace-analysis-categories">';
             
@@ -1499,16 +1487,15 @@
             html += '</div>';
             
             $content.html(html);
-            $results.show();
-            $('#ace-analysis-status').hide();
+            $section.show();
             
             // Update analysis score indicator
             this.updateAnalysisScore('good');
         },
 
         populateContentImprovements: function(improvements) {
-            const $list = $('#ace-improvements-list');
-            const $container = $('#ace-content-improvements');
+            const $content = $('#ace-content-improvements-content');
+            const $section = $('#ace-content-improvements-section');
             
             let html = '';
             
@@ -1524,17 +1511,13 @@
                 `;
             });
             
-            $list.html(html);
-            $container.show();
-            $('#ace-analysis-status').hide();
-            
-            // Switch to analysis tab and scroll to improvements
-            this.switchToAnalysisTab();
+            $content.html(html);
+            $section.show();
         },
 
         populateTopicSuggestions: function(suggestions) {
-            const $content = $('#ace-topic-content');
-            const $container = $('#ace-topic-suggestions');
+            const $content = $('#ace-topic-ideas-content');
+            const $section = $('#ace-topic-ideas-section');
             
             let html = '';
             
@@ -1563,57 +1546,14 @@
             }
             
             $content.html(html);
-            $container.show();
-            $('#ace-analysis-status').hide();
+            $section.show();
             
             // Switch to analysis tab and scroll to topics
             this.switchToAnalysisTab();
         },
 
         updateAnalysisScore: function(rating) {
-            const $score = $('#ace-ai-analysis-score');
-            const scoreText = rating === 'good' ? '✓' : rating === 'needs-improvement' ? '!' : '—';
-            $score.text(scoreText).removeClass('good needs-improvement poor').addClass(rating);
-        },
-
-        // Content Analysis Button Handlers
-        handleAnalyzeContent: function(e) {
-            e.preventDefault();
-            const $button = $(e.currentTarget);
-            
-            if ($button.hasClass('loading')) {
-                return;
-            }
-            
-            this.setButtonLoading($button, true);
-            const contentData = this.getContentData();
-            this.analyzeContent(contentData, $button);
-        },
-
-        handleTopicSuggestions: function(e) {
-            e.preventDefault();
-            const $button = $(e.currentTarget);
-            
-            if ($button.hasClass('loading')) {
-                return;
-            }
-            
-            this.setButtonLoading($button, true);
-            const contentData = this.getContentData();
-            this.suggestTopics(contentData, $button);
-        },
-
-        handleImproveContent: function(e) {
-            e.preventDefault();
-            const $button = $(e.currentTarget);
-            
-            if ($button.hasClass('loading')) {
-                return;
-            }
-            
-            this.setButtonLoading($button, true);
-            const contentData = this.getContentData();
-            this.improveContent(contentData, $button);
+            // Score indicator removed in new sidebar design
         },
 
         handleComprehensiveAnalysis: function(e) {

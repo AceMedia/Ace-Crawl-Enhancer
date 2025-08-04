@@ -186,28 +186,6 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                 <!-- Results will be populated by JavaScript -->
             </div>
         </div>
-
-        <!-- AI Content Analysis -->
-        <?php if (AceSEOAiAssistant::is_ai_available()): ?>
-        <div class="ace-ai-analysis" id="ace-ai-analysis">
-            <h4>
-                <span class="dashicons dashicons-admin-generic"></span>
-                AI Content Analysis
-                <span class="ace-ai-beta-badge">BETA</span>
-            </h4>
-            <p class="ace-seo-description">
-                Get AI-powered insights and suggestions to improve your content's SEO and readability.
-            </p>
-            <div class="ace-ai-actions">
-                <?php echo AceSEOAiAssistant::render_ai_buttons('analysis'); ?>
-                <?php echo AceSEOAiAssistant::render_ai_buttons('improve'); ?>
-                <?php echo AceSEOAiAssistant::render_ai_buttons('topics'); ?>
-            </div>
-            <div class="ace-ai-results" id="ace-ai-analysis-results" style="display: none;">
-                <!-- AI analysis results will be populated here -->
-            </div>
-        </div>
-        <?php endif; ?>
     </div>
 
     <!-- Readability Tab -->
