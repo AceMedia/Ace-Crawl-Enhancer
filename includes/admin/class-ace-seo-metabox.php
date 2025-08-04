@@ -92,6 +92,27 @@ class AceSEOMetabox {
             <!-- Analysis Results -->
             <div class="ace-analysis-results" id="ace-analysis-results" style="display: none;">
                 
+                <!-- SEO Hat Analysis Bar -->
+                <div class="ace-seo-hat-analysis" id="ace-seo-hat-analysis" style="display: none;">
+                    <h4 style="margin: 15px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                        <span class="dashicons dashicons-shield-alt"></span>
+                        SEO Practice Analysis
+                    </h4>
+                    <div class="ace-seo-hat-container">
+                        <div class="ace-seo-hat-bar">
+                            <div class="ace-seo-hat-indicator" id="ace-seo-hat-indicator"></div>
+                        </div>
+                        <div class="ace-seo-hat-labels">
+                            <span class="ace-hat-label black-hat">Black Hat</span>
+                            <span class="ace-hat-label gray-hat">Gray Hat</span>
+                            <span class="ace-hat-label white-hat">White Hat</span>
+                        </div>
+                        <div class="ace-seo-hat-score" id="ace-seo-hat-score">
+                            <span class="ace-hat-score-text">Analyzing...</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Content Analysis Section -->
                 <div class="ace-analysis-section" id="ace-content-analysis-section">
                     <h4 style="margin: 15px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">

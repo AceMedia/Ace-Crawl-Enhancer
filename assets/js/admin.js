@@ -1489,6 +1489,9 @@
             $content.html(html);
             $section.show();
             
+            // Update SEO hat analysis
+            this.populateSeoHatAnalysis(analysis);
+            
             // Update analysis score indicator
             this.updateAnalysisScore('good');
         },
@@ -1556,6 +1559,146 @@
             // Score indicator removed in new sidebar design
         },
 
+        populateSeoHatAnalysis: function(analysis) {
+            const $container = $('#ace-seo-hat-analysis');
+            const $indicator = $('#ace-seo-hat-indicator');
+            const $scoreText = $('.ace-hat-score-text');
+            
+            // Analyze content for SEO practices
+            const hatScore = this.calculateSeoHatScore(analysis);
+            
+            // Update the indicator position (0-100%)
+            const position = hatScore.percentage;
+            $indicator.css('left', `calc(${position}% - 3px)`);
+            
+            // Update the score text and styling
+            $scoreText.text(hatScore.label)
+                .removeClass('black-hat gray-hat white-hat')
+                .addClass(hatScore.class);
+            
+            // Show the container
+            $container.show();
+            
+            // Log for debugging
+            console.log('SEO Hat Analysis:', hatScore);
+            console.log('Analysis data:', analysis);
+        },
+
+        calculateSeoHatScore: function(analysis) {
+            let score = 50; // Start neutral (gray hat)
+            let reasons = [];
+            
+            // Convert analysis to string for pattern matching
+            const content = JSON.stringify(analysis).toLowerCase();
+            
+            // First, check if AI provided explicit SEO ethics assessment
+            if (analysis && analysis.seo_ethics) {
+                let ethicsText = '';
+                
+                // Handle both array and string formats
+                if (Array.isArray(analysis.seo_ethics)) {
+                    ethicsText = analysis.seo_ethics.join(' ').toLowerCase();
+                } else {
+                    ethicsText = analysis.seo_ethics.toLowerCase();
+                }
+                
+                console.log('SEO Ethics text:', ethicsText);
+                
+                if (ethicsText.includes('white hat')) {
+                    score = 80;
+                    reasons.push('AI Assessment: White Hat practices detected');
+                } else if (ethicsText.includes('black hat')) {
+                    score = 20;
+                    reasons.push('AI Assessment: Black Hat practices detected');
+                } else if (ethicsText.includes('gray hat') || ethicsText.includes('grey hat')) {
+                    score = 50;
+                    reasons.push('AI Assessment: Gray Hat practices detected');
+                }
+            } else {
+                console.log('No seo_ethics found in analysis:', analysis);
+            }
+            
+            // Black hat indicators (negative score)
+            const blackHatPatterns = [
+                'keyword stuffing', 'keyword density too high', 'excessive keywords',
+                'hidden text', 'cloaking', 'duplicate content', 'thin content',
+                'over-optimization', 'unnatural link building', 'clickbait',
+                'misleading', 'spammy', 'manipulative', 'deceptive',
+                'artificial', 'forced keywords', 'irrelevant keywords'
+            ];
+            
+            // Gray hat indicators (neutral)
+            const grayHatPatterns = [
+                'aggressive seo', 'borderline', 'questionable',
+                'paid links', 'guest posting', 'article spinning',
+                'aggressive optimization', 'slightly aggressive'
+            ];
+            
+            // White hat indicators (positive score)
+            const whiteHatPatterns = [
+                'natural', 'user-focused', 'high quality', 'valuable content',
+                'good user experience', 'relevant', 'informative',
+                'well-structured', 'helpful', 'authoritative',
+                'original content', 'proper optimization', 'ethical',
+                'user intent', 'natural flow', 'quality content'
+            ];
+            
+            // Check for black hat patterns
+            blackHatPatterns.forEach(pattern => {
+                if (content.includes(pattern)) {
+                    score -= 8;
+                    reasons.push(`Detected: ${pattern}`);
+                }
+            });
+            
+            // Check for gray hat patterns
+            grayHatPatterns.forEach(pattern => {
+                if (content.includes(pattern)) {
+                    score -= 3;
+                    reasons.push(`Detected: ${pattern}`);
+                }
+            });
+            
+            // Check for white hat patterns
+            whiteHatPatterns.forEach(pattern => {
+                if (content.includes(pattern)) {
+                    score += 5;
+                    reasons.push(`Detected: ${pattern}`);
+                }
+            });
+            
+            // Ensure score is between 0-100
+            score = Math.max(0, Math.min(100, score));
+            
+            // Determine category and label
+            let category, label, className;
+            if (score < 33) {
+                category = 'black-hat';
+                label = `Black Hat SEO (${Math.round(score)}% Ethical)`;
+                className = 'black-hat';
+            } else if (score < 67) {
+                category = 'gray-hat';
+                label = `Gray Hat SEO (${Math.round(score)}% Ethical)`;
+                className = 'gray-hat';
+            } else {
+                category = 'white-hat';
+                label = `White Hat SEO (${Math.round(score)}% Ethical)`;
+                className = 'white-hat';
+            }
+            
+            console.log('Calculated SEO hat score:', {score, category, reasons});
+            
+            return {
+                score: score,
+                percentage: score,
+                category: category,
+                label: label,
+                class: className,
+                reasons: reasons
+            };
+        },
+
+        // Test function for debugging SEO hat analysis
         handleComprehensiveAnalysis: function(e) {
             e.preventDefault();
             const $button = $(e.currentTarget);
@@ -1686,6 +1829,9 @@
         populateContentAnalysisSidebar: function(analysis) {
             const $content = $('#ace-content-analysis-content');
             let html = '';
+            
+            // First, show SEO hat analysis
+            this.populateSeoHatAnalysis(analysis);
             
             Object.keys(analysis).forEach(category => {
                 const categoryTitle = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

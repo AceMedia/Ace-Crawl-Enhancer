@@ -1631,6 +1631,103 @@
     font-size: 13px;
 }
 
+/* SEO Hat Analysis Bar Styles */
+.ace-seo-hat-analysis {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e1e8ed;
+}
+
+.ace-seo-hat-container {
+    margin-top: 10px;
+}
+
+.ace-seo-hat-bar {
+    position: relative;
+    height: 20px;
+    background: linear-gradient(to right, #dc3545 0%, #dc3545 33%, #ffc107 33%, #ffc107 66%, #28a745 66%, #28a745 100%);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.ace-seo-hat-indicator {
+    position: absolute;
+    top: -3px;
+    width: 6px;
+    height: 26px;
+    background: #fff;
+    border: 2px solid #333;
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    transition: left 0.3s ease;
+    z-index: 2;
+}
+
+.ace-seo-hat-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.ace-hat-label {
+    flex: 1;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ace-hat-label.black-hat {
+    color: #dc3545;
+}
+
+.ace-hat-label.gray-hat {
+    color: #ffc107;
+}
+
+.ace-hat-label.white-hat {
+    color: #28a745;
+}
+
+.ace-seo-hat-score {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.ace-hat-score-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    padding: 5px 12px;
+    background: #fff;
+    border-radius: 15px;
+    border: 1px solid #dee2e6;
+    display: inline-block;
+}
+
+.ace-hat-score-text.black-hat {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.ace-hat-score-text.gray-hat {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.ace-hat-score-text.white-hat {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 782px) {
     #ace-ai-analysis-sidebar .button-primary {
@@ -1640,5 +1737,18 @@
     
     .ace-analysis-section h4 {
         font-size: 13px;
+    }
+    
+    .ace-seo-hat-analysis {
+        padding: 12px;
+    }
+    
+    .ace-hat-label {
+        font-size: 10px;
+    }
+    
+    .ace-hat-score-text {
+        font-size: 12px;
+        padding: 4px 10px;
     }
 }

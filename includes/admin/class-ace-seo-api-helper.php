@@ -633,21 +633,24 @@ class AceSEOApiHelper {
         
         if ( $enable_search ) {
             $prompt .= "Based on current SEO trends and best practices, provide analysis in these categories with specific actionable suggestions:\n";
-            $prompt .= "1. KEYWORD_OPTIMIZATION: How well is the focus keyword used and where to improve based on current trends?\n";
-            $prompt .= "2. CONTENT_STRUCTURE: How is the content organized and what structure improvements are needed for current SEO standards?\n";
-            $prompt .= "3. READABILITY: How easy is it to read and specific ways to improve readability for modern audiences?\n";
-            $prompt .= "4. SEO_IMPROVEMENTS: What specific SEO improvements are needed based on current algorithm preferences?\n";
-            $prompt .= "5. ENGAGEMENT: How engaging is the content and specific ways to improve engagement using current best practices?\n\n";
+            $prompt .= "1. SEO_ETHICS: Analyze if the content follows ethical SEO practices. Rate as Black Hat (manipulative/deceptive), Gray Hat (borderline/aggressive), or White Hat (natural/user-focused). Explain why.\n";
+            $prompt .= "2. KEYWORD_OPTIMIZATION: How well is the focus keyword used and where to improve based on current trends?\n";
+            $prompt .= "3. CONTENT_STRUCTURE: How is the content organized and what structure improvements are needed for current SEO standards?\n";
+            $prompt .= "4. READABILITY: How easy is it to read and specific ways to improve readability for modern audiences?\n";
+            $prompt .= "5. SEO_IMPROVEMENTS: What specific SEO improvements are needed based on current algorithm preferences?\n";
+            $prompt .= "6. ENGAGEMENT: How engaging is the content and specific ways to improve engagement using current best practices?\n\n";
         } else {
             $prompt .= "Provide analysis in these categories with specific actionable suggestions:\n";
-            $prompt .= "1. KEYWORD_OPTIMIZATION: How well is the focus keyword used and where to improve?\n";
-            $prompt .= "2. CONTENT_STRUCTURE: How is the content organized and what structure improvements are needed?\n";
-            $prompt .= "3. READABILITY: How easy is it to read and specific ways to improve readability?\n";
-            $prompt .= "4. SEO_IMPROVEMENTS: What specific SEO improvements are needed?\n";
-            $prompt .= "5. ENGAGEMENT: How engaging is the content and specific ways to improve engagement?\n\n";
+            $prompt .= "1. SEO_ETHICS: Analyze if the content follows ethical SEO practices. Rate as Black Hat (manipulative/deceptive), Gray Hat (borderline/aggressive), or White Hat (natural/user-focused). Explain why.\n";
+            $prompt .= "2. KEYWORD_OPTIMIZATION: How well is the focus keyword used and where to improve?\n";
+            $prompt .= "3. CONTENT_STRUCTURE: How is the content organized and what structure improvements are needed?\n";
+            $prompt .= "4. READABILITY: How easy is it to read and specific ways to improve readability?\n";
+            $prompt .= "5. SEO_IMPROVEMENTS: What specific SEO improvements are needed?\n";
+            $prompt .= "6. ENGAGEMENT: How engaging is the content and specific ways to improve engagement?\n\n";
         }
         
         $prompt .= "Respond with clear, actionable suggestions for each category. Do NOT use JSON format. Use this format:\n\n";
+        $prompt .= "SEO_ETHICS:\n- Your ethical assessment (Black Hat/Gray Hat/White Hat) with explanation\n\n";
         $prompt .= "KEYWORD_OPTIMIZATION:\n- Suggestion 1\n- Suggestion 2\n\n";
         $prompt .= "CONTENT_STRUCTURE:\n- Suggestion 1\n- Suggestion 2\n\n";
         if ( $enable_search ) {
@@ -783,6 +786,7 @@ class AceSEOApiHelper {
      */
     private static function parse_ai_analysis_text( $text ) {
         $analysis = [
+            'seo_ethics' => [],
             'keyword_optimization' => [],
             'content_structure' => [],
             'readability' => [],
@@ -797,7 +801,10 @@ class AceSEOApiHelper {
             $line = trim( $line );
             
             // Check for category headers
-            if ( stripos( $line, 'KEYWORD_OPTIMIZATION' ) !== false || stripos( $line, 'keyword optimization' ) !== false ) {
+            if ( stripos( $line, 'SEO_ETHICS' ) !== false || stripos( $line, 'seo ethics' ) !== false ) {
+                $current_category = 'seo_ethics';
+                continue;
+            } elseif ( stripos( $line, 'KEYWORD_OPTIMIZATION' ) !== false || stripos( $line, 'keyword optimization' ) !== false ) {
                 $current_category = 'keyword_optimization';
                 continue;
             } elseif ( stripos( $line, 'CONTENT_STRUCTURE' ) !== false || stripos( $line, 'content structure' ) !== false ) {
