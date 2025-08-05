@@ -292,18 +292,23 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <?php endif; ?>
                 </label>
                 <div class="ace-seo-image-field">
-                    <input 
-                        type="url" 
-                        id="yoast_wpseo_opengraph-image" 
-                        name="yoast_wpseo_opengraph-image" 
-                        value="<?php echo esc_attr($og_image); ?>"
-                        class="ace-seo-input"
-                        placeholder="<?php echo $featured_image_url ? 'Using featured image as default' : 'Enter image URL'; ?>"
-                        data-featured-image="<?php echo esc_attr($featured_image_url); ?>"
-                    >
-                    <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_opengraph-image">
-                        Select Image
-                    </button>
+                    <div class="ace-seo-image-input-group">
+                        <input 
+                            type="url" 
+                            id="yoast_wpseo_opengraph-image" 
+                            name="yoast_wpseo_opengraph-image" 
+                            value="<?php echo esc_attr($og_image); ?>"
+                            class="ace-seo-input"
+                            placeholder="<?php echo $featured_image_url ? 'Using featured image as default' : 'Enter image URL'; ?>"
+                            data-featured-image="<?php echo esc_attr($featured_image_url); ?>"
+                        >
+                        <div class="ace-seo-image-buttons">
+                            <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_opengraph-image">
+                                Select Image
+                            </button>
+                            <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_image'); ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -317,8 +322,6 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                 <div class="ace-seo-social-preview-image" id="twitter-preview-image">
                     <?php if ($twitter_image): ?>
                         <img src="<?php echo esc_url($twitter_image); ?>" alt="Twitter preview">
-                    <?php elseif ($og_image): ?>
-                        <img src="<?php echo esc_url($og_image); ?>" alt="Twitter preview (Facebook image)">
                     <?php elseif ($featured_image_url): ?>
                         <img src="<?php echo esc_url($featured_image_url); ?>" alt="Twitter preview (featured image)">
                     <?php else: ?>
@@ -378,32 +381,34 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             <div class="ace-seo-field">
                 <label for="yoast_wpseo_twitter-image" class="ace-seo-label">
                     <strong>Twitter Image</strong>
-                    <?php if (($featured_image_url || $og_image) && !$twitter_image): ?>
-                        <span class="ace-seo-help" title="<?php echo $og_image ? 'Using Facebook image as default' : 'Using featured image as default'; ?>">📷</span>
+                    <?php if ($featured_image_url && !$twitter_image): ?>
+                        <span class="ace-seo-help" title="Using featured image as default">📷</span>
                     <?php endif; ?>
                 </label>
                 <div class="ace-seo-image-field">
-                    <input 
-                        type="url" 
-                        id="yoast_wpseo_twitter-image" 
-                        name="yoast_wpseo_twitter-image" 
-                        value="<?php echo esc_attr($twitter_image); ?>"
-                        class="ace-seo-input"
-                        placeholder="<?php 
-                            if ($og_image) {
-                                echo 'Using Facebook image as default';
-                            } elseif ($featured_image_url) {
-                                echo 'Using featured image as default';
-                            } else {
-                                echo 'Enter image URL';
-                            }
-                        ?>"
-                        data-featured-image="<?php echo esc_attr($featured_image_url); ?>"
-                        data-facebook-image="<?php echo esc_attr($og_image); ?>"
-                    >
-                    <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_twitter-image">
-                        Select Image
-                    </button>
+                    <div class="ace-seo-image-input-group">
+                        <input 
+                            type="url" 
+                            id="yoast_wpseo_twitter-image" 
+                            name="yoast_wpseo_twitter-image" 
+                            value="<?php echo esc_attr($twitter_image); ?>"
+                            class="ace-seo-input"
+                            placeholder="<?php 
+                                if ($featured_image_url) {
+                                    echo 'Using featured image as default';
+                                } else {
+                                    echo 'Enter image URL';
+                                }
+                            ?>"
+                            data-featured-image="<?php echo esc_attr($featured_image_url); ?>"
+                        >
+                        <div class="ace-seo-image-buttons">
+                            <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_twitter-image">
+                                Select Image
+                            </button>
+                            <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_image'); ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

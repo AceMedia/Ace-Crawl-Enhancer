@@ -9,8 +9,95 @@
         currentModal: null,
         selectedSuggestion: null,
         aiData: {},
+        aiCache: {}, // Cache for AI responses
         
         init: function() {
+            this.loadAiCache(); // Load cached responses
+            this.bindEvents();
+            this.initTabs();
+            this.initCounters();
+            this.initImageSelectors();
+            this.initRealTimeAnalysis();
+            this.initPageSpeed();
+            this.initAiAssistant();
+            this.initSocialDefaults();
+            this.updatePreviews();
+            
+            // Initial analysis
+            setTimeout(() => {
+                this.performClientSideAnalysis(); // Use client-side for immediate feedback
+                this.performReadabilityAnalysis();
+            }, 1000);
+        },
+
+        // Cache management functions
+        loadAiCache: function() {
+            try {
+                const cached = localStorage.getItem('ace_seo_ai_cache_' + (aceSeoAdmin.postId || 'new'));
+                if (cached) {
+                    this.aiCache = JSON.parse(cached);
+                }
+            } catch (e) {
+                console.log('Could not load AI cache:', e);
+                this.aiCache = {};
+            }
+        },
+
+        saveAiCache: function() {
+            try {
+                localStorage.setItem('ace_seo_ai_cache_' + (aceSeoAdmin.postId || 'new'), JSON.stringify(this.aiCache));
+            } catch (e) {
+                console.log('Could not save AI cache:', e);
+            }
+        },
+
+        getCacheKey: function(type, content, extraParams = {}) {
+            // Create a simple hash of the content and parameters
+            const dataString = type + content + JSON.stringify(extraParams);
+            let hash = 0;
+            for (let i = 0; i < dataString.length; i++) {
+                const char = dataString.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            return type + '_' + Math.abs(hash);
+        },
+
+        getCachedResponse: function(cacheKey) {
+            const cached = this.aiCache[cacheKey];
+            if (cached && (Date.now() - cached.timestamp) < 3600000) { // 1 hour cache
+                return cached.data;
+            }
+            return null;
+        },
+
+        setCachedResponse: function(cacheKey, data) {
+            this.aiCache[cacheKey] = {
+                data: data,
+                timestamp: Date.now()
+            };
+            this.saveAiCache();
+        },
+
+        invalidateImageCaches: function(fieldType) {
+            // Invalidate all caches related to the field type when an image is actually set
+            const platform = fieldType.replace('_image', ''); // 'facebook' or 'twitter'
+            
+            // Clear cache for this platform's image generation
+            Object.keys(this.aiCache).forEach(key => {
+                if (key.includes(`${platform}_image`) || key.includes(`${platform}_more_images`)) {
+                    delete this.aiCache[key];
+                }
+            });
+            
+            this.saveAiCache();
+            console.log(`Invalidated ${platform} image caches due to manual image selection`);
+        },
+        
+        init: function() {
+            // Load cached AI responses from localStorage
+            this.loadAiCache();
+            
             this.bindEvents();
             this.initTabs();
             this.initCounters();
@@ -69,8 +156,18 @@
             $('#yoast_wpseo_opengraph-title, #yoast_wpseo_opengraph-description, #yoast_wpseo_opengraph-image').on('input', this.updateFacebookPreview.bind(this));
             $('#yoast_wpseo_twitter-title, #yoast_wpseo_twitter-description, #yoast_wpseo_twitter-image').on('input', this.updateTwitterPreview.bind(this));
             
-            // When Facebook image changes, also update Twitter preview (since Twitter can use Facebook image as fallback)
-            $('#yoast_wpseo_opengraph-image').on('input', this.updateTwitterPreview.bind(this));
+            // Cache invalidation when image fields are manually changed
+            $('#yoast_wpseo_opengraph-image').on('input change', this.debounce((e) => {
+                if ($(e.target).val().trim()) {
+                    this.invalidateImageCaches('facebook_image');
+                }
+            }, 1000));
+            
+            $('#yoast_wpseo_twitter-image').on('input change', this.debounce((e) => {
+                if ($(e.target).val().trim()) {
+                    this.invalidateImageCaches('twitter_image');
+                }
+            }, 1000));
             
             // Character counters
             $('#yoast_wpseo_title').on('input', () => this.updateCounter('title', 60));
@@ -756,23 +853,18 @@
                 });
             }
             
-            const image = $('#yoast_wpseo_twitter-image').val() || $('#yoast_wpseo_opengraph-image').val();
+            const twitterImage = $('#yoast_wpseo_twitter-image').val();
             const featuredImage = $('#yoast_wpseo_twitter-image').data('featured-image');
-            const facebookImage = $('#yoast_wpseo_twitter-image').data('facebook-image');
             
             $('#twitter-preview-title').text(title);
             $('#twitter-preview-description').text(description);
             
             const $imageContainer = $('#twitter-preview-image');
-            const imageToShow = image || facebookImage || featuredImage;
+            const imageToShow = twitterImage || featuredImage;
             if (imageToShow) {
                 let altText = 'Twitter preview';
-                if (!$('#yoast_wpseo_twitter-image').val()) {
-                    if (facebookImage) {
-                        altText = 'Twitter preview (Facebook image)';
-                    } else if (featuredImage) {
-                        altText = 'Twitter preview (featured image)';
-                    }
+                if (!twitterImage && featuredImage) {
+                    altText = 'Twitter preview (featured image)';
                 }
                 $imageContainer.html(`<img src="${imageToShow}" alt="${altText}">`);
             } else {
@@ -1122,6 +1214,12 @@
                 case 'generate_twitter_descriptions':
                     this.generateTwitterDescriptions(contentData, $button);
                     break;
+                case 'generate_facebook_image':
+                    this.generateFacebookImage(contentData, $button);
+                    break;
+                case 'generate_twitter_image':
+                    this.generateTwitterImage(contentData, $button);
+                    break;
                 default:
                     this.setButtonLoading($button, false);
                     console.warn('Unknown AI action:', action);
@@ -1296,6 +1394,84 @@
                     this.showDescriptionSuggestions(response.data.descriptions, 'twitter');
                 } else {
                     this.showAiError(response.data || 'Failed to generate Twitter descriptions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateFacebookImage: function(contentData, $button) {
+            const facebookData = {
+                ...contentData,
+                facebook_title: $('#yoast_wpseo_opengraph-title').val(),
+                facebook_description: $('#yoast_wpseo_opengraph-description').val(),
+                featured_image_url: aceSeoAdmin.featuredImage || ''
+            };
+            
+            // Check cache first
+            const cacheKey = this.getCacheKey('facebook_image', contentData.content, facebookData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            
+            if (cachedResponse) {
+                console.log('Using cached Facebook image response');
+                this.setButtonLoading($button, false);
+                this.showImageSuggestions(cachedResponse, 'facebook');
+                return;
+            }
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_facebook_image',
+                ...facebookData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    // Cache the response
+                    this.setCachedResponse(cacheKey, response.data.image_suggestions);
+                    this.showImageSuggestions(response.data.image_suggestions, 'facebook');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Facebook image suggestions');
+                }
+            })
+            .fail(() => {
+                this.setButtonLoading($button, false);
+                this.showAiError('Network error occurred');
+            });
+        },
+
+        generateTwitterImage: function(contentData, $button) {
+            const twitterData = {
+                ...contentData,
+                twitter_title: $('#yoast_wpseo_twitter-title').val(),
+                twitter_description: $('#yoast_wpseo_twitter-description').val(),
+                featured_image_url: aceSeoAdmin.featuredImage || ''
+            };
+            
+            // Check cache first
+            const cacheKey = this.getCacheKey('twitter_image', contentData.content, twitterData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            
+            if (cachedResponse) {
+                console.log('Using cached Twitter image response');
+                this.setButtonLoading($button, false);
+                this.showImageSuggestions(cachedResponse, 'twitter');
+                return;
+            }
+            
+            $.post(aceSeoAdmin.ajaxurl, {
+                action: 'ace_seo_generate_twitter_image',
+                ...twitterData
+            })
+            .done((response) => {
+                this.setButtonLoading($button, false);
+                if (response.success) {
+                    // Cache the response
+                    this.setCachedResponse(cacheKey, response.data.image_suggestions);
+                    this.showImageSuggestions(response.data.image_suggestions, 'twitter');
+                } else {
+                    this.showAiError(response.data || 'Failed to generate Twitter image suggestions');
                 }
             })
             .fail(() => {
@@ -1508,6 +1684,543 @@
             html += '</div>';
             
             this.showModal('AI Keyword Suggestions', html, 'keyword');
+        },
+
+        showImageSuggestions: function(imageSuggestions, platform) {
+            // Determine the platform details
+            let modalTitle, targetField;
+            if (platform === 'facebook') {
+                modalTitle = 'AI Facebook Image Suggestions';
+                targetField = 'facebook_image';
+            } else if (platform === 'twitter') {
+                modalTitle = 'AI Twitter Image Suggestions';
+                targetField = 'twitter_image';
+            } else {
+                modalTitle = 'AI Image Suggestions';
+                targetField = 'image';
+            }
+            
+            let html = '<div class="ace-ai-suggestions-list ace-ai-image-suggestions">';
+            
+            imageSuggestions.forEach((imageData, index) => {
+                const isRecommended = index === 0;
+                
+                html += `
+                    <div class="ace-ai-suggestion-item ace-ai-image-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(imageData.concept)}" data-type="${targetField}">
+                        ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
+                        
+                        <div class="ace-ai-image-display">
+                            ${imageData.generated_image ? 
+                                `<div class="ace-ai-generated-image">
+                                    <img src="${imageData.generated_image}" alt="${this.escapeHtml(imageData.concept)}" class="ace-generated-img" data-url="${imageData.generated_image}" data-field="${targetField}">
+                                    <div class="ace-ai-image-overlay">
+                                        <button type="button" class="ace-btn ace-btn-primary ace-use-image" data-url="${imageData.generated_image}" data-field="${targetField}">
+                                            Use This Image
+                                        </button>
+                                    </div>
+                                </div>` :
+                                `<div class="ace-ai-image-placeholder">
+                                    <span class="ace-ai-placeholder-icon">🖼️</span>
+                                    <span class="ace-ai-placeholder-text">${imageData.image_error || 'Image generation failed'}</span>
+                                </div>`
+                            }
+                        </div>
+                        
+                        <div class="ace-ai-image-concept">
+                            <h4 class="ace-ai-concept-title">${this.escapeHtml(imageData.concept)}</h4>
+                            <div class="ace-ai-concept-details">
+                                <div class="ace-ai-detail-item">
+                                    <strong>Text Overlay:</strong> ${this.escapeHtml(imageData.text_overlay)}
+                                </div>
+                                <div class="ace-ai-detail-item">
+                                    <strong>Colors:</strong> ${this.escapeHtml(imageData.colors)}
+                                </div>
+                                <div class="ace-ai-detail-item">
+                                    <strong>Why it works:</strong> ${this.escapeHtml(imageData.reason)}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="ace-ai-image-prompt">
+                            <strong>AI Image Prompt:</strong>
+                            <div class="ace-ai-prompt-editor">
+                                <textarea class="ace-ai-prompt-text" data-original="${this.escapeHtml(imageData.image_prompt)}">${this.escapeHtml(imageData.image_prompt)}</textarea>
+                                <div class="ace-ai-prompt-actions">
+                                    <button type="button" class="ace-btn ace-btn-secondary ace-copy-prompt" data-prompt="${this.escapeHtml(imageData.image_prompt)}">
+                                        Copy Prompt
+                                    </button>
+                                    <button type="button" class="ace-btn ace-btn-primary ace-regenerate-image" data-platform="${platform}" data-index="${index}">
+                                        🔄 Regenerate
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            // Add generation controls
+            html += `
+                <div class="ace-ai-generation-controls">
+                    <div class="ace-ai-generation-buttons">
+                        <button type="button" class="ace-btn ace-btn-secondary ace-generate-more" data-platform="${platform}">
+                            🎨 Generate 2 More
+                        </button>
+                        <button type="button" class="ace-btn ace-btn-outline ace-custom-prompt-toggle" data-platform="${platform}">
+                            ✏️ Custom Prompt
+                        </button>
+                    </div>
+                    <div class="ace-ai-custom-prompt" style="display: none;">
+                        <textarea class="ace-ai-custom-prompt-text" placeholder="Enter your custom image generation prompt..."></textarea>
+                        <button type="button" class="ace-btn ace-btn-primary ace-generate-custom" data-platform="${platform}">
+                            Generate from Prompt
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            html += '<div class="ace-ai-image-note"><p><strong>Note:</strong> Click on any generated image to use it, or edit the prompt and regenerate for different variations. Images are powered by OpenAI\'s DALL-E.</p></div>';
+            
+            this.showModal(modalTitle, html, targetField);
+            
+            // Add event handlers using delegation to avoid conflicts
+            const $modal = $('#ace-ai-suggestions-modal');
+            
+            // Handle image clicks
+            $modal.off('click.aceImage').on('click.aceImage', '.ace-generated-img, .ace-use-image', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const imageUrl = $(this).data('url');
+                const fieldType = $(this).data('field');
+                
+                // Find the button - either this element if it's the button, or find it in the same container
+                let $button;
+                if ($(this).hasClass('ace-use-image')) {
+                    $button = $(this);
+                } else {
+                    // If image was clicked, find the button in the same image container
+                    $button = $(this).closest('.ace-ai-generated-image').find('.ace-use-image');
+                }
+                
+                AceSeo.useImageUrl(imageUrl, fieldType, $button);
+            });
+            
+            // Handle copy prompt functionality
+            $modal.off('click.aceCopy').on('click.aceCopy', '.ace-copy-prompt', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const prompt = $(this).data('prompt');
+                navigator.clipboard.writeText(prompt).then(() => {
+                    $(this).text('Copied!').addClass('copied');
+                    setTimeout(() => {
+                        $(this).text('Copy Prompt').removeClass('copied');
+                    }, 2000);
+                });
+            });
+            
+            // Handle regenerate functionality
+            $modal.off('click.aceRegen').on('click.aceRegen', '.ace-regenerate-image', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const platform = $(this).data('platform');
+                const index = $(this).data('index');
+                const promptTextarea = $(this).closest('.ace-ai-prompt-editor').find('.ace-ai-prompt-text');
+                const customPrompt = promptTextarea.val();
+                const $button = $(this);
+                const $imageContainer = $(this).closest('.ace-ai-image-item').find('.ace-ai-image-display');
+                
+                // Show loading state
+                $button.prop('disabled', true).text('🔄 Generating...');
+                $imageContainer.html('<div class="ace-ai-image-loading"><span class="ace-seo-spinner"></span><span>Generating new image...</span></div>');
+                
+                // Make AJAX request to regenerate image
+                $.ajax({
+                    url: aceSeoAdmin.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_regenerate_image',
+                        nonce: $('#ace_seo_ai_nonce').val(),
+                        prompt: customPrompt,
+                        platform: platform
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.image_url) {
+                            $imageContainer.html(`
+                                <div class="ace-ai-generated-image">
+                                    <img src="${response.data.image_url}" alt="Regenerated image" class="ace-generated-img" data-url="${response.data.image_url}" data-field="${targetField}">
+                                    <div class="ace-ai-image-overlay">
+                                        <button type="button" class="ace-btn ace-btn-primary ace-use-image" data-url="${response.data.image_url}" data-field="${targetField}">
+                                            Use This Image
+                                        </button>
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            $imageContainer.html(`
+                                <div class="ace-ai-image-placeholder">
+                                    <span class="ace-ai-placeholder-icon">❌</span>
+                                    <span class="ace-ai-placeholder-text">${response.data || 'Regeneration failed'}</span>
+                                </div>
+                            `);
+                        }
+                    },
+                    error: function() {
+                        $imageContainer.html(`
+                            <div class="ace-ai-image-placeholder">
+                                <span class="ace-ai-placeholder-icon">❌</span>
+                                <span class="ace-ai-placeholder-text">Network error</span>
+                            </div>
+                        `);
+                    },
+                    complete: function() {
+                        $button.prop('disabled', false).text('🔄 Regenerate');
+                    }
+                });
+            });
+            
+            // Prevent prompt textarea from triggering image events
+            $modal.off('click.acePrompt').on('click.acePrompt', '.ace-ai-prompt-text', function(e) {
+                e.stopPropagation();
+                $(this).focus();
+            });
+            
+            // Handle custom prompt toggle
+            $modal.off('click.aceToggle').on('click.aceToggle', '.ace-custom-prompt-toggle', function(e) {
+                e.preventDefault();
+                const $customSection = $(this).closest('.ace-ai-generation-controls').find('.ace-ai-custom-prompt');
+                $customSection.toggle();
+                $(this).text($customSection.is(':visible') ? '✏️ Hide Custom' : '✏️ Custom Prompt');
+            });
+            
+            // Handle generate more images
+            $modal.off('click.aceMore').on('click.aceMore', '.ace-generate-more', function(e) {
+                e.preventDefault();
+                const platform = $(this).data('platform');
+                const $button = $(this);
+                
+                $button.prop('disabled', true).text('🎨 Generating...');
+                
+                AceSeo.generateMoreImages(platform, function(newImages) {
+                    // Append new images to the existing list
+                    const $suggestionsList = $('.ace-ai-suggestions-list');
+                    newImages.forEach(imageData => {
+                        const newHtml = AceSeo.createImageSuggestionHtml(imageData, targetField, false);
+                        $suggestionsList.append(newHtml);
+                    });
+                    $button.prop('disabled', false).text('🎨 Generate 2 More');
+                }, function(error) {
+                    AceSeo.showNotification('Failed to generate more images: ' + error, 'error');
+                    $button.prop('disabled', false).text('🎨 Generate 2 More');
+                });
+            });
+            
+            // Handle generate from custom prompt
+            $modal.off('click.aceCustom').on('click.aceCustom', '.ace-generate-custom', function(e) {
+                e.preventDefault();
+                const platform = $(this).data('platform');
+                const customPrompt = $(this).siblings('.ace-ai-custom-prompt-text').val().trim();
+                const $button = $(this);
+                
+                if (!customPrompt) {
+                    AceSeo.showNotification('Please enter a custom prompt', 'error');
+                    return;
+                }
+                
+                $button.prop('disabled', true).text('Generating...');
+                
+                AceSeo.generateCustomImage(platform, customPrompt, function(imageData) {
+                    // Append custom image to the existing list
+                    const $suggestionsList = $('.ace-ai-suggestions-list');
+                    const newHtml = AceSeo.createImageSuggestionHtml(imageData, targetField, false);
+                    $suggestionsList.append(newHtml);
+                    
+                    // Clear and hide custom prompt
+                    $(this).siblings('.ace-ai-custom-prompt-text').val('');
+                    $(this).closest('.ace-ai-custom-prompt').hide();
+                    $('.ace-custom-prompt-toggle').text('✏️ Custom Prompt');
+                    
+                    $button.prop('disabled', false).text('Generate from Prompt');
+                }.bind(this), function(error) {
+                    AceSeo.showNotification('Failed to generate custom image: ' + error, 'error');
+                    $button.prop('disabled', false).text('Generate from Prompt');
+                });
+            });
+        },
+
+        useImageUrl: function(imageUrl, fieldType, $button) {
+            // Set the image URL in the appropriate field
+            const fieldMapping = {
+                'facebook_image': '#yoast_wpseo_opengraph-image',
+                'twitter_image': '#yoast_wpseo_twitter-image'
+            };
+            
+            const fieldSelector = fieldMapping[fieldType];
+            if (fieldSelector) {
+                // Show loading state on input field
+                const $field = $(fieldSelector);
+                const originalValue = $field.val();
+                $field.val('Saving image to media library...').prop('disabled', true);
+                
+                // Show loading state on button if provided
+                let originalButtonText = '';
+                if ($button && $button.length) {
+                    originalButtonText = $button.text();
+                    $button.text('🔄 Uploading to Library...').prop('disabled', true).addClass('uploading');
+                }
+                
+                // Invalidate related caches when image is set
+                this.invalidateImageCaches(fieldType);
+                
+                // Save image to media library first
+                $.ajax({
+                    url: aceSeoAdmin.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_save_image_to_library',
+                        nonce: $('#ace_seo_ai_nonce').val(),
+                        image_url: imageUrl,
+                        post_id: aceSeoAdmin.postId || 0,
+                        filename: 'ai-' + fieldType.replace('_', '-') + '-' + Date.now() + '.png'
+                    },
+                    success: (response) => {
+                        if (response.success) {
+                            // Use the saved image URL
+                            $field.val(response.data.url).trigger('input').prop('disabled', false);
+                            
+                            // Restore button state
+                            if ($button && $button.length) {
+                                $button.text(originalButtonText).prop('disabled', false).removeClass('uploading');
+                            }
+                            
+                            // Update the preview if it exists
+                            const previewMapping = {
+                                'facebook_image': '#facebook-preview-image img',
+                                'twitter_image': '#twitter-preview-image img'
+                            };
+                            
+                            const previewSelector = previewMapping[fieldType];
+                            if (previewSelector) {
+                                $(previewSelector).attr('src', response.data.url);
+                            }
+                            
+                            // Close the modal
+                            this.closeModal({ target: $('#ace-ai-suggestions-modal')[0], currentTarget: $('#ace-ai-suggestions-modal')[0] });
+                            
+                            // Show success message
+                            this.showNotification('Image saved to media library and applied!', 'success');
+                        } else {
+                            // Fallback to direct URL if saving fails
+                            $field.val(imageUrl).trigger('input').prop('disabled', false);
+                            
+                            // Restore button state
+                            if ($button && $button.length) {
+                                $button.text(originalButtonText).prop('disabled', false).removeClass('uploading');
+                            }
+                            
+                            const previewMapping = {
+                                'facebook_image': '#facebook-preview-image img',
+                                'twitter_image': '#twitter-preview-image img'
+                            };
+                            
+                            const previewSelector = previewMapping[fieldType];
+                            if (previewSelector) {
+                                $(previewSelector).attr('src', imageUrl);
+                            }
+                            
+                            this.closeModal({ target: $('#ace-ai-suggestions-modal')[0], currentTarget: $('#ace-ai-suggestions-modal')[0] });
+                            this.showNotification('Image applied (direct URL - could not save to library)', 'success');
+                        }
+                    },
+                    error: () => {
+                        // Fallback to direct URL on error
+                        $field.val(imageUrl).trigger('input').prop('disabled', false);
+                        
+                        // Restore button state
+                        if ($button && $button.length) {
+                            $button.text(originalButtonText).prop('disabled', false).removeClass('uploading');
+                        }
+                        
+                        const previewMapping = {
+                            'facebook_image': '#facebook-preview-image img',
+                            'twitter_image': '#twitter-preview-image img'
+                        };
+                        
+                        const previewSelector = previewMapping[fieldType];
+                        if (previewSelector) {
+                            $(previewSelector).attr('src', imageUrl);
+                        }
+                        
+                        this.closeModal({ target: $('#ace-ai-suggestions-modal')[0], currentTarget: $('#ace-ai-suggestions-modal')[0] });
+                        this.showNotification('Image applied (direct URL - could not save to library)', 'success');
+                    }
+                });
+            }
+        },
+
+        showNotification: function(message, type = 'success') {
+            const notification = $(`
+                <div class="ace-notification ace-notification-${type}">
+                    ${message}
+                </div>
+            `);
+            
+            $('body').append(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.addClass('ace-notification-show');
+            }, 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.removeClass('ace-notification-show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        },
+
+        generateMoreImages: function(platform, successCallback, errorCallback) {
+            const contentData = {
+                content: this.getContent(),
+                focus_keyword: $('#yoast_wpseo_focuskw').val(),
+                current_title: this.getCurrentTitle(),
+                facebook_title: $('#yoast_wpseo_opengraph-title').val(),
+                facebook_description: $('#yoast_wpseo_opengraph-description').val(),
+                twitter_title: $('#yoast_wpseo_twitter-title').val(),
+                twitter_description: $('#yoast_wpseo_twitter-description').val(),
+                featured_image_url: this.getFeaturedImageUrl()
+            };
+            
+            // Use a unique cache key for additional images with timestamp
+            const cacheKey = this.getCacheKey(`${platform}_more_images`, contentData.content, {
+                ...contentData,
+                timestamp: Math.floor(Date.now() / (1000 * 60 * 10)) // 10-minute buckets for more images
+            });
+            
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached more images response');
+                successCallback(cachedResponse);
+                return;
+            }
+            
+            $.ajax({
+                url: aceSeoAdmin.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'ace_seo_generate_more_images',
+                    nonce: $('#ace_seo_ai_nonce').val(),
+                    platform: platform,
+                    ...contentData
+                },
+                success: (response) => {
+                    if (response.success && response.data.image_suggestions) {
+                        // Cache the response
+                        this.setCachedResponse(cacheKey, response.data.image_suggestions);
+                        successCallback(response.data.image_suggestions);
+                    } else {
+                        errorCallback(response.data || 'Unknown error');
+                    }
+                },
+                error: function() {
+                    errorCallback('Network error');
+                }
+            });
+        },
+
+        generateCustomImage: function(platform, customPrompt, successCallback, errorCallback) {
+            // Create cache key for custom prompts
+            const cacheKey = this.getCacheKey(`${platform}_custom_image`, customPrompt, {
+                timestamp: Math.floor(Date.now() / (1000 * 60 * 60)) // 1-hour buckets for custom prompts
+            });
+            
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse && cachedResponse.length > 0) {
+                console.log('Using cached custom image response');
+                successCallback(cachedResponse[0]);
+                return;
+            }
+            
+            $.ajax({
+                url: aceSeoAdmin.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'ace_seo_generate_more_images',
+                    nonce: $('#ace_seo_ai_nonce').val(),
+                    platform: platform,
+                    custom_prompt: customPrompt
+                },
+                success: (response) => {
+                    if (response.success && response.data.image_suggestions && response.data.image_suggestions.length > 0) {
+                        // Cache the response
+                        this.setCachedResponse(cacheKey, response.data.image_suggestions);
+                        successCallback(response.data.image_suggestions[0]);
+                    } else {
+                        errorCallback(response.data || 'Unknown error');
+                    }
+                },
+                error: function() {
+                    errorCallback('Network error');
+                }
+            });
+        },
+
+        createImageSuggestionHtml: function(imageData, targetField, isRecommended = false) {
+            return `
+                <div class="ace-ai-suggestion-item ace-ai-image-item ${isRecommended ? 'recommended' : ''}" data-suggestion="${this.escapeHtml(imageData.concept)}" data-type="${targetField}">
+                    ${isRecommended ? '<div class="ace-ai-recommended-badge">✨ AI Recommended</div>' : ''}
+                    
+                    <div class="ace-ai-image-display">
+                        ${imageData.generated_image ? 
+                            `<div class="ace-ai-generated-image">
+                                <img src="${imageData.generated_image}" alt="${this.escapeHtml(imageData.concept)}" class="ace-generated-img" data-url="${imageData.generated_image}" data-field="${targetField}">
+                                <div class="ace-ai-image-overlay">
+                                    <button type="button" class="ace-btn ace-btn-primary ace-use-image" data-url="${imageData.generated_image}" data-field="${targetField}">
+                                        Use This Image
+                                    </button>
+                                </div>
+                            </div>` :
+                            `<div class="ace-ai-image-placeholder">
+                                <span class="ace-ai-placeholder-icon">🖼️</span>
+                                <span class="ace-ai-placeholder-text">${imageData.image_error || 'Image generation failed'}</span>
+                            </div>`
+                        }
+                    </div>
+                    
+                    <div class="ace-ai-image-concept">
+                        <h4 class="ace-ai-concept-title">${this.escapeHtml(imageData.concept)}</h4>
+                        <div class="ace-ai-concept-details">
+                            <div class="ace-ai-detail-item">
+                                <strong>Text Overlay:</strong> ${this.escapeHtml(imageData.text_overlay)}
+                            </div>
+                            <div class="ace-ai-detail-item">
+                                <strong>Colors:</strong> ${this.escapeHtml(imageData.colors)}
+                            </div>
+                            <div class="ace-ai-detail-item">
+                                <strong>Why it works:</strong> ${this.escapeHtml(imageData.reason)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="ace-ai-image-prompt">
+                        <strong>AI Image Prompt:</strong>
+                        <div class="ace-ai-prompt-editor">
+                            <textarea class="ace-ai-prompt-text" data-original="${this.escapeHtml(imageData.image_prompt)}">${this.escapeHtml(imageData.image_prompt)}</textarea>
+                            <div class="ace-ai-prompt-actions">
+                                <button type="button" class="ace-btn ace-btn-secondary ace-copy-prompt" data-prompt="${this.escapeHtml(imageData.image_prompt)}">
+                                    Copy Prompt
+                                </button>
+                                <button type="button" class="ace-btn ace-btn-primary ace-regenerate-image" data-platform="${imageData.platform || 'facebook'}" data-index="${Date.now()}">
+                                    🔄 Regenerate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         },
 
         showContentAnalysis: function(analysis) {
@@ -2160,7 +2873,13 @@
         },
 
         closeModal: function(e) {
-            if (e.target === e.currentTarget) {
+            // Don't close if clicking on modal content, textareas, inputs, or buttons
+            if ($(e.target).closest('.ace-modal-content, textarea, input, button').length > 0) {
+                return;
+            }
+            
+            // Only close if clicking on overlay or close button
+            if (e.target === e.currentTarget || $(e.target).hasClass('ace-modal-close')) {
                 $('#ace-ai-suggestions-modal').hide();
                 this.currentModal = null;
                 this.selectedSuggestion = null;
@@ -2205,6 +2924,12 @@
                     // Also update Twitter preview
                     this.updateTwitterPreview();
                     break;
+                case 'facebook_image':
+                case 'twitter_image':
+                    // For images, we don't use the suggestion text, but trigger the image selection
+                    // The actual image selection happens via the "Use This Image" button
+                    console.log('Image suggestion clicked - image selection should be handled by "Use This Image" button');
+                    return; // Don't close modal for images
             }
             
             // Close modal

@@ -44,6 +44,7 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['ai']['ai_content_analysis'] = isset($_POST['ai_content_analysis']) ? 1 : 0;
     $options['ai']['ai_keyword_suggestions'] = isset($_POST['ai_keyword_suggestions']) ? 1 : 0;
     $options['ai']['ai_content_optimization'] = isset($_POST['ai_content_optimization']) ? 1 : 0;
+    $options['ai']['ai_image_generation'] = isset($_POST['ai_image_generation']) ? 1 : 0;
     
     $options['performance']['pagespeed_api_key'] = sanitize_text_field($_POST['pagespeed_api_key'] ?? '');
     $options['performance']['pagespeed_monitoring'] = isset($_POST['pagespeed_monitoring']) ? 1 : 0;
@@ -513,6 +514,17 @@ $post_type_samples['date'] = [
                                 Enable AI content optimization suggestions
                             </label>
                             <p class="description">Receive AI-generated suggestions to improve your content for better search rankings.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">AI Image Generation</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_image_generation" value="1" <?php checked($ai['ai_image_generation'] ?? 0, 1); ?>>
+                                Enable AI-powered social media image generation
+                            </label>
+                            <p class="description">Allow generation of custom social media images using DALL-E 3 for Facebook and Twitter previews.</p>
                         </td>
                     </tr>
                 </table>

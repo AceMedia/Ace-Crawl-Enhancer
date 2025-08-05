@@ -29,6 +29,11 @@ class AceSEOAiAssistant {
         add_action( 'wp_ajax_ace_seo_generate_facebook_descriptions', array( $this, 'ajax_generate_facebook_descriptions' ) );
         add_action( 'wp_ajax_ace_seo_generate_twitter_titles', array( $this, 'ajax_generate_twitter_titles' ) );
         add_action( 'wp_ajax_ace_seo_generate_twitter_descriptions', array( $this, 'ajax_generate_twitter_descriptions' ) );
+        add_action( 'wp_ajax_ace_seo_generate_facebook_image', array( $this, 'ajax_generate_facebook_image' ) );
+        add_action( 'wp_ajax_ace_seo_generate_twitter_image', array( $this, 'ajax_generate_twitter_image' ) );
+        add_action( 'wp_ajax_ace_seo_regenerate_image', array( $this, 'ajax_regenerate_image' ) );
+        add_action( 'wp_ajax_ace_seo_generate_more_images', array( $this, 'ajax_generate_more_images' ) );
+        add_action( 'wp_ajax_ace_seo_save_image_to_library', array( $this, 'ajax_save_image_to_library' ) );
     }
     
     /**
@@ -331,6 +336,272 @@ class AceSEOAiAssistant {
     }
     
     /**
+     * AJAX handler for generating Facebook image
+     */
+    public function ajax_generate_facebook_image() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        // Check if image generation is enabled
+        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+            wp_send_json_error( 'AI image generation is not enabled' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
+        $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
+        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI image generation' );
+        }
+        
+        $image_suggestions = AceSEOApiHelper::generate_facebook_image( 
+            $post_content, 
+            $focus_keyword, 
+            $facebook_title ?: $current_title,
+            $facebook_description,
+            $featured_image_url
+        );
+        
+        if ( is_wp_error( $image_suggestions ) ) {
+            wp_send_json_error( $image_suggestions->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'image_suggestions' => $image_suggestions ) );
+    }
+    
+    /**
+     * AJAX handler for generating Twitter image
+     */
+    public function ajax_generate_twitter_image() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        // Check if image generation is enabled
+        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+            wp_send_json_error( 'AI image generation is not enabled' );
+        }
+        
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $twitter_title = sanitize_text_field( $_POST['twitter_title'] ?? '' );
+        $twitter_description = sanitize_text_field( $_POST['twitter_description'] ?? '' );
+        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        
+        if ( empty( $post_content ) ) {
+            wp_send_json_error( 'Content is required for AI image generation' );
+        }
+        
+        $image_suggestions = AceSEOApiHelper::generate_twitter_image( 
+            $post_content, 
+            $focus_keyword, 
+            $twitter_title ?: $current_title,
+            $twitter_description,
+            $featured_image_url
+        );
+        
+        if ( is_wp_error( $image_suggestions ) ) {
+            wp_send_json_error( $image_suggestions->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'image_suggestions' => $image_suggestions ) );
+    }
+    
+    /**
+     * AJAX handler for regenerating a single image with custom prompt
+     */
+    public function ajax_regenerate_image() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        // Check if image generation is enabled
+        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+            wp_send_json_error( 'AI image generation is not enabled' );
+        }
+        
+        $custom_prompt = sanitize_textarea_field( $_POST['prompt'] ?? '' );
+        $platform = sanitize_text_field( $_POST['platform'] ?? 'facebook' );
+        
+        if ( empty( $custom_prompt ) ) {
+            wp_send_json_error( 'Image prompt is required' );
+        }
+        
+        // Determine image size based on platform
+        $size = ( $platform === 'twitter' ) ? '1024x1024' : '1792x1024';
+        
+        $image_url = AceSEOApiHelper::generate_dalle_image( $custom_prompt, $size );
+        
+        if ( is_wp_error( $image_url ) ) {
+            wp_send_json_error( $image_url->get_error_message() );
+        }
+        
+        wp_send_json_success( array( 'image_url' => $image_url ) );
+    }
+    
+    /**
+     * AJAX handler for generating additional images
+     */
+    public function ajax_generate_more_images() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+        
+        // Check if image generation is enabled
+        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+            wp_send_json_error( 'AI image generation is not enabled' );
+        }
+        
+        $platform = sanitize_text_field( $_POST['platform'] ?? 'facebook' );
+        $custom_prompt = sanitize_textarea_field( $_POST['custom_prompt'] ?? '' );
+        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
+        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        
+        if ( ! empty( $custom_prompt ) ) {
+            // Generate from custom prompt
+            $size = ( $platform === 'twitter' ) ? '1024x1024' : '1792x1024';
+            $image_url = AceSEOApiHelper::generate_dalle_image( $custom_prompt, $size );
+            
+            if ( is_wp_error( $image_url ) ) {
+                wp_send_json_error( $image_url->get_error_message() );
+            }
+            
+            wp_send_json_success( array( 
+                'image_suggestions' => array( array(
+                    'concept' => 'Custom Generated Image',
+                    'text_overlay' => 'Custom prompt',
+                    'colors' => 'Varies',
+                    'reason' => 'Generated from your custom prompt',
+                    'image_prompt' => $custom_prompt,
+                    'generated_image' => $image_url
+                ) )
+            ) );
+        } else {
+            // Generate additional AI concepts
+            if ( empty( $post_content ) ) {
+                wp_send_json_error( 'Content is required for AI image generation' );
+            }
+            
+            if ( $platform === 'facebook' ) {
+                $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
+                $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
+                
+                $image_suggestions = AceSEOApiHelper::generate_facebook_image( 
+                    $post_content, 
+                    $focus_keyword, 
+                    $facebook_title ?: $current_title,
+                    $facebook_description,
+                    $featured_image_url
+                );
+            } else {
+                $twitter_title = sanitize_text_field( $_POST['twitter_title'] ?? '' );
+                $twitter_description = sanitize_text_field( $_POST['twitter_description'] ?? '' );
+                
+                $image_suggestions = AceSEOApiHelper::generate_twitter_image( 
+                    $post_content, 
+                    $focus_keyword, 
+                    $twitter_title ?: $current_title,
+                    $twitter_description,
+                    $featured_image_url
+                );
+            }
+            
+            if ( is_wp_error( $image_suggestions ) ) {
+                wp_send_json_error( $image_suggestions->get_error_message() );
+            }
+            
+            wp_send_json_success( array( 'image_suggestions' => $image_suggestions ) );
+        }
+    }
+    
+    /**
+     * AJAX handler for saving image to media library
+     */
+    public function ajax_save_image_to_library() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'upload_files' ) ) {
+            wp_send_json_error( 'Insufficient permissions to upload files' );
+        }
+        
+        $image_url = esc_url_raw( $_POST['image_url'] ?? '' );
+        $post_id = intval( $_POST['post_id'] ?? 0 );
+        $filename = sanitize_file_name( $_POST['filename'] ?? '' );
+        
+        if ( empty( $image_url ) ) {
+            wp_send_json_error( 'Image URL is required' );
+        }
+        
+        if ( ! $filename ) {
+            $filename = 'ai-generated-image-' . time() . '.png';
+        }
+        
+        // Download the image
+        $response = wp_remote_get( $image_url, array(
+            'timeout' => 30,
+            'headers' => array(
+                'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url()
+            )
+        ) );
+        
+        if ( is_wp_error( $response ) ) {
+            wp_send_json_error( 'Failed to download image: ' . $response->get_error_message() );
+        }
+        
+        $image_data = wp_remote_retrieve_body( $response );
+        if ( empty( $image_data ) ) {
+            wp_send_json_error( 'Downloaded image is empty' );
+        }
+        
+        // Save to uploads directory
+        $upload = wp_upload_bits( $filename, null, $image_data );
+        
+        if ( $upload['error'] ) {
+            wp_send_json_error( 'Failed to save image: ' . $upload['error'] );
+        }
+        
+        // Create attachment
+        $attachment = array(
+            'post_mime_type' => 'image/png',
+            'post_title'     => 'AI Generated Image',
+            'post_content'   => '',
+            'post_status'    => 'inherit'
+        );
+        
+        $attach_id = wp_insert_attachment( $attachment, $upload['file'], $post_id );
+        
+        if ( is_wp_error( $attach_id ) ) {
+            wp_send_json_error( 'Failed to create attachment: ' . $attach_id->get_error_message() );
+        }
+        
+        // Generate attachment metadata
+        require_once( ABSPATH . 'wp-admin/includes/image.php' );
+        $attach_data = wp_generate_attachment_metadata( $attach_id, $upload['file'] );
+        wp_update_attachment_metadata( $attach_id, $attach_data );
+        
+        wp_send_json_success( array( 
+            'attachment_id' => $attach_id,
+            'url' => $upload['url']
+        ) );
+    }
+    
+    /**
      * Get AI assistance status for current user
      */
     public static function is_ai_available() {
@@ -388,6 +659,20 @@ class AceSEOAiAssistant {
                 'icon' => 'twitter-alt',
                 'tooltip' => 'Generate compelling Twitter descriptions'
             ),
+            'facebook_image' => array(
+                'action' => 'generate_facebook_image',
+                'text' => 'AI Image',
+                'icon' => 'facebook-image',
+                'tooltip' => 'Generate AI-powered Facebook image suggestions',
+                'requires_image_generation' => true
+            ),
+            'twitter_image' => array(
+                'action' => 'generate_twitter_image',
+                'text' => 'AI Image',
+                'icon' => 'twitter-image',
+                'tooltip' => 'Generate AI-powered Twitter image suggestions',
+                'requires_image_generation' => true
+            ),
             'analysis' => array(
                 'action' => 'analyze_content',
                 'text' => 'AI Analysis',
@@ -413,6 +698,13 @@ class AceSEOAiAssistant {
         }
         
         $config = $button_configs[ $field_type ];
+        
+        // Check if image generation is required and enabled
+        if ( isset( $config['requires_image_generation'] ) && $config['requires_image_generation'] ) {
+            if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+                return '';
+            }
+        }
         
         return sprintf(
             '<button type="button" class="ace-ai-button" data-action="%s" title="%s">

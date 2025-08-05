@@ -218,6 +218,17 @@ class AceSEOApiHelper {
     }
     
     /**
+     * Check if AI image generation is enabled
+     */
+    public static function is_ai_image_generation_enabled() {
+        $options = get_option( 'ace_seo_options', array() );
+        $ai_settings = $options['ai'] ?? array();
+        
+        return ! empty( $ai_settings['openai_api_key'] ) && 
+               ( $ai_settings['ai_image_generation'] ?? 0 );
+    }
+    
+    /**
      * Check if performance monitoring is enabled
      */
     public static function is_performance_monitoring_enabled() {
@@ -343,6 +354,64 @@ class AceSEOApiHelper {
         }
         
         return new WP_Error( 'api_error', 'All AI models failed to respond' );
+    }
+    
+    /**
+     * Generate image using DALL-E API
+     */
+    public static function generate_dalle_image( $prompt, $size = '1024x1024', $quality = 'standard' ) {
+        if ( ! self::is_ai_image_generation_enabled() ) {
+            return new WP_Error( 'ai_image_disabled', 'AI image generation is not enabled' );
+        }
+        $api_key = self::get_openai_key();
+        
+        if ( empty( $api_key ) ) {
+            return new WP_Error( 'no_api_key', 'OpenAI API key not configured' );
+        }
+        
+        $request_body = array(
+            'model' => 'dall-e-3',
+            'prompt' => $prompt,
+            'n' => 1,
+            'size' => $size,
+            'quality' => $quality,
+            'response_format' => 'url'
+        );
+        
+        $response = wp_remote_post( 'https://api.openai.com/v1/images/generations', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode( $request_body ),
+            'timeout' => 60, // Image generation can take longer
+        ) );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        $response_code = wp_remote_retrieve_response_code( $response );
+        
+        if ( $response_code !== 200 ) {
+            $body = wp_remote_retrieve_body( $response );
+            $error_data = json_decode( $body, true );
+            
+            if ( isset( $error_data['error']['message'] ) ) {
+                return new WP_Error( 'api_error', 'DALL-E API error: ' . $error_data['error']['message'] );
+            } else {
+                return new WP_Error( 'api_error', 'DALL-E API returned HTTP ' . $response_code );
+            }
+        }
+        
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+        
+        if ( isset( $data['data'][0]['url'] ) ) {
+            return $data['data'][0]['url'];
+        }
+        
+        return new WP_Error( 'api_error', 'Invalid DALL-E API response format' );
     }
     
     /**
@@ -1290,6 +1359,226 @@ class AceSEOApiHelper {
         }
         
         return array_slice( $valid_descriptions, 0, 3 );
+    }
+    
+    /**
+     * Generate Facebook-specific image suggestions
+     */
+    public static function generate_facebook_image( $post_content, $focus_keyword = '', $title = '', $description = '', $featured_image_url = '' ) {
+        if ( ! self::is_ai_image_generation_enabled() ) {
+            return new WP_Error( 'ai_image_disabled', 'AI image generation is not enabled' );
+        }
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for trending Facebook visual content and high-engagement posts for '" . $focus_keyword . "'.";
+        }
+        
+        $prompt = "Generate 3 Facebook image concept suggestions optimized for maximum engagement." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Title: " . $title . "\n";
+        $prompt .= "Description: " . $description . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 200 ) . "\n";
+        if ( ! empty( $featured_image_url ) ) {
+            $prompt .= "Current Featured Image: " . $featured_image_url . " (use as reference for style/branding)\n";
+        }
+        $prompt .= "\n";
+        
+        $prompt .= "Create Facebook image suggestions that:\n";
+        $prompt .= "- Are optimized for Facebook's 1200x630px format (1.91:1 ratio)\n";
+        $prompt .= "- Include compelling visual concepts that drive clicks and engagement\n";
+        $prompt .= "- Work well in Facebook's feed algorithm\n";
+        $prompt .= "- Include text overlay concepts (max 20% text per Facebook guidelines)\n";
+        $prompt .= "- Consider current Facebook visual trends and best practices\n";
+        $prompt .= "- Are eye-catching when viewed as thumbnails\n";
+        $prompt .= "- Match the content's tone and target audience\n\n";
+        
+        $prompt .= "Each suggestion should include:\n";
+        $prompt .= "- Visual concept description\n";
+        $prompt .= "- Recommended text overlay (if any)\n";
+        $prompt .= "- Color scheme suggestions\n";
+        $prompt .= "- Why this concept will perform well on Facebook\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"image_suggestions":[{"concept":"Visual concept description","text_overlay":"Suggested overlay text","colors":"Color scheme","reason":"Why this will engage Facebook users","image_prompt":"Detailed DALL-E style prompt for generating this image"},{"concept":"Second concept","text_overlay":"Second overlay","colors":"Second colors","reason":"Second reason","image_prompt":"Second detailed prompt"}]}' . "\n\n";
+        $prompt .= "Focus on Facebook engagement metrics. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        $image_concepts = self::parse_image_suggestions_response( $response );
+        
+        if ( is_wp_error( $image_concepts ) ) {
+            return $image_concepts;
+        }
+        
+        // Generate actual images for each concept
+        foreach ( $image_concepts as &$concept ) {
+            if ( isset( $concept['image_prompt'] ) ) {
+                $image_url = self::generate_dalle_image( $concept['image_prompt'], '1792x1024' ); // Closest to Facebook 1200x630 ratio
+                if ( ! is_wp_error( $image_url ) ) {
+                    $concept['generated_image'] = $image_url;
+                } else {
+                    $concept['generated_image'] = false;
+                    $concept['image_error'] = $image_url->get_error_message();
+                }
+            }
+        }
+        
+        return $image_concepts;
+    }
+    
+    /**
+     * Generate Twitter-specific image suggestions
+     */
+    public static function generate_twitter_image( $post_content, $focus_keyword = '', $title = '', $description = '', $featured_image_url = '' ) {
+        if ( ! self::is_ai_image_generation_enabled() ) {
+            return new WP_Error( 'ai_image_disabled', 'AI image generation is not enabled' );
+        }
+        if ( ! self::is_ai_enabled() ) {
+            return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        $search_context = '';
+        if ( ! empty( $focus_keyword ) ) {
+            $search_context = " First, search for trending Twitter visual content and viral tweets for '" . $focus_keyword . "'.";
+        }
+        
+        $prompt = "Generate 3 Twitter image concept suggestions optimized for maximum retweets and engagement." . $search_context . "\n\n";
+        $prompt .= "Content Details:\n";
+        $prompt .= "Title: " . $title . "\n";
+        $prompt .= "Description: " . $description . "\n";
+        $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
+        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 200 ) . "\n";
+        if ( ! empty( $featured_image_url ) ) {
+            $prompt .= "Current Featured Image: " . $featured_image_url . " (use as reference for style/branding)\n";
+        }
+        $prompt .= "\n";
+        
+        $prompt .= "Create Twitter image suggestions that:\n";
+        $prompt .= "- Are optimized for Twitter's 1024x512px format (2:1 ratio) for optimal display\n";
+        $prompt .= "- Include compelling visual concepts that drive retweets and replies\n";
+        $prompt .= "- Work well with Twitter's algorithm and trending topics\n";
+        $prompt .= "- Are mobile-friendly and look great on small screens\n";
+        $prompt .= "- Consider current Twitter visual trends and meme culture\n";
+        $prompt .= "- Include engaging text overlays that complement tweets\n";
+        $prompt .= "- Are shareable and discussion-worthy\n\n";
+        
+        $prompt .= "Each suggestion should include:\n";
+        $prompt .= "- Visual concept description\n";
+        $prompt .= "- Recommended text overlay (if any)\n";
+        $prompt .= "- Color scheme suggestions\n";
+        $prompt .= "- Why this concept will go viral on Twitter\n\n";
+        
+        $prompt .= "Respond with ONLY valid JSON in this exact format:\n";
+        $prompt .= '{"image_suggestions":[{"concept":"Visual concept description","text_overlay":"Suggested overlay text","colors":"Color scheme","reason":"Why this will engage Twitter users","image_prompt":"Detailed DALL-E style prompt for generating this image"},{"concept":"Second concept","text_overlay":"Second overlay","colors":"Second colors","reason":"Second reason","image_prompt":"Second detailed prompt"}]}' . "\n\n";
+        $prompt .= "Focus on Twitter viral potential. Return ONLY the JSON, nothing else.";
+        
+        $enable_search = self::is_ai_web_search_enabled() && ! empty( $focus_keyword );
+        $response = self::make_openai_request( $prompt, 'gpt-3.5-turbo', $enable_search );
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        $image_concepts = self::parse_image_suggestions_response( $response );
+        
+        if ( is_wp_error( $image_concepts ) ) {
+            return $image_concepts;
+        }
+        
+        // Generate actual images for each concept
+        foreach ( $image_concepts as &$concept ) {
+            if ( isset( $concept['image_prompt'] ) ) {
+                $image_url = self::generate_dalle_image( $concept['image_prompt'], '1024x1024' ); // Twitter's preferred square format
+                if ( ! is_wp_error( $image_url ) ) {
+                    $concept['generated_image'] = $image_url;
+                } else {
+                    $concept['generated_image'] = false;
+                    $concept['image_error'] = $image_url->get_error_message();
+                }
+            }
+        }
+        
+        return $image_concepts;
+    }
+    
+    /**
+     * Parse image suggestions response
+     */
+    private static function parse_image_suggestions_response( $response ) {
+        // Clean the response - remove any markdown formatting
+        $response = trim( $response );
+        $start = strpos( $response, '{' );
+        $end = strrpos( $response, '}' );
+        if ( $start !== false && $end !== false && $end > $start ) {
+            $response = substr( $response, $start, $end - $start + 1 );
+        }
+        $response = trim( $response );
+        
+        $data = json_decode( $response, true );
+        
+        if ( json_last_error() !== JSON_ERROR_NONE || ! isset( $data['image_suggestions'] ) ) {
+            return array(
+                array( 
+                    'concept' => 'Professional Header Image',
+                    'text_overlay' => 'Eye-catching title text',
+                    'colors' => 'Brand colors with high contrast',
+                    'reason' => 'Professional appearance builds trust',
+                    'image_prompt' => 'Professional, clean design with modern typography'
+                ),
+                array( 
+                    'concept' => 'Engaging Visual Metaphor',
+                    'text_overlay' => 'Key message highlight',
+                    'colors' => 'Vibrant, attention-grabbing palette',
+                    'reason' => 'Visual metaphors increase engagement',
+                    'image_prompt' => 'Creative visual metaphor related to the content topic'
+                ),
+                array( 
+                    'concept' => 'Minimalist Design',
+                    'text_overlay' => 'Simple, clear message',
+                    'colors' => 'Clean, minimal color scheme',
+                    'reason' => 'Minimalist designs perform well on social media',
+                    'image_prompt' => 'Clean, minimalist design with plenty of white space'
+                )
+            );
+        }
+        
+        $suggestions = $data['image_suggestions'];
+        $valid_suggestions = array();
+        
+        foreach ( $suggestions as $suggestion ) {
+            if ( isset( $suggestion['concept'] ) && ! empty( $suggestion['concept'] ) ) {
+                $valid_suggestions[] = array(
+                    'concept' => sanitize_text_field( $suggestion['concept'] ),
+                    'text_overlay' => sanitize_text_field( $suggestion['text_overlay'] ?? '' ),
+                    'colors' => sanitize_text_field( $suggestion['colors'] ?? '' ),
+                    'reason' => sanitize_text_field( $suggestion['reason'] ?? '' ),
+                    'image_prompt' => sanitize_text_field( $suggestion['image_prompt'] ?? '' )
+                );
+            }
+        }
+        
+        // Ensure we have at least 3 suggestions
+        while ( count( $valid_suggestions ) < 3 ) {
+            $valid_suggestions[] = array(
+                'concept' => 'Custom Design Concept',
+                'text_overlay' => 'Compelling message',
+                'colors' => 'Brand-appropriate colors',
+                'reason' => 'Tailored to your content',
+                'image_prompt' => 'Professional design tailored to the content'
+            );
+        }
+        
+        return array_slice( $valid_suggestions, 0, 3 );
     }
 }
 
