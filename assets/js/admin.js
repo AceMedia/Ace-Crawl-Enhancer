@@ -1242,7 +1242,15 @@
 
         generateTitles: function(contentData, $button) {
             console.log('Generating titles with data:', contentData); // Debug log
-            
+            // Cache logic
+            const cacheKey = this.getCacheKey('titles', contentData.content, contentData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached AI titles response');
+                this.setButtonLoading($button, false);
+                this.showTitleSuggestions(cachedResponse);
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_titles',
                 ...contentData
@@ -1251,6 +1259,7 @@
                 console.log('Titles response:', response); // Debug log
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.titles);
                     this.showTitleSuggestions(response.data.titles);
                 } else {
                     this.showAiError(response.data || 'Failed to generate titles');
@@ -1263,6 +1272,15 @@
         },
 
         generateDescriptions: function(contentData, $button) {
+            // Cache logic
+            const cacheKey = this.getCacheKey('descriptions', contentData.content, contentData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached AI descriptions response');
+                this.setButtonLoading($button, false);
+                this.showDescriptionSuggestions(cachedResponse);
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_descriptions',
                 ...contentData
@@ -1270,6 +1288,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.descriptions);
                     this.showDescriptionSuggestions(response.data.descriptions);
                 } else {
                     this.showAiError(response.data || 'Failed to generate descriptions');
@@ -1282,6 +1301,15 @@
         },
 
         generateKeywords: function(contentData, $button) {
+            // Cache logic
+            const cacheKey = this.getCacheKey('keywords', contentData.content, contentData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached AI keywords response');
+                this.setButtonLoading($button, false);
+                this.showKeywordSuggestions(cachedResponse);
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_keywords',
                 ...contentData
@@ -1289,6 +1317,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.keywords);
                     this.showKeywordSuggestions(response.data.keywords);
                 } else {
                     this.showAiError(response.data || 'Failed to generate keywords');
@@ -1307,7 +1336,15 @@
                 facebook_title: $('#yoast_wpseo_opengraph-title').val(),
                 seo_title: $('#yoast_wpseo_title').val()
             };
-            
+            // Cache logic
+            const cacheKey = this.getCacheKey('facebook_titles', contentData.content, facebookData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached Facebook titles response');
+                this.setButtonLoading($button, false);
+                this.showTitleSuggestions(cachedResponse, 'facebook');
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_facebook_titles',
                 ...facebookData
@@ -1315,6 +1352,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.titles);
                     this.showTitleSuggestions(response.data.titles, 'facebook');
                 } else {
                     this.showAiError(response.data || 'Failed to generate Facebook titles');
@@ -1332,7 +1370,15 @@
                 facebook_description: $('#yoast_wpseo_opengraph-description').val(),
                 meta_description: $('#yoast_wpseo_metadesc').val()
             };
-            
+            // Cache logic
+            const cacheKey = this.getCacheKey('facebook_descriptions', contentData.content, facebookData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached Facebook descriptions response');
+                this.setButtonLoading($button, false);
+                this.showDescriptionSuggestions(cachedResponse, 'facebook');
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_facebook_descriptions',
                 ...facebookData
@@ -1340,6 +1386,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.descriptions);
                     this.showDescriptionSuggestions(response.data.descriptions, 'facebook');
                 } else {
                     this.showAiError(response.data || 'Failed to generate Facebook descriptions');
@@ -1358,7 +1405,15 @@
                 facebook_title: $('#yoast_wpseo_opengraph-title').val(),
                 seo_title: $('#yoast_wpseo_title').val()
             };
-            
+            // Cache logic
+            const cacheKey = this.getCacheKey('twitter_titles', contentData.content, twitterData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached Twitter titles response');
+                this.setButtonLoading($button, false);
+                this.showTitleSuggestions(cachedResponse, 'twitter');
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_twitter_titles',
                 ...twitterData
@@ -1366,6 +1421,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.titles);
                     this.showTitleSuggestions(response.data.titles, 'twitter');
                 } else {
                     this.showAiError(response.data || 'Failed to generate Twitter titles');
@@ -1384,7 +1440,15 @@
                 facebook_description: $('#yoast_wpseo_opengraph-description').val(),
                 meta_description: $('#yoast_wpseo_metadesc').val()
             };
-            
+            // Cache logic
+            const cacheKey = this.getCacheKey('twitter_descriptions', contentData.content, twitterData);
+            const cachedResponse = this.getCachedResponse(cacheKey);
+            if (cachedResponse) {
+                console.log('Using cached Twitter descriptions response');
+                this.setButtonLoading($button, false);
+                this.showDescriptionSuggestions(cachedResponse, 'twitter');
+                return;
+            }
             $.post(aceSeoAdmin.ajaxurl, {
                 action: 'ace_seo_generate_twitter_descriptions',
                 ...twitterData
@@ -1392,6 +1456,7 @@
             .done((response) => {
                 this.setButtonLoading($button, false);
                 if (response.success) {
+                    this.setCachedResponse(cacheKey, response.data.descriptions);
                     this.showDescriptionSuggestions(response.data.descriptions, 'twitter');
                 } else {
                     this.showAiError(response.data || 'Failed to generate Twitter descriptions');
