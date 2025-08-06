@@ -55,17 +55,12 @@ class AceSEOAiAssistant {
         }
         
         // Debug logging
-        error_log( 'ACE SEO: Generating titles for keyword: ' . $focus_keyword );
-        error_log( 'ACE SEO: Content length: ' . strlen( $post_content ) );
-        
         $titles = AceSEOApiHelper::generate_seo_titles( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $titles ) ) {
-            error_log( 'ACE SEO: Title generation error: ' . $titles->get_error_message() );
             wp_send_json_error( $titles->get_error_message() );
         }
         
-        error_log( 'ACE SEO: Successfully generated ' . count( $titles ) . ' titles' );
         wp_send_json_success( array( 'titles' => $titles ) );
     }
     
@@ -88,16 +83,11 @@ class AceSEOAiAssistant {
         }
         
         // Debug logging
-        error_log( 'ACE SEO: Generating descriptions for keyword: ' . $focus_keyword );
         
-        $descriptions = AceSEOApiHelper::generate_meta_descriptions( $post_content, $focus_keyword, $current_title );
-        
-        if ( is_wp_error( $descriptions ) ) {
-            error_log( 'ACE SEO: Description generation error: ' . $descriptions->get_error_message() );
+        $descriptions = AceSEOApiHelper::generate_meta_descriptions( $post_content, $focus_keyword, $current_title );        if ( is_wp_error( $descriptions ) ) {
             wp_send_json_error( $descriptions->get_error_message() );
         }
         
-        error_log( 'ACE SEO: Successfully generated ' . count( $descriptions ) . ' descriptions' );
         wp_send_json_success( array( 'descriptions' => $descriptions ) );
     }
     
@@ -199,16 +189,11 @@ class AceSEOAiAssistant {
         }
         
         // Debug logging
-        error_log( 'ACE SEO: Generating keywords for content length: ' . strlen( $post_content ) );
         
-        $keywords = AceSEOApiHelper::generate_keyword_suggestions( $post_content, $current_title );
-        
-        if ( is_wp_error( $keywords ) ) {
-            error_log( 'ACE SEO: Keyword generation error: ' . $keywords->get_error_message() );
+        $keywords = AceSEOApiHelper::generate_keywords( $post_content, $focus_keyword );        if ( is_wp_error( $keywords ) ) {
             wp_send_json_error( $keywords->get_error_message() );
         }
         
-        error_log( 'ACE SEO: Successfully generated ' . count( $keywords ) . ' keywords' );
         wp_send_json_success( array( 'keywords' => $keywords ) );
     }
     

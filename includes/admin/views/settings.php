@@ -11,6 +11,21 @@ if (!defined('ABSPATH')) {
 if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'], 'ace_seo_settings')) {
     $options = get_option('ace_seo_options', []);
     
+    // Ensure we have an array - handle corrupted data
+    if (!is_array($options)) {
+        $options = [];
+        // If data was corrupted, delete the option and start fresh
+        delete_option('ace_seo_options');
+    }
+    
+    // Ensure all required array keys exist
+    $options['general'] = isset($options['general']) && is_array($options['general']) ? $options['general'] : [];
+    $options['templates'] = isset($options['templates']) && is_array($options['templates']) ? $options['templates'] : [];
+    $options['social'] = isset($options['social']) && is_array($options['social']) ? $options['social'] : [];
+    $options['advanced'] = isset($options['advanced']) && is_array($options['advanced']) ? $options['advanced'] : [];
+    $options['ai'] = isset($options['ai']) && is_array($options['ai']) ? $options['ai'] : [];
+    $options['performance'] = isset($options['performance']) && is_array($options['performance']) ? $options['performance'] : [];
+    
     // Update general settings
     $options['general']['separator'] = sanitize_text_field($_POST['separator'] ?? '|');
     $options['general']['site_name'] = sanitize_text_field($_POST['site_name'] ?? '');
@@ -701,8 +716,6 @@ jQuery(document).ready(function($) {
                 nonce: '<?php echo wp_create_nonce('ace_seo_api_test'); ?>'
             },
             success: function(response) {
-                console.log('API Test Response:', response); // Debug log
-                
                 if (response.success) {
                     resultDiv.html('<span style="color: #28a745;">✅ ' + response.message + '</span>');
                 } else {

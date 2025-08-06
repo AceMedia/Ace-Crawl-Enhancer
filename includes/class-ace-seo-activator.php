@@ -51,8 +51,8 @@ class AceSEOActivator {
         if ( version_compare( $wp_version, '6.0', '<' ) ) {
             deactivate_plugins( plugin_basename( __FILE__ ) );
             wp_die( 
-                __( 'Ace SEO requires WordPress 6.0 or higher.', 'ace-seo' ),
-                __( 'Plugin Activation Error', 'ace-seo' ),
+                __( 'Ace SEO requires WordPress 6.0 or higher.', 'ace-crawl-enhancer' ),
+                __( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
                 array( 'back_link' => true )
             );
             return false;
@@ -62,8 +62,8 @@ class AceSEOActivator {
         if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
             deactivate_plugins( plugin_basename( __FILE__ ) );
             wp_die( 
-                __( 'Ace SEO requires PHP 7.4 or higher.', 'ace-seo' ),
-                __( 'Plugin Activation Error', 'ace-seo' ),
+                __( 'Ace SEO requires PHP 7.4 or higher.', 'ace-crawl-enhancer' ),
+                __( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
                 array( 'back_link' => true )
             );
             return false;

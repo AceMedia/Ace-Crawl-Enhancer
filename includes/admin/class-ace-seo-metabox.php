@@ -306,12 +306,12 @@ class AceSEOMetabox {
             'siteName' => $general['site_name'] ?? get_bloginfo('name'),
             'separator' => $general['separator'] ?? '|',
             'strings' => array(
-                'analyzing' => __( 'Analyzing...', 'ace-seo' ),
-                'excellent' => __( 'Excellent', 'ace-seo' ),
-                'good' => __( 'Good', 'ace-seo' ),
-                'ok' => __( 'OK', 'ace-seo' ),
-                'poor' => __( 'Poor', 'ace-seo' ),
-                'bad' => __( 'Bad', 'ace-seo' ),
+                'analyzing' => __( 'Analyzing...', 'ace-crawl-enhancer' ),
+                'excellent' => __( 'Excellent', 'ace-crawl-enhancer' ),
+                'good' => __( 'Good', 'ace-crawl-enhancer' ),
+                'ok' => __( 'OK', 'ace-crawl-enhancer' ),
+                'poor' => __( 'Poor', 'ace-crawl-enhancer' ),
+                'bad' => __( 'Bad', 'ace-crawl-enhancer' ),
             )
         ) );
     }

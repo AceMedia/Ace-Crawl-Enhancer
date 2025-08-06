@@ -2873,13 +2873,21 @@
         },
 
         closeModal: function(e) {
-            // Don't close if clicking on modal content, textareas, inputs, or buttons
-            if ($(e.target).closest('.ace-modal-content, textarea, input, button').length > 0) {
+            // Allow closing if clicking on close button or X button
+            if ($(e.target).hasClass('ace-modal-close') || $(e.target).closest('.ace-modal-close').length > 0) {
+                $('#ace-ai-suggestions-modal').hide();
+                this.currentModal = null;
+                this.selectedSuggestion = null;
                 return;
             }
             
-            // Only close if clicking on overlay or close button
-            if (e.target === e.currentTarget || $(e.target).hasClass('ace-modal-close')) {
+            // Don't close if clicking on modal content, textareas, inputs, or other buttons
+            if ($(e.target).closest('.ace-modal-content, textarea, input').length > 0) {
+                return;
+            }
+            
+            // Only close if clicking on overlay
+            if (e.target === e.currentTarget) {
                 $('#ace-ai-suggestions-modal').hide();
                 this.currentModal = null;
                 this.selectedSuggestion = null;
