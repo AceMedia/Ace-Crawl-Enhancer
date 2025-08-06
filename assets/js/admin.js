@@ -1157,8 +1157,19 @@
             this.currentModal = null;
             this.selectedSuggestion = null;
             this.aiData = {};
-            // Set all AI buttons to consistent initial label
-            $('.ace-ai-button').html('✨ <strong><em>AI</em></strong>');
+            // Ensure all AI buttons have spinner markup and correct label
+            $('.ace-ai-button').each(function() {
+                var $btn = $(this);
+                // If not already present, add spinner markup
+                if ($btn.find('.ace-ai-loading').length === 0) {
+                    $btn.append('<span class="ace-ai-loading" style="display:none;"><span class="ace-seo-spinner"></span></span>');
+                }
+                // If not already present, add text span
+                if ($btn.find('.ace-ai-button-text').length === 0) {
+                    var label = $btn.text().trim() || 'AI';
+                    $btn.html('<span class="ace-ai-button-text">✨ <strong><em>' + label + '</em></strong></span>' + $btn.html());
+                }
+            });
         },
 
         initSocialDefaults: function() {
