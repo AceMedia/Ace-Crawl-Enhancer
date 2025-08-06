@@ -1,18 +1,18 @@
 === Ace Crawl Enhancer ===
 Contributors: acemedia
-Tags: seo, yoast, search engine optimization, meta, social media, schema, sitemap
+Tags: seo, search engine optimization, meta, social media, schema
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
 Stable tag: 1.0.0
-License: GPLv3 or later
-License URI: https://www.gnu.org/licenses/gpl-3.0.html
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.
 
 == Description ==
 
-**Ace Crawl Enhancer** is a modern, powerful SEO plugin designed to replace Yoast SEO while maintaining full compatibility with existing data. Built with a sleek, intuitive interface and advanced features for serious SEO optimization.
+**Ace Crawl Enhancer** is a modern, powerful SEO plugin with full compatibility with existing SEO data. Built with a sleek, intuitive interface and advanced features for serious SEO optimization.
 
 ### 🚀 Key Features
 

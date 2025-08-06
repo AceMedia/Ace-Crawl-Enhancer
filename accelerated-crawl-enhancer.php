@@ -18,8 +18,8 @@
  * Requires at least: 6.0
  * Tested up to: 6.8
  * Requires PHP: 7.4
- * License: GPL v3 or later
- * License URI: https://www.gnu.org/licenses/gpl-3.0.html
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
 // Prevent direct access

@@ -1,6 +1,10 @@
 <?php
 /**
  * Ace SEO Admin Class
+ * 
+ * @package AceCrawlEnhancer
+ * @version 1.0.0
+ * @license GPLv2 or later
  */
 
 if (!defined('ABSPATH')) {
