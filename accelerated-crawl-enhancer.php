@@ -5,12 +5,12 @@
  * @package AceCrawlEnhancer
  * @version 1.0.0
  * @author AceMedia
- * @description A modern SEO plugin with Yoast compatibility, featuring real-time analysis and advanced features
+ * @description A modern SEO plugin with seamless Yoast migration, AI-powered optimization, and advanced performance features
  * 
  * @wordpress-plugin
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
- * Description: Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.
+ * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
  * Version: 1.0.0
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer

@@ -12,33 +12,35 @@ Advanced SEO plugin with Yoast compatibility, modern interface, real-time analys
 
 == Description ==
 
-**Ace Crawl Enhancer** is a modern, powerful SEO plugin with full compatibility with existing SEO data. Built with a sleek, intuitive interface and advanced features for serious SEO optimization.
+**Ace Crawl Enhancer** is a modern, powerful SEO plugin with seamless Yoast SEO migration support. Built with a sleek, intuitive interface and advanced features for serious SEO optimization.
 
 ### 🚀 Key Features
 
 **Modern Interface**
-* Clean, tabbed interface similar to Yoast but more modern
+* Clean, tabbed interface with modern design
 * Real-time SEO and readability analysis
 * Live Google, Facebook, and Twitter previews
 * Character counters with visual progress bars
 * Mobile-responsive design
 
-**Full Yoast Compatibility**
-* Uses identical database structure (`_yoast_wpseo_*` meta keys)
-* Seamless migration - no data loss
-* Can replace Yoast SEO without any configuration
-* Import/export compatibility
+**Seamless Yoast SEO Migration**
+* Automatic migration of existing Yoast SEO data
+* One-click bulk migration tool
+* Preserves all your existing SEO titles, descriptions, and settings
+* Can safely replace Yoast SEO without data loss
+* Uses plugin-specific database fields (`_ace_seo_*`) for future-proofing
 
 **Advanced SEO Features**
 * Focus keyword optimization with real-time scoring
-* SEO title and meta description optimization
+* SEO title and meta description optimization with AI assistance
 * Canonical URL management
 * Meta robots controls (noindex, nofollow, advanced)
 * Breadcrumbs with structured data
 * XML sitemaps generation
+* PageSpeed integration with Core Web Vitals monitoring
 
 **Social Media Optimization**
-* Open Graph (Facebook) optimization
+* Open Graph (Facebook) optimization with live previews
 * Twitter Cards optimization
 * Social media image management
 * Live social media previews
@@ -51,20 +53,29 @@ Advanced SEO plugin with Yoast compatibility, modern interface, real-time analys
 * FAQ schema detection
 * WooCommerce Product schema (if WooCommerce is active)
 
+**AI-Powered Features**
+* OpenAI integration for content suggestions
+* AI-generated SEO titles and meta descriptions
+* Content analysis with AI recommendations
+* Web search integration for trend analysis
+* Smart keyword suggestions
+
 **Content Analysis**
-* Real-time SEO scoring
+* Real-time SEO scoring with performance metrics
 * Readability analysis
 * Content recommendations
 * Keyword density analysis
 * Image alt text checking
+* PageSpeed performance impact on SEO
 
 ### 🎯 Why Choose Ace SEO?
 
-1. **Performance Focused**: Lightweight and optimized for speed
+1. **Performance Focused**: Lightweight and optimized for speed with PageSpeed integration
 2. **User Experience**: Modern, intuitive interface that's easy to use
-3. **Developer Friendly**: Clean code, hooks, and filters for customization
-4. **Future Proof**: Regular updates and modern WordPress standards
-5. **No Vendor Lock-in**: Compatible with Yoast data structure
+3. **AI-Enhanced**: Advanced AI features for content optimization and suggestions
+4. **Developer Friendly**: Clean code, hooks, and filters for customization
+5. **Future Proof**: Regular updates and modern WordPress standards
+6. **Migration Ready**: Seamless transition from Yoast SEO or other plugins
 
 ### 🔧 Technical Features
 
@@ -75,14 +86,20 @@ Advanced SEO plugin with Yoast compatibility, modern interface, real-time analys
 * WPML ready
 * Developer hooks and filters
 * Clean uninstall process
+* AI integration with OpenAI API
+* PageSpeed API integration
+* Core Web Vitals monitoring
 
 ### 📊 Admin Features
 
-* SEO Dashboard with performance overview
+* SEO Dashboard with performance overview and analytics
 * Bulk optimization tools
 * Content analysis columns in post lists
 * Settings import/export
 * Site health integration
+* AI-powered content suggestions
+* PageSpeed performance monitoring
+* One-click Yoast SEO migration
 
 == Installation ==
 
@@ -93,25 +110,28 @@ Advanced SEO plugin with Yoast compatibility, modern interface, real-time analys
 
 ### Migrating from Yoast SEO
 
-1. Keep Yoast SEO active initially
-2. Install and activate Ace SEO
-3. Verify all data is working correctly
-4. Deactivate Yoast SEO (data remains intact)
-5. Optionally delete Yoast SEO
+1. Install and activate Ace SEO (keep Yoast SEO active initially)
+2. Go to 'Ace SEO' → 'Tools' in your admin menu
+3. Click 'Migrate Yoast SEO Data' to transfer all your SEO data
+4. Verify all data is working correctly in the post editor
+5. Deactivate Yoast SEO (your data remains safe and intact)
+6. Optionally delete Yoast SEO
+
+**Note**: The migration process copies your Yoast data to Ace SEO's database fields but leaves the original Yoast data untouched, so you can always revert if needed.
 
 == Frequently Asked Questions ==
 
 = Is this compatible with Yoast SEO data? =
 
-Yes! Ace SEO uses the exact same database structure as Yoast SEO. All your existing SEO titles, meta descriptions, focus keywords, and social media settings will work immediately without any migration needed.
+Yes! Ace SEO can automatically migrate all your existing Yoast SEO data including titles, meta descriptions, focus keywords, and social media settings. The plugin includes a one-click migration tool that safely transfers your data while preserving the originals.
 
 = Can I run this alongside Yoast SEO? =
 
-While technically possible, it's not recommended as both plugins will output SEO tags. You should deactivate Yoast SEO after confirming Ace SEO is working correctly.
+While technically possible during migration, it's not recommended for production as both plugins will output SEO tags. You should migrate your data first, then deactivate Yoast SEO after confirming everything works correctly.
 
 = Does this work with WooCommerce? =
 
-Yes! Ace SEO includes special WooCommerce integration with Product schema markup and e-commerce specific SEO features.
+Yes! Ace SEO includes special WooCommerce integration with Product schema markup, e-commerce specific SEO features, and performance monitoring for product pages.
 
 = Is this compatible with page builders? =
 
@@ -119,11 +139,19 @@ Yes! Ace SEO works with all major page builders including Elementor, Beaver Buil
 
 = Does this generate XML sitemaps? =
 
-Yes! Ace SEO includes automatic XML sitemap generation that's submitted to search engines and follows best practices.
+Yes! Ace SEO includes automatic XML sitemap generation that's submitted to search engines and follows best practices for SEO.
+
+= Are there AI features? =
+
+Yes! With an OpenAI API key, you can use AI-powered features for generating SEO titles, meta descriptions, content analysis, and optimization suggestions based on current trends.
+
+= Does it monitor page performance? =
+
+Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 = Is there an import/export feature? =
 
-Yes! You can export your SEO settings and import them to other sites. Since we use Yoast's data structure, you can also import from Yoast backups.
+Yes! You can export your SEO settings and import them to other sites. The migration tool also works with Yoast SEO backups and exports.
 
 == Screenshots ==
 
@@ -139,14 +167,17 @@ Yes! You can export your SEO settings and import them to other sites. Since we u
 
 = 1.0.0 =
 * Initial release
-* Full Yoast SEO compatibility
-* Modern tabbed interface
-* Real-time SEO analysis
-* Social media optimization
-* Schema.org structured data
-* XML sitemap generation
-* REST API integration
+* Modern tabbed interface with real-time analysis
+* Seamless Yoast SEO migration with one-click tool
+* AI-powered content optimization with OpenAI integration
+* PageSpeed API integration with Core Web Vitals monitoring
+* Advanced social media optimization with live previews
+* Comprehensive Schema.org structured data
+* XML sitemap generation with automatic submission
+* REST API integration for real-time analysis
 * WordPress 6.8 compatibility
+* WooCommerce integration with Product schema
+* Bulk optimization tools and SEO dashboard
 
 == Upgrade Notice ==
 
@@ -157,24 +188,28 @@ Initial release of Ace Crawl Enhancer - the modern Yoast SEO alternative.
 
 ### Database Structure
 
-Ace SEO uses the following meta keys (identical to Yoast SEO):
+Ace SEO uses its own database fields (`_ace_seo_*` prefix) for storing SEO data, ensuring future compatibility and performance. The plugin includes automatic migration from Yoast SEO fields:
 
-* `_yoast_wpseo_title` - SEO title
-* `_yoast_wpseo_metadesc` - Meta description  
-* `_yoast_wpseo_focuskw` - Focus keyword
-* `_yoast_wpseo_linkdex` - SEO score
-* `_yoast_wpseo_content_score` - Content score
-* `_yoast_wpseo_opengraph-title` - Facebook title
-* `_yoast_wpseo_opengraph-description` - Facebook description
-* `_yoast_wpseo_opengraph-image` - Facebook image
-* `_yoast_wpseo_twitter-title` - Twitter title
-* `_yoast_wpseo_twitter-description` - Twitter description
-* `_yoast_wpseo_twitter-image` - Twitter image
-* `_yoast_wpseo_canonical` - Canonical URL
-* `_yoast_wpseo_meta-robots-noindex` - Noindex setting
-* `_yoast_wpseo_meta-robots-nofollow` - Nofollow setting
-* `_yoast_wpseo_meta-robots-adv` - Advanced robots
-* `_yoast_wpseo_bctitle` - Breadcrumb title
+**Plugin Fields (used for storage):**
+* `_ace_seo_title` - SEO title
+* `_ace_seo_metadesc` - Meta description  
+* `_ace_seo_focuskw` - Focus keyword
+* `_ace_seo_linkdex` - SEO score
+* `_ace_seo_content_score` - Content score
+* `_ace_seo_opengraph-title` - Facebook title
+* `_ace_seo_opengraph-description` - Facebook description
+* `_ace_seo_opengraph-image` - Facebook image
+* `_ace_seo_twitter-title` - Twitter title
+* `_ace_seo_twitter-description` - Twitter description
+* `_ace_seo_twitter-image` - Twitter image
+* `_ace_seo_canonical` - Canonical URL
+* `_ace_seo_meta-robots-noindex` - Noindex setting
+* `_ace_seo_meta-robots-nofollow` - Nofollow setting
+* `_ace_seo_meta-robots-adv` - Advanced robots
+* `_ace_seo_bctitle` - Breadcrumb title
+
+**Migration Support:**
+The plugin automatically migrates data from Yoast SEO fields (`_yoast_wpseo_*`) when first accessed, ensuring seamless transition without data loss.
 
 ### Developer Hooks
 
@@ -183,11 +218,16 @@ Ace SEO uses the following meta keys (identical to Yoast SEO):
 * `ace_seo_analysis_score` - Filter SEO analysis score
 * `ace_seo_before_head_output` - Action before head output
 * `ace_seo_after_head_output` - Action after head output
+* `ace_seo_ai_suggestions` - Filter AI-generated suggestions
+* `ace_seo_pagespeed_data` - Filter PageSpeed API data
 
 ### REST API Endpoints
 
 * `GET /wp-json/ace-seo/v1/analyze/{post_id}` - Get SEO analysis
 * `GET /wp-json/ace-seo/v1/preview/{post_id}` - Get search preview
+* `POST /wp-json/ace-seo/v1/ai/suggest-titles` - AI title suggestions
+* `POST /wp-json/ace-seo/v1/ai/suggest-descriptions` - AI description suggestions
+* `GET /wp-json/ace-seo/v1/pagespeed/{post_id}` - PageSpeed analysis
 
 == Support ==
 
@@ -195,4 +235,10 @@ For support, feature requests, or bug reports, please visit our [GitHub reposito
 
 == Privacy ==
 
-Ace SEO does not collect or transmit any personal data. All analysis is performed locally on your server. No external API calls are made for SEO analysis.
+Ace SEO prioritizes your privacy and data security:
+
+* **No Data Collection**: The plugin does not collect or transmit any personal data by default
+* **Local Analysis**: All SEO analysis is performed locally on your server
+* **Optional API Integration**: AI features and PageSpeed monitoring require API keys but are completely optional
+* **Data Control**: When using AI features, only the content you choose to analyze is sent to OpenAI
+* **No Tracking**: No external tracking or analytics are embedded in the plugin
