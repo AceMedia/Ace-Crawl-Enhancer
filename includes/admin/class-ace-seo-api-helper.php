@@ -20,6 +20,11 @@ class AceSEOApiHelper {
         add_action( 'wp_ajax_ace_seo_test_api', array( $this, 'test_api_connection' ) );
         add_action( 'wp_ajax_ace_seo_validate_openai', array( $this, 'validate_openai_key' ) );
         add_action( 'wp_ajax_ace_seo_validate_pagespeed', array( $this, 'validate_pagespeed_key' ) );
+        
+        // Clear AI cache when posts are updated
+        add_action( 'save_post', array( __CLASS__, 'clear_post_ai_cache' ) );
+        add_action( 'wp_insert_post', array( __CLASS__, 'clear_post_ai_cache' ) );
+        add_action( 'before_delete_post', array( __CLASS__, 'clear_post_ai_cache' ) );
     }
     
     /**
@@ -444,11 +449,152 @@ class AceSEOApiHelper {
     }
     
     /**
+     * Get AI suggestion cache key for post meta
+     */
+    private static function get_post_cache_key( $type, $post_content, $focus_keyword = '', $additional_data = '' ) {
+        $content_hash = md5( $post_content . $focus_keyword . $additional_data );
+        return "ace_ai_cache_{$type}_{$content_hash}";
+    }
+    
+    /**
+     * Get post revision timestamp for cache invalidation
+     */
+    private static function get_post_revision_time( $post_id = null ) {
+        if ( ! $post_id ) {
+            global $post;
+            if ( ! $post ) {
+                return time(); // Fallback to current time
+            }
+            $post_id = $post->ID;
+        }
+        
+        // Get the latest revision time, or post modified time if no revisions
+        $revisions = wp_get_post_revisions( $post_id, array( 'numberposts' => 1 ) );
+        if ( $revisions ) {
+            $latest_revision = array_shift( $revisions );
+            return strtotime( $latest_revision->post_modified );
+        }
+        
+        $post = get_post( $post_id );
+        if ( $post ) {
+            return strtotime( $post->post_modified );
+        }
+        
+        return time();
+    }
+    
+    /**
+     * Get cached AI suggestions from post meta if valid
+     */
+    private static function get_cached_post_suggestions( $post_id, $cache_key ) {
+        if ( ! $post_id ) {
+            global $post;
+            if ( ! $post ) {
+                return false;
+            }
+            $post_id = $post->ID;
+        }
+        
+        $cached_data = get_post_meta( $post_id, $cache_key, true );
+        
+        if ( ! $cached_data || ! is_array( $cached_data ) ) {
+            return false;
+        }
+        
+        // Check if cache is still valid based on post revision time
+        $cache_time = $cached_data['timestamp'] ?? 0;
+        $post_revision_time = self::get_post_revision_time( $post_id );
+        
+        // Cache is valid if it was created after the last post modification
+        if ( $cache_time < $post_revision_time ) {
+            delete_post_meta( $post_id, $cache_key );
+            return false;
+        }
+        
+        return $cached_data['suggestions'] ?? false;
+    }
+    
+    /**
+     * Cache AI suggestions in post meta
+     */
+    private static function cache_post_suggestions( $post_id, $cache_key, $suggestions ) {
+        if ( ! $post_id ) {
+            global $post;
+            if ( ! $post ) {
+                return false;
+            }
+            $post_id = $post->ID;
+        }
+        
+        $cache_data = array(
+            'suggestions' => $suggestions,
+            'timestamp' => time()
+        );
+        
+        return update_post_meta( $post_id, $cache_key, $cache_data );
+    }
+    
+    /**
+     * Clear all AI suggestion caches for a specific post
+     */
+    public static function clear_post_ai_cache( $post_id ) {
+        if ( ! $post_id ) {
+            return false;
+        }
+        
+        global $wpdb;
+        
+        // Delete all post meta that starts with ace_ai_cache_
+        $wpdb->query( $wpdb->prepare( 
+            "DELETE FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key LIKE %s", 
+            $post_id,
+            'ace_ai_cache_%'
+        ) );
+        
+        return true;
+    }
+    
+    /**
+     * Clear all AI suggestion caches (useful for cache management)
+     */
+    public static function clear_all_ai_cache() {
+        global $wpdb;
+        
+        // Delete all post meta that starts with ace_ai_cache_
+        $wpdb->query( $wpdb->prepare( 
+            "DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE %s", 
+            'ace_ai_cache_%'
+        ) );
+        
+        // Also clear old transient-based caches for backward compatibility
+        $cache_prefix = 'ace_ai_';
+        $wpdb->query( $wpdb->prepare( 
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", 
+            '_transient_' . $cache_prefix . '%'
+        ) );
+        $wpdb->query( $wpdb->prepare( 
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", 
+            '_transient_timeout_' . $cache_prefix . '%'
+        ) );
+    }
+
+    /**
      * Generate AI-powered SEO title suggestions
      */
     public static function generate_seo_titles( $post_content, $focus_keyword = '', $post_title = '' ) {
         if ( ! self::is_ai_enabled() ) {
             return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        // Get current post ID
+        global $post;
+        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        
+        // Check cache first
+        $cache_key = self::get_post_cache_key( 'titles', $post_content, $focus_keyword, $post_title );
+        $cached_titles = self::get_cached_post_suggestions( $post_id, $cache_key );
+        if ( $cached_titles !== false ) {
+            return $cached_titles;
         }
         
         // Enable web search if setting is enabled and focus keyword is provided
@@ -539,6 +685,11 @@ class AceSEOApiHelper {
             }
         }
         
+        // Cache the results in post meta
+        if ( $post_id ) {
+            self::cache_post_suggestions( $post_id, $cache_key, $valid_titles );
+        }
+        
         return $valid_titles;
     }
     
@@ -567,6 +718,17 @@ class AceSEOApiHelper {
     public static function generate_meta_descriptions( $post_content, $focus_keyword = '', $post_title = '' ) {
         if ( ! self::is_ai_enabled() ) {
             return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
+        }
+        
+        // Get current post ID
+        global $post;
+        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        
+        // Check cache first
+        $cache_key = self::get_post_cache_key( 'descriptions', $post_content, $focus_keyword, $post_title );
+        $cached_descriptions = self::get_cached_post_suggestions( $post_id, $cache_key );
+        if ( $cached_descriptions !== false ) {
+            return $cached_descriptions;
         }
         
         // Enable web search if setting is enabled and focus keyword is provided
@@ -654,6 +816,11 @@ class AceSEOApiHelper {
                     'reason' => $desc_data['reason']
                 );
             }
+        }
+        
+        // Cache the results in post meta
+        if ( $post_id ) {
+            self::cache_post_suggestions( $post_id, $cache_key, $valid_descriptions );
         }
         
         return $valid_descriptions;
@@ -972,6 +1139,17 @@ class AceSEOApiHelper {
             return new WP_Error( 'ai_disabled', 'AI features are not enabled' );
         }
         
+        // Get current post ID
+        global $post;
+        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        
+        // Check cache first
+        $cache_key = self::get_post_cache_key( 'keywords', $post_content, '', $post_title );
+        $cached_keywords = self::get_cached_post_suggestions( $post_id, $cache_key );
+        if ( $cached_keywords !== false ) {
+            return $cached_keywords;
+        }
+        
         $prompt = "Based on this content, suggest 5 potential focus keywords for SEO optimization:\n\n";
         if ( ! empty( $post_title ) ) {
             $prompt .= "Title: " . $post_title . "\n";
@@ -1033,7 +1211,14 @@ class AceSEOApiHelper {
         }
         
         // Limit to 5 keywords
-        return array_slice( $valid_keywords, 0, 5 );
+        $final_keywords = array_slice( $valid_keywords, 0, 5 );
+        
+        // Cache the results in post meta
+        if ( $post_id ) {
+            self::cache_post_suggestions( $post_id, $cache_key, $final_keywords );
+        }
+        
+        return $final_keywords;
     }
     
     /**

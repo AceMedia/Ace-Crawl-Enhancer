@@ -49,9 +49,16 @@ class AceSEOAiAssistant {
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
         $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_id = intval( $_POST['post_id'] ?? 0 );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        // Set global post context for caching
+        if ( $post_id ) {
+            global $post;
+            $post = get_post( $post_id );
         }
         
         // Debug logging
@@ -77,9 +84,16 @@ class AceSEOAiAssistant {
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
         $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_id = intval( $_POST['post_id'] ?? 0 );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
+        }
+        
+        // Set global post context for caching
+        if ( $post_id ) {
+            global $post;
+            $post = get_post( $post_id );
         }
         
         // Debug logging
@@ -183,14 +197,21 @@ class AceSEOAiAssistant {
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_id = intval( $_POST['post_id'] ?? 0 );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for keyword suggestions' );
         }
         
+        // Set global post context for caching
+        if ( $post_id ) {
+            global $post;
+            $post = get_post( $post_id );
+        }
+        
         // Debug logging
         
-        $keywords = AceSEOApiHelper::generate_keywords( $post_content, $focus_keyword );        if ( is_wp_error( $keywords ) ) {
+        $keywords = AceSEOApiHelper::generate_keyword_suggestions( $post_content, $current_title );        if ( is_wp_error( $keywords ) ) {
             wp_send_json_error( $keywords->get_error_message() );
         }
         

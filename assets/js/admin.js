@@ -1235,7 +1235,8 @@
                 content: content,
                 current_title: title,
                 focus_keyword: focusKeyword,
-                nonce: $('#ace_seo_ai_nonce').val()
+                nonce: $('#ace_seo_ai_nonce').val(),
+                post_id: (typeof aceSeoAdmin !== 'undefined' && aceSeoAdmin.postId) ? aceSeoAdmin.postId : ($('input#post_ID').val() || 0)
             };
         },
 
