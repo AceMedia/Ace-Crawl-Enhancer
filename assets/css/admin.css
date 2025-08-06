@@ -1,3 +1,71 @@
+.metabox-location-side {
+  .ace-seo-tabs {
+    border-radius: 8px;
+    border-bottom: none;
+    background: #f9f9f9;
+    margin-bottom: 0;
+    padding-top: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+  .ace-seo-tab-nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-height: unset;
+    width: 100%;
+    border: none;
+    gap: 8px;
+    padding: 8px 0;
+    background: transparent;
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+  .ace-seo-tab-item {
+    flex: 0 1 auto;
+    border: none;
+    min-width: 80px;
+    max-width: 100%;
+    width: auto;
+    justify-content: flex-start;
+    padding: 10px 16px;
+    border-radius: 6px;
+    gap: 0;
+    background: #f3f3f3;
+    color: #444;
+    font-weight: 500;
+    font-size: 13px;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    margin: 0;
+    position: relative;
+    box-shadow: none;
+    outline: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .ace-seo-tab-item:not(.active):hover,
+  .ace-seo-tab-item:not(.active):focus {
+    background: #ececec;
+    color: #a4286a;
+    box-shadow: 0 1px 4px rgba(164,40,106,0.07);
+  }
+  .ace-seo-tab-item.active {
+    background: #fff;
+    color: #a4286a;
+    font-weight: 700;
+    border-left: 3px solid #a4286a;
+    box-shadow: 0 2px 8px rgba(164,40,106,0.10);
+    z-index: 1;
+  }
+  .ace-seo-tab-inner {
+    gap: 8px;
+  }
+  .ace-seo-tab-score {
+    margin-left: 8px;
+    margin-right: 0;
+  }
+}
 /* Ace SEO Admin Styles - Modern Yoast-like Interface */
 
 .ace-seo-metabox {
@@ -14,27 +82,39 @@
     border-bottom: 1px solid #e1e1e1;
     background: #f9f9f9;
     border-radius: 4px 4px 0 0;
+    margin-bottom: 0;
+    padding-top: 0;
 }
 
 .ace-seo-tab-nav {
     display: flex;
     margin: 0;
-    padding: 0;
+    padding: 0 0 0 0;
     list-style: none;
+    min-height: 38px;
 }
 
 .ace-seo-tab-item {
     flex: 1;
     border-right: 1px solid #e1e1e1;
     cursor: pointer;
-    padding: 16px 12px;
+    padding: 6px 10px 6px 10px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between;
     transition: all 0.2s ease;
     background: #f9f9f9;
     position: relative;
+    min-width: 80px;
+    gap: 0;
+}
+
+.ace-seo-tab-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
 }
 
 .ace-seo-tab-item:last-child {
@@ -51,27 +131,34 @@
 }
 
 .ace-seo-tab-icon {
-    font-size: 18px;
-    margin-bottom: 2px;
+    font-size: 15px;
+    margin-bottom: 0;
+    margin-right: 4px;
 }
 
 .ace-seo-tab-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #444;
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-right: 0;
 }
 
 .ace-seo-tab-score {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
-    padding: 2px 6px;
-    border-radius: 10px;
-    min-width: 20px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    min-width: 18px;
     text-align: center;
     background: #e1e1e1;
     color: #666;
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-left: 8px;
 }
 
 .ace-seo-tab-score.good {

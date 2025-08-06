@@ -32,29 +32,39 @@ $breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
 
 <div id="ace-seo-metabox" class="ace-seo-metabox">
     <!-- Tab Navigation -->
-    <div class="ace-seo-tabs">
+    <div class="ace-seo-tabs" style="margin-top:0;">
         <ul class="ace-seo-tab-nav">
             <li class="ace-seo-tab-item active" data-tab="general">
-                <span class="ace-seo-tab-icon">📊</span>
-                <span class="ace-seo-tab-label">SEO</span>
+                <span class="ace-seo-tab-inner">
+                    <span class="ace-seo-tab-icon">📊</span>
+                    <span class="ace-seo-tab-label">SEO</span>
+                </span>
                 <span class="ace-seo-tab-score" id="ace-seo-score">—</span>
             </li>
             <li class="ace-seo-tab-item" data-tab="readability">
-                <span class="ace-seo-tab-icon">📖</span>
-                <span class="ace-seo-tab-label">Readability</span>
+                <span class="ace-seo-tab-inner">
+                    <span class="ace-seo-tab-icon">📖</span>
+                    <span class="ace-seo-tab-label">Readability</span>
+                </span>
                 <span class="ace-seo-tab-score" id="ace-readability-score">—</span>
             </li>
             <li class="ace-seo-tab-item" data-tab="social">
-                <span class="ace-seo-tab-icon">📱</span>
-                <span class="ace-seo-tab-label">Social</span>
+                <span class="ace-seo-tab-inner">
+                    <span class="ace-seo-tab-icon">📱</span>
+                    <span class="ace-seo-tab-label">Social</span>
+                </span>
             </li>
             <li class="ace-seo-tab-item" data-tab="advanced">
-                <span class="ace-seo-tab-icon">⚙️</span>
-                <span class="ace-seo-tab-label">Advanced</span>
+                <span class="ace-seo-tab-inner">
+                    <span class="ace-seo-tab-icon">⚙️</span>
+                    <span class="ace-seo-tab-label">Advanced</span>
+                </span>
             </li>
             <li class="ace-seo-tab-item" data-tab="performance">
-                <span class="ace-seo-tab-icon">⚡</span>
-                <span class="ace-seo-tab-label">Performance</span>
+                <span class="ace-seo-tab-inner">
+                    <span class="ace-seo-tab-icon">⚡</span>
+                    <span class="ace-seo-tab-label">Performance</span>
+                </span>
                 <span class="ace-seo-tab-score" id="ace-performance-score">—</span>
             </li>
         </ul>
@@ -181,7 +191,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
 
         <!-- SEO Analysis -->
         <div class="ace-seo-analysis" id="ace-seo-analysis">
-            <h4>SEO Analysis <button type="button" onclick="AceSeo.performClientSideAnalysis()" style="font-size: 10px; margin-left: 10px;">Test Analysis</button></h4>
+            <h4>SEO Analysis</h4>
             <div class="ace-seo-analysis-loading">
                 <span class="ace-seo-spinner"></span>
                 Analyzing content...
