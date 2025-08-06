@@ -38,7 +38,7 @@
                     this.aiCache = JSON.parse(cached);
                 }
             } catch (e) {
-                console.log('Could not load AI cache:', e);
+                // Could not load AI cache
                 this.aiCache = {};
             }
         },
@@ -47,7 +47,7 @@
             try {
                 localStorage.setItem('ace_seo_ai_cache_' + (aceSeoAdmin.postId || 'new'), JSON.stringify(this.aiCache));
             } catch (e) {
-                console.log('Could not save AI cache:', e);
+                // Could not save AI cache
             }
         },
 
@@ -91,7 +91,7 @@
             });
             
             this.saveAiCache();
-            console.log(`Invalidated ${platform} image caches due to manual image selection`);
+            // Invalidated image caches due to manual image selection
         },
         
         init: function() {
@@ -386,7 +386,7 @@
 
         performSeoAnalysis: function() {
             // Always use client-side analysis for consistency
-            console.log('performSeoAnalysis called - using client-side analysis');
+            // performSeoAnalysis called - using client-side analysis
             this.performClientSideAnalysis();
         },
 
@@ -430,8 +430,7 @@
                 }
             }
             
-            console.log('Client-side analysis - Title field:', titleFieldValue, 'Effective title:', effectiveTitle, 'Length:', effectiveTitle.length);
-            console.log('Client-side analysis - Meta field:', metaDescFieldValue, 'Effective meta:', effectiveMetaDesc, 'Length:', effectiveMetaDesc.length);
+            // Client-side analysis - Title/Meta fields
             
             const recommendations = [];
             let score = 100;
@@ -530,7 +529,7 @@
                 }
             }
             
-            console.log('Client-side analysis results:', {seo_score: Math.max(0, score), recommendations: recommendations});
+            // Client-side analysis results
             
             this.displaySeoResults({
                 seo_score: Math.max(0, score),
@@ -1239,12 +1238,12 @@
         },
 
         generateTitles: function(contentData, $button) {
-            console.log('Generating titles with data:', contentData); // Debug log
+            // Generating titles
             // Cache logic
             const cacheKey = this.getCacheKey('titles', contentData.content, contentData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached AI titles response');
+                // Using cached AI titles response
                 this.setButtonLoading($button, false);
                 this.showTitleSuggestions(cachedResponse);
                 return;
@@ -1254,7 +1253,7 @@
                 ...contentData
             })
             .done((response) => {
-                console.log('Titles response:', response); // Debug log
+                // Titles response
                 this.setButtonLoading($button, false);
                 if (response.success) {
                     this.setCachedResponse(cacheKey, response.data.titles);
@@ -1274,7 +1273,7 @@
             const cacheKey = this.getCacheKey('descriptions', contentData.content, contentData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached AI descriptions response');
+                // Using cached AI descriptions response
                 this.setButtonLoading($button, false);
                 this.showDescriptionSuggestions(cachedResponse);
                 return;
@@ -1303,7 +1302,7 @@
             const cacheKey = this.getCacheKey('keywords', contentData.content, contentData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached AI keywords response');
+                // Using cached AI keywords response
                 this.setButtonLoading($button, false);
                 this.showKeywordSuggestions(cachedResponse);
                 return;
@@ -1338,7 +1337,7 @@
             const cacheKey = this.getCacheKey('facebook_titles', contentData.content, facebookData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached Facebook titles response');
+                // Using cached Facebook titles response
                 this.setButtonLoading($button, false);
                 this.showTitleSuggestions(cachedResponse, 'facebook');
                 return;
@@ -1372,7 +1371,7 @@
             const cacheKey = this.getCacheKey('facebook_descriptions', contentData.content, facebookData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached Facebook descriptions response');
+                // Using cached Facebook descriptions response
                 this.setButtonLoading($button, false);
                 this.showDescriptionSuggestions(cachedResponse, 'facebook');
                 return;
@@ -1407,7 +1406,7 @@
             const cacheKey = this.getCacheKey('twitter_titles', contentData.content, twitterData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached Twitter titles response');
+                // Using cached Twitter titles response
                 this.setButtonLoading($button, false);
                 this.showTitleSuggestions(cachedResponse, 'twitter');
                 return;
@@ -1442,7 +1441,7 @@
             const cacheKey = this.getCacheKey('twitter_descriptions', contentData.content, twitterData);
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached Twitter descriptions response');
+                // Using cached Twitter descriptions response
                 this.setButtonLoading($button, false);
                 this.showDescriptionSuggestions(cachedResponse, 'twitter');
                 return;
@@ -1479,7 +1478,7 @@
             const cachedResponse = this.getCachedResponse(cacheKey);
             
             if (cachedResponse) {
-                console.log('Using cached Facebook image response');
+                // Using cached Facebook image response
                 this.setButtonLoading($button, false);
                 this.showImageSuggestions(cachedResponse, 'facebook');
                 return;
@@ -1518,7 +1517,7 @@
             const cachedResponse = this.getCachedResponse(cacheKey);
             
             if (cachedResponse) {
-                console.log('Using cached Twitter image response');
+                // Using cached Twitter image response
                 this.setButtonLoading($button, false);
                 this.showImageSuggestions(cachedResponse, 'twitter');
                 return;
@@ -1620,7 +1619,7 @@
         },
 
         showTitleSuggestions: function(titles, platform) {
-            console.log('Showing title suggestions:', titles, 'Platform:', platform); // Debug log
+            // Showing title suggestions
             
             // Determine the title type and character limits based on platform
             let titleType, charLimit, modalTitle;
@@ -1717,7 +1716,7 @@
         },
 
         showKeywordSuggestions: function(keywords) {
-            console.log('Showing keyword suggestions:', keywords); // Debug log
+            // Showing keyword suggestions
             
             let html = '<div class="ace-ai-suggestions-list">';
             
@@ -2166,7 +2165,7 @@
             
             const cachedResponse = this.getCachedResponse(cacheKey);
             if (cachedResponse) {
-                console.log('Using cached more images response');
+                // Using cached more images response
                 successCallback(cachedResponse);
                 return;
             }
