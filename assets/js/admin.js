@@ -1158,6 +1158,8 @@
             this.currentModal = null;
             this.selectedSuggestion = null;
             this.aiData = {};
+            // Set all AI buttons to consistent initial label
+            $('.ace-ai-button').html('✨ <strong><em>AI</em></strong>');
         },
 
         initSocialDefaults: function() {
@@ -1173,16 +1175,12 @@
             e.preventDefault();
             const $button = $(e.currentTarget);
             const action = $button.data('action');
-            
             if ($button.hasClass('loading')) {
                 return;
             }
-            
             this.setButtonLoading($button, true);
-            
             // Get current content data
             const contentData = this.getContentData();
-            
             switch (action) {
                 case 'generate_titles':
                     this.generateTitles(contentData, $button);
