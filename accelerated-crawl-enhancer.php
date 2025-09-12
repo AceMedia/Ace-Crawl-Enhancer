@@ -218,6 +218,9 @@ class AceCrawlEnhancer {
         // Register meta fields
         add_action('init', [$this, 'register_meta_fields']);
         
+        // Background database optimization hook
+        add_action('ace_seo_optimize_database', [$this, 'run_background_optimization']);
+        
         // Frontend output
         add_filter('wp_title', [$this, 'filter_title'], 50);
         add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 50);
@@ -1154,6 +1157,63 @@ class AceCrawlEnhancer {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
         }
+    }
+    
+    /**
+     * Run background database optimization
+     */
+    public function run_background_optimization() {
+        // Include the database optimizer
+        if ( file_exists( ACE_SEO_PATH . 'includes/database/class-database-optimizer.php' ) ) {
+            require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+            
+            if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
+                $optimizer = new ACE_SEO_Database_Optimizer();
+                $results = $optimizer->create_indexes();
+                
+                // Log the optimization results
+                error_log( 'ACE SEO Background Task: Database optimization completed - ' . print_r( $results, true ) );
+                
+                // Clear pending flag and store completion status
+                delete_option( 'ace_seo_db_optimization_pending' );
+                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ) );
+                update_option( 'ace_seo_db_optimization_results', $results );
+                
+                // Optionally send a notification (if user wants it)
+                $this->send_optimization_notification( $results );
+            }
+        }
+    }
+    
+    /**
+     * Send optimization completion notification
+     */
+    private function send_optimization_notification( $results ) {
+        // Only send if user has enabled notifications
+        $send_notifications = get_option( 'ace_seo_send_notifications', false );
+        if ( ! $send_notifications ) {
+            return;
+        }
+        
+        $admin_email = get_option( 'admin_email' );
+        $site_name = get_bloginfo( 'name' );
+        
+        $subject = sprintf( '[%s] ACE SEO Database Optimization Complete', $site_name );
+        
+        $message = "Database optimization has been completed for your ACE SEO plugin.\n\n";
+        $message .= "Optimization Results:\n";
+        
+        foreach ( $results as $table => $indexes ) {
+            $message .= "\n" . strtoupper( str_replace( '_', ' ', $table ) ) . ":\n";
+            foreach ( $indexes as $index_name => $result ) {
+                $message .= "  • " . $index_name . ": " . $result['message'] . "\n";
+            }
+        }
+        
+        $message .= "\nYour SEO dashboard should now load significantly faster.\n";
+        $message .= "\nThis optimization runs automatically when the plugin is activated.";
+        
+        wp_mail( $admin_email, $subject, $message );
     }
     
     /**

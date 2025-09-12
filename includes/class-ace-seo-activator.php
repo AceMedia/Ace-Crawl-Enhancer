@@ -30,8 +30,8 @@ class AceSEOActivator {
         // Create necessary database tables
         self::create_tables();
         
-        // Optimize database performance with indexes
-        self::optimize_database();
+        // Schedule database optimization for background processing
+        self::schedule_database_optimization();
         
         // Set up rewrite rules
         self::setup_rewrites();
@@ -205,7 +205,22 @@ class AceSEOActivator {
     }
     
     /**
-     * Optimize database performance with indexes
+     * Schedule database optimization for background processing
+     */
+    private static function schedule_database_optimization() {
+        // Schedule immediate background optimization
+        if ( ! wp_next_scheduled( 'ace_seo_optimize_database' ) ) {
+            // Schedule for 30 seconds from now to allow activation to complete
+            wp_schedule_single_event( time() + 30, 'ace_seo_optimize_database' );
+            
+            // Set a flag that optimization is pending
+            update_option( 'ace_seo_db_optimization_pending', true );
+            update_option( 'ace_seo_db_optimization_scheduled', current_time( 'mysql' ) );
+        }
+    }
+    
+    /**
+     * Optimize database performance with indexes (background task)
      */
     private static function optimize_database() {
         // Include the database optimizer
@@ -217,10 +232,12 @@ class AceSEOActivator {
                 $results = $optimizer->create_indexes();
                 
                 // Log the optimization results
-                error_log( 'ACE SEO Activation: Database optimization completed - ' . print_r( $results, true ) );
+                error_log( 'ACE SEO Background: Database optimization completed - ' . print_r( $results, true ) );
                 
-                // Store optimization status
+                // Clear pending flag and store completion status
+                delete_option( 'ace_seo_db_optimization_pending' );
                 update_option( 'ace_seo_db_optimized', current_time( 'mysql' ) );
+                update_option( 'ace_seo_db_optimization_results', $results );
             }
         }
     }
@@ -238,6 +255,9 @@ class AceSEOActivator {
         if ( ! wp_next_scheduled( 'ace_seo_cleanup_analytics' ) ) {
             wp_schedule_event( time(), 'weekly', 'ace_seo_cleanup_analytics' );
         }
+        
+        // Hook the background database optimization task
+        add_action( 'ace_seo_optimize_database', array( __CLASS__, 'optimize_database' ) );
     }
 }
 
@@ -266,5 +286,9 @@ class AceSEODeactivator {
     private static function clear_scheduled_events() {
         wp_clear_scheduled_hook( 'ace_seo_generate_sitemap' );
         wp_clear_scheduled_hook( 'ace_seo_cleanup_analytics' );
+        wp_clear_scheduled_hook( 'ace_seo_optimize_database' );
+        
+        // Clear optimization flags
+        delete_option( 'ace_seo_db_optimization_pending' );
     }
 }

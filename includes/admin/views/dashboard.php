@@ -207,42 +207,66 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <?php
-                    // Initialize database optimizer for analysis
-                    if (class_exists('ACE_SEO_Database_Optimizer')) {
-                        $db_optimizer = new ACE_SEO_Database_Optimizer();
-                        $analysis = $db_optimizer->analyze_performance();
-                    ?>
-                        <div class="ace-seo-db-stats">
-                            <div class="ace-seo-db-stat">
-                                <strong>SEO Meta Records:</strong> <?php echo number_format($analysis['seo_meta_records']); ?>
-                            </div>
-                            <div class="ace-seo-db-stat">
-                                <strong>Total Meta Records:</strong> <?php echo number_format($analysis['postmeta_records']); ?>
-                            </div>
-                            <div class="ace-seo-db-stat">
-                                <strong>Active Indexes:</strong> <?php echo count($analysis['existing_indexes']); ?>
-                            </div>
+                    // Check if optimization is pending
+                    $optimization_pending = get_option( 'ace_seo_db_optimization_pending', false );
+                    $optimization_completed = get_option( 'ace_seo_db_optimized', false );
+                    
+                    if ( $optimization_pending ) {
+                        ?>
+                        <div class="ace-seo-optimization-pending">
+                            <div class="ace-seo-spinner"></div>
+                            <h4>🚀 Database Optimization In Progress</h4>
+                            <p>Database indexes are being created in the background to improve performance. This may take a few minutes on large sites.</p>
+                            <p><small>This process started when the plugin was activated and runs automatically.</small></p>
+                            <button type="button" onclick="location.reload()" class="ace-seo-refresh-btn">Refresh Status</button>
                         </div>
-                        
-                        <?php if (!empty($analysis['recommendations'])): ?>
-                            <div class="ace-seo-recommendations">
-                                <h4>Performance Recommendations:</h4>
-                                <?php foreach ($analysis['recommendations'] as $recommendation): ?>
-                                    <div class="ace-seo-recommendation">⚠️ <?php echo esc_html($recommendation); ?></div>
-                                <?php endforeach; ?>
-                                
-                                <button type="button" id="ace-optimize-database" class="ace-seo-optimize-btn">
-                                    Optimize Database Indexes
-                                </button>
-                                <div id="ace-optimize-result" class="ace-optimize-result" style="display: none;"></div>
+                        <?php
+                    } else {
+                        // Initialize database optimizer for analysis
+                        if (class_exists('ACE_SEO_Database_Optimizer')) {
+                            $db_optimizer = new ACE_SEO_Database_Optimizer();
+                            $analysis = $db_optimizer->analyze_performance();
+                        ?>
+                            <div class="ace-seo-db-stats">
+                                <div class="ace-seo-db-stat">
+                                    <strong>SEO Meta Records:</strong> <?php echo number_format($analysis['seo_meta_records']); ?>
+                                </div>
+                                <div class="ace-seo-db-stat">
+                                    <strong>Total Meta Records:</strong> <?php echo number_format($analysis['postmeta_records']); ?>
+                                </div>
+                                <div class="ace-seo-db-stat">
+                                    <strong>Active Indexes:</strong> <?php echo count($analysis['existing_indexes']); ?>
+                                </div>
+                                <?php if ( $optimization_completed ) { ?>
+                                    <div class="ace-seo-db-stat">
+                                        <strong>Last Optimized:</strong> <?php echo human_time_diff( strtotime( $optimization_completed ), current_time( 'timestamp' ) ); ?> ago
+                                    </div>
+                                <?php } ?>
                             </div>
-                        <?php else: ?>
-                            <div class="ace-seo-performance-good">
-                                ✅ Database performance is optimized!
-                            </div>
-                        <?php endif; ?>
-                    <?php } else { ?>
-                        <p>Database optimizer not available.</p>
+                            
+                            <?php if (!empty($analysis['recommendations'])): ?>
+                                <div class="ace-seo-recommendations">
+                                    <h4>Performance Recommendations:</h4>
+                                    <?php foreach ($analysis['recommendations'] as $recommendation): ?>
+                                        <div class="ace-seo-recommendation">⚠️ <?php echo esc_html($recommendation); ?></div>
+                                    <?php endforeach; ?>
+                                    
+                                    <button type="button" id="ace-optimize-database" class="ace-seo-optimize-btn">
+                                        Optimize Database Indexes
+                                    </button>
+                                    <div id="ace-optimize-result" class="ace-optimize-result" style="display: none;"></div>
+                                </div>
+                            <?php else: ?>
+                                <div class="ace-seo-performance-good">
+                                    ✅ Database performance is optimized!
+                                    <?php if ( $optimization_completed ) { ?>
+                                        <br><small>Optimization completed <?php echo human_time_diff( strtotime( $optimization_completed ), current_time( 'timestamp' ) ); ?> ago</small>
+                                    <?php } ?>
+                                </div>
+                            <?php endif; ?>
+                        <?php } else { ?>
+                            <p>Database optimizer not available.</p>
+                        <?php } ?>
                     <?php } ?>
                 </div>
             </div>
@@ -480,6 +504,54 @@ if (!defined('ABSPATH')) {
     padding: 20px;
     color: #155724;
     font-weight: 500;
+}
+
+.ace-seo-optimization-pending {
+    text-align: center;
+    padding: 30px 20px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+}
+
+.ace-seo-optimization-pending h4 {
+    margin: 10px 0;
+    color: #856404;
+}
+
+.ace-seo-optimization-pending p {
+    color: #856404;
+    margin: 8px 0;
+}
+
+.ace-seo-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 15px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #a4286a;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.ace-seo-refresh-btn {
+    background: #a4286a;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.ace-seo-refresh-btn:hover {
+    background: #8a2258;
 }
 </style>
 
