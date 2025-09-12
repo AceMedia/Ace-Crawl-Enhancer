@@ -248,6 +248,9 @@ class AceCrawlEnhancer {
         add_filter('query_vars', [$this, 'add_query_vars']);
         add_action('init', [$this, 'register_meta_fields']);
         add_action('ace_seo_optimize_database', [$this, 'run_background_optimization']);
+        
+        // Homepage synchronization hook
+        add_action('updated_post_meta', [$this, 'sync_homepage_meta'], 10, 4);
     }
     
     /**
@@ -955,8 +958,42 @@ class AceCrawlEnhancer {
         if (!empty($post->post_excerpt)) {
             return wp_trim_words($post->post_excerpt, 25);
         } else {
-            return wp_trim_words(strip_tags($post->post_content), 25);
+            // Extract only from paragraph blocks to avoid JavaScript/custom block code
+            $clean_content = $this->extract_paragraph_content($post->post_content);
+            return wp_trim_words($clean_content, 25);
         }
+    }
+    
+    /**
+     * Extract content only from paragraph blocks (Gutenberg)
+     */
+    private function extract_paragraph_content($content) {
+        // Handle Gutenberg paragraph blocks
+        if (has_blocks($content)) {
+            $blocks = parse_blocks($content);
+            $paragraph_content = '';
+            
+            foreach ($blocks as $block) {
+                // Only get content from paragraph blocks
+                if ($block['blockName'] === 'core/paragraph' && !empty($block['innerHTML'])) {
+                    $paragraph_content .= $block['innerHTML'] . ' ';
+                }
+            }
+            
+            if (!empty($paragraph_content)) {
+                return strip_tags($paragraph_content);
+            }
+        }
+        
+        // Fallback for non-Gutenberg content - extract first paragraph
+        $content = strip_tags($content);
+        $paragraphs = preg_split('/\n\s*\n/', trim($content));
+        
+        if (!empty($paragraphs[0])) {
+            return $paragraphs[0];
+        }
+        
+        return wp_trim_words($content, 30);
     }
     
     /**
@@ -1018,6 +1055,14 @@ class AceCrawlEnhancer {
             if (!empty($seo_title)) {
                 $title_parts['title'] = $seo_title;
             }
+        } elseif (is_home() || is_front_page()) {
+            // Handle homepage title with synchronization
+            $home_title = $this->get_homepage_title();
+            if (!empty($home_title)) {
+                $title_parts = [
+                    'title' => $home_title
+                ];
+            }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages (search, archive, author)
             $special_title = $this->process_special_page_title();
@@ -1033,6 +1078,44 @@ class AceCrawlEnhancer {
     }
     
     /**
+     * Get homepage title with synchronization between settings and page meta
+     */
+    private function get_homepage_title() {
+        $options = get_option('ace_seo_options', []);
+        $settings_title = $options['general']['home_title'] ?? '';
+        
+        // Check if homepage is a static page
+        $page_on_front = get_option('page_on_front');
+        $show_on_front = get_option('show_on_front');
+        
+        if ($show_on_front === 'page' && $page_on_front) {
+            // Static homepage - check page meta first, then plugin settings
+            $page_meta_title = self::get_meta_value($page_on_front, 'title');
+            
+            if (!empty($page_meta_title)) {
+                // Sync page meta to plugin settings if different
+                if ($page_meta_title !== $settings_title) {
+                    $options['general']['home_title'] = $page_meta_title;
+                    update_option('ace_seo_options', $options);
+                }
+                return $page_meta_title;
+            } elseif (!empty($settings_title)) {
+                // Sync plugin settings to page meta
+                update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'title', $settings_title);
+                return $settings_title;
+            }
+        } else {
+            // Blog homepage - use plugin settings
+            if (!empty($settings_title)) {
+                return $settings_title;
+            }
+        }
+        
+        // Fallback to site name
+        return get_bloginfo('name');
+    }
+    
+    /**
      * Output meta description
      */
     public function output_meta_description() {
@@ -1042,6 +1125,121 @@ class AceCrawlEnhancer {
             if (!empty($meta_desc)) {
                 echo '<meta name="description" content="' . esc_attr($meta_desc) . '">' . "\n";
             }
+        } elseif (is_home() || is_front_page()) {
+            // Handle homepage meta description with synchronization
+            $home_desc = $this->get_homepage_meta_description();
+            
+            if (!empty($home_desc)) {
+                echo '<meta name="description" content="' . esc_attr($home_desc) . '">' . "\n";
+            }
+        } elseif (is_category() || is_tag() || is_tax()) {
+            // Handle taxonomy pages
+            $tax_desc = $this->get_taxonomy_meta_description();
+            if (!empty($tax_desc)) {
+                echo '<meta name="description" content="' . esc_attr($tax_desc) . '">' . "\n";
+            }
+        } elseif (is_author()) {
+            // Handle author pages
+            $author_desc = $this->get_author_meta_description();
+            if (!empty($author_desc)) {
+                echo '<meta name="description" content="' . esc_attr($author_desc) . '">' . "\n";
+            }
+        } elseif (is_search()) {
+            // Handle search pages
+            $search_desc = $this->get_search_meta_description();
+            if (!empty($search_desc)) {
+                echo '<meta name="description" content="' . esc_attr($search_desc) . '">' . "\n";
+            }
+        } elseif (is_archive()) {
+            // Handle other archive pages
+            $archive_desc = $this->get_archive_meta_description();
+            if (!empty($archive_desc)) {
+                echo '<meta name="description" content="' . esc_attr($archive_desc) . '">' . "\n";
+            }
+        }
+    }
+    
+    /**
+     * Get homepage meta description with synchronization between settings and page meta
+     */
+    private function get_homepage_meta_description() {
+        $options = get_option('ace_seo_options', []);
+        $settings_desc = $options['general']['home_description'] ?? '';
+        
+        // Check if homepage is a static page
+        $page_on_front = get_option('page_on_front');
+        $show_on_front = get_option('show_on_front');
+        
+        if ($show_on_front === 'page' && $page_on_front) {
+            // Static homepage - check page meta first, then plugin settings
+            $page_meta_desc = self::get_meta_value($page_on_front, 'metadesc');
+            
+            if (!empty($page_meta_desc)) {
+                // Sync page meta to plugin settings if different
+                if ($page_meta_desc !== $settings_desc) {
+                    $options['general']['home_description'] = $page_meta_desc;
+                    update_option('ace_seo_options', $options);
+                }
+                return $page_meta_desc;
+            } elseif (!empty($settings_desc)) {
+                // Sync plugin settings to page meta
+                update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $settings_desc);
+                return $settings_desc;
+            } else {
+                // Generate from page content
+                $page = get_post($page_on_front);
+                if ($page) {
+                    $auto_desc = $this->extract_paragraph_content($page->post_content);
+                    $auto_desc = wp_trim_words($auto_desc, 25);
+                    if (!empty($auto_desc)) {
+                        // Save auto-generated description to both places
+                        update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $auto_desc);
+                        $options['general']['home_description'] = $auto_desc;
+                        update_option('ace_seo_options', $options);
+                        return $auto_desc;
+                    }
+                }
+            }
+        } else {
+            // Blog homepage - use plugin settings or site tagline
+            if (!empty($settings_desc)) {
+                return $settings_desc;
+            }
+        }
+        
+        // Final fallback to site tagline
+        return get_bloginfo('description');
+    }
+    
+    /**
+     * Sync homepage meta between page fields and plugin settings
+     */
+    public function sync_homepage_meta($meta_id, $post_id, $meta_key, $meta_value) {
+        // Check if this is a homepage meta update
+        $page_on_front = get_option('page_on_front');
+        $show_on_front = get_option('show_on_front');
+        
+        if ($show_on_front !== 'page' || $page_on_front != $post_id) {
+            return; // Not the homepage
+        }
+        
+        // Only sync ACE SEO meta fields
+        if (strpos($meta_key, ACE_SEO_META_PREFIX) !== 0) {
+            return; // Not our meta field
+        }
+        
+        $options = get_option('ace_seo_options', []);
+        
+        // Sync title changes
+        if ($meta_key === ACE_SEO_META_PREFIX . 'title') {
+            $options['general']['home_title'] = $meta_value;
+            update_option('ace_seo_options', $options);
+        }
+        
+        // Sync description changes
+        if ($meta_key === ACE_SEO_META_PREFIX . 'metadesc') {
+            $options['general']['home_description'] = $meta_value;
+            update_option('ace_seo_options', $options);
         }
     }
     
@@ -1060,6 +1258,43 @@ class AceCrawlEnhancer {
             if (!empty($canonical)) {
                 echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
             }
+        } elseif (is_home()) {
+            // Blog homepage
+            $canonical = home_url('/');
+            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+        } elseif (is_front_page()) {
+            // Static front page
+            $page_on_front = get_option('page_on_front');
+            if ($page_on_front) {
+                $canonical = get_permalink($page_on_front);
+            } else {
+                $canonical = home_url('/');
+            }
+            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+        } elseif (is_category() || is_tag() || is_tax()) {
+            // Taxonomy pages
+            $term = get_queried_object();
+            if ($term && isset($term->term_id)) {
+                $canonical = get_term_link($term);
+                if (!is_wp_error($canonical)) {
+                    echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+                }
+            }
+        } elseif (is_author()) {
+            // Author pages
+            $author = get_queried_object();
+            if ($author && isset($author->ID)) {
+                $canonical = get_author_posts_url($author->ID);
+                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            }
+        } elseif (is_search()) {
+            // Search pages
+            $canonical = home_url('/') . '?s=' . urlencode(get_search_query());
+            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+        } elseif (is_archive()) {
+            // Other archive pages
+            $canonical = get_pagenum_link(get_query_var('paged') ?: 1, false);
+            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
         }
     }
     
@@ -1134,6 +1369,23 @@ class AceCrawlEnhancer {
             // OG URL
             echo '<meta property="og:url" content="' . esc_url(get_permalink($post)) . '">' . "\n";
             echo '<meta property="og:type" content="article">' . "\n";
+        } elseif (is_home() || is_front_page()) {
+            // Handle homepage Open Graph tags
+            // OG Title for homepage - use synchronized title
+            $og_title = $this->get_homepage_title();
+            if (!empty($og_title)) {
+                echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+            }
+            
+            // OG Description for homepage - use synchronized description
+            $og_desc = $this->get_homepage_meta_description();
+            if (!empty($og_desc)) {
+                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '">' . "\n";
+            }
+            
+            // OG URL for homepage
+            echo '<meta property="og:url" content="' . esc_url(home_url()) . '">' . "\n";
+            echo '<meta property="og:type" content="website">' . "\n";
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages
             $og_title = $this->process_special_page_title();
@@ -1182,6 +1434,21 @@ class AceCrawlEnhancer {
             }
             if (!empty($twitter_image)) {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
+            }
+        } elseif (is_home() || is_front_page()) {
+            // Handle homepage Twitter cards
+            echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+            
+            // Twitter Title for homepage - use synchronized title
+            $twitter_title = $this->get_homepage_title();
+            if (!empty($twitter_title)) {
+                echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
+            }
+            
+            // Twitter Description for homepage - use synchronized description
+            $twitter_desc = $this->get_homepage_meta_description();
+            if (!empty($twitter_desc)) {
+                echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages

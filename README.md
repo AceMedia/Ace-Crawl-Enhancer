@@ -95,37 +95,7 @@
 6. **Future Proof**: Regular updates and modern WordPress standards
 7. **Migration Ready**: Seamless transition from Yoast SEO or other plugins
 
-## 📊 Performance Improvements
-
-### Database Optimization System (v1.0.1)
-- **5 strategic indexes** added for postmeta and posts tables
-- **Background processing** prevents slow plugin activation
-- **Real-time performance monitoring** in dashboard
-- **Optimized for 1M+ meta records** - tested on large sites
-- **Automatic optimization** on plugin activation
-
-### Frontend Performance System (v1.0.2)
-- **Guest-optimized loading** - Minimal overhead for logged-out users
-- **Batch meta queries** - Single SQL query replaces 10+ individual calls
-- **WordPress object cache** - 1-hour TTL for SEO meta and schema
-- **Conditional hook loading** - Admin features skipped on frontend
-- **Schema optimization** - Cached and deferred structured data
-- **Core Web Vitals focused** - Optimized for search engine crawlers
-
-### Query Performance
-- **Direct SQL queries** replace expensive WordPress ORM calls
-- **LIMIT clauses** prevent runaway queries
-- **Proper JOINs** with indexed columns
-- **Eliminated full table scans** on large databases
-
-### Results
-- **Dashboard loads 10-50x faster** on large sites
-- **Frontend loads ~0.4s** for guest users (excellent SEO)
-- **No more MariaDB spikes** during SEO operations  
-- **No 504 timeouts** on admin pages
-- **Scales to millions of posts** without performance degradation
-
-## 🔧 Technical Features
+##  Technical Features
 
 - **REST API integration** for real-time analysis
 - **WordPress Block Editor (Gutenberg) integration**
@@ -247,7 +217,7 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 ## 📝 Changelog
 
 ### 1.0.2 (2025-09-12)
-**⚡ Frontend Performance & Guest Optimization Release**
+**⚡ Frontend Performance & Content Optimization Release**
 
 #### New Features
 - **Frontend Performance Optimization System**
@@ -256,6 +226,13 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
   - Conditional component loading (admin vs. frontend separation)
   - WordPress object cache integration with 1-hour TTL
   - Schema markup optimization with deferred loading
+
+- **Content Extraction & Homepage Synchronization**
+  - **Gutenberg-aware paragraph extraction** - Only extracts content from core paragraph blocks
+  - **JavaScript contamination prevention** - Filters out custom blocks with JavaScript code
+  - **Bidirectional homepage sync** - Settings ↔ Page meta synchronization for homepage SEO
+  - **Auto-generation from clean content** - Meta descriptions generated only from paragraph text
+  - **Real-time synchronization** - Changes in either plugin settings or page meta sync automatically
 
 #### Performance Improvements
 - **Guest User Optimization**
@@ -278,6 +255,9 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
   - Performance monitoring for frontend vs. admin users
 
 #### Bug Fixes
+- **Fixed homepage meta description corruption** - Eliminated JavaScript code in auto-generated descriptions
+- **Resolved custom block contamination** - Content extraction now only uses core paragraph blocks
+- **Enhanced homepage SEO handling** - Proper synchronization between plugin settings and page meta
 - Fixed PHP fatal error with undefined `init_optimizations()` method
 - Resolved frontend loading issues for guest users
 - Improved error handling in performance optimization class
