@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.1-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.2-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.1  
+**Stable tag:** 1.0.2  
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -46,6 +46,15 @@
 - **Breadcrumbs with structured data**
 - **XML sitemaps generation**
 - **PageSpeed integration** with Core Web Vitals monitoring
+
+### Frontend Performance Optimization (New in 1.0.2)
+- **Guest User Optimization** - Lightning-fast loading for logged-out visitors
+- **Batch Meta Loading** - Single database query instead of multiple `get_post_meta()` calls
+- **Intelligent Caching** - WordPress object cache for SEO meta with 1-hour TTL
+- **Conditional Component Loading** - Different features for admin vs. frontend users
+- **Schema Optimization** - Cached and deferred schema markup generation
+- **Hook Optimization** - Removes unnecessary admin hooks on frontend
+- **Core Web Vitals Focus** - Optimized specifically for search engine crawling speed
 
 ### Social Media Optimization
 - **Open Graph (Facebook) optimization** with live previews
@@ -86,14 +95,22 @@
 6. **Future Proof**: Regular updates and modern WordPress standards
 7. **Migration Ready**: Seamless transition from Yoast SEO or other plugins
 
-## 📊 Performance Improvements (v1.0.1)
+## 📊 Performance Improvements
 
-### Database Optimization System
+### Database Optimization System (v1.0.1)
 - **5 strategic indexes** added for postmeta and posts tables
 - **Background processing** prevents slow plugin activation
 - **Real-time performance monitoring** in dashboard
 - **Optimized for 1M+ meta records** - tested on large sites
 - **Automatic optimization** on plugin activation
+
+### Frontend Performance System (v1.0.2)
+- **Guest-optimized loading** - Minimal overhead for logged-out users
+- **Batch meta queries** - Single SQL query replaces 10+ individual calls
+- **WordPress object cache** - 1-hour TTL for SEO meta and schema
+- **Conditional hook loading** - Admin features skipped on frontend
+- **Schema optimization** - Cached and deferred structured data
+- **Core Web Vitals focused** - Optimized for search engine crawlers
 
 ### Query Performance
 - **Direct SQL queries** replace expensive WordPress ORM calls
@@ -103,7 +120,8 @@
 
 ### Results
 - **Dashboard loads 10-50x faster** on large sites
-- **No more MariaDB spikes** during SEO operations
+- **Frontend loads ~0.4s** for guest users (excellent SEO)
+- **No more MariaDB spikes** during SEO operations  
 - **No 504 timeouts** on admin pages
 - **Scales to millions of posts** without performance degradation
 
@@ -227,6 +245,49 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.2 (2025-09-12)
+**⚡ Frontend Performance & Guest Optimization Release**
+
+#### New Features
+- **Frontend Performance Optimization System**
+  - Guest-optimized loading for maximum SEO performance
+  - Intelligent meta caching system with batch loading
+  - Conditional component loading (admin vs. frontend separation)
+  - WordPress object cache integration with 1-hour TTL
+  - Schema markup optimization with deferred loading
+
+#### Performance Improvements
+- **Guest User Optimization**
+  - Lightning-fast loading for logged-out visitors (~0.4s response times)
+  - Single database query replaces 10+ individual `get_post_meta()` calls
+  - Preloaded common site data (title, description, icon, URLs)
+  - Optimized hook loading removes unnecessary admin functionality
+  
+- **SEO-Focused Caching**
+  - Cached SEO meta with automatic Yoast fallback support
+  - Schema markup cached and reused for repeat crawls
+  - Core Web Vitals optimizations for search engine crawlers
+  - Automatic cache invalidation on post updates
+
+#### Technical Improvements
+- **Database Query Optimization**
+  - Batch meta loading with single SQL query per post
+  - Cached meta accessible via static methods for external use
+  - Intelligent cache warming for commonly accessed data
+  - Performance monitoring for frontend vs. admin users
+
+#### Bug Fixes
+- Fixed PHP fatal error with undefined `init_optimizations()` method
+- Resolved frontend loading issues for guest users
+- Improved error handling in performance optimization class
+- Enhanced compatibility with existing caching systems
+
+#### Developer Features
+- **ACE_SEO_Performance** class for external integration
+- Static cache access methods for theme developers
+- Performance hooks and filters for customization
+- Debugging tools for frontend performance analysis
 
 ### 1.0.1 (2025-09-12)
 **🚀 Performance & Database Optimization Release**

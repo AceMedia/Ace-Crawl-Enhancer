@@ -3,7 +3,7 @@
  * Ace Crawl Enhancer - Advanced SEO Plugin
  *
  * @package AceCrawlEnhancer
- * @version 1.0.1
+ * @version 1.0.2
  * @author AceMedia
  * @description A modern SEO plugin with seamless Yoast migration, AI-powered optimization, and advanced performance features
  * 
@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.1');
+define('ACE_SEO_VERSION', '1.0.2');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -210,35 +210,44 @@ class AceCrawlEnhancer {
      */
     private function init_hooks() {
         add_action('init', [$this, 'init']);
-        add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
-        add_action('wp_head', [$this, 'output_head_tags']);
-        add_action('rest_api_init', [$this, 'register_rest_routes']);
+        
+        // Conditional loading for better performance
+        if (!is_admin()) {
+            // Frontend-only hooks
+            add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
+            add_action('wp_head', [$this, 'output_head_tags']);
+            
+            // Skip REST API for logged-out users unless needed
+            if (is_user_logged_in() || !apply_filters('ace_seo_skip_rest_api', false)) {
+                add_action('rest_api_init', [$this, 'register_rest_routes']);
+            }
+            
+            // Frontend SEO output
+            add_filter('wp_title', [$this, 'filter_title'], 50);
+            add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 50);
+            add_action('wp_head', [$this, 'output_meta_description'], 1);
+            add_action('wp_head', [$this, 'output_canonical'], 2);
+            add_action('wp_head', [$this, 'output_robots_meta'], 3);
+            add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
+            add_action('wp_head', [$this, 'output_twitter_tags'], 11);
+        } else {
+            // Admin-only hooks
+            add_action('load-post.php', [$this, 'maybe_migrate_post_data']);
+            add_action('load-post-new.php', [$this, 'maybe_migrate_post_data']);
+            
+            // Admin columns (skip for frontend users)
+            if (!apply_filters('ace_seo_skip_admin_columns', false)) {
+                add_filter('manage_posts_columns', [$this, 'add_admin_columns']);
+                add_filter('manage_pages_columns', [$this, 'add_admin_columns']);
+                add_action('manage_posts_custom_column', [$this, 'populate_admin_columns'], 10, 2);
+                add_action('manage_pages_custom_column', [$this, 'populate_admin_columns'], 10, 2);
+            }
+        }
+        
+        // Always needed
         add_filter('query_vars', [$this, 'add_query_vars']);
-        
-        // Register meta fields
         add_action('init', [$this, 'register_meta_fields']);
-        
-        // Background database optimization hook
         add_action('ace_seo_optimize_database', [$this, 'run_background_optimization']);
-        
-        // Frontend output
-        add_filter('wp_title', [$this, 'filter_title'], 50);
-        add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 50);
-        add_action('wp_head', [$this, 'output_meta_description'], 1);
-        add_action('wp_head', [$this, 'output_canonical'], 2);
-        
-        // Auto-migrate Yoast data when post is loaded in admin
-        add_action('load-post.php', [$this, 'maybe_migrate_post_data']);
-        add_action('load-post-new.php', [$this, 'maybe_migrate_post_data']);
-        add_action('wp_head', [$this, 'output_robots_meta'], 3);
-        add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
-        add_action('wp_head', [$this, 'output_twitter_tags'], 11);
-        
-        // Admin columns
-        add_filter('manage_posts_columns', [$this, 'add_admin_columns']);
-        add_filter('manage_pages_columns', [$this, 'add_admin_columns']);
-        add_action('manage_posts_custom_column', [$this, 'populate_admin_columns'], 10, 2);
-        add_action('manage_pages_custom_column', [$this, 'populate_admin_columns'], 10, 2);
     }
     
     /**
@@ -276,13 +285,29 @@ class AceCrawlEnhancer {
      */
     private function init_frontend() {
         if (!is_admin()) {
+            // Load performance optimizer first for guests
+            require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-performance.php';
+            
+            // Load core frontend components
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-frontend.php';
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';
         }
         
-        // Always load sitemap functionality
+        // Always load sitemap functionality (but initialize conditionally)
         require_once ACE_SEO_PATH . 'includes/class-ace-seo-sitemap.php';
-        new AceSEOSitemap();
+        
+        // Only initialize sitemap if needed (not for all guest requests)
+        if (is_admin() || is_user_logged_in() || $this->is_sitemap_request()) {
+            new AceSEOSitemap();
+        }
+    }
+    
+    /**
+     * Check if this is a sitemap request
+     */
+    private function is_sitemap_request() {
+        return isset($_GET['ace_seo_sitemap']) || 
+               (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'sitemap') !== false);
     }
     
     /**
@@ -348,8 +373,17 @@ class AceCrawlEnhancer {
     
     /**
      * Get meta value with fallback to default and Yoast migration
+     * Optimized to use cached data on frontend for better performance
      */
     public static function get_meta_value($post_id, $key) {
+        // On frontend, try to use cached data first for better performance
+        if (!is_admin() && class_exists('ACE_SEO_Performance')) {
+            $cached_value = ACE_SEO_Performance::get_meta($post_id, $key);
+            if ($cached_value !== null) {
+                return $cached_value;
+            }
+        }
+        
         // First try to get plugin-specific meta
         $value = get_post_meta($post_id, ACE_SEO_META_PREFIX . $key, true);
         
