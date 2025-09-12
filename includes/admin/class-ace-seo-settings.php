@@ -22,6 +22,8 @@ class AceSEOSettings {
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
         add_action( 'wp_ajax_ace_seo_migrate_yoast', array( $this, 'ajax_migrate_yoast_data' ) );
         add_action( 'wp_ajax_ace_seo_optimize_database_manual', array( $this, 'ajax_optimize_database_manual' ) );
+        add_action( 'wp_ajax_ace_seo_refresh_dashboard_cache', array( $this, 'ajax_refresh_dashboard_cache' ) );
+        add_action( 'wp_ajax_ace_seo_clear_dashboard_cache', array( $this, 'ajax_clear_dashboard_cache' ) );
     }
     
     /**
@@ -229,6 +231,59 @@ class AceSEOSettings {
                 </button>
                 
                 <div id="ace-db-optimization-result" class="ace-optimization-result" style="display: none; margin-top: 15px;"></div>
+            </div>
+            
+            <!-- Dashboard Cache Management -->
+            <div class="card">
+                <h2>Dashboard Cache</h2>
+                <h3>Performance Statistics Cache</h3>
+                <p>Manage dashboard statistics cache to prevent 504 timeouts on large sites. Statistics are cached for 1 hour to improve performance.</p>
+                
+                <?php
+                // Load dashboard cache class
+                if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                    require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+                }
+                
+                $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+                ?>
+                
+                <p><strong>Cache Status:</strong></p>
+                <ul>
+                    <li>Statistics Cache: 
+                        <?php if ($cache_status['stats_cached']): ?>
+                            ✅ Active (<?php echo human_time_diff(time() - $cache_status['stats_age']); ?> old)
+                        <?php else: ?>
+                            ❌ Empty
+                        <?php endif; ?>
+                    </li>
+                    <li>Recent Posts Cache: 
+                        <?php if ($cache_status['recent_cached']): ?>
+                            ✅ Active
+                        <?php else: ?>
+                            ❌ Empty
+                        <?php endif; ?>
+                    </li>
+                    <li>Cache Duration: <?php echo human_time_diff(0, $cache_status['cache_duration']); ?></li>
+                </ul>
+                
+                <p><strong>What this does:</strong></p>
+                <ul>
+                    <li>Caches expensive dashboard queries for 1 hour</li>
+                    <li>Prevents 504 timeouts when loading ACE SEO dashboard</li>
+                    <li>Automatically clears when posts are updated</li>
+                    <li>Safe operation - only affects dashboard display speed</li>
+                </ul>
+                
+                <button type="button" id="ace-refresh-cache-btn" class="button button-secondary">
+                    🔄 Refresh Dashboard Cache
+                </button>
+                
+                <button type="button" id="ace-clear-cache-btn" class="button button-secondary" style="margin-left: 10px;">
+                    🗑️ Clear Cache
+                </button>
+                
+                <div id="ace-cache-result" class="ace-optimization-result" style="display: none; margin-top: 15px;"></div>
             </div>
             
             <!-- Additional Tools -->
@@ -462,6 +517,76 @@ class AceSEOSettings {
         } catch (Exception $e) {
             error_log('ACE SEO Manual Optimization Error: ' . $e->getMessage());
             wp_send_json_error('Database optimization failed: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * AJAX handler for refreshing dashboard cache
+     */
+    public function ajax_refresh_dashboard_cache() {
+        // Check permissions and nonce
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized access');
+        }
+        
+        check_ajax_referer('ace_seo_admin', 'nonce');
+        
+        try {
+            // Load dashboard cache class
+            if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+            }
+            
+            // Force regenerate cache
+            $result = ACE_SEO_Dashboard_Cache::force_regenerate();
+            
+            wp_send_json_success(array(
+                'message' => 'Dashboard cache refreshed successfully!',
+                'stats' => array(
+                    'focus_keywords' => $result['stats']['focus_keywords_count'],
+                    'meta_descriptions' => $result['stats']['meta_desc_count'],
+                    'total_posts' => $result['stats']['total_posts']
+                ),
+                'recent_posts_count' => count($result['recent_posts']),
+                'regenerated_at' => date('Y-m-d H:i:s', $result['regenerated_at'])
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error('Failed to refresh cache: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * AJAX handler for clearing dashboard cache
+     */
+    public function ajax_clear_dashboard_cache() {
+        // Check permissions and nonce
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized access');
+        }
+        
+        check_ajax_referer('ace_seo_admin', 'nonce');
+        
+        try {
+            // Load dashboard cache class
+            if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+            }
+            
+            // Clear all cache
+            $cleared = ACE_SEO_Dashboard_Cache::clear_cache();
+            
+            if ($cleared) {
+                wp_send_json_success(array(
+                    'message' => 'Dashboard cache cleared successfully!',
+                    'note' => 'Cache will be regenerated on next dashboard visit.'
+                ));
+            } else {
+                wp_send_json_error('Failed to clear cache');
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error('Failed to clear cache: ' . $e->getMessage());
         }
     }
 }

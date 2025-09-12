@@ -3178,8 +3178,123 @@ Alternative - Lighthouse CLI:
             AceSeo.init();
         }
     });
+    
+    // Dashboard Cache Management
+    const DashboardCache = {
+        init: function() {
+            this.bindCacheButtons();
+        },
+        
+        bindCacheButtons: function() {
+            // Refresh cache button
+            $(document).on('click', '#ace-refresh-cache-btn', function() {
+                DashboardCache.refreshCache($(this));
+            });
+            
+            // Clear cache button  
+            $(document).on('click', '#ace-clear-cache-btn', function() {
+                DashboardCache.clearCache($(this));
+            });
+        },
+        
+        refreshCache: function($button) {
+            const $result = $('#ace-cache-result');
+            
+            // Show loading state
+            $button.prop('disabled', true).html('🔄 Refreshing...');
+            $result.show().html('<div class="notice notice-info"><p>🔄 Refreshing dashboard cache...</p></div>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'ace_seo_refresh_dashboard_cache',
+                    nonce: aceSeoAdmin.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        const data = response.data;
+                        $result.html(`
+                            <div class="notice notice-success">
+                                <p><strong>✅ Cache Refreshed Successfully!</strong></p>
+                                <ul>
+                                    <li>Focus Keywords: ${data.stats.focus_keywords}</li>
+                                    <li>Meta Descriptions: ${data.stats.meta_descriptions}</li>
+                                    <li>Total Posts: ${data.stats.total_posts}</li>
+                                    <li>Recent Posts Cached: ${data.recent_posts_count}</li>
+                                    <li>Refreshed: ${data.regenerated_at}</li>
+                                </ul>
+                                <p><em>Dashboard should load much faster now!</em></p>
+                            </div>
+                        `);
+                        
+                        // Reload page after 2 seconds to show updated data
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                        
+                    } else {
+                        $result.html(`<div class="notice notice-error"><p><strong>❌ Error:</strong> ${response.data}</p></div>`);
+                    }
+                },
+                error: function() {
+                    $result.html('<div class="notice notice-error"><p><strong>❌ Error:</strong> Failed to refresh cache. Please try again.</p></div>');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).html('🔄 Refresh Dashboard Cache');
+                }
+            });
+        },
+        
+        clearCache: function($button) {
+            const $result = $('#ace-cache-result');
+            
+            if (!confirm('Are you sure you want to clear the dashboard cache? This will slow down the next dashboard load until cache is rebuilt.')) {
+                return;
+            }
+            
+            // Show loading state
+            $button.prop('disabled', true).html('🗑️ Clearing...');
+            $result.show().html('<div class="notice notice-info"><p>🗑️ Clearing dashboard cache...</p></div>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'ace_seo_clear_dashboard_cache',
+                    nonce: aceSeoAdmin.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $result.html(`
+                            <div class="notice notice-success">
+                                <p><strong>✅ Cache Cleared Successfully!</strong></p>
+                                <p>${response.data.note}</p>
+                            </div>
+                        `);
+                    } else {
+                        $result.html(`<div class="notice notice-error"><p><strong>❌ Error:</strong> ${response.data}</p></div>`);
+                    }
+                },
+                error: function() {
+                    $result.html('<div class="notice notice-error"><p><strong>❌ Error:</strong> Failed to clear cache. Please try again.</p></div>');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).html('🗑️ Clear Cache');
+                }
+            });
+        }
+    };
+    
+    // Initialize dashboard cache management when DOM is ready
+    $(document).ready(function() {
+        if ($('#ace-refresh-cache-btn, #ace-clear-cache-btn').length > 0) {
+            DashboardCache.init();
+        }
+    });
 
     // Make AceSeo globally available for debugging
     window.AceSeo = AceSeo;
+    window.DashboardCache = DashboardCache;
 
 })(jQuery);

@@ -23,48 +23,32 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <?php
-                    // Get some basic stats using direct database queries for better performance
-                    global $wpdb;
+                    // Load dashboard cache class if not loaded
+                    if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+                    }
                     
-                    // Count posts with focus keywords - much faster direct query
-                    $focus_keywords_count = $wpdb->get_var("
-                        SELECT COUNT(DISTINCT p.ID) 
-                        FROM {$wpdb->posts} p 
-                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
-                        WHERE p.post_status = 'publish' 
-                        AND p.post_type IN ('post', 'page') 
-                        AND pm.meta_key = '_yoast_wpseo_focuskw' 
-                        AND pm.meta_value != ''
-                        LIMIT 1000
-                    ");
+                    // Get cached statistics to prevent 504 timeouts
+                    $stats = ACE_SEO_Dashboard_Cache::get_dashboard_stats();
                     
-                    // Count posts with meta descriptions - much faster direct query
-                    $meta_desc_count = $wpdb->get_var("
-                        SELECT COUNT(DISTINCT p.ID) 
-                        FROM {$wpdb->posts} p 
-                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
-                        WHERE p.post_status = 'publish' 
-                        AND p.post_type IN ('post', 'page') 
-                        AND pm.meta_key = '_yoast_wpseo_metadesc' 
-                        AND pm.meta_value != ''
-                        LIMIT 1000
-                    ");
+                    // Use cached values with error handling
+                    $focus_keywords_count = $stats['focus_keywords_count'] ?? 0;
+                    $meta_desc_count = $stats['meta_desc_count'] ?? 0;
+                    $total_posts = $stats['total_posts'] ?? 0;
+                    $focus_keyword_percentage = $stats['focus_keyword_percentage'] ?? 0;
+                    $meta_desc_percentage = $stats['meta_desc_percentage'] ?? 0;
                     
-                    // Get total published posts count
-                    $total_posts = wp_count_posts('post')->publish + wp_count_posts('page')->publish;
-                    
-                    // Convert to arrays for compatibility with existing code
-                    $posts_with_focus_keywords = range(1, $focus_keywords_count ?: 0);
-                    $posts_with_meta_desc = range(1, $meta_desc_count ?: 0);
+                    // Show cache status for debugging
+                    $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
                     ?>
                     
                     <div class="ace-seo-stats">
                         <div class="ace-seo-stat">
-                            <div class="ace-seo-stat-number"><?php echo count($posts_with_focus_keywords); ?></div>
+                            <div class="ace-seo-stat-number"><?php echo $focus_keywords_count; ?></div>
                             <div class="ace-seo-stat-label">Posts with Focus Keywords</div>
                         </div>
                         <div class="ace-seo-stat">
-                            <div class="ace-seo-stat-number"><?php echo count($posts_with_meta_desc); ?></div>
+                            <div class="ace-seo-stat-number"><?php echo $meta_desc_count; ?></div>
                             <div class="ace-seo-stat-label">Posts with Meta Descriptions</div>
                         </div>
                         <div class="ace-seo-stat">
@@ -73,12 +57,18 @@ if (!defined('ABSPATH')) {
                         </div>
                     </div>
                     
+                    <?php if (isset($stats['error']) && $stats['error']): ?>
+                        <div class="notice notice-warning">
+                            <p><strong>⚠️ Performance Notice:</strong> Dashboard stats are using cached fallback due to database timeout protection.</p>
+                        </div>
+                    <?php endif; ?>
+                    
                     <div class="ace-seo-progress">
-                        <p><strong>SEO Optimization Progress:</strong></p>
-                        <?php 
-                        $focus_keyword_percentage = $total_posts > 0 ? round((count($posts_with_focus_keywords) / $total_posts) * 100) : 0;
-                        $meta_desc_percentage = $total_posts > 0 ? round((count($posts_with_meta_desc) / $total_posts) * 100) : 0;
-                        ?>
+                        <p><strong>SEO Optimization Progress:</strong> 
+                            <?php if ($cache_status['stats_cached']): ?>
+                                <small style="color: #666;">(Cached - <?php echo human_time_diff($stats['generated_at'] ?? time()); ?> ago)</small>
+                            <?php endif; ?>
+                        </p>
                         <div class="ace-seo-progress-item">
                             <span>Focus Keywords: <?php echo $focus_keyword_percentage; ?>%</span>
                             <div class="ace-seo-progress-bar">
@@ -129,47 +119,31 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <?php
-                    // Get recently optimized posts using optimized query
-                    global $wpdb;
-                    
-                    // Much faster query - get recent posts with SEO data
-                    $recent_post_ids = $wpdb->get_results($wpdb->prepare("
-                        SELECT DISTINCT p.ID, p.post_title, p.post_type, p.post_modified
-                        FROM {$wpdb->posts} p 
-                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
-                        WHERE p.post_status = 'publish' 
-                        AND p.post_type IN ('post', 'page') 
-                        AND pm.meta_key IN ('_yoast_wpseo_focuskw', '_yoast_wpseo_metadesc')
-                        AND pm.meta_value != ''
-                        ORDER BY p.post_modified DESC 
-                        LIMIT %d
-                    ", 5));
-                    
-                    // Convert to post objects for compatibility
-                    $recent_posts = array();
-                    foreach ($recent_post_ids as $post_data) {
-                        $recent_posts[] = get_post($post_data->ID);
+                    // Get cached recent posts to prevent 504 timeouts
+                    if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
                     }
-                    ?>
                     
-                    <?php if (!empty($recent_posts)): ?>
-                        <ul class="ace-seo-recent-list">
-                            <?php foreach ($recent_posts as $post): ?>
-                                <li class="ace-seo-recent-item">
-                                    <div class="ace-seo-recent-title">
-                                        <a href="<?php echo get_edit_post_link($post->ID); ?>">
-                                            <?php echo esc_html($post->post_title); ?>
+                    $recent_posts = ACE_SEO_Dashboard_Cache::get_recent_posts(5);
+                    
+                    if (!empty($recent_posts)): ?>
+                        <div class="ace-seo-recent-posts">
+                            <?php foreach ($recent_posts as $post_data): ?>
+                                <div class="ace-seo-recent-post">
+                                    <div class="ace-seo-recent-post-title">
+                                        <a href="<?php echo esc_url($post_data['edit_link']); ?>">
+                                            <?php echo esc_html($post_data['post_title']); ?>
                                         </a>
+                                        <span class="ace-seo-post-type"><?php echo esc_html(ucfirst($post_data['post_type'])); ?></span>
                                     </div>
-                                    <div class="ace-seo-recent-meta">
-                                        <?php echo get_post_type($post->ID); ?> • 
-                                        <?php echo human_time_diff(strtotime($post->post_modified), current_time('timestamp')); ?> ago
+                                    <div class="ace-seo-recent-post-date">
+                                        Modified: <?php echo human_time_diff(strtotime($post_data['post_modified'])); ?> ago
                                     </div>
-                                </li>
+                                </div>
                             <?php endforeach; ?>
-                        </ul>
+                        </div>
                     <?php else: ?>
-                        <p>No SEO-optimized content found. Start optimizing your posts and pages!</p>
+                        <p>No optimized content found yet. Start optimizing your posts for better SEO!</p>
                     <?php endif; ?>
                 </div>
             </div>

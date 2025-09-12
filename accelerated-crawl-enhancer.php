@@ -270,6 +270,7 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-ai-assistant.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
