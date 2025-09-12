@@ -199,6 +199,53 @@ if (!defined('ABSPATH')) {
                     </div>
                 </div>
             </div>
+            
+            <!-- Database Performance Card -->
+            <div class="ace-seo-card">
+                <div class="ace-seo-card-header">
+                    <h3>🚀 Database Performance</h3>
+                </div>
+                <div class="ace-seo-card-body">
+                    <?php
+                    // Initialize database optimizer for analysis
+                    if (class_exists('ACE_SEO_Database_Optimizer')) {
+                        $db_optimizer = new ACE_SEO_Database_Optimizer();
+                        $analysis = $db_optimizer->analyze_performance();
+                    ?>
+                        <div class="ace-seo-db-stats">
+                            <div class="ace-seo-db-stat">
+                                <strong>SEO Meta Records:</strong> <?php echo number_format($analysis['seo_meta_records']); ?>
+                            </div>
+                            <div class="ace-seo-db-stat">
+                                <strong>Total Meta Records:</strong> <?php echo number_format($analysis['postmeta_records']); ?>
+                            </div>
+                            <div class="ace-seo-db-stat">
+                                <strong>Active Indexes:</strong> <?php echo count($analysis['existing_indexes']); ?>
+                            </div>
+                        </div>
+                        
+                        <?php if (!empty($analysis['recommendations'])): ?>
+                            <div class="ace-seo-recommendations">
+                                <h4>Performance Recommendations:</h4>
+                                <?php foreach ($analysis['recommendations'] as $recommendation): ?>
+                                    <div class="ace-seo-recommendation">⚠️ <?php echo esc_html($recommendation); ?></div>
+                                <?php endforeach; ?>
+                                
+                                <button type="button" id="ace-optimize-database" class="ace-seo-optimize-btn">
+                                    Optimize Database Indexes
+                                </button>
+                                <div id="ace-optimize-result" class="ace-optimize-result" style="display: none;"></div>
+                            </div>
+                        <?php else: ?>
+                            <div class="ace-seo-performance-good">
+                                ✅ Database performance is optimized!
+                            </div>
+                        <?php endif; ?>
+                    <?php } else { ?>
+                        <p>Database optimizer not available.</p>
+                    <?php } ?>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -357,4 +404,134 @@ if (!defined('ABSPATH')) {
     line-height: 1.5;
     border-left: 3px solid #a4286a;
 }
+
+.ace-seo-db-stats {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.ace-seo-db-stat {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.ace-seo-recommendations {
+    margin-top: 16px;
+    padding: 16px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+}
+
+.ace-seo-recommendations h4 {
+    margin: 0 0 12px 0;
+    color: #856404;
+}
+
+.ace-seo-recommendation {
+    margin: 8px 0;
+    color: #856404;
+    font-size: 14px;
+}
+
+.ace-seo-optimize-btn {
+    background: #a4286a;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+.ace-seo-optimize-btn:hover {
+    background: #8a2258;
+}
+
+.ace-seo-optimize-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.ace-optimize-result {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.ace-optimize-result.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.ace-optimize-result.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.ace-seo-performance-good {
+    text-align: center;
+    padding: 20px;
+    color: #155724;
+    font-weight: 500;
+}
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    $('#ace-optimize-database').on('click', function() {
+        var $btn = $(this);
+        var $result = $('#ace-optimize-result');
+        
+        $btn.prop('disabled', true).text('Optimizing...');
+        $result.hide().removeClass('success error');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'ace_seo_optimize_database',
+                nonce: '<?php echo wp_create_nonce('ace_seo_optimize_db'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    var message = '<strong>Database optimization completed!</strong><br>';
+                    var hasResults = false;
+                    
+                    $.each(response.data, function(table, indexes) {
+                        $.each(indexes, function(index_name, result) {
+                            hasResults = true;
+                            message += '• ' + index_name + ': ' + result.message + '<br>';
+                        });
+                    });
+                    
+                    if (!hasResults) {
+                        message = 'All indexes are already optimized.';
+                    }
+                    
+                    $result.addClass('success').html(message).show();
+                    
+                    // Refresh the page after 3 seconds to show updated stats
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                } else {
+                    $result.addClass('error').html('Error optimizing database: ' + response.data).show();
+                }
+            },
+            error: function() {
+                $result.addClass('error').html('Network error occurred during optimization.').show();
+            },
+            complete: function() {
+                $btn.prop('disabled', false).text('Optimize Database Indexes');
+            }
+        });
+    });
+});
+</script>

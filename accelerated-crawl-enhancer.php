@@ -263,6 +263,9 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard.php';
         }
+        
+        // Always load database optimizer for performance
+        require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
     }
     
     /**

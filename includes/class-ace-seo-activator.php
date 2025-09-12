@@ -30,6 +30,9 @@ class AceSEOActivator {
         // Create necessary database tables
         self::create_tables();
         
+        // Optimize database performance with indexes
+        self::optimize_database();
+        
         // Set up rewrite rules
         self::setup_rewrites();
         
@@ -199,6 +202,27 @@ class AceSEOActivator {
         
         // Flush rewrite rules
         flush_rewrite_rules();
+    }
+    
+    /**
+     * Optimize database performance with indexes
+     */
+    private static function optimize_database() {
+        // Include the database optimizer
+        if ( file_exists( ACE_SEO_PATH . 'includes/database/class-database-optimizer.php' ) ) {
+            require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+            
+            if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
+                $optimizer = new ACE_SEO_Database_Optimizer();
+                $results = $optimizer->create_indexes();
+                
+                // Log the optimization results
+                error_log( 'ACE SEO Activation: Database optimization completed - ' . print_r( $results, true ) );
+                
+                // Store optimization status
+                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ) );
+            }
+        }
     }
     
     /**
