@@ -251,6 +251,7 @@ class AceCrawlEnhancer {
         
         // Homepage synchronization hook
         add_action('updated_post_meta', [$this, 'sync_homepage_meta'], 10, 4);
+        add_action('updated_option', [$this, 'sync_homepage_settings_to_page'], 10, 3);
     }
     
     /**
@@ -1240,6 +1241,42 @@ class AceCrawlEnhancer {
         if ($meta_key === ACE_SEO_META_PREFIX . 'metadesc') {
             $options['general']['home_description'] = $meta_value;
             update_option('ace_seo_options', $options);
+        }
+    }
+    
+    /**
+     * Sync homepage settings to page meta when plugin settings are updated
+     */
+    public function sync_homepage_settings_to_page($option_name, $old_value, $new_value) {
+        // Only sync ACE SEO options
+        if ($option_name !== 'ace_seo_options') {
+            return;
+        }
+        
+        // Check if homepage is a static page
+        $page_on_front = get_option('page_on_front');
+        $show_on_front = get_option('show_on_front');
+        
+        if ($show_on_front !== 'page' || !$page_on_front) {
+            return; // Not a static homepage
+        }
+        
+        // Get the new homepage settings
+        $new_home_title = $new_value['general']['home_title'] ?? '';
+        $new_home_desc = $new_value['general']['home_description'] ?? '';
+        
+        // Get the old homepage settings for comparison
+        $old_home_title = $old_value['general']['home_title'] ?? '';
+        $old_home_desc = $old_value['general']['home_description'] ?? '';
+        
+        // Sync title if it changed in settings
+        if ($new_home_title !== $old_home_title && !empty($new_home_title)) {
+            update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'title', $new_home_title);
+        }
+        
+        // Sync description if it changed in settings
+        if ($new_home_desc !== $old_home_desc && !empty($new_home_desc)) {
+            update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $new_home_desc);
         }
     }
     
