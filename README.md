@@ -373,4 +373,4 @@ This project is licensed under the GPLv2 or later - see the [LICENSE](LICENSE) f
 
 ---
 
-**Made with ❤️ by [AceMedia](https://acemedia.com)**
+**Made with ❤️ by [AceMedia](https://acemedia.ninja)**
