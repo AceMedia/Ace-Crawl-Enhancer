@@ -23,34 +23,39 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <?php
-                    // Get some basic stats
-                    $posts_with_focus_keywords = get_posts([
-                        'post_type' => ['post', 'page'],
-                        'meta_query' => [
-                            [
-                                'key' => '_yoast_wpseo_focuskw',
-                                'value' => '',
-                                'compare' => '!='
-                            ]
-                        ],
-                        'posts_per_page' => -1,
-                        'fields' => 'ids'
-                    ]);
+                    // Get some basic stats using direct database queries for better performance
+                    global $wpdb;
                     
-                    $posts_with_meta_desc = get_posts([
-                        'post_type' => ['post', 'page'],
-                        'meta_query' => [
-                            [
-                                'key' => '_yoast_wpseo_metadesc',
-                                'value' => '',
-                                'compare' => '!='
-                            ]
-                        ],
-                        'posts_per_page' => -1,
-                        'fields' => 'ids'
-                    ]);
+                    // Count posts with focus keywords - much faster direct query
+                    $focus_keywords_count = $wpdb->get_var("
+                        SELECT COUNT(DISTINCT p.ID) 
+                        FROM {$wpdb->posts} p 
+                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
+                        WHERE p.post_status = 'publish' 
+                        AND p.post_type IN ('post', 'page') 
+                        AND pm.meta_key = '_yoast_wpseo_focuskw' 
+                        AND pm.meta_value != ''
+                        LIMIT 1000
+                    ");
                     
+                    // Count posts with meta descriptions - much faster direct query
+                    $meta_desc_count = $wpdb->get_var("
+                        SELECT COUNT(DISTINCT p.ID) 
+                        FROM {$wpdb->posts} p 
+                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
+                        WHERE p.post_status = 'publish' 
+                        AND p.post_type IN ('post', 'page') 
+                        AND pm.meta_key = '_yoast_wpseo_metadesc' 
+                        AND pm.meta_value != ''
+                        LIMIT 1000
+                    ");
+                    
+                    // Get total published posts count
                     $total_posts = wp_count_posts('post')->publish + wp_count_posts('page')->publish;
+                    
+                    // Convert to arrays for compatibility with existing code
+                    $posts_with_focus_keywords = range(1, $focus_keywords_count ?: 0);
+                    $posts_with_meta_desc = range(1, $meta_desc_count ?: 0);
                     ?>
                     
                     <div class="ace-seo-stats">
@@ -124,26 +129,27 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <?php
-                    // Get recently optimized posts
-                    $recent_posts = get_posts([
-                        'post_type' => ['post', 'page'],
-                        'posts_per_page' => 5,
-                        'meta_query' => [
-                            'relation' => 'OR',
-                            [
-                                'key' => '_yoast_wpseo_focuskw',
-                                'value' => '',
-                                'compare' => '!='
-                            ],
-                            [
-                                'key' => '_yoast_wpseo_metadesc',
-                                'value' => '',
-                                'compare' => '!='
-                            ]
-                        ],
-                        'orderby' => 'modified',
-                        'order' => 'DESC'
-                    ]);
+                    // Get recently optimized posts using optimized query
+                    global $wpdb;
+                    
+                    // Much faster query - get recent posts with SEO data
+                    $recent_post_ids = $wpdb->get_results($wpdb->prepare("
+                        SELECT DISTINCT p.ID, p.post_title, p.post_type, p.post_modified
+                        FROM {$wpdb->posts} p 
+                        INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id 
+                        WHERE p.post_status = 'publish' 
+                        AND p.post_type IN ('post', 'page') 
+                        AND pm.meta_key IN ('_yoast_wpseo_focuskw', '_yoast_wpseo_metadesc')
+                        AND pm.meta_value != ''
+                        ORDER BY p.post_modified DESC 
+                        LIMIT %d
+                    ", 5));
+                    
+                    // Convert to post objects for compatibility
+                    $recent_posts = array();
+                    foreach ($recent_post_ids as $post_data) {
+                        $recent_posts[] = get_post($post_data->ID);
+                    }
                     ?>
                     
                     <?php if (!empty($recent_posts)): ?>
