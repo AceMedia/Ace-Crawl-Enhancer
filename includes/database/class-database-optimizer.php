@@ -52,8 +52,9 @@ class ACE_SEO_Database_Optimizer {
         return array(
             $wpdb->postmeta => array(
                 'ace_seo_meta_key_value' => array(
-                    'columns' => array('meta_key', 'meta_value(50)'),
-                    'type' => 'INDEX'
+                    'columns' => array('meta_key', 'meta_value'),
+                    'type' => 'INDEX',
+                    'prefix_length' => array('meta_key' => null, 'meta_value' => 50)
                 ),
                 'ace_seo_post_meta_key' => array(
                     'columns' => array('post_id', 'meta_key'),
@@ -61,8 +62,7 @@ class ACE_SEO_Database_Optimizer {
                 ),
                 'ace_seo_yoast_meta' => array(
                     'columns' => array('meta_key', 'post_id'),
-                    'type' => 'INDEX',
-                    'where' => "meta_key LIKE '_yoast_wpseo_%'"
+                    'type' => 'INDEX'
                 )
             ),
             $wpdb->posts => array(
@@ -94,11 +94,18 @@ class ACE_SEO_Database_Optimizer {
             }
             
             // Build CREATE INDEX statement
-            $columns = implode(', ', array_map(function($col) {
-                return "`{$col}`";
-            }, $index_data['columns']));
+            $columns = array();
+            foreach ($index_data['columns'] as $col) {
+                if (isset($index_data['prefix_length']) && isset($index_data['prefix_length'][$col])) {
+                    $prefix = $index_data['prefix_length'][$col];
+                    $columns[] = "`{$col}`" . ($prefix ? "({$prefix})" : '');
+                } else {
+                    $columns[] = "`{$col}`";
+                }
+            }
+            $columns_str = implode(', ', $columns);
             
-            $sql = "CREATE {$index_data['type']} `{$index_name}` ON `{$table}` ({$columns})";
+            $sql = "CREATE {$index_data['type']} `{$index_name}` ON `{$table}` ({$columns_str})";
             
             // Execute the query
             $result = $wpdb->query($sql);
