@@ -4,7 +4,7 @@
  * Handles the plugin settings pages and configuration
  * 
  * @package AceCrawlEnhancer
- * @version 1.0.0
+ * @version 1.0.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
