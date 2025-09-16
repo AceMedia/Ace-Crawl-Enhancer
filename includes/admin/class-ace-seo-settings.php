@@ -21,6 +21,8 @@ class AceSEOSettings {
         add_action( 'admin_init', array( $this, 'register_settings' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
         add_action( 'wp_ajax_ace_seo_migrate_yoast', array( $this, 'ajax_migrate_yoast_data' ) );
+        add_action( 'wp_ajax_ace_seo_batch_migrate_yoast', array( $this, 'ajax_batch_migrate_yoast_data' ) );
+        add_action( 'wp_ajax_ace_seo_get_migration_stats', array( $this, 'ajax_get_migration_stats' ) );
         add_action( 'wp_ajax_ace_seo_optimize_database_manual', array( $this, 'ajax_optimize_database_manual' ) );
         add_action( 'wp_ajax_ace_seo_refresh_dashboard_cache', array( $this, 'ajax_refresh_dashboard_cache' ) );
         add_action( 'wp_ajax_ace_seo_clear_dashboard_cache', array( $this, 'ajax_clear_dashboard_cache' ) );
@@ -133,12 +135,6 @@ class AceSEOSettings {
      * Render tools page
      */
     public function render_tools_page() {
-        // Handle migration request
-        if (isset($_POST['migrate_yoast_data']) && wp_verify_nonce($_POST['_wpnonce'], 'ace_seo_migrate_yoast')) {
-            $migrated = AceCrawlEnhancer::bulk_migrate_yoast_data();
-            echo '<div class="notice notice-success"><p><strong>Migration Complete:</strong> Migrated ' . $migrated . ' fields from Yoast SEO.</p></div>';
-        }
-        
         ?>
         <div class="wrap">
             <h1>Ace SEO Tools</h1>
@@ -149,35 +145,56 @@ class AceSEOSettings {
                 <h3>Migrate from Yoast SEO</h3>
                 <p>If you have existing Yoast SEO data, you can migrate it to Ace SEO. This will copy your SEO titles, meta descriptions, focus keywords, and other settings while preserving your original Yoast data.</p>
                 
-                <?php
-                global $wpdb;
-                $yoast_posts_count = $wpdb->get_var($wpdb->prepare("
-                    SELECT COUNT(DISTINCT post_id) 
-                    FROM {$wpdb->postmeta} 
-                    WHERE meta_key LIKE %s
-                ", '_yoast_wpseo_%'));
+                <div id="ace-migration-status">
+                    <p><strong>Status:</strong> <span id="migration-status-text">Loading...</span></p>
+                    <div id="migration-stats">
+                        <!-- Stats will be loaded via AJAX -->
+                    </div>
+                </div>
                 
-                $ace_posts_count = $wpdb->get_var($wpdb->prepare("
-                    SELECT COUNT(DISTINCT post_id) 
-                    FROM {$wpdb->postmeta} 
-                    WHERE meta_key LIKE %s
-                ", '_ace_seo_%'));
-                ?>
+                <div id="ace-migration-controls">
+                    <button type="button" id="start-migration-btn" class="button button-primary" disabled>
+                        Start Migration
+                    </button>
+                    <button type="button" id="pause-migration-btn" class="button button-secondary" style="display: none;">
+                        Pause Migration
+                    </button>
+                    <button type="button" id="resume-migration-btn" class="button button-secondary" style="display: none;">
+                        Resume Migration
+                    </button>
+                    <button type="button" id="cancel-migration-btn" class="button" style="display: none;">
+                        Cancel
+                    </button>
+                </div>
                 
-                <p><strong>Status:</strong></p>
-                <ul>
-                    <li>Posts with Yoast SEO data: <?php echo $yoast_posts_count; ?></li>
-                    <li>Posts with Ace SEO data: <?php echo $ace_posts_count; ?></li>
-                </ul>
+                <!-- Progress Bar -->
+                <div id="ace-migration-progress" style="display: none;">
+                    <div class="migration-progress-container">
+                        <div class="migration-progress-bar">
+                            <div class="migration-progress-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="migration-progress-text">
+                            <span id="migration-progress-current">0</span> / 
+                            <span id="migration-progress-total">0</span> posts 
+                            (<span id="migration-progress-percent">0</span>%)
+                        </div>
+                    </div>
+                    
+                    <div id="migration-current-item" class="migration-current-item">
+                        <!-- Current processing item will be shown here -->
+                    </div>
+                    
+                    <div id="migration-log" class="migration-log">
+                        <h4>Migration Log:</h4>
+                        <div id="migration-log-content"></div>
+                    </div>
+                </div>
                 
-                <?php if ($yoast_posts_count > 0): ?>
-                    <form method="post" action="">
-                        <?php wp_nonce_field('ace_seo_migrate_yoast'); ?>
-                        <input type="submit" name="migrate_yoast_data" class="button button-primary" value="Migrate Yoast SEO Data" onclick="return confirm('This will migrate SEO data from Yoast to Ace SEO. This is safe and won\'t delete your Yoast data. Continue?');">
-                    </form>
-                <?php else: ?>
-                    <p><em>No Yoast SEO data found to migrate.</em></p>
-                <?php endif; ?>
+                <!-- Results Summary -->
+                <div id="ace-migration-results" style="display: none;">
+                    <h4>Migration Results:</h4>
+                    <div id="migration-results-content"></div>
+                </div>
             </div>
             
             <!-- Database Optimization Tool -->
@@ -336,10 +353,393 @@ class AceSEOSettings {
             margin: 10px 0;
             padding: 10px 15px;
         }
+        
+        /* Migration Progress Styles */
+        .migration-progress-container {
+            margin: 20px 0;
+        }
+        .migration-progress-bar {
+            width: 100%;
+            height: 25px;
+            background-color: #f0f0f1;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .migration-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00a32a, #00ba37);
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        .migration-progress-fill:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%);
+            animation: shine 1.5s infinite;
+        }
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .migration-progress-text {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: 600;
+            color: #1d2327;
+        }
+        .migration-current-item {
+            background: #f6f7f7;
+            border: 1px solid #dcdcde;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .migration-log {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .migration-log h4 {
+            margin-bottom: 10px;
+        }
+        .migration-log-content {
+            background: #2c3338;
+            color: #f0f0f1;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .migration-log-entry {
+            margin-bottom: 5px;
+        }
+        .migration-log-entry.success {
+            color: #4f9c4f;
+        }
+        .migration-log-entry.error {
+            color: #d63384;
+        }
+        .migration-log-entry.warning {
+            color: #ffc107;
+        }
+        .migration-log-entry.info {
+            color: #0dcaf0;
+        }
+        #migration-stats {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f6f7f7;
+            border-left: 4px solid #0073aa;
+            border-radius: 0 4px 4px 0;
+        }
+        #migration-stats ul {
+            margin: 0;
+            list-style: none;
+        }
+        #migration-stats li {
+            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #migration-stats .stat-value {
+            font-weight: 600;
+            color: #0073aa;
+        }
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
         </style>
         
         <script>
         jQuery(document).ready(function($) {
+            let migrationState = {
+                isRunning: false,
+                isPaused: false,
+                currentBatch: 0,
+                totalPosts: 0,
+                processedPosts: 0,
+                batchSize: 10,
+                totalMigrated: 0,
+                errors: []
+            };
+            
+            // Load initial migration stats
+            loadMigrationStats();
+            
+            function loadMigrationStats() {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_get_migration_stats',
+                        nonce: '<?php echo wp_create_nonce('ace_seo_migration_stats'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            updateMigrationStats(response.data);
+                            
+                            if (response.data.yoast_posts > 0) {
+                                $('#start-migration-btn').prop('disabled', false);
+                                $('#migration-status-text').text('Ready to migrate');
+                            } else {
+                                $('#migration-status-text').text('No Yoast SEO data found to migrate');
+                            }
+                        } else {
+                            $('#migration-status-text').text('Error loading migration stats');
+                        }
+                    },
+                    error: function() {
+                        $('#migration-status-text').text('Error loading migration stats');
+                    }
+                });
+            }
+            
+            function updateMigrationStats(stats) {
+                const statsHtml = `
+                    <ul>
+                        <li>
+                            <span>Posts with Yoast SEO data:</span>
+                            <span class="stat-value">${stats.yoast_posts}</span>
+                        </li>
+                        <li>
+                            <span>Posts with Ace SEO data:</span>
+                            <span class="stat-value">${stats.ace_posts}</span>
+                        </li>
+                        <li>
+                            <span>Ready to migrate:</span>
+                            <span class="stat-value">${stats.pending_migration}</span>
+                        </li>
+                    </ul>
+                `;
+                $('#migration-stats').html(statsHtml);
+            }
+            
+            function logMessage(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `<div class="migration-log-entry ${type}">[${timestamp}] ${message}</div>`;
+                $('#migration-log-content').append(logEntry);
+                
+                // Auto scroll to bottom
+                const logContent = $('#migration-log-content');
+                logContent.scrollTop(logContent[0].scrollHeight);
+            }
+            
+            function updateProgress() {
+                const percent = migrationState.totalPosts > 0 ? 
+                    Math.round((migrationState.processedPosts / migrationState.totalPosts) * 100) : 0;
+                
+                $('.migration-progress-fill').css('width', percent + '%');
+                $('#migration-progress-current').text(migrationState.processedPosts);
+                $('#migration-progress-total').text(migrationState.totalPosts);
+                $('#migration-progress-percent').text(percent);
+            }
+            
+            function updateCurrentItem(item) {
+                if (item) {
+                    const itemHtml = `Processing: <strong>${item.title}</strong> (ID: ${item.id}, Type: ${item.type})`;
+                    $('#migration-current-item').html(itemHtml).show();
+                } else {
+                    $('#migration-current-item').hide();
+                }
+            }
+            
+            function processBatch() {
+                if (!migrationState.isRunning || migrationState.isPaused) {
+                    return;
+                }
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_batch_migrate_yoast',
+                        batch: migrationState.currentBatch,
+                        batch_size: migrationState.batchSize,
+                        nonce: '<?php echo wp_create_nonce('ace_seo_batch_migrate'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            const data = response.data;
+                            
+                            // Update progress
+                            migrationState.processedPosts += data.processed;
+                            migrationState.totalMigrated += data.migrated;
+                            migrationState.currentBatch++;
+                            
+                            // Update UI
+                            updateProgress();
+                            
+                            // Log batch results
+                            logMessage(`Batch ${migrationState.currentBatch}: Processed ${data.processed} posts, migrated ${data.migrated} fields`, 'success');
+                            
+                            // Update current item
+                            if (data.current_item) {
+                                updateCurrentItem(data.current_item);
+                            }
+                            
+                            // Log any errors
+                            if (data.errors && data.errors.length > 0) {
+                                data.errors.forEach(error => {
+                                    logMessage(error, 'error');
+                                    migrationState.errors.push(error);
+                                });
+                            }
+                            
+                            // Check if migration is complete
+                            if (data.completed) {
+                                completeMigration();
+                            } else {
+                                // Process next batch after a short delay
+                                setTimeout(processBatch, 500);
+                            }
+                        } else {
+                            logMessage('Error: ' + response.data, 'error');
+                            stopMigration();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        logMessage(`Network error: ${error}`, 'error');
+                        stopMigration();
+                    }
+                });
+            }
+            
+            function startMigration() {
+                migrationState.isRunning = true;
+                migrationState.isPaused = false;
+                migrationState.currentBatch = 0;
+                migrationState.processedPosts = 0;
+                migrationState.totalMigrated = 0;
+                migrationState.errors = [];
+                
+                // Update UI
+                $('#start-migration-btn').hide();
+                $('#pause-migration-btn, #cancel-migration-btn').show();
+                $('#ace-migration-progress').show();
+                $('#migration-status-text').text('Migration in progress...');
+                
+                // Clear previous logs
+                $('#migration-log-content').empty();
+                
+                // Get total count and start processing
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_get_migration_stats',
+                        nonce: '<?php echo wp_create_nonce('ace_seo_migration_stats'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            migrationState.totalPosts = response.data.pending_migration;
+                            updateProgress();
+                            logMessage(`Starting migration of ${migrationState.totalPosts} posts...`, 'info');
+                            
+                            // Start processing
+                            processBatch();
+                        } else {
+                            logMessage('Error getting migration stats: ' + response.data, 'error');
+                            stopMigration();
+                        }
+                    }
+                });
+            }
+            
+            function pauseMigration() {
+                migrationState.isPaused = true;
+                $('#pause-migration-btn').hide();
+                $('#resume-migration-btn').show();
+                $('#migration-status-text').text('Migration paused');
+                logMessage('Migration paused by user', 'warning');
+            }
+            
+            function resumeMigration() {
+                migrationState.isPaused = false;
+                $('#resume-migration-btn').hide();
+                $('#pause-migration-btn').show();
+                $('#migration-status-text').text('Migration in progress...');
+                logMessage('Migration resumed', 'info');
+                
+                // Continue processing
+                processBatch();
+            }
+            
+            function stopMigration() {
+                migrationState.isRunning = false;
+                migrationState.isPaused = false;
+                
+                $('#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn').hide();
+                $('#start-migration-btn').show().prop('disabled', false);
+                $('#migration-status-text').text('Migration stopped');
+                updateCurrentItem(null);
+                logMessage('Migration stopped', 'warning');
+            }
+            
+            function completeMigration() {
+                migrationState.isRunning = false;
+                migrationState.isPaused = false;
+                
+                $('#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn').hide();
+                $('#start-migration-btn').show().prop('disabled', false);
+                $('#migration-status-text').text('Migration completed successfully!');
+                updateCurrentItem(null);
+                
+                logMessage(`Migration completed! Migrated ${migrationState.totalMigrated} SEO fields from ${migrationState.processedPosts} posts`, 'success');
+                
+                if (migrationState.errors.length > 0) {
+                    logMessage(`Completed with ${migrationState.errors.length} errors - check log above`, 'warning');
+                }
+                
+                // Show results summary
+                showMigrationResults();
+                
+                // Refresh stats
+                setTimeout(loadMigrationStats, 1000);
+            }
+            
+            function showMigrationResults() {
+                const resultsHtml = `
+                    <div class="ace-optimization-result success">
+                        <p><strong>Migration Summary:</strong></p>
+                        <ul>
+                            <li>Posts processed: ${migrationState.processedPosts}</li>
+                            <li>SEO fields migrated: ${migrationState.totalMigrated}</li>
+                            <li>Errors encountered: ${migrationState.errors.length}</li>
+                            <li>Duration: Started at ${new Date().toLocaleTimeString()}</li>
+                        </ul>
+                        ${migrationState.errors.length > 0 ? 
+                            '<p><em>Some errors occurred during migration. Check the log above for details.</em></p>' : 
+                            '<p><em>All data migrated successfully!</em></p>'
+                        }
+                    </div>
+                `;
+                $('#migration-results-content').html(resultsHtml);
+                $('#ace-migration-results').show();
+            }
+            
+            // Event handlers
+            $('#start-migration-btn').on('click', startMigration);
+            $('#pause-migration-btn').on('click', pauseMigration);
+            $('#resume-migration-btn').on('click', resumeMigration);
+            $('#cancel-migration-btn').on('click', function() {
+                if (confirm('Are you sure you want to cancel the migration? Progress will be saved and you can resume later.')) {
+                    stopMigration();
+                }
+            });
+            
+            // Database optimization handler
             $('#ace-optimize-db-btn').on('click', function() {
                 var $btn = $(this);
                 var $result = $('#ace-db-optimization-result');
@@ -391,6 +791,77 @@ class AceSEOSettings {
                     },
                     complete: function() {
                         $btn.prop('disabled', false).text('Optimize Database Performance');
+                    }
+                });
+            });
+            
+            // Cache management handlers
+            $('#ace-refresh-cache-btn').on('click', function() {
+                var $btn = $(this);
+                var $result = $('#ace-cache-result');
+                
+                $btn.prop('disabled', true).text('🔄 Refreshing...');
+                $result.hide().removeClass('success error info');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_refresh_dashboard_cache',
+                        nonce: '<?php echo wp_create_nonce('ace_seo_admin'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var message = '<strong>Cache refreshed successfully!</strong><br>';
+                            message += 'Statistics: ' + response.data.stats.total_posts + ' posts, ';
+                            message += response.data.stats.focus_keywords + ' with keywords, ';
+                            message += response.data.stats.meta_descriptions + ' with descriptions<br>';
+                            message += 'Recent posts cached: ' + response.data.recent_posts_count;
+                            
+                            $result.addClass('success').html(message).show();
+                            
+                            setTimeout(function() {
+                                location.reload();
+                            }, 2000);
+                        } else {
+                            $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
+                        }
+                    },
+                    error: function() {
+                        $result.addClass('error').html('<strong>Network error:</strong> Failed to refresh cache.').show();
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('🔄 Refresh Dashboard Cache');
+                    }
+                });
+            });
+            
+            $('#ace-clear-cache-btn').on('click', function() {
+                var $btn = $(this);
+                var $result = $('#ace-cache-result');
+                
+                $btn.prop('disabled', true).text('🗑️ Clearing...');
+                $result.hide().removeClass('success error info');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ace_seo_clear_dashboard_cache',
+                        nonce: '<?php echo wp_create_nonce('ace_seo_admin'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $result.addClass('success').html('<strong>Cache cleared successfully!</strong><br>' + response.data.note).show();
+                        } else {
+                            $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
+                        }
+                    },
+                    error: function() {
+                        $result.addClass('error').html('<strong>Network error:</strong> Failed to clear cache.').show();
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text('🗑️ Clear Cache');
                     }
                 });
             });
@@ -588,6 +1059,135 @@ class AceSEOSettings {
         } catch (Exception $e) {
             wp_send_json_error('Failed to clear cache: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * AJAX handler for batch Yoast data migration
+     */
+    public function ajax_batch_migrate_yoast_data() {
+        // Security check
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_batch_migrate')) {
+            wp_send_json_error('Insufficient permissions or invalid nonce');
+            return;
+        }
+        
+        $batch = intval($_POST['batch']);
+        $batch_size = intval($_POST['batch_size']) ?: 10;
+        $offset = $batch * $batch_size;
+        
+        global $wpdb;
+        
+        // Get posts with Yoast data that haven't been fully migrated yet
+        $posts = $wpdb->get_results($wpdb->prepare("
+            SELECT DISTINCT p.ID, p.post_title, p.post_type 
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
+            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+            ORDER BY p.ID ASC
+            LIMIT %d OFFSET %d
+        ", time() - (7 * DAY_IN_SECONDS), $batch_size, $offset));
+        
+        $processed = 0;
+        $migrated = 0;
+        $errors = [];
+        $current_item = null;
+        
+        foreach ($posts as $post) {
+            try {
+                $current_item = [
+                    'id' => $post->ID,
+                    'title' => $post->post_title,
+                    'type' => $post->post_type
+                ];
+                
+                // Migrate this post's Yoast data
+                $post_migrated = AceCrawlEnhancer::migrate_yoast_data($post->ID);
+                $migrated += $post_migrated;
+                $processed++;
+                
+                // Mark as checked
+                update_post_meta($post->ID, '_ace_seo_migration_check', time());
+                
+                // Add small delay to prevent server overload
+                usleep(50000); // 50ms delay
+                
+            } catch (Exception $e) {
+                $errors[] = "Error processing post {$post->ID} ({$post->post_title}): " . $e->getMessage();
+            }
+        }
+        
+        // Check if migration is complete
+        $remaining = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
+            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", time() - (7 * DAY_IN_SECONDS)));
+        
+        $completed = ($remaining == 0);
+        
+        wp_send_json_success([
+            'processed' => $processed,
+            'migrated' => $migrated,
+            'errors' => $errors,
+            'current_item' => $current_item,
+            'completed' => $completed,
+            'remaining' => $remaining
+        ]);
+    }
+    
+    /**
+     * AJAX handler for getting migration statistics
+     */
+    public function ajax_get_migration_stats() {
+        // Security check
+        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_migration_stats')) {
+            wp_send_json_error('Insufficient permissions or invalid nonce');
+            return;
+        }
+        
+        global $wpdb;
+        
+        // Count posts with Yoast data
+        $yoast_posts = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT post_id) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key LIKE %s
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", '_yoast_wpseo_%'));
+        
+        // Count posts with Ace SEO data
+        $ace_posts = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT post_id) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key LIKE %s
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", '_ace_seo_%'));
+        
+        // Count posts that need migration (have Yoast data but not fully migrated)
+        $pending_migration = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
+            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", time() - (7 * DAY_IN_SECONDS)));
+        
+        wp_send_json_success([
+            'yoast_posts' => intval($yoast_posts),
+            'ace_posts' => intval($ace_posts),
+            'pending_migration' => intval($pending_migration)
+        ]);
     }
 }
 

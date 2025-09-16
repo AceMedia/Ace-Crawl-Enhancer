@@ -451,23 +451,72 @@ class AceCrawlEnhancer {
     }
     
     /**
-     * Bulk migrate all Yoast SEO data
+     * Get migration statistics
+     */
+    public static function get_migration_stats() {
+        global $wpdb;
+        
+        // Count posts with Yoast data
+        $yoast_posts = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT post_id) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key LIKE %s
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", '_yoast_wpseo_%'));
+        
+        // Count posts with Ace SEO data
+        $ace_posts = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT post_id) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key LIKE %s
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", '_ace_seo_%'));
+        
+        // Count posts that need migration
+        $pending_migration = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
+            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", time() - (7 * DAY_IN_SECONDS)));
+        
+        return [
+            'yoast_posts' => intval($yoast_posts),
+            'ace_posts' => intval($ace_posts),
+            'pending_migration' => intval($pending_migration)
+        ];
+    }
+    
+    /**
+     * Bulk migrate all Yoast SEO data (legacy method - kept for compatibility)
      */
     public static function bulk_migrate_yoast_data() {
         global $wpdb;
         
-        // Get all posts that have Yoast meta
+        // Get all posts that have Yoast meta and haven't been migrated recently
         $yoast_posts = $wpdb->get_col($wpdb->prepare("
-            SELECT DISTINCT post_id 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key LIKE %s
-        ", '_yoast_wpseo_%'));
+            SELECT DISTINCT p.ID
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
+            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
+            AND p.post_status IN ('publish', 'draft', 'private', 'future')
+        ", time() - (7 * DAY_IN_SECONDS)));
         
         $total_migrated = 0;
         
         foreach ($yoast_posts as $post_id) {
             $migrated = self::migrate_yoast_data($post_id);
             $total_migrated += $migrated;
+            
+            // Mark as migrated
+            update_post_meta($post_id, '_ace_seo_migration_check', time());
         }
         
         return $total_migrated;
