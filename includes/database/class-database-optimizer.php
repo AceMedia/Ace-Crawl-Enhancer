@@ -17,25 +17,20 @@ class ACE_SEO_Database_Optimizer {
         // Hook into plugin activation
         register_activation_hook(ACE_SEO_FILE, array($this, 'create_indexes'));
         
-        // Add admin action for manual optimization
+        // Add admin actions for manual optimization
         add_action('wp_ajax_ace_seo_optimize_database', array($this, 'ajax_optimize_database'));
+        add_action('wp_ajax_ace_seo_get_optimization_progress', array($this, 'ajax_get_optimization_progress'));
     }
     
     /**
      * Create database indexes for better performance
      */
     public function create_indexes() {
-        global $wpdb;
+        // Mark optimization as pending for activation scenario
+        update_option('ace_seo_db_optimization_pending', true);
         
-        $indexes = $this->get_required_indexes();
-        $results = array();
-        
-        foreach ($indexes as $table => $table_indexes) {
-            foreach ($table_indexes as $index_name => $index_data) {
-                $result = $this->create_index($table, $index_name, $index_data);
-                $results[$table][$index_name] = $result;
-            }
-        }
+        // Use the progress-enabled version
+        $results = $this->create_indexes_with_progress();
         
         // Log results
         error_log('ACE SEO: Database indexes created - ' . print_r($results, true));
@@ -125,14 +120,103 @@ class ACE_SEO_Database_Optimizer {
      * AJAX handler for manual database optimization
      */
     public function ajax_optimize_database() {
-        // Verify nonce and permissions
-        if (!wp_verify_nonce($_POST['nonce'], 'ace_seo_optimize_db') || !current_user_can('manage_options')) {
+        // Verify nonce and permissions - accept both dashboard and tools nonces
+        $nonce_valid = wp_verify_nonce($_POST['nonce'], 'ace_seo_optimize_db') || 
+                      wp_verify_nonce($_POST['nonce'], 'ace_seo_dashboard_nonce');
+        
+        if (!$nonce_valid || !current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
         
-        $results = $this->create_indexes();
+        // Set progress tracking
+        $this->set_optimization_progress(0, 'Starting database optimization...');
+        
+        $results = $this->create_indexes_with_progress();
         
         wp_send_json_success($results);
+    }
+    
+    /**
+     * Get optimization progress
+     */
+    public function ajax_get_optimization_progress() {
+        // Verify nonce and permissions
+        if (!wp_verify_nonce($_POST['nonce'], 'ace_seo_dashboard_nonce') || !current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+        
+        $progress = get_option('ace_seo_optimization_progress', array(
+            'percent' => 0,
+            'message' => 'Not started',
+            'completed' => false,
+            'error' => false
+        ));
+        
+        wp_send_json_success($progress);
+    }
+    
+    /**
+     * Set optimization progress
+     */
+    private function set_optimization_progress($percent, $message, $completed = false, $error = false) {
+        $progress = array(
+            'percent' => min(100, max(0, $percent)),
+            'message' => $message,
+            'completed' => $completed,
+            'error' => $error,
+            'timestamp' => current_time('timestamp')
+        );
+        
+        update_option('ace_seo_optimization_progress', $progress);
+    }
+    
+    /**
+     * Create database indexes with progress tracking
+     */
+    public function create_indexes_with_progress() {
+        global $wpdb;
+        
+        $indexes = $this->get_required_indexes();
+        $results = array();
+        $total_indexes = 0;
+        $completed_indexes = 0;
+        
+        // Count total indexes
+        foreach ($indexes as $table => $table_indexes) {
+            $total_indexes += count($table_indexes);
+        }
+        
+        $this->set_optimization_progress(10, 'Analyzing database structure...');
+        
+        foreach ($indexes as $table => $table_indexes) {
+            foreach ($table_indexes as $index_name => $index_data) {
+                $progress = 10 + (($completed_indexes / $total_indexes) * 80); // 10-90%
+                $this->set_optimization_progress(
+                    $progress, 
+                    "Creating index '{$index_name}' on {$table} table..."
+                );
+                
+                $result = $this->create_index($table, $index_name, $index_data);
+                $results[$table][$index_name] = $result;
+                
+                $completed_indexes++;
+                
+                // Small delay to allow progress to be visible
+                usleep(500000); // 0.5 seconds
+            }
+        }
+        
+        // Mark as completed
+        $this->set_optimization_progress(100, 'Database optimization completed successfully!', true);
+        
+        // Update completion timestamp
+        update_option('ace_seo_db_optimized', current_time('mysql'));
+        delete_option('ace_seo_db_optimization_pending');
+        
+        // Log results
+        error_log('ACE SEO: Database indexes created with progress - ' . print_r($results, true));
+        
+        return $results;
     }
     
     /**

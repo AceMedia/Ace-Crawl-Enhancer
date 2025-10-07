@@ -232,6 +232,7 @@ class AceCrawlEnhancer {
             add_action('wp_head', [$this, 'output_twitter_tags'], 11);
         } else {
             // Admin-only hooks
+            add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
             add_action('load-post.php', [$this, 'maybe_migrate_post_data']);
             add_action('load-post-new.php', [$this, 'maybe_migrate_post_data']);
             add_action('load-edit-tags.php', [$this, 'maybe_migrate_taxonomy_data']);
@@ -287,6 +288,11 @@ class AceCrawlEnhancer {
         
         // Always load database optimizer for performance
         require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+        
+        // Instantiate database optimizer to register AJAX handlers
+        if (is_admin()) {
+            new ACE_SEO_Database_Optimizer();
+        }
     }
     
     /**
@@ -300,6 +306,12 @@ class AceCrawlEnhancer {
             // Load core frontend components
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-frontend.php';
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';
+        }
+        
+        // Load dashboard AJAX handler for admin
+        if (is_admin()) {
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-ajax.php';
+            new ACE_SEO_Dashboard_Ajax();
         }
         
         // Sitemap functionality removed - WordPress core sitemaps are used instead
@@ -766,6 +778,41 @@ class AceCrawlEnhancer {
      */
     public function frontend_scripts() {
         // Frontend scripts if needed
+    }
+    
+    /**
+     * Enqueue admin scripts and styles
+     */
+    public function admin_scripts($hook) {
+        // Only load on our plugin pages
+        if (strpos($hook, 'ace-seo') === false) {
+            return;
+        }
+        
+        // Enqueue admin CSS
+        wp_enqueue_style(
+            'ace-seo-admin',
+            ACE_SEO_URL . 'assets/css/admin.css',
+            [],
+            ACE_SEO_VERSION
+        );
+        
+        // Enqueue tools script on tools page
+        if ($hook === 'ace-seo_page_ace-seo-tools') {
+            wp_enqueue_script(
+                'ace-seo-tools',
+                ACE_SEO_URL . 'assets/js/tools.js',
+                ['jquery'],
+                ACE_SEO_VERSION,
+                true
+            );
+            
+            // Localize script with AJAX data
+            wp_localize_script('ace-seo-tools', 'aceToolsData', [
+                'nonce' => wp_create_nonce('ace_seo_optimize_db'),
+                'dashboardNonce' => wp_create_nonce('ace_seo_dashboard_nonce'),
+            ]);
+        }
     }
     
     /**

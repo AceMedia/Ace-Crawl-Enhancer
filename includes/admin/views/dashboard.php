@@ -15,71 +15,19 @@ if (!defined('ABSPATH')) {
     </h1>
     
     <div class="ace-seo-dashboard">
-        <div class="ace-seo-cards">
+        <!-- First Row: 3 Cards -->
+        <div class="ace-seo-cards ace-seo-row-1">
             <!-- SEO Overview Card -->
             <div class="ace-seo-card">
                 <div class="ace-seo-card-header">
                     <h3>📊 SEO Overview</h3>
                 </div>
                 <div class="ace-seo-card-body">
-                    <?php
-                    // Load dashboard cache class if not loaded
-                    if (!class_exists('ACE_SEO_Dashboard_Cache')) {
-                        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
-                    }
-                    
-                    // Get cached statistics to prevent 504 timeouts
-                    $stats = ACE_SEO_Dashboard_Cache::get_dashboard_stats();
-                    
-                    // Use cached values with error handling
-                    $focus_keywords_count = $stats['focus_keywords_count'] ?? 0;
-                    $meta_desc_count = $stats['meta_desc_count'] ?? 0;
-                    $total_posts = $stats['total_posts'] ?? 0;
-                    $focus_keyword_percentage = $stats['focus_keyword_percentage'] ?? 0;
-                    $meta_desc_percentage = $stats['meta_desc_percentage'] ?? 0;
-                    
-                    // Show cache status for debugging
-                    $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
-                    ?>
-                    
-                    <div class="ace-seo-stats">
-                        <div class="ace-seo-stat">
-                            <div class="ace-seo-stat-number"><?php echo $focus_keywords_count; ?></div>
-                            <div class="ace-seo-stat-label">Posts with Focus Keywords</div>
-                        </div>
-                        <div class="ace-seo-stat">
-                            <div class="ace-seo-stat-number"><?php echo $meta_desc_count; ?></div>
-                            <div class="ace-seo-stat-label">Posts with Meta Descriptions</div>
-                        </div>
-                        <div class="ace-seo-stat">
-                            <div class="ace-seo-stat-number"><?php echo $total_posts; ?></div>
-                            <div class="ace-seo-stat-label">Total Published Content</div>
-                        </div>
-                    </div>
-                    
-                    <?php if (isset($stats['error']) && $stats['error']): ?>
-                        <div class="notice notice-warning">
-                            <p><strong>⚠️ Performance Notice:</strong> Dashboard stats are using cached fallback due to database timeout protection.</p>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <div class="ace-seo-progress">
-                        <p><strong>SEO Optimization Progress:</strong> 
-                            <?php if ($cache_status['stats_cached']): ?>
-                                <small style="color: #666;">(Cached - <?php echo human_time_diff($stats['generated_at'] ?? time()); ?> ago)</small>
-                            <?php endif; ?>
-                        </p>
-                        <div class="ace-seo-progress-item">
-                            <span>Focus Keywords: <?php echo $focus_keyword_percentage; ?>%</span>
-                            <div class="ace-seo-progress-bar">
-                                <div class="ace-seo-progress-fill" style="width: <?php echo $focus_keyword_percentage; ?>%;"></div>
-                            </div>
-                        </div>
-                        <div class="ace-seo-progress-item">
-                            <span>Meta Descriptions: <?php echo $meta_desc_percentage; ?>%</span>
-                            <div class="ace-seo-progress-bar">
-                                <div class="ace-seo-progress-fill" style="width: <?php echo $meta_desc_percentage; ?>%;"></div>
-                            </div>
+                    <!-- AJAX Loading Container for Statistics -->
+                    <div id="ace-seo-stats-container">
+                        <div class="ace-loading">
+                            <div class="ace-spinner"></div>
+                            <p>Loading SEO statistics...</p>
                         </div>
                     </div>
                 </div>
@@ -118,33 +66,32 @@ if (!defined('ABSPATH')) {
                     <h3>📈 Recent SEO Activity</h3>
                 </div>
                 <div class="ace-seo-card-body">
-                    <?php
-                    // Get cached recent posts to prevent 504 timeouts
-                    if (!class_exists('ACE_SEO_Dashboard_Cache')) {
-                        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
-                    }
-                    
-                    $recent_posts = ACE_SEO_Dashboard_Cache::get_recent_posts(5);
-                    
-                    if (!empty($recent_posts)): ?>
-                        <div class="ace-seo-recent-posts">
-                            <?php foreach ($recent_posts as $post_data): ?>
-                                <div class="ace-seo-recent-post">
-                                    <div class="ace-seo-recent-post-title">
-                                        <a href="<?php echo esc_url($post_data['edit_link']); ?>">
-                                            <?php echo esc_html($post_data['post_title']); ?>
-                                        </a>
-                                        <span class="ace-seo-post-type"><?php echo esc_html(ucfirst($post_data['post_type'])); ?></span>
-                                    </div>
-                                    <div class="ace-seo-recent-post-date">
-                                        Modified: <?php echo human_time_diff(strtotime($post_data['post_modified'])); ?> ago
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                    <!-- AJAX Loading Container for Recent Activity -->
+                    <div id="ace-recent-activity-container">
+                        <div class="ace-loading">
+                            <div class="ace-spinner"></div>
+                            <p>Loading recent activity...</p>
                         </div>
-                    <?php else: ?>
-                        <p>No optimized content found yet. Start optimizing your posts for better SEO!</p>
-                    <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Second Row: 3 Cards -->
+        <div class="ace-seo-cards ace-seo-row-2">
+            <!-- Content Analysis Card -->
+            <div class="ace-seo-card">
+                <div class="ace-seo-card-header">
+                    <h3>🔍 Content Analysis</h3>
+                </div>
+                <div class="ace-seo-card-body">
+                    <!-- AJAX Loading Container for Content Analysis -->
+                    <div id="ace-content-analysis-container">
+                        <div class="ace-loading">
+                            <div class="ace-spinner"></div>
+                            <p>Analyzing content...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -180,68 +127,13 @@ if (!defined('ABSPATH')) {
                     <h3>🚀 Database Performance</h3>
                 </div>
                 <div class="ace-seo-card-body">
-                    <?php
-                    // Check if optimization is pending
-                    $optimization_pending = get_option( 'ace_seo_db_optimization_pending', false );
-                    $optimization_completed = get_option( 'ace_seo_db_optimized', false );
-                    
-                    if ( $optimization_pending ) {
-                        ?>
-                        <div class="ace-seo-optimization-pending">
-                            <div class="ace-seo-spinner"></div>
-                            <h4>🚀 Database Optimization In Progress</h4>
-                            <p>Database indexes are being created in the background to improve performance. This may take a few minutes on large sites.</p>
-                            <p><small>This process started when the plugin was activated and runs automatically.</small></p>
-                            <button type="button" onclick="location.reload()" class="ace-seo-refresh-btn">Refresh Status</button>
+                    <!-- AJAX Loading Container for Database Performance -->
+                    <div id="ace-seo-database-container">
+                        <div class="ace-loading">
+                            <div class="ace-spinner"></div>
+                            <p>Loading database performance status...</p>
                         </div>
-                        <?php
-                    } else {
-                        // Initialize database optimizer for analysis
-                        if (class_exists('ACE_SEO_Database_Optimizer')) {
-                            $db_optimizer = new ACE_SEO_Database_Optimizer();
-                            $analysis = $db_optimizer->analyze_performance();
-                        ?>
-                            <div class="ace-seo-db-stats">
-                                <div class="ace-seo-db-stat">
-                                    <strong>SEO Meta Records:</strong> <?php echo number_format($analysis['seo_meta_records']); ?>
-                                </div>
-                                <div class="ace-seo-db-stat">
-                                    <strong>Total Meta Records:</strong> <?php echo number_format($analysis['postmeta_records']); ?>
-                                </div>
-                                <div class="ace-seo-db-stat">
-                                    <strong>Active Indexes:</strong> <?php echo count($analysis['existing_indexes']); ?>
-                                </div>
-                                <?php if ( $optimization_completed ) { ?>
-                                    <div class="ace-seo-db-stat">
-                                        <strong>Last Optimized:</strong> <?php echo human_time_diff( strtotime( $optimization_completed ), current_time( 'timestamp' ) ); ?> ago
-                                    </div>
-                                <?php } ?>
-                            </div>
-                            
-                            <?php if (!empty($analysis['recommendations'])): ?>
-                                <div class="ace-seo-recommendations">
-                                    <h4>Performance Recommendations:</h4>
-                                    <?php foreach ($analysis['recommendations'] as $recommendation): ?>
-                                        <div class="ace-seo-recommendation">⚠️ <?php echo esc_html($recommendation); ?></div>
-                                    <?php endforeach; ?>
-                                    
-                                    <button type="button" id="ace-optimize-database" class="ace-seo-optimize-btn">
-                                        Optimize Database Indexes
-                                    </button>
-                                    <div id="ace-optimize-result" class="ace-optimize-result" style="display: none;"></div>
-                                </div>
-                            <?php else: ?>
-                                <div class="ace-seo-performance-good">
-                                    ✅ Database performance is optimized!
-                                    <?php if ( $optimization_completed ) { ?>
-                                        <br><small>Optimization completed <?php echo human_time_diff( strtotime( $optimization_completed ), current_time( 'timestamp' ) ); ?> ago</small>
-                                    <?php } ?>
-                                </div>
-                            <?php endif; ?>
-                        <?php } else { ?>
-                            <p>Database optimizer not available.</p>
-                        <?php } ?>
-                    <?php } ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -255,9 +147,22 @@ if (!defined('ABSPATH')) {
 
 .ace-seo-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin-bottom: 20px;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1200px) {
+    .ace-seo-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .ace-seo-cards {
+        grid-template-columns: 1fr;
+    }
 }
 
 .ace-seo-card {
@@ -283,6 +188,141 @@ if (!defined('ABSPATH')) {
 
 .ace-seo-card-body {
     padding: 20px;
+}
+
+/* AJAX Loading States */
+.ace-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: #666;
+}
+
+.ace-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #a4286a;
+    border-radius: 50%;
+    animation: ace-spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes ace-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.ace-error {
+    text-align: center;
+    color: #dc3232;
+    padding: 20px;
+}
+
+/* Large Site Notice */
+.ace-large-site-notice {
+    margin-top: 15px;
+}
+
+.ace-progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.ace-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #a4286a 0%, #667eea 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.ace-progress-text {
+    font-size: 14px;
+    color: #666;
+    margin: 5px 0;
+}
+
+/* Analysis Results */
+.ace-analysis-results {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-top: 15px;
+}
+
+.ace-analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.ace-analysis-item {
+    text-align: center;
+}
+
+.ace-analysis-number {
+    font-size: 24px;
+    font-weight: bold;
+    color: #a4286a;
+    margin-bottom: 5px;
+}
+
+.ace-analysis-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Content Analysis Styles */
+.ace-content-analysis .ace-content-breakdown {
+    margin: 10px 0;
+    color: #666;
+}
+
+.ace-content-type {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #f0f0f1;
+    border-radius: 12px;
+    font-size: 12px;
+    margin: 2px;
+}
+
+.ace-missing-optimization ul {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.ace-missing-optimization li {
+    padding: 5px 0;
+    color: #d63638;
+    font-size: 14px;
+}
+
+/* Refresh buttons */
+.button-link.ace-refresh-stats,
+.button-link.ace-refresh-activity, 
+.button-link.ace-refresh-analysis {
+    color: #0073aa;
+    text-decoration: none;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+.button-link.ace-refresh-stats:hover,
+.button-link.ace-refresh-activity:hover,
+.button-link.ace-refresh-analysis:hover {
+    color: #005177;
+    text-decoration: underline;
 }
 
 .ace-seo-stats {
