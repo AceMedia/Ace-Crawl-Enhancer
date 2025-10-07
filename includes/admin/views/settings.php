@@ -64,7 +64,6 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     
     // Update advanced settings
     $options['advanced']['breadcrumbs'] = isset($_POST['breadcrumbs']) ? 1 : 0;
-    $options['advanced']['xml_sitemap'] = isset($_POST['xml_sitemap']) ? 1 : 0;
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
     // Update AI/Performance settings
@@ -477,16 +476,7 @@ $post_type_samples['date'] = [
                         </td>
                     </tr>
                     
-                    <tr>
-                        <th scope="row">XML Sitemap</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="xml_sitemap" value="1" <?php checked($advanced['xml_sitemap'] ?? 1, 1); ?>>
-                                Generate XML sitemap
-                            </label>
-                            <p class="description">Automatically generate XML sitemaps for search engines.</p>
-                        </td>
-                    </tr>
+
                     
                     <tr>
                         <th scope="row">Clean URLs</th>
@@ -659,6 +649,48 @@ $post_type_samples['date'] = [
         
         <?php submit_button('Save Settings', 'primary', 'submit'); ?>
     </form>
+    
+    <!-- WordPress Sitemap Information -->
+    <div class="ace-seo-sitemap-info">
+        <div class="ace-seo-info-box">
+            <h3>
+                <span class="dashicons dashicons-admin-site-alt3" style="color: #00a32a;"></span>
+                XML Sitemaps
+            </h3>
+            <p>Your WordPress site automatically generates optimized XML sitemaps using WordPress core functionality.</p>
+            
+            <div class="ace-sitemap-links">
+                <p><strong>Your sitemap URLs:</strong></p>
+                <ul>
+                    <li>
+                        <code><?php echo esc_url(home_url('/wp-sitemap.xml')); ?></code>
+                        <span class="ace-sitemap-badge">WordPress Core (Recommended)</span>
+                    </li>
+                    <li>
+                        <code><?php echo esc_url(home_url('/sitemap.xml')); ?></code>
+                        <span class="ace-sitemap-badge ace-sitemap-legacy">Legacy URL</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="ace-sitemap-features">
+                <p><strong>✅ Features automatically included:</strong></p>
+                <ul>
+                    <li>Proper pagination for large sites (2000+ posts)</li>
+                    <li>Automatic updates when content changes</li>
+                    <li>Support for posts, pages, categories, tags, and custom post types</li>
+                    <li>Optimized for search engine discovery</li>
+                    <li>No configuration needed</li>
+                </ul>
+            </div>
+            
+            <p class="description">
+                <strong>💡 Tip:</strong> Submit <code><?php echo esc_url(home_url('/wp-sitemap.xml')); ?></code> to 
+                <a href="https://search.google.com/search-console" target="_blank">Google Search Console</a> 
+                and <a href="https://www.bing.com/webmasters" target="_blank">Bing Webmaster Tools</a> for optimal indexing.
+            </p>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -965,5 +997,98 @@ jQuery(document).ready(function($) {
     color: #495057;
     border-radius: 0 4px 4px 0;
     font-style: italic;
+}
+
+/* Sitemap Information Box */
+.ace-seo-sitemap-info {
+    margin-top: 30px;
+}
+
+.ace-seo-info-box {
+    background: #f0f8ff;
+    border: 1px solid #b8deff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.ace-seo-info-box h3 {
+    margin: 0 0 15px 0;
+    color: #0073aa;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ace-sitemap-links ul {
+    margin: 10px 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.ace-sitemap-links li {
+    margin: 8px 0;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.ace-sitemap-links code {
+    background: #2271b1;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+}
+
+.ace-sitemap-badge {
+    background: #00a32a;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ace-sitemap-badge.ace-sitemap-legacy {
+    background: #f56e28;
+}
+
+.ace-sitemap-features {
+    background: #fff;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    margin: 15px 0;
+}
+
+.ace-sitemap-features ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.ace-sitemap-features li {
+    margin: 5px 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .ace-sitemap-links li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
 }
 </style>

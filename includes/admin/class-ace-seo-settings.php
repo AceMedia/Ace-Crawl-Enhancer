@@ -315,7 +315,6 @@ class AceSEOSettings {
                     <li>🔄 Broken link checker (coming soon)</li>
                     <li>🔄 Redirect manager (coming soon)</li>
                     <li>🔄 SEO audit tool (coming soon)</li>
-                    <li>🔄 Sitemap management (coming soon)</li>
                 </ul>
             </div>
         </div>

@@ -250,7 +250,6 @@ class AceCrawlEnhancer {
         }
         
         // Always needed
-        add_filter('query_vars', [$this, 'add_query_vars']);
         add_action('init', [$this, 'register_meta_fields']);
         add_action('ace_seo_optimize_database', [$this, 'run_background_optimization']);
         
@@ -303,30 +302,10 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';
         }
         
-        // Always load sitemap functionality (but initialize conditionally)
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-sitemap.php';
-        
-        // Only initialize sitemap if needed (not for all guest requests)
-        if (is_admin() || is_user_logged_in() || $this->is_sitemap_request()) {
-            new AceSEOSitemap();
-        }
+        // Sitemap functionality removed - WordPress core sitemaps are used instead
     }
     
-    /**
-     * Check if this is a sitemap request
-     */
-    private function is_sitemap_request() {
-        return isset($_GET['ace_seo_sitemap']) || 
-               (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'sitemap') !== false);
-    }
-    
-    /**
-     * Add query vars for sitemap functionality
-     */
-    public function add_query_vars($vars) {
-        $vars[] = 'ace_seo_sitemap';
-        return $vars;
-    }
+
     
     /**
      * Register meta fields
