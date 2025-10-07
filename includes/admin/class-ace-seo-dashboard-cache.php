@@ -201,11 +201,15 @@ class ACE_SEO_Dashboard_Cache {
         $stats_cache = get_transient(self::STATS_TRANSIENT);
         $recent_cache = get_transient(self::RECENT_POSTS_TRANSIENT . '_5');
         
+        // If viewing tools page and no cache exists, show that cache needs to be generated
+        // Don't auto-generate here as it could cause performance issues on tools page load
+        
         return array(
-            'stats_cached' => $stats_cache !== false,
-            'recent_cached' => $recent_cache !== false,
-            'stats_age' => $stats_cache ? (time() - ($stats_cache['generated_at'] ?? time())) : 0,
-            'cache_duration' => self::CACHE_DURATION
+            'stats_cached' => $stats_cache !== false && is_array($stats_cache),
+            'recent_cached' => $recent_cache !== false && is_array($recent_cache),
+            'stats_age' => ($stats_cache && isset($stats_cache['generated_at'])) ? (time() - $stats_cache['generated_at']) : 0,
+            'cache_duration' => self::CACHE_DURATION,
+            'needs_generation' => ($stats_cache === false)
         );
     }
     

@@ -266,23 +266,29 @@ class AceSEOSettings {
                 ?>
                 
                 <p><strong>Cache Status:</strong></p>
-                <ul>
+                <ul class="ace-cache-status-list">
                     <li>Statistics Cache: 
                         <?php if ($cache_status['stats_cached']): ?>
                             ✅ Active (<?php echo human_time_diff(time() - $cache_status['stats_age']); ?> old)
                         <?php else: ?>
-                            ❌ Empty
+                            ⏳ Not generated yet - click "Refresh Dashboard Cache" to generate
                         <?php endif; ?>
                     </li>
                     <li>Recent Posts Cache: 
                         <?php if ($cache_status['recent_cached']): ?>
                             ✅ Active
                         <?php else: ?>
-                            ❌ Empty
+                            ⏳ Not generated yet - will be created with statistics cache
                         <?php endif; ?>
                     </li>
                     <li>Cache Duration: <?php echo human_time_diff(0, $cache_status['cache_duration']); ?></li>
                 </ul>
+                
+                <?php if (isset($cache_status['needs_generation']) && $cache_status['needs_generation']): ?>
+                <div class="notice notice-info ace-cache-info-notice">
+                    <p><strong>ℹ️ Cache Not Generated:</strong> The dashboard cache hasn't been created yet. Click "Refresh Dashboard Cache" to generate it and improve dashboard performance. The cache will also be automatically created the first time you visit the ACE SEO Dashboard.</p>
+                </div>
+                <?php endif; ?>
                 
                 <p><strong>What this does:</strong></p>
                 <ul>
@@ -831,9 +837,8 @@ class AceSEOSettings {
                             
                             $result.addClass('success').html(message).show();
                             
-                            setTimeout(function() {
-                                location.reload();
-                            }, 2000);
+                            // Update cache status display instead of reloading
+                            updateCacheStatusDisplay(response.data.cache_status);
                         } else {
                             $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
                         }
@@ -864,6 +869,9 @@ class AceSEOSettings {
                     success: function(response) {
                         if (response.success) {
                             $result.addClass('success').html('<strong>Cache cleared successfully!</strong><br>' + response.data.note).show();
+                            
+                            // Update cache status display instead of reloading
+                            updateCacheStatusDisplay(response.data.cache_status);
                         } else {
                             $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
                         }
@@ -876,6 +884,56 @@ class AceSEOSettings {
                     }
                 });
             });
+            
+            // Function to update cache status display
+            function updateCacheStatusDisplay(cacheStatus) {
+                var $statusList = $('.ace-cache-status-list');
+                if (!$statusList.length) return;
+                
+                var statusHtml = '<li>Statistics Cache: ';
+                if (cacheStatus.stats_cached) {
+                    var ageText = cacheStatus.stats_age > 0 ? 
+                        humanTimeDiff(cacheStatus.stats_age) + ' old' : 
+                        'just generated';
+                    statusHtml += '✅ Active (' + ageText + ')';
+                } else {
+                    statusHtml += '⏳ Not generated yet - click "Refresh Dashboard Cache" to generate';
+                }
+                statusHtml += '</li>';
+                
+                statusHtml += '<li>Recent Posts Cache: ';
+                if (cacheStatus.recent_cached) {
+                    statusHtml += '✅ Active';
+                } else {
+                    statusHtml += '⏳ Not generated yet - will be created with statistics cache';
+                }
+                statusHtml += '</li>';
+                
+                statusHtml += '<li>Cache Duration: ' + humanTimeDiff(cacheStatus.cache_duration) + '</li>';
+                
+                $statusList.html(statusHtml);
+                
+                // Update or hide the info notice
+                var $infoNotice = $('.ace-cache-info-notice');
+                if (cacheStatus.needs_generation && !cacheStatus.stats_cached) {
+                    if (!$infoNotice.length) {
+                        $statusList.after('<div class="notice notice-info ace-cache-info-notice"><p><strong>ℹ️ Cache Not Generated:</strong> The dashboard cache hasn\'t been created yet. Click "Refresh Dashboard Cache" to generate it and improve dashboard performance. The cache will also be automatically created the first time you visit the ACE SEO Dashboard.</p></div>');
+                    }
+                } else {
+                    $infoNotice.remove();
+                }
+            }
+            
+            // Helper function for human readable time differences
+            function humanTimeDiff(seconds) {
+                if (seconds < 60) return seconds + 's';
+                var minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return minutes + 'm';
+                var hours = Math.floor(minutes / 60);
+                if (hours < 24) return hours + 'h';
+                var days = Math.floor(hours / 24);
+                return days + 'd';
+            }
         });
         </script>
         <?php
@@ -1022,6 +1080,9 @@ class AceSEOSettings {
             // Force regenerate cache
             $result = ACE_SEO_Dashboard_Cache::force_regenerate();
             
+            // Get updated cache status
+            $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+            
             wp_send_json_success(array(
                 'message' => 'Dashboard cache refreshed successfully!',
                 'stats' => array(
@@ -1030,7 +1091,8 @@ class AceSEOSettings {
                     'total_posts' => $result['stats']['total_posts']
                 ),
                 'recent_posts_count' => count($result['recent_posts']),
-                'regenerated_at' => date('Y-m-d H:i:s', $result['regenerated_at'])
+                'regenerated_at' => date('Y-m-d H:i:s', $result['regenerated_at']),
+                'cache_status' => $cache_status
             ));
             
         } catch (Exception $e) {
@@ -1058,14 +1120,14 @@ class AceSEOSettings {
             // Clear all cache
             $cleared = ACE_SEO_Dashboard_Cache::clear_cache();
             
-            if ($cleared) {
-                wp_send_json_success(array(
-                    'message' => 'Dashboard cache cleared successfully!',
-                    'note' => 'Cache will be regenerated on next dashboard visit.'
-                ));
-            } else {
-                wp_send_json_error('Failed to clear cache');
-            }
+            // Get updated cache status after clearing
+            $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+            
+            wp_send_json_success(array(
+                'message' => 'Dashboard cache cleared successfully!',
+                'note' => 'Cache will be regenerated on next dashboard visit.',
+                'cache_status' => $cache_status
+            ));
             
         } catch (Exception $e) {
             wp_send_json_error('Failed to clear cache: ' . $e->getMessage());
