@@ -1,0 +1,52 @@
+# Ace Crawl Enhancer Translation Template
+# Copyright (C) 2025 AceMedia
+# This file is distributed under the same license as the Ace Crawl Enhancer plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Ace Crawl Enhancer 1.0.0\n"
+"Report-Msgid-Bugs-To: https://acemedia.com/support\n"
+"POT-Creation-Date: 2025-01-01 00:00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: manual\n"
+
+#: includes/admin/class-ace-seo-metabox.php:309
+msgid "Analyzing..."
+msgstr ""
+
+#: includes/admin/class-ace-seo-metabox.php:310
+msgid "Excellent"
+msgstr ""
+
+#: includes/admin/class-ace-seo-metabox.php:311
+msgid "Good"
+msgstr ""
+
+#: includes/admin/class-ace-seo-metabox.php:312
+msgid "OK"
+msgstr ""
+
+#: includes/admin/class-ace-seo-metabox.php:313
+msgid "Poor"
+msgstr ""
+
+#: includes/admin/class-ace-seo-metabox.php:314
+msgid "Bad"
+msgstr ""
+
+#: includes/class-ace-seo-activator.php:54
+msgid "Ace SEO requires WordPress 6.0 or higher."
+msgstr ""
+
+#: includes/class-ace-seo-activator.php:55
+msgid "Plugin Activation Error"
+msgstr ""
+
+#: includes/class-ace-seo-activator.php:65
+msgid "Ace SEO requires PHP 7.4 or higher."
+msgstr ""
