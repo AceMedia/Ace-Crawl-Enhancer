@@ -28,6 +28,9 @@ class AceSeoFrontend {
 
         // Remove other common SEO plugins
         remove_action('wp_head', 'rel_canonical');
+
+        // Disable Jetpack's Open Graph tags so ACE controls social meta
+        add_filter('jetpack_enable_open_graph', '__return_false', 99);
     }
 
     public function output_schema_markup() {
