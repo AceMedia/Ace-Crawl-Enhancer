@@ -63,7 +63,6 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['social']['default_image'] = esc_url_raw($_POST['default_image'] ?? '');
     
     // Update advanced settings
-    $options['advanced']['breadcrumbs'] = isset($_POST['breadcrumbs']) ? 1 : 0;
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
     // Update AI/Performance settings
@@ -465,19 +464,6 @@ $post_type_samples['date'] = [
                 <h2>Advanced Features</h2>
                 
                 <table class="form-table">
-                    <tr>
-                        <th scope="row">Breadcrumbs</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="breadcrumbs" value="1" <?php checked($advanced['breadcrumbs'] ?? 0, 1); ?>>
-                                Enable breadcrumb navigation
-                            </label>
-                            <p class="description">Add breadcrumb navigation to your site for better user experience and SEO.</p>
-                        </td>
-                    </tr>
-                    
-
-                    
                     <tr>
                         <th scope="row">Clean URLs</th>
                         <td>

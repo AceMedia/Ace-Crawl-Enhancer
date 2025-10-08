@@ -94,7 +94,6 @@ class AceSEOActivator {
                     'default_image' => '',
                 ),
                 'advanced' => array(
-                    'breadcrumbs' => 1,
                     'xml_sitemap' => 1,
                     'clean_permalinks' => 0,
                 ),
@@ -121,7 +120,6 @@ class AceSEOActivator {
                 'site_name' => get_bloginfo( 'name' ),
                 'site_description' => get_bloginfo( 'description' ),
                 'separator' => '-',
-                'breadcrumbs_enabled' => true,
                 'schema_enabled' => true,
                 'sitemap_enabled' => true,
                 'conflict_detection' => true

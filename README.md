@@ -48,7 +48,7 @@
 - **SEO title and meta description optimization** with AI assistance
 - **Canonical URL management**
 - **Meta robots controls** (noindex, nofollow, advanced)
-- **Breadcrumbs with structured data**
+- **Gutenberg breadcrumbs block placeholder**
 - **XML sitemaps generation**
 - **PageSpeed integration** with Core Web Vitals monitoring
 
@@ -71,7 +71,6 @@
 ### Schema.org Structured Data
 - **Automatic Article schema**
 - **Organization/LocalBusiness schema**
-- **Breadcrumb navigation schema**
 - **FAQ schema detection**
 - **WooCommerce Product schema** (if WooCommerce is active)
 
@@ -190,7 +189,6 @@ Ace SEO uses its own database fields (`_ace_seo_*` prefix) for storing SEO data,
 - `_ace_seo_meta-robots-noindex` - Noindex setting
 - `_ace_seo_meta-robots-nofollow` - Nofollow setting
 - `_ace_seo_meta-robots-adv` - Advanced robots
-- `_ace_seo_bctitle` - Breadcrumb title
 
 ### Migration Support
 The plugin automatically migrates data from Yoast SEO fields (`_yoast_wpseo_*`) when first accessed, ensuring seamless transition without data loss.

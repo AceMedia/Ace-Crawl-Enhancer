@@ -269,6 +269,9 @@ class AceCrawlEnhancer {
         // Initialize components
         $this->init_admin();
         $this->init_frontend();
+
+        // Register Gutenberg blocks
+        $this->register_blocks();
     }
     
     /**
@@ -299,6 +302,8 @@ class AceCrawlEnhancer {
      * Initialize frontend components
      */
     private function init_frontend() {
+        require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-breadcrumbs.php';
+
         if (!is_admin()) {
             // Load performance optimizer first for guests
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-performance.php';
@@ -315,6 +320,166 @@ class AceCrawlEnhancer {
         }
         
         // Sitemap functionality removed - WordPress core sitemaps are used instead
+    }
+
+    /**
+     * Register Gutenberg blocks
+     */
+    private function register_blocks() {
+        if (!function_exists('register_block_type')) {
+            return;
+        }
+
+        register_block_type(ACE_SEO_PATH, [
+            'render_callback' => [$this, 'render_breadcrumbs_block'],
+        ]);
+    }
+
+    /**
+     * Render callback for the breadcrumbs block output.
+     */
+    public function render_breadcrumbs_block($attributes, $content, $block) {
+        $defaults = [
+            'textAlign' => '',
+            'showHome' => true,
+            'showCurrent' => true,
+            'showLabel' => false,
+            'labelText' => __('You are here:', 'ace-crawl-enhancer'),
+            'separator' => '/',
+            'ariaLabel' => __('Breadcrumbs', 'ace-crawl-enhancer'),
+        ];
+
+        $attributes = wp_parse_args((array) $attributes, $defaults);
+
+        $context = [];
+
+        if ($block instanceof WP_Block && !empty($block->context)) {
+            $context = (array) $block->context;
+        }
+
+        $items = class_exists('ACE_SEO_Breadcrumbs')
+            ? ACE_SEO_Breadcrumbs::get_items($context)
+            : [];
+
+        if (!$attributes['showHome'] && !empty($items)) {
+            array_shift($items);
+        }
+
+        if (!$attributes['showCurrent'] && !empty($items)) {
+            for ($i = count($items) - 1; $i >= 0; $i--) {
+                if (!empty($items[$i]['is_current'])) {
+                    array_splice($items, $i, 1);
+                    break;
+                }
+            }
+        }
+
+        $separator = isset($attributes['separator']) ? $attributes['separator'] : '/';
+        $separator = wp_strip_all_tags((string) $separator, true);
+        $separator = trim($separator);
+        if ($separator === '') {
+            $separator = '/';
+        }
+        if (function_exists('mb_substr')) {
+            $separator = mb_substr($separator, 0, 10);
+        } else {
+            $separator = substr($separator, 0, 10);
+        }
+
+        $label_text = isset($attributes['labelText']) ? $attributes['labelText'] : '';
+        $label_text = wp_strip_all_tags((string) $label_text, true);
+
+        $aria_label = isset($attributes['ariaLabel']) ? $attributes['ariaLabel'] : '';
+        $aria_label = $aria_label !== '' ? sanitize_text_field($aria_label) : __('Breadcrumbs', 'ace-crawl-enhancer');
+
+        if (empty($items)) {
+            $placeholder_wrapper = [
+                'class' => 'ace-seo-breadcrumbs ace-seo-breadcrumbs--placeholder',
+                'aria-label' => $aria_label,
+            ];
+
+            $placeholder_content = '<span class="ace-seo-breadcrumbs__placeholder">'
+                . esc_html__('Breadcrumbs will render here.', 'ace-crawl-enhancer')
+                . '</span>';
+
+            $nav_placeholder = '<nav ' . get_block_wrapper_attributes($placeholder_wrapper, $block) . '>' . $placeholder_content . '</nav>';
+
+            return apply_filters('ace_seo_breadcrumbs_placeholder', $nav_placeholder, $attributes, $block);
+        }
+
+        $wrapper_classes = ['ace-seo-breadcrumbs'];
+        $wrapper_styles = [];
+
+        if (!empty($attributes['textAlign'])) {
+            $text_align = in_array($attributes['textAlign'], ['left', 'center', 'right'], true)
+                ? $attributes['textAlign']
+                : '';
+
+            if ($text_align) {
+                $wrapper_classes[] = 'has-text-align-' . sanitize_html_class($text_align);
+                $wrapper_styles[] = 'text-align:' . $text_align;
+            }
+        }
+
+        $wrapper_attrs = [
+            'class' => implode(' ', array_filter($wrapper_classes)),
+            'aria-label' => $aria_label,
+        ];
+
+        if (!empty($wrapper_styles)) {
+            $wrapper_attrs['style'] = implode(';', $wrapper_styles);
+        }
+
+        $nav_open = '<nav ' . get_block_wrapper_attributes($wrapper_attrs, $block) . '>';
+        $nav_close = '</nav>';
+
+        $markup = '';
+
+        if (!empty($attributes['showLabel']) && $label_text !== '') {
+            $markup .= '<span class="ace-seo-breadcrumbs__label">' . esc_html($label_text) . '</span>';
+        }
+
+        $markup .= '<ol class="ace-seo-breadcrumbs__list" itemscope itemtype="https://schema.org/BreadcrumbList">';
+
+        foreach ($items as $index => $item) {
+            $position = (int) $index + 1;
+            $label    = isset($item['label']) ? wp_strip_all_tags((string) $item['label']) : '';
+            $url      = isset($item['url']) ? $item['url'] : '';
+            $current  = !empty($item['is_current']);
+
+            $markup .= '<li class="ace-seo-breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">';
+
+            if ($index > 0) {
+                $markup .= '<span class="ace-seo-breadcrumbs__separator" aria-hidden="true">' . esc_html($separator) . '</span>';
+            }
+
+            if (!$current && !empty($url)) {
+                $markup .= '<a class="ace-seo-breadcrumbs__link" href="' . esc_url($url) . '" itemprop="item">'
+                    . '<span itemprop="name">' . esc_html($label) . '</span>'
+                    . '</a>';
+            } else {
+                $markup .= '<span class="ace-seo-breadcrumbs__current" itemprop="name" aria-current="page">'
+                    . esc_html($label)
+                    . '</span>';
+            }
+
+            $markup .= '<meta itemprop="position" content="' . $position . '">';
+            $markup .= '</li>';
+        }
+
+        $markup .= '</ol>';
+
+        $full_markup = $nav_open . $markup . $nav_close;
+
+        /**
+         * Filter the final breadcrumbs markup for the block.
+         *
+         * @param string    $full_markup Breadcrumb HTML including the wrapper element.
+         * @param array     $items       Breadcrumb items.
+         * @param array     $attributes  Block attributes.
+         * @param WP_Block  $block       Block instance.
+         */
+        return apply_filters('ace_seo_breadcrumbs_markup', $full_markup, $items, $attributes, $block);
     }
     
 

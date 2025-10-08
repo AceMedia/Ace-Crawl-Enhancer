@@ -27,7 +27,6 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
 $noindex = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-noindex');
 $nofollow = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-nofollow');
 $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
-$breadcrumb_title = AceCrawlEnhancer::get_meta_value($post_id, 'bctitle');
 ?>
 
 <div id="ace-seo-metabox" class="ace-seo-metabox">
@@ -505,23 +504,6 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             </p>
         </div>
 
-        <!-- Breadcrumbs Title -->
-        <div class="ace-seo-field">
-            <label for="yoast_wpseo_bctitle" class="ace-seo-label">
-                <strong>Breadcrumbs Title</strong>
-            </label>
-            <input 
-                type="text" 
-                id="yoast_wpseo_bctitle" 
-                name="yoast_wpseo_bctitle" 
-                value="<?php echo esc_attr($breadcrumb_title); ?>"
-                class="ace-seo-input"
-                placeholder="<?php echo esc_attr($post->post_title); ?>"
-            >
-            <p class="ace-seo-description">
-                Title to use in breadcrumb navigation. Leave empty to use the post title.
-            </p>
-        </div>
     </div>
 
     <!-- Performance Tab -->
