@@ -16,6 +16,7 @@ class ACE_SEO_Frontend_Performance {
     private static $instance = null;
     private $cached_meta = array();
     private $is_guest = false;
+    private $schema_deferred = false;
     
     public function __construct() {
         $this->is_guest = !is_user_logged_in();
@@ -49,7 +50,29 @@ class ACE_SEO_Frontend_Performance {
         
         // Add schema optimization
         add_action('wp_head', array($this, 'output_optimized_schema'), 1);
-    }    /**
+    }
+
+    /**
+     * Cache meta for the current page context
+     */
+    public function cache_current_page_meta() {
+        $this->preload_meta_cache();
+    }
+
+    /**
+     * Prepare optimized schema output
+     */
+    public function output_optimized_schema() {
+        if ($this->schema_deferred) {
+            return;
+        }
+
+        $this->preload_meta_cache();
+
+        $this->schema_deferred = true;
+    }
+
+    /**
      * Preload meta cache for current post/page
      */
     public function preload_meta_cache() {

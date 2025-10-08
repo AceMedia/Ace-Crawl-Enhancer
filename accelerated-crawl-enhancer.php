@@ -311,6 +311,12 @@ class AceCrawlEnhancer {
             // Load core frontend components
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-frontend.php';
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';
+
+            // Initialize core frontend services
+            $performance = ACE_SEO_Frontend_Performance::get_instance();
+            $performance->init();
+            new AceSeoFrontend();
+            new AceSeoSchema();
         }
         
         // Load dashboard AJAX handler for admin
