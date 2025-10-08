@@ -205,21 +205,168 @@ class AceSeoFrontend {
     }
 
     private function get_publisher_schema() {
+        $options = get_option('ace_seo_options', []);
+        $organization = $options['organization'] ?? [];
+
+        $name = !empty($organization['name']) ? $organization['name'] : get_bloginfo('name');
+        $url = !empty($organization['url']) ? $organization['url'] : home_url();
+
         $publisher = [
             '@type' => 'Organization',
-            'name' => get_bloginfo('name'),
-            'url' => home_url(),
+            '@id' => trailingslashit($url) . '#organization',
+            'name' => $name,
+            'url' => $url,
         ];
 
-        $options = get_option('ace_seo_options', []);
-        if (!empty($options['social']['default_image'])) {
-            $publisher['logo'] = [
+        if (!empty($organization['legal_name'])) {
+            $publisher['legalName'] = $organization['legal_name'];
+        }
+
+        if (!empty($organization['alternate_name'])) {
+            $publisher['alternateName'] = $organization['alternate_name'];
+        }
+
+        $description = !empty($organization['description']) ? $organization['description'] : get_bloginfo('description');
+        if (!empty($description)) {
+            $publisher['description'] = wp_strip_all_tags($description);
+        }
+
+        $logo = $this->build_logo_schema($organization, $options);
+        if (!empty($logo)) {
+            $publisher['logo'] = $logo;
+        }
+
+        $contact_point = $this->build_contact_point($organization);
+        if (!empty($contact_point)) {
+            $publisher['contactPoint'] = [$contact_point];
+        }
+
+        $social_profiles = $this->build_social_profiles($organization, $options);
+        if (!empty($social_profiles)) {
+            $publisher['sameAs'] = $social_profiles;
+        }
+
+        /**
+         * Filter the organization publisher schema data before output.
+         *
+         * @param array $publisher     Publisher schema array.
+         * @param array $organization  Saved organization settings.
+         * @param array $options       All Ace SEO options.
+         */
+        return apply_filters('ace_seo_publisher_schema', $publisher, $organization, $options);
+    }
+
+    private function build_logo_schema($organization, $options) {
+        $logo_id = !empty($organization['logo_id']) ? absint($organization['logo_id']) : 0;
+        $logo_url = '';
+
+        if ($logo_id) {
+            $logo_url = wp_get_attachment_image_url($logo_id, 'full');
+            if (!empty($logo_url)) {
+                $metadata = wp_get_attachment_metadata($logo_id);
+                $logo = [
+                    '@type' => 'ImageObject',
+                    'url' => $logo_url,
+                ];
+
+                if (is_array($metadata)) {
+                    if (!empty($metadata['width'])) {
+                        $logo['width'] = (int) $metadata['width'];
+                    }
+                    if (!empty($metadata['height'])) {
+                        $logo['height'] = (int) $metadata['height'];
+                    }
+                }
+
+                return $logo;
+            }
+        }
+
+        if (empty($logo_url) && !empty($organization['logo_url'])) {
+            $logo_url = $organization['logo_url'];
+        }
+
+        if (empty($logo_url) && !empty($options['social']['default_image'])) {
+            $logo_url = $options['social']['default_image'];
+        }
+
+        if (!empty($logo_url)) {
+            return [
                 '@type' => 'ImageObject',
-                'url' => $options['social']['default_image'],
+                'url' => $logo_url,
             ];
         }
 
-        return $publisher;
+        return null;
+    }
+
+    private function build_contact_point($organization) {
+        $contact_type = $organization['contact_type'] ?? '';
+        $telephone = $organization['contact_phone'] ?? '';
+        $email = $organization['contact_email'] ?? '';
+        $contact_url = $organization['contact_url'] ?? '';
+
+        if (empty($contact_type) && empty($telephone) && empty($email) && empty($contact_url)) {
+            return null;
+        }
+
+        $contact_point = [
+            '@type' => 'ContactPoint',
+        ];
+
+        if (!empty($contact_type)) {
+            $contact_point['contactType'] = $contact_type;
+        }
+        if (!empty($telephone)) {
+            $contact_point['telephone'] = $telephone;
+        }
+        if (!empty($email)) {
+            $contact_point['email'] = $email;
+        }
+        if (!empty($contact_url)) {
+            $contact_point['url'] = $contact_url;
+        }
+
+        return $contact_point;
+    }
+
+    private function build_social_profiles($organization, $options) {
+        $profiles = [];
+        $keys = [
+            'social_facebook',
+            'social_twitter',
+            'social_instagram',
+            'social_linkedin',
+            'social_youtube',
+        ];
+
+        foreach ($keys as $key) {
+            if (!empty($organization[$key])) {
+                $profiles[] = $organization[$key];
+            }
+        }
+
+        if (empty($profiles)) {
+            if (!empty($options['social']['facebook_page'])) {
+                $profiles[] = $options['social']['facebook_page'];
+            }
+            if (!empty($options['social']['twitter_username'])) {
+                $profiles[] = 'https://twitter.com/' . ltrim($options['social']['twitter_username'], '@');
+            }
+            if (!empty($options['social']['linkedin_page'])) {
+                $profiles[] = $options['social']['linkedin_page'];
+            }
+            if (!empty($options['social']['instagram_page'])) {
+                $profiles[] = $options['social']['instagram_page'];
+            }
+            if (!empty($options['social']['youtube_channel'])) {
+                $profiles[] = $options['social']['youtube_channel'];
+            }
+        }
+
+        $profiles = array_filter(array_unique(array_map('esc_url_raw', $profiles)));
+
+        return array_values($profiles);
     }
 
     private function get_current_url() {

@@ -25,6 +25,7 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['advanced'] = isset($options['advanced']) && is_array($options['advanced']) ? $options['advanced'] : [];
     $options['ai'] = isset($options['ai']) && is_array($options['ai']) ? $options['ai'] : [];
     $options['performance'] = isset($options['performance']) && is_array($options['performance']) ? $options['performance'] : [];
+    $options['organization'] = isset($options['organization']) && is_array($options['organization']) ? $options['organization'] : [];
     
     // Update general settings
     $options['general']['separator'] = sanitize_text_field($_POST['separator'] ?? '|');
@@ -62,6 +63,24 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['social']['twitter_username'] = sanitize_text_field($_POST['twitter_username'] ?? '');
     $options['social']['default_image'] = esc_url_raw($_POST['default_image'] ?? '');
     
+    // Update organization settings
+    $options['organization']['name'] = sanitize_text_field($_POST['organization_name'] ?? '');
+    $options['organization']['legal_name'] = sanitize_text_field($_POST['organization_legal_name'] ?? '');
+    $options['organization']['alternate_name'] = sanitize_text_field($_POST['organization_alternate_name'] ?? '');
+    $options['organization']['url'] = esc_url_raw($_POST['organization_url'] ?? '');
+    $options['organization']['description'] = sanitize_textarea_field($_POST['organization_description'] ?? '');
+    $options['organization']['logo_id'] = absint($_POST['organization_logo_id'] ?? 0);
+    $options['organization']['logo_url'] = esc_url_raw($_POST['organization_logo_url'] ?? '');
+    $options['organization']['contact_type'] = sanitize_text_field($_POST['organization_contact_type'] ?? '');
+    $options['organization']['contact_phone'] = sanitize_text_field($_POST['organization_contact_phone'] ?? '');
+    $options['organization']['contact_email'] = sanitize_email($_POST['organization_contact_email'] ?? '');
+    $options['organization']['contact_url'] = esc_url_raw($_POST['organization_contact_url'] ?? '');
+    $options['organization']['social_facebook'] = esc_url_raw($_POST['organization_social_facebook'] ?? '');
+    $options['organization']['social_instagram'] = esc_url_raw($_POST['organization_social_instagram'] ?? '');
+    $options['organization']['social_linkedin'] = esc_url_raw($_POST['organization_social_linkedin'] ?? '');
+    $options['organization']['social_youtube'] = esc_url_raw($_POST['organization_social_youtube'] ?? '');
+    $options['organization']['social_twitter'] = esc_url_raw($_POST['organization_social_twitter'] ?? '');
+
     // Update advanced settings
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
@@ -89,6 +108,17 @@ $advanced = $options['advanced'] ?? [];
 $ai = $options['ai'] ?? [];
 $performance = $options['performance'] ?? [];
 $templates = $options['templates'] ?? [];
+$organization = $options['organization'] ?? [];
+
+$organization_logo_url = '';
+if (!empty($organization['logo_id'])) {
+    $logo_id = absint($organization['logo_id']);
+    $organization_logo_url = wp_get_attachment_image_url($logo_id, 'full') ?: '';
+}
+
+if (empty($organization_logo_url) && !empty($organization['logo_url'])) {
+    $organization_logo_url = $organization['logo_url'];
+}
 
 // Get default templates
 $default_templates = [
@@ -458,6 +488,167 @@ $post_type_samples['date'] = [
                     </tr>
                 </table>
             </div>
+
+            <!-- Organization Profile -->
+            <div class="ace-seo-settings-section">
+                <h2>Organization Profile</h2>
+                <p class="description">Define your organization details for structured data markup and metadata.
+                    These details will be used as the publisher information across your site.</p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_name">Organization Name</label>
+                        </th>
+                        <td>
+                            <input type="text" id="organization_name" name="organization_name" value="<?php echo esc_attr($organization['name'] ?? ''); ?>" class="regular-text" placeholder="<?php echo esc_attr(get_bloginfo('name')); ?>">
+                            <p class="description">Primary name of your organization. Defaults to the site name if left blank.</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_legal_name">Legal Name</label>
+                        </th>
+                        <td>
+                            <input type="text" id="organization_legal_name" name="organization_legal_name" value="<?php echo esc_attr($organization['legal_name'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Registered legal name of your company or organization.</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_alternate_name">Alternate Name</label>
+                        </th>
+                        <td>
+                            <input type="text" id="organization_alternate_name" name="organization_alternate_name" value="<?php echo esc_attr($organization['alternate_name'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Short name, trading name, or commonly used nickname.</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_url">Organization URL</label>
+                        </th>
+                        <td>
+                            <input type="url" id="organization_url" name="organization_url" value="<?php echo esc_attr($organization['url'] ?? ''); ?>" class="regular-text" placeholder="<?php echo esc_attr(home_url()); ?>">
+                            <p class="description">Canonical homepage for your organization. Defaults to the site home URL.</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_description">Organization Description</label>
+                        </th>
+                        <td>
+                            <textarea id="organization_description" name="organization_description" rows="3" class="large-text"><?php echo esc_textarea($organization['description'] ?? ''); ?></textarea>
+                            <p class="description">A short description or tagline that represents your organization.</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_logo_url">Organization Logo</label>
+                        </th>
+                        <td>
+                            <div class="ace-seo-image-field">
+                                <input type="hidden" id="organization_logo_id" name="organization_logo_id" value="<?php echo isset($organization['logo_id']) ? absint($organization['logo_id']) : 0; ?>">
+                                <input type="url" id="organization_logo_url" name="organization_logo_url" value="<?php echo esc_attr($organization_logo_url); ?>" class="regular-text">
+                                <button type="button"
+                                        class="button ace-seo-image-select"
+                                        data-target="organization_logo_url"
+                                        data-target-id="organization_logo_id"
+                                        data-preview="organization_logo_preview"
+                                        data-clear-button="organization_logo_clear"
+                                        data-title="Select Organization Logo"
+                                        data-button="Use this logo">
+                                    Select Logo
+                                </button>
+                                <button type="button" class="button button-link" id="organization_logo_clear" style="<?php echo empty($organization_logo_url) ? 'display:none;' : ''; ?>">Remove</button>
+                            </div>
+                            <p class="description">Upload a square logo at least 112×112px. This logo will be used in structured data.</p>
+                            <div class="ace-seo-logo-preview" style="margin-top:10px;">
+                                <img id="organization_logo_preview" src="<?php echo esc_url($organization_logo_url); ?>" alt="Organization logo preview" style="max-width:150px; height:auto; <?php echo empty($organization_logo_url) ? 'display:none;' : ''; ?>">
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <h3>Contact Information</h3>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_contact_type">Contact Type</label>
+                        </th>
+                        <td>
+                            <input type="text" id="organization_contact_type" name="organization_contact_type" value="<?php echo esc_attr($organization['contact_type'] ?? ''); ?>" class="regular-text" placeholder="Customer Service">
+                            <p class="description">Describe this contact point (e.g., Customer Service, Editorial, Sales).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_contact_phone">Phone Number</label>
+                        </th>
+                        <td>
+                            <input type="text" id="organization_contact_phone" name="organization_contact_phone" value="<?php echo esc_attr($organization['contact_phone'] ?? ''); ?>" class="regular-text" placeholder="+44 20 7946 0958">
+                            <p class="description">Primary phone number for this contact point. Include country code.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_contact_email">Email Address</label>
+                        </th>
+                        <td>
+                            <input type="email" id="organization_contact_email" name="organization_contact_email" value="<?php echo esc_attr($organization['contact_email'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Email for this contact point. Optional.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="organization_contact_url">Contact URL</label>
+                        </th>
+                        <td>
+                            <input type="url" id="organization_contact_url" name="organization_contact_url" value="<?php echo esc_attr($organization['contact_url'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Link to a contact page or help center.</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <h3>Social Profiles</h3>
+                <p class="description">Add the primary social media profiles associated with your organization. These will be marked up using <code>sameAs</code> in structured data.</p>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="organization_social_facebook">Facebook</label></th>
+                        <td>
+                            <input type="url" id="organization_social_facebook" name="organization_social_facebook" value="<?php echo esc_attr($organization['social_facebook'] ?? ''); ?>" class="regular-text" placeholder="https://www.facebook.com/yourpage">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="organization_social_twitter">X / Twitter</label></th>
+                        <td>
+                            <input type="url" id="organization_social_twitter" name="organization_social_twitter" value="<?php echo esc_attr($organization['social_twitter'] ?? ''); ?>" class="regular-text" placeholder="https://twitter.com/yourhandle">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="organization_social_instagram">Instagram</label></th>
+                        <td>
+                            <input type="url" id="organization_social_instagram" name="organization_social_instagram" value="<?php echo esc_attr($organization['social_instagram'] ?? ''); ?>" class="regular-text" placeholder="https://www.instagram.com/yourprofile">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="organization_social_linkedin">LinkedIn</label></th>
+                        <td>
+                            <input type="url" id="organization_social_linkedin" name="organization_social_linkedin" value="<?php echo esc_attr($organization['social_linkedin'] ?? ''); ?>" class="regular-text" placeholder="https://www.linkedin.com/company/yourcompany">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="organization_social_youtube">YouTube</label></th>
+                        <td>
+                            <input type="url" id="organization_social_youtube" name="organization_social_youtube" value="<?php echo esc_attr($organization['social_youtube'] ?? ''); ?>" class="regular-text" placeholder="https://www.youtube.com/@yourchannel">
+                        </td>
+                    </tr>
+                </table>
+            </div>
             
             <!-- Advanced Settings -->
             <div class="ace-seo-settings-section">
@@ -690,14 +881,25 @@ jQuery(document).ready(function($) {
     $('.ace-seo-image-select').on('click', function(e) {
         e.preventDefault();
         
-        const targetInput = $(this).data('target');
+        const $button = $(this);
+        const targetInput = $button.data('target');
+        const targetIdInput = $button.data('target-id');
+        const previewId = $button.data('preview');
+        const clearButtonId = $button.data('clear-button');
+
+        if (!targetInput) {
+            return;
+        }
+
         const $target = $('#' + targetInput);
+        const mediaTitle = $button.data('title') || 'Select Image';
+        const mediaButton = $button.data('button') || 'Use this image';
         
         if (typeof wp !== 'undefined' && wp.media) {
             const mediaUploader = wp.media({
-                title: 'Select Default Social Image',
+                title: mediaTitle,
                 button: {
-                    text: 'Use this image'
+                    text: mediaButton
                 },
                 multiple: false,
                 library: {
@@ -708,10 +910,30 @@ jQuery(document).ready(function($) {
             mediaUploader.on('select', function() {
                 const attachment = mediaUploader.state().get('selection').first().toJSON();
                 $target.val(attachment.url);
+                
+                if (targetIdInput) {
+                    $('#' + targetIdInput).val(attachment.id);
+                }
+                
+                if (previewId) {
+                    $('#' + previewId).attr('src', attachment.url).show();
+                }
+                
+                if (clearButtonId) {
+                    $('#' + clearButtonId).show();
+                }
             });
             
             mediaUploader.open();
         }
+    });
+
+    $('#organization_logo_clear').on('click', function(e) {
+        e.preventDefault();
+        $('#organization_logo_url').val('');
+        $('#organization_logo_id').val('');
+        $('#organization_logo_preview').hide().attr('src', '');
+        $(this).hide();
     });
     
     // API Key validation feedback

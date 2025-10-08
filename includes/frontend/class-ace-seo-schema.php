@@ -50,48 +50,168 @@ class AceSeoSchema {
     
     private function get_organization_data() {
         $options = get_option('ace_seo_options', []);
-        
+        $organization_settings = $options['organization'] ?? [];
+
+        $name = !empty($organization_settings['name']) ? $organization_settings['name'] : get_bloginfo('name');
+        $url = !empty($organization_settings['url']) ? $organization_settings['url'] : home_url();
+        $description = !empty($organization_settings['description']) ? $organization_settings['description'] : get_bloginfo('description');
+
         $organization = [
             '@context' => 'https://schema.org',
             '@type' => 'Organization',
-            'name' => get_bloginfo('name'),
-            'url' => home_url(),
-            'description' => get_bloginfo('description'),
+            '@id' => trailingslashit($url) . '#organization',
+            'name' => $name,
+            'url' => $url,
         ];
-        
-        // Add logo if available
-        if (!empty($options['social']['default_image'])) {
-            $organization['logo'] = [
-                '@type' => 'ImageObject',
-                'url' => $options['social']['default_image'],
-            ];
+
+        if (!empty($description)) {
+            $organization['description'] = wp_strip_all_tags($description);
         }
-        
-        // Add social media profiles
-        $social_profiles = [];
-        
-        if (!empty($options['social']['facebook_page'])) {
-            $social_profiles[] = $options['social']['facebook_page'];
+
+        if (!empty($organization_settings['legal_name'])) {
+            $organization['legalName'] = $organization_settings['legal_name'];
         }
-        
-        if (!empty($options['social']['twitter_username'])) {
-            $twitter_url = 'https://twitter.com/' . ltrim($options['social']['twitter_username'], '@');
-            $social_profiles[] = $twitter_url;
+
+        if (!empty($organization_settings['alternate_name'])) {
+            $organization['alternateName'] = $organization_settings['alternate_name'];
         }
-        
-        if (!empty($options['social']['linkedin_page'])) {
-            $social_profiles[] = $options['social']['linkedin_page'];
+
+        $logo = $this->build_logo_schema($organization_settings, $options);
+        if (!empty($logo)) {
+            $organization['logo'] = $logo;
         }
-        
-        if (!empty($options['social']['instagram_page'])) {
-            $social_profiles[] = $options['social']['instagram_page'];
+
+        $contact_point = $this->build_contact_point($organization_settings);
+        if (!empty($contact_point)) {
+            $organization['contactPoint'] = [$contact_point];
         }
-        
+
+        $social_profiles = $this->build_social_profiles($organization_settings, $options);
         if (!empty($social_profiles)) {
             $organization['sameAs'] = $social_profiles;
         }
-        
-        return $organization;
+
+        /**
+         * Filter the organization schema data before output.
+         *
+         * @param array $organization       Organization schema array.
+         * @param array $organization_settings Saved organization settings.
+         * @param array $options            All Ace SEO options.
+         */
+        return apply_filters('ace_seo_organization_schema', $organization, $organization_settings, $options);
+    }
+
+    private function build_logo_schema($organization, $options) {
+        $logo_id = !empty($organization['logo_id']) ? absint($organization['logo_id']) : 0;
+        $logo_url = '';
+
+        if ($logo_id) {
+            $logo_url = wp_get_attachment_image_url($logo_id, 'full');
+            if (!empty($logo_url)) {
+                $metadata = wp_get_attachment_metadata($logo_id);
+                $logo = [
+                    '@type' => 'ImageObject',
+                    'url' => $logo_url,
+                ];
+
+                if (is_array($metadata)) {
+                    if (!empty($metadata['width'])) {
+                        $logo['width'] = (int) $metadata['width'];
+                    }
+                    if (!empty($metadata['height'])) {
+                        $logo['height'] = (int) $metadata['height'];
+                    }
+                }
+
+                return $logo;
+            }
+        }
+
+        if (empty($logo_url) && !empty($organization['logo_url'])) {
+            $logo_url = $organization['logo_url'];
+        }
+
+        if (empty($logo_url) && !empty($options['social']['default_image'])) {
+            $logo_url = $options['social']['default_image'];
+        }
+
+        if (!empty($logo_url)) {
+            return [
+                '@type' => 'ImageObject',
+                'url' => $logo_url,
+            ];
+        }
+
+        return null;
+    }
+
+    private function build_contact_point($organization) {
+        $contact_type = $organization['contact_type'] ?? '';
+        $telephone = $organization['contact_phone'] ?? '';
+        $email = $organization['contact_email'] ?? '';
+        $contact_url = $organization['contact_url'] ?? '';
+
+        if (empty($contact_type) && empty($telephone) && empty($email) && empty($contact_url)) {
+            return null;
+        }
+
+        $contact_point = [
+            '@type' => 'ContactPoint',
+        ];
+
+        if (!empty($contact_type)) {
+            $contact_point['contactType'] = $contact_type;
+        }
+        if (!empty($telephone)) {
+            $contact_point['telephone'] = $telephone;
+        }
+        if (!empty($email)) {
+            $contact_point['email'] = $email;
+        }
+        if (!empty($contact_url)) {
+            $contact_point['url'] = $contact_url;
+        }
+
+        return $contact_point;
+    }
+
+    private function build_social_profiles($organization, $options) {
+        $profiles = [];
+        $keys = [
+            'social_facebook',
+            'social_twitter',
+            'social_instagram',
+            'social_linkedin',
+            'social_youtube',
+        ];
+
+        foreach ($keys as $key) {
+            if (!empty($organization[$key])) {
+                $profiles[] = $organization[$key];
+            }
+        }
+
+        if (empty($profiles)) {
+            if (!empty($options['social']['facebook_page'])) {
+                $profiles[] = $options['social']['facebook_page'];
+            }
+            if (!empty($options['social']['twitter_username'])) {
+                $profiles[] = 'https://twitter.com/' . ltrim($options['social']['twitter_username'], '@');
+            }
+            if (!empty($options['social']['linkedin_page'])) {
+                $profiles[] = $options['social']['linkedin_page'];
+            }
+            if (!empty($options['social']['instagram_page'])) {
+                $profiles[] = $options['social']['instagram_page'];
+            }
+            if (!empty($options['social']['youtube_channel'])) {
+                $profiles[] = $options['social']['youtube_channel'];
+            }
+        }
+
+        $profiles = array_filter(array_unique(array_map('esc_url_raw', $profiles)));
+
+        return array_values($profiles);
     }
     
     private function get_local_business_data() {
