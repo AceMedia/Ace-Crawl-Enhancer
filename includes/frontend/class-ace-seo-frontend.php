@@ -340,6 +340,13 @@ class AceSeoFrontend {
             'social_youtube',
         ];
 
+        if (!empty($organization['twitter_username'])) {
+            $twitter_username = ltrim($organization['twitter_username'], '@');
+            if (!empty($twitter_username)) {
+                $profiles[] = 'https://twitter.com/' . $twitter_username;
+            }
+        }
+
         foreach ($keys as $key) {
             if (!empty($organization[$key])) {
                 $profiles[] = $organization[$key];
@@ -351,7 +358,10 @@ class AceSeoFrontend {
                 $profiles[] = $options['social']['facebook_page'];
             }
             if (!empty($options['social']['twitter_username'])) {
-                $profiles[] = 'https://twitter.com/' . ltrim($options['social']['twitter_username'], '@');
+                $legacy_handle = ltrim($options['social']['twitter_username'], '@');
+                if (!empty($legacy_handle)) {
+                    $profiles[] = 'https://twitter.com/' . $legacy_handle;
+                }
             }
             if (!empty($options['social']['linkedin_page'])) {
                 $profiles[] = $options['social']['linkedin_page'];
@@ -422,8 +432,19 @@ class AceSeoFrontend {
         }
 
         // Add Twitter site if set
-        if (!empty($options['social']['twitter_username'])) {
-            echo '<meta name="twitter:site" content="' . esc_attr($options['social']['twitter_username']) . '">' . "\n";
+        $twitter_handle = '';
+        if (!empty($options['organization']['twitter_username'])) {
+            $twitter_handle = $options['organization']['twitter_username'];
+        } elseif (!empty($options['social']['twitter_username'])) {
+            // Backward compatibility with legacy setting
+            $twitter_handle = $options['social']['twitter_username'];
+        }
+
+        if (!empty($twitter_handle)) {
+            $twitter_handle = '@' . ltrim($twitter_handle, '@');
+            if (strlen($twitter_handle) > 1) {
+                echo '<meta name="twitter:site" content="' . esc_attr($twitter_handle) . '">' . "\n";
+            }
         }
     }
 }

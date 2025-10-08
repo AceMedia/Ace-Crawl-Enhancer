@@ -60,7 +60,6 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     
     // Update social settings
     $options['social']['facebook_app_id'] = sanitize_text_field($_POST['facebook_app_id'] ?? '');
-    $options['social']['twitter_username'] = sanitize_text_field($_POST['twitter_username'] ?? '');
     $options['social']['default_image'] = esc_url_raw($_POST['default_image'] ?? '');
     
     // Update organization settings
@@ -75,11 +74,23 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['organization']['contact_phone'] = sanitize_text_field($_POST['organization_contact_phone'] ?? '');
     $options['organization']['contact_email'] = sanitize_email($_POST['organization_contact_email'] ?? '');
     $options['organization']['contact_url'] = esc_url_raw($_POST['organization_contact_url'] ?? '');
+    $twitter_username = sanitize_text_field($_POST['organization_twitter_username'] ?? '');
+    $twitter_username = preg_replace('/\s+/', '', $twitter_username);
+    if (!empty($twitter_username)) {
+        $twitter_username = '@' . ltrim($twitter_username, '@');
+    }
+    $options['organization']['twitter_username'] = $twitter_username;
+
     $options['organization']['social_facebook'] = esc_url_raw($_POST['organization_social_facebook'] ?? '');
     $options['organization']['social_instagram'] = esc_url_raw($_POST['organization_social_instagram'] ?? '');
     $options['organization']['social_linkedin'] = esc_url_raw($_POST['organization_social_linkedin'] ?? '');
     $options['organization']['social_youtube'] = esc_url_raw($_POST['organization_social_youtube'] ?? '');
-    $options['organization']['social_twitter'] = esc_url_raw($_POST['organization_social_twitter'] ?? '');
+
+    if (!empty($twitter_username)) {
+        $options['organization']['social_twitter'] = esc_url_raw('https://twitter.com/' . ltrim($twitter_username, '@'));
+    } else {
+        $options['organization']['social_twitter'] = '';
+    }
 
     // Update advanced settings
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
@@ -119,6 +130,21 @@ if (!empty($organization['logo_id'])) {
 if (empty($organization_logo_url) && !empty($organization['logo_url'])) {
     $organization_logo_url = $organization['logo_url'];
 }
+
+$organization_twitter_username = $organization['twitter_username'] ?? '';
+
+if (empty($organization_twitter_username)) {
+    if (!empty($organization['social_twitter'])) {
+        $parsed_social_twitter = wp_parse_url($organization['social_twitter']);
+        if (!empty($parsed_social_twitter['path'])) {
+            $organization_twitter_username = '@' . ltrim($parsed_social_twitter['path'], '/@');
+        }
+    } elseif (!empty($social['twitter_username'])) {
+        $organization_twitter_username = '@' . ltrim($social['twitter_username'], '@');
+    }
+}
+
+$organization_twitter_username = ltrim($organization_twitter_username ?? '', '@');
 
 // Get default templates
 $default_templates = [
@@ -466,16 +492,6 @@ $post_type_samples['date'] = [
                     
                     <tr>
                         <th scope="row">
-                            <label for="twitter_username">Twitter Username</label>
-                        </th>
-                        <td>
-                            <input type="text" id="twitter_username" name="twitter_username" value="<?php echo esc_attr($social['twitter_username'] ?? ''); ?>" class="regular-text" placeholder="@username">
-                            <p class="description">Your Twitter username (including @) for Twitter Cards.</p>
-                        </td>
-                    </tr>
-                    
-                    <tr>
-                        <th scope="row">
                             <label for="default_image">Default Social Image</label>
                         </th>
                         <td>
@@ -624,9 +640,10 @@ $post_type_samples['date'] = [
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="organization_social_twitter">X / Twitter</label></th>
+                        <th scope="row"><label for="organization_twitter_username">X / Twitter Handle</label></th>
                         <td>
-                            <input type="url" id="organization_social_twitter" name="organization_social_twitter" value="<?php echo esc_attr($organization['social_twitter'] ?? ''); ?>" class="regular-text" placeholder="https://twitter.com/yourhandle">
+                            <input type="text" id="organization_twitter_username" name="organization_twitter_username" value="<?php echo esc_attr($organization_twitter_username); ?>" class="regular-text" placeholder="yourhandle">
+                            <p class="description">Enter your @username without spaces. We'll automatically use it for Twitter Cards and structured data.</p>
                         </td>
                     </tr>
                     <tr>

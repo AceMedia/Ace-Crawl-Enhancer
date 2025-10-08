@@ -185,6 +185,13 @@ class AceSeoSchema {
             'social_youtube',
         ];
 
+        if (!empty($organization['twitter_username'])) {
+            $twitter_username = ltrim($organization['twitter_username'], '@');
+            if (!empty($twitter_username)) {
+                $profiles[] = 'https://twitter.com/' . $twitter_username;
+            }
+        }
+
         foreach ($keys as $key) {
             if (!empty($organization[$key])) {
                 $profiles[] = $organization[$key];
@@ -196,7 +203,10 @@ class AceSeoSchema {
                 $profiles[] = $options['social']['facebook_page'];
             }
             if (!empty($options['social']['twitter_username'])) {
-                $profiles[] = 'https://twitter.com/' . ltrim($options['social']['twitter_username'], '@');
+                $legacy_handle = ltrim($options['social']['twitter_username'], '@');
+                if (!empty($legacy_handle)) {
+                    $profiles[] = 'https://twitter.com/' . $legacy_handle;
+                }
             }
             if (!empty($options['social']['linkedin_page'])) {
                 $profiles[] = $options['social']['linkedin_page'];
