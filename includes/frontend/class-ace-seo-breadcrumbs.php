@@ -282,12 +282,7 @@ class ACE_SEO_Breadcrumbs {
     private static function build_for_term(WP_Term $term) {
         $items = [self::home_item()];
 
-        if ('category' === $term->taxonomy) {
-            $blog_index = self::get_blog_index_item();
-            if ($blog_index) {
-                $items[] = $blog_index;
-            }
-        } else {
+        if ('category' !== $term->taxonomy) {
             $archive_item = self::get_taxonomy_archive_item($term->taxonomy);
             if ($archive_item) {
                 $items[] = $archive_item;

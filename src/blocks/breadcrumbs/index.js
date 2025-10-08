@@ -360,19 +360,12 @@ const buildPreviewItems = (attributes, context = {}) => {
 		case 'term': {
 			const taxonomyPlaceholder =
 				taxonomyPlaceholders[scenario.taxonomy] || {};
-			const taxonomyLabel =
-				taxonomyPlaceholder.archive ||
-				context?.archiveTitle ||
-				humanize(scenario.taxonomy, __('Taxonomy archive', 'ace-crawl-enhancer'));
 			const termLabel =
 				scenario.termLabel
 				|| taxonomyPlaceholder.term
 				|| context?.title
 				|| humanize(scenario.taxonomy, __('Term Title', 'ace-crawl-enhancer'));
 
-			if (taxonomyLabel) {
-				addCrumb(taxonomyLabel);
-			}
 			addCrumb(
 				termLabel,
 				{ isCurrent: true }
@@ -406,27 +399,21 @@ const buildPreviewItems = (attributes, context = {}) => {
 			break;
 		}
 		case 'postTypeArchive': {
-			const archiveLabel = humanize(
-				scenario.postType,
-				__('Content', 'ace-crawl-enhancer')
-			);
-			if (scenario.title) {
-				addCrumb(scenario.title, { isCurrent: true });
-				break;
-			}
+			const archiveLabel =
+				scenario.title ||
+				context?.title ||
+				(scenario.postType === 'post'
+					? __('Post archive', 'ace-crawl-enhancer')
+					: sprintf(
+							/* translators: %s: post type label. */
+							__('%s archive', 'ace-crawl-enhancer'),
+							humanize(
+								scenario.postType,
+								__('Content', 'ace-crawl-enhancer')
+							)
+					  ));
 
-			if (scenario.postType === 'post') {
-				addCrumb(__('Post archive', 'ace-crawl-enhancer'), { isCurrent: true });
-			} else {
-				addCrumb(
-					sprintf(
-						/* translators: %s: post type label. */
-						__('%s archive', 'ace-crawl-enhancer'),
-						archiveLabel
-					),
-					{ isCurrent: true }
-				);
-			}
+			addCrumb(archiveLabel, { isCurrent: true });
 			break;
 		}
 		case 'date': {
