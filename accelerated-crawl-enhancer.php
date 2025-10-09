@@ -1561,6 +1561,12 @@ class AceCrawlEnhancer {
             $taxonomy_title = $this->get_taxonomy_title();
             if (!empty($taxonomy_title)) {
                 $title_parts['title'] = $taxonomy_title;
+                if (isset($title_parts['site'])) {
+                    $title_parts['site'] = '';
+                }
+                if (isset($title_parts['tagline'])) {
+                    $title_parts['tagline'] = '';
+                }
             }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages (search, archive, author)
@@ -1570,6 +1576,8 @@ class AceCrawlEnhancer {
                 $title_parts = [
                     'title' => $special_title
                 ];
+                $title_parts['site'] = '';
+                $title_parts['tagline'] = '';
             }
         }
         
