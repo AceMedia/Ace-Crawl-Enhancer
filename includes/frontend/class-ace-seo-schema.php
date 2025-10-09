@@ -25,11 +25,11 @@ class AceSeoSchema {
         }
         
         $options = get_option('ace_seo_options', []);
-        $organization = $this->get_organization_data();
+        $entity = $this->get_site_entity_schema($options);
         
-        if (!empty($organization)) {
+        if (!empty($entity)) {
             echo '<script type="application/ld+json">' . "\n";
-            echo wp_json_encode($organization, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            echo wp_json_encode($entity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             echo "\n" . '</script>' . "\n";
         }
     }
@@ -39,6 +39,12 @@ class AceSeoSchema {
             return;
         }
         
+        $options = get_option('ace_seo_options', []);
+        $organization_settings = $options['organization'] ?? [];
+        if (($organization_settings['type'] ?? 'organization') === 'person') {
+            return;
+        }
+
         $local_business = $this->get_local_business_data();
         
         if (!empty($local_business)) {
@@ -48,9 +54,12 @@ class AceSeoSchema {
         }
     }
     
-    private function get_organization_data() {
-        $options = get_option('ace_seo_options', []);
+    private function get_site_entity_schema($options) {
         $organization_settings = $options['organization'] ?? [];
+
+        if (($organization_settings['type'] ?? 'organization') === 'person') {
+            return $this->get_person_schema($options);
+        }
 
         $name = !empty($organization_settings['name']) ? $organization_settings['name'] : get_bloginfo('name');
         $url = !empty($organization_settings['url']) ? $organization_settings['url'] : home_url();
@@ -99,6 +108,49 @@ class AceSeoSchema {
          * @param array $options            All Ace SEO options.
          */
         return apply_filters('ace_seo_organization_schema', $organization, $organization_settings, $options);
+    }
+
+    private function get_person_schema($options) {
+        $person = $options['person'] ?? [];
+
+        $name = !empty($person['name']) ? $person['name'] : get_bloginfo('name');
+        $url = !empty($person['url']) ? $person['url'] : home_url();
+        $description = !empty($person['description']) ? $person['description'] : get_bloginfo('description');
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Person',
+            '@id' => trailingslashit($url) . '#person',
+            'name' => $name,
+            'url' => $url,
+        ];
+
+        if (!empty($description)) {
+            $schema['description'] = wp_strip_all_tags($description);
+        }
+
+        if (!empty($person['job_title'])) {
+            $schema['jobTitle'] = $person['job_title'];
+        }
+
+        $image = $this->build_person_image($person);
+        if (!empty($image)) {
+            $schema['image'] = $image;
+        }
+
+        $same_as = $this->build_person_same_as($person);
+        if (!empty($same_as)) {
+            $schema['sameAs'] = $same_as;
+        }
+
+        /**
+         * Filter the person schema data before output.
+         *
+         * @param array $schema Person schema array.
+         * @param array $person Person settings.
+         * @param array $options All Ace SEO options.
+         */
+        return apply_filters('ace_seo_person_schema', $schema, $person, $options);
     }
 
     private function build_logo_schema($organization, $options) {
@@ -216,6 +268,69 @@ class AceSeoSchema {
             }
             if (!empty($options['social']['youtube_channel'])) {
                 $profiles[] = $options['social']['youtube_channel'];
+            }
+        }
+
+        $profiles = array_filter(array_unique(array_map('esc_url_raw', $profiles)));
+
+        return array_values($profiles);
+    }
+
+    private function build_person_image($person) {
+        $image_id = !empty($person['image_id']) ? absint($person['image_id']) : 0;
+        $image_url = '';
+
+        if ($image_id) {
+            $image_url = wp_get_attachment_image_url($image_id, 'full');
+            if (!empty($image_url)) {
+                $metadata = wp_get_attachment_metadata($image_id);
+                $image = [
+                    '@type' => 'ImageObject',
+                    'url' => $image_url,
+                ];
+
+                if (is_array($metadata)) {
+                    if (!empty($metadata['width'])) {
+                        $image['width'] = (int) $metadata['width'];
+                    }
+                    if (!empty($metadata['height'])) {
+                        $image['height'] = (int) $metadata['height'];
+                    }
+                }
+
+                return $image;
+            }
+        }
+
+        if (empty($image_url) && !empty($person['image_url'])) {
+            $image_url = $person['image_url'];
+        }
+
+        if (!empty($image_url)) {
+            return [
+                '@type' => 'ImageObject',
+                'url' => $image_url,
+            ];
+        }
+
+        return null;
+    }
+
+    private function build_person_same_as($person) {
+        $profiles = [];
+
+        if (!empty($person['twitter_username'])) {
+            $handle = ltrim($person['twitter_username'], '@');
+            if (!empty($handle)) {
+                $profiles[] = 'https://twitter.com/' . $handle;
+            }
+        }
+
+        if (!empty($person['same_as']) && is_array($person['same_as'])) {
+            foreach ($person['same_as'] as $url) {
+                if (!empty($url)) {
+                    $profiles[] = $url;
+                }
             }
         }
 

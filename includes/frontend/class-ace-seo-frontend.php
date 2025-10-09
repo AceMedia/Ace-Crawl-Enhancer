@@ -208,6 +208,10 @@ class AceSeoFrontend {
         $options = get_option('ace_seo_options', []);
         $organization = $options['organization'] ?? [];
 
+        if (($organization['type'] ?? 'organization') === 'person') {
+            return $this->get_person_publisher_schema($options);
+        }
+
         $name = !empty($organization['name']) ? $organization['name'] : get_bloginfo('name');
         $url = !empty($organization['url']) ? $organization['url'] : home_url();
 
@@ -254,6 +258,47 @@ class AceSeoFrontend {
          * @param array $options       All Ace SEO options.
          */
         return apply_filters('ace_seo_publisher_schema', $publisher, $organization, $options);
+    }
+
+    private function get_person_publisher_schema($options) {
+        $person = $options['person'] ?? [];
+
+        $name = !empty($person['name']) ? $person['name'] : get_bloginfo('name');
+        $url = !empty($person['url']) ? $person['url'] : home_url();
+
+        $schema = [
+            '@type' => 'Person',
+            '@id' => trailingslashit($url) . '#person',
+            'name' => $name,
+            'url' => $url,
+        ];
+
+        if (!empty($person['job_title'])) {
+            $schema['jobTitle'] = $person['job_title'];
+        }
+
+        if (!empty($person['description'])) {
+            $schema['description'] = wp_strip_all_tags($person['description']);
+        }
+
+        $image = $this->build_person_image($person);
+        if (!empty($image)) {
+            $schema['image'] = $image;
+        }
+
+        $same_as = $this->build_person_same_as($person);
+        if (!empty($same_as)) {
+            $schema['sameAs'] = $same_as;
+        }
+
+        /**
+         * Filter the person publisher schema data before output.
+         *
+         * @param array $schema Person schema array.
+         * @param array $person Person settings.
+         * @param array $options All Ace SEO options.
+         */
+        return apply_filters('ace_seo_publisher_person_schema', $schema, $person, $options);
     }
 
     private function build_logo_schema($organization, $options) {
@@ -328,6 +373,69 @@ class AceSeoFrontend {
         }
 
         return $contact_point;
+    }
+
+    private function build_person_image($person) {
+        $image_id = !empty($person['image_id']) ? absint($person['image_id']) : 0;
+        $image_url = '';
+
+        if ($image_id) {
+            $image_url = wp_get_attachment_image_url($image_id, 'full');
+            if (!empty($image_url)) {
+                $metadata = wp_get_attachment_metadata($image_id);
+                $image = [
+                    '@type' => 'ImageObject',
+                    'url' => $image_url,
+                ];
+
+                if (is_array($metadata)) {
+                    if (!empty($metadata['width'])) {
+                        $image['width'] = (int) $metadata['width'];
+                    }
+                    if (!empty($metadata['height'])) {
+                        $image['height'] = (int) $metadata['height'];
+                    }
+                }
+
+                return $image;
+            }
+        }
+
+        if (empty($image_url) && !empty($person['image_url'])) {
+            $image_url = $person['image_url'];
+        }
+
+        if (!empty($image_url)) {
+            return [
+                '@type' => 'ImageObject',
+                'url' => $image_url,
+            ];
+        }
+
+        return null;
+    }
+
+    private function build_person_same_as($person) {
+        $profiles = [];
+
+        if (!empty($person['twitter_username'])) {
+            $handle = ltrim($person['twitter_username'], '@');
+            if (!empty($handle)) {
+                $profiles[] = 'https://twitter.com/' . $handle;
+            }
+        }
+
+        if (!empty($person['same_as']) && is_array($person['same_as'])) {
+            foreach ($person['same_as'] as $url) {
+                if (!empty($url)) {
+                    $profiles[] = $url;
+                }
+            }
+        }
+
+        $profiles = array_filter(array_unique(array_map('esc_url_raw', $profiles)));
+
+        return array_values($profiles);
     }
 
     private function build_social_profiles($organization, $options) {
@@ -418,12 +526,30 @@ class AceSeoFrontend {
         // Add site verification meta if set
         $options = get_option('ace_seo_options', []);
 
-        if (!empty($options['webmaster']['google_verify'])) {
-            echo '<meta name="google-site-verification" content="' . esc_attr($options['webmaster']['google_verify']) . '">' . "\n";
+        $google_code = $options['webmaster']['google'] ?? ($options['webmaster']['google_verify'] ?? '');
+        if (!empty($google_code)) {
+            echo '<meta name="google-site-verification" content="' . esc_attr($google_code) . '">' . "\n";
         }
 
-        if (!empty($options['webmaster']['bing_verify'])) {
-            echo '<meta name="msvalidate.01" content="' . esc_attr($options['webmaster']['bing_verify']) . '">' . "\n";
+        $bing_code = $options['webmaster']['bing'] ?? ($options['webmaster']['bing_verify'] ?? '');
+        if (!empty($bing_code)) {
+            echo '<meta name="msvalidate.01" content="' . esc_attr($bing_code) . '">' . "\n";
+        }
+
+        if (!empty($options['webmaster']['pinterest'])) {
+            echo '<meta name="p:domain_verify" content="' . esc_attr($options['webmaster']['pinterest']) . '">' . "\n";
+        }
+
+        if (!empty($options['webmaster']['yandex'])) {
+            echo '<meta name="yandex-verification" content="' . esc_attr($options['webmaster']['yandex']) . '">' . "\n";
+        }
+
+        if (!empty($options['webmaster']['baidu'])) {
+            echo '<meta name="baidu-site-verification" content="' . esc_attr($options['webmaster']['baidu']) . '">' . "\n";
+        }
+
+        if (!empty($options['webmaster']['ahrefs'])) {
+            echo '<meta name="ahrefs-site-verification" content="' . esc_attr($options['webmaster']['ahrefs']) . '">' . "\n";
         }
 
         // Add Facebook App ID if set
@@ -433,9 +559,15 @@ class AceSeoFrontend {
 
         // Add Twitter site if set
         $twitter_handle = '';
-        if (!empty($options['organization']['twitter_username'])) {
+        if (($options['organization']['type'] ?? 'organization') === 'person') {
+            if (!empty($options['person']['twitter_username'])) {
+                $twitter_handle = $options['person']['twitter_username'];
+            }
+        }
+
+        if (empty($twitter_handle) && !empty($options['organization']['twitter_username'])) {
             $twitter_handle = $options['organization']['twitter_username'];
-        } elseif (!empty($options['social']['twitter_username'])) {
+        } elseif (empty($twitter_handle) && !empty($options['social']['twitter_username'])) {
             // Backward compatibility with legacy setting
             $twitter_handle = $options['social']['twitter_username'];
         }

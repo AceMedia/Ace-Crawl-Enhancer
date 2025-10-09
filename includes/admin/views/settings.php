@@ -26,6 +26,8 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['ai'] = isset($options['ai']) && is_array($options['ai']) ? $options['ai'] : [];
     $options['performance'] = isset($options['performance']) && is_array($options['performance']) ? $options['performance'] : [];
     $options['organization'] = isset($options['organization']) && is_array($options['organization']) ? $options['organization'] : [];
+    $options['webmaster'] = isset($options['webmaster']) && is_array($options['webmaster']) ? $options['webmaster'] : [];
+    $options['person'] = isset($options['person']) && is_array($options['person']) ? $options['person'] : [];
     
     // Update general settings
     $options['general']['separator'] = sanitize_text_field($_POST['separator'] ?? '|');
@@ -92,6 +94,36 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
         $options['organization']['social_twitter'] = '';
     }
 
+    $options['organization']['type'] = sanitize_text_field($_POST['organization_type'] ?? 'organization');
+
+    // Update person settings
+    $options['person']['name'] = sanitize_text_field($_POST['person_name'] ?? '');
+    $options['person']['job_title'] = sanitize_text_field($_POST['person_job_title'] ?? '');
+    $options['person']['url'] = esc_url_raw($_POST['person_url'] ?? '');
+    $options['person']['description'] = sanitize_textarea_field($_POST['person_description'] ?? '');
+    $options['person']['image_id'] = absint($_POST['person_image_id'] ?? 0);
+    $options['person']['image_url'] = esc_url_raw($_POST['person_image_url'] ?? '');
+    $options['person']['twitter_username'] = sanitize_text_field($_POST['person_twitter_username'] ?? '');
+
+    if (!empty($options['person']['twitter_username'])) {
+        $options['person']['twitter_username'] = '@' . ltrim($options['person']['twitter_username'], '@');
+    }
+
+    $person_same_as_input = array_map('trim', (array) ($_POST['person_same_as'] ?? []));
+    $options['person']['same_as'] = array_values(array_filter(array_unique(array_map('esc_url_raw', $person_same_as_input))));
+
+    // Update webmaster verification codes
+    $options['webmaster']['ahrefs'] = sanitize_text_field($_POST['webmaster_ahrefs'] ?? '');
+    $options['webmaster']['baidu'] = sanitize_text_field($_POST['webmaster_baidu'] ?? '');
+    $options['webmaster']['bing'] = sanitize_text_field($_POST['webmaster_bing'] ?? '');
+    $options['webmaster']['google'] = sanitize_text_field($_POST['webmaster_google'] ?? '');
+    $options['webmaster']['pinterest'] = sanitize_text_field($_POST['webmaster_pinterest'] ?? '');
+    $options['webmaster']['yandex'] = sanitize_text_field($_POST['webmaster_yandex'] ?? '');
+
+    // Maintain legacy keys for backwards compatibility
+    $options['webmaster']['google_verify'] = $options['webmaster']['google'];
+    $options['webmaster']['bing_verify'] = $options['webmaster']['bing'];
+
     // Update advanced settings
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
@@ -120,6 +152,8 @@ $ai = $options['ai'] ?? [];
 $performance = $options['performance'] ?? [];
 $templates = $options['templates'] ?? [];
 $organization = $options['organization'] ?? [];
+$webmaster = $options['webmaster'] ?? [];
+$person = $options['person'] ?? [];
 
 $organization_logo_url = '';
 if (!empty($organization['logo_id'])) {
@@ -145,6 +179,15 @@ if (empty($organization_twitter_username)) {
 }
 
 $organization_twitter_username = ltrim($organization_twitter_username ?? '', '@');
+
+$person_image_url = '';
+if (!empty($person['image_id'])) {
+    $person_image_url = wp_get_attachment_image_url(absint($person['image_id']), 'full') ?: '';
+}
+
+if (empty($person_image_url) && !empty($person['image_url'])) {
+    $person_image_url = $person['image_url'];
+}
 
 // Get default templates
 $default_templates = [
@@ -505,8 +548,85 @@ $post_type_samples['date'] = [
                 </table>
             </div>
 
-            <!-- Organization Profile -->
+            <!-- Site Connections / Verification -->
             <div class="ace-seo-settings-section">
+                <h2>Site Connections</h2>
+                <p class="description">Add verification codes for search engines and analytics platforms. We'll output the correct meta tags on your homepage automatically.</p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="webmaster_google">Google</label></th>
+                        <td>
+                            <input type="text" id="webmaster_google" name="webmaster_google" value="<?php echo esc_attr($webmaster['google'] ?? ''); ?>" class="regular-text" placeholder="example-code">
+                            <p class="description">Find this in <a href="https://search.google.com/search-console" target="_blank" rel="noopener">Google Search Console</a>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="webmaster_bing">Bing</label></th>
+                        <td>
+                            <input type="text" id="webmaster_bing" name="webmaster_bing" value="<?php echo esc_attr($webmaster['bing'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Get your verification code from <a href="https://www.bing.com/webmasters" target="_blank" rel="noopener">Bing Webmaster Tools</a>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="webmaster_pinterest">Pinterest</label></th>
+                        <td>
+                            <input type="text" id="webmaster_pinterest" name="webmaster_pinterest" value="<?php echo esc_attr($webmaster['pinterest'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Enter the code from your <a href="https://www.pinterest.com/settings/claim" target="_blank" rel="noopener">Pinterest claim</a>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="webmaster_ahrefs">Ahrefs</label></th>
+                        <td>
+                            <input type="text" id="webmaster_ahrefs" name="webmaster_ahrefs" value="<?php echo esc_attr($webmaster['ahrefs'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Paste the token provided by Ahrefs site verification.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="webmaster_yandex">Yandex</label></th>
+                        <td>
+                            <input type="text" id="webmaster_yandex" name="webmaster_yandex" value="<?php echo esc_attr($webmaster['yandex'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Find this in <a href="https://webmaster.yandex.com" target="_blank" rel="noopener">Yandex Webmaster</a>.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="webmaster_baidu">Baidu</label></th>
+                        <td>
+                            <input type="text" id="webmaster_baidu" name="webmaster_baidu" value="<?php echo esc_attr($webmaster['baidu'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Retrieve your code from <a href="https://ziyuan.baidu.com" target="_blank" rel="noopener">Baidu Webmaster Tools</a>.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Knowledge Graph Entity -->
+            <div class="ace-seo-settings-section">
+                <h2>Knowledge Graph Entity</h2>
+                <p class="description">Tell search engines whether your site represents an organization or a person. We'll use this information to build structured data and social profiles.</p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">Site represents</th>
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input type="radio" name="organization_type" value="organization" <?php checked(($organization['type'] ?? 'organization'), 'organization'); ?>>
+                                    Organization
+                                </label>
+                                <br>
+                                <label>
+                                    <input type="radio" name="organization_type" value="person" <?php checked(($organization['type'] ?? 'organization'), 'person'); ?>>
+                                    Person
+                                </label>
+                                <p class="description">Choose whether your website primarily represents a company/brand or an individual. Selecting "Person" unlocks profile fields below.</p>
+                            </fieldset>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Organization Profile -->
+            <div class="ace-seo-settings-section ace-seo-organization-settings" data-conditional="organization" style="<?php echo (($organization['type'] ?? 'organization') === 'person') ? 'display:none;' : ''; ?>">
                 <h2>Organization Profile</h2>
                 <p class="description">Define your organization details for structured data markup and metadata.
                     These details will be used as the publisher information across your site.</p>
@@ -662,6 +782,93 @@ $post_type_samples['date'] = [
                         <th scope="row"><label for="organization_social_youtube">YouTube</label></th>
                         <td>
                             <input type="url" id="organization_social_youtube" name="organization_social_youtube" value="<?php echo esc_attr($organization['social_youtube'] ?? ''); ?>" class="regular-text" placeholder="https://www.youtube.com/@yourchannel">
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Person Profile (if selected) -->
+            <div class="ace-seo-settings-section ace-seo-person-settings" data-conditional="person" style="<?php echo (($organization['type'] ?? 'organization') === 'person') ? '' : 'display:none;'; ?>">
+                <h2>Person Profile</h2>
+                <p class="description">If your site represents a person, fill out their profile for structured data and social cards.</p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="person_name">Name</label></th>
+                        <td>
+                            <input type="text" id="person_name" name="person_name" value="<?php echo esc_attr($person['name'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Full name of the person.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="person_job_title">Job Title</label></th>
+                        <td>
+                            <input type="text" id="person_job_title" name="person_job_title" value="<?php echo esc_attr($person['job_title'] ?? ''); ?>" class="regular-text">
+                            <p class="description">Optional: e.g., Editor-in-Chief, Lead Writer.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="person_url">Website</label></th>
+                        <td>
+                            <input type="url" id="person_url" name="person_url" value="<?php echo esc_attr($person['url'] ?? ''); ?>" class="regular-text" placeholder="https://example.com">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="person_description">Bio</label></th>
+                        <td>
+                            <textarea id="person_description" name="person_description" rows="3" class="large-text"><?php echo esc_textarea($person['description'] ?? ''); ?></textarea>
+                            <p class="description">Short biography or tagline.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="person_image_url">Profile Image</label></th>
+                        <td>
+                            <div class="ace-seo-image-field">
+                                <input type="hidden" id="person_image_id" name="person_image_id" value="<?php echo isset($person['image_id']) ? absint($person['image_id']) : 0; ?>">
+                                <input type="url" id="person_image_url" name="person_image_url" value="<?php echo esc_attr($person_image_url); ?>" class="regular-text">
+                                <button type="button"
+                                        class="button ace-seo-image-select"
+                                        data-target="person_image_url"
+                                        data-target-id="person_image_id"
+                                        data-preview="person_image_preview"
+                                        data-clear-button="person_image_clear"
+                                        data-title="Select Profile Image"
+                                        data-button="Use this image">
+                                    Select Image
+                                </button>
+                                <button type="button" class="button button-link" id="person_image_clear" style="<?php echo empty($person_image_url) ? 'display:none;' : ''; ?>">Remove</button>
+                            </div>
+                            <div class="ace-seo-logo-preview" style="margin-top:10px;">
+                                <img id="person_image_preview" src="<?php echo esc_url($person_image_url); ?>" alt="Person image preview" style="max-width:150px; height:auto; <?php echo empty($person_image_url) ? 'display:none;' : ''; ?>">
+                            </div>
+                            <p class="description">Recommended minimum size: 112×112px.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="person_twitter_username">X / Twitter Handle</label></th>
+                        <td>
+                            <input type="text" id="person_twitter_username" name="person_twitter_username" value="<?php echo esc_attr(ltrim($person['twitter_username'] ?? '', '@')); ?>" class="regular-text" placeholder="yourhandle">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Other Profiles</th>
+                        <td>
+                            <div id="person-same-as-list">
+                                <?php if (!empty($person['same_as'])): ?>
+                                    <?php foreach ($person['same_as'] as $index => $profile_url): ?>
+                                        <div class="ace-seo-same-as-item">
+                                            <input type="url" name="person_same_as[]" value="<?php echo esc_attr($profile_url); ?>" class="regular-text" placeholder="https://www.linkedin.com/in/example">
+                                            <button type="button" class="button button-link ace-remove-same-as">Remove</button>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                                <div class="ace-seo-same-as-item ace-seo-same-as-template" style="display:none;">
+                                    <input type="url" name="person_same_as[]" value="" class="regular-text" placeholder="https://www.linkedin.com/in/example">
+                                    <button type="button" class="button button-link ace-remove-same-as">Remove</button>
+                                </div>
+                            </div>
+                            <button type="button" class="button ace-add-same-as" style="margin-top:10px;">Add Profile</button>
+                            <p class="description">Add URLs for other profiles (LinkedIn, Instagram, YouTube, etc.).</p>
                         </td>
                     </tr>
                 </table>
@@ -895,6 +1102,29 @@ function togglePasswordVisibility(fieldId) {
 }
 
 jQuery(document).ready(function($) {
+    function addPersonProfileField() {
+        const $list = $('#person-same-as-list');
+        const $template = $list.find('.ace-seo-same-as-template').first();
+        if ($template.length) {
+            const $clone = $template.clone(true);
+            $clone.removeClass('ace-seo-same-as-template').show();
+            $clone.insertBefore($template);
+        } else {
+            const $item = $('<div class="ace-seo-same-as-item" />');
+            const $input = $('<input type="url" name="person_same_as[]" class="regular-text" placeholder="https://www.linkedin.com/in/example" />');
+            const $remove = $('<button type="button" class="button button-link ace-remove-same-as">Remove</button>');
+            $item.append($input).append($remove);
+            $list.append($item);
+        }
+    }
+
+    function ensurePersonProfileField() {
+        const $list = $('#person-same-as-list');
+        if ($list.find('.ace-seo-same-as-item').not('.ace-seo-same-as-template').length === 0) {
+            addPersonProfileField();
+        }
+    }
+
     $('.ace-seo-image-select').on('click', function(e) {
         e.preventDefault();
         
@@ -952,6 +1182,43 @@ jQuery(document).ready(function($) {
         $('#organization_logo_preview').hide().attr('src', '');
         $(this).hide();
     });
+
+    $('#person_image_clear').on('click', function(e) {
+        e.preventDefault();
+        $('#person_image_url').val('');
+        $('#person_image_id').val('');
+        $('#person_image_preview').hide().attr('src', '');
+        $(this).hide();
+    });
+
+    $('input[name="organization_type"]').on('change', function() {
+        const value = $(this).val();
+        if (value === 'person') {
+            $('.ace-seo-person-settings').slideDown();
+            $('.ace-seo-organization-settings').slideUp();
+            ensurePersonProfileField();
+        } else {
+            $('.ace-seo-person-settings').slideUp();
+            $('.ace-seo-organization-settings').slideDown();
+        }
+    });
+
+    $(document).on('click', '.ace-remove-same-as', function(e) {
+        e.preventDefault();
+        $(this).closest('.ace-seo-same-as-item').remove();
+        if ($('input[name="organization_type"]:checked').val() === 'person') {
+            ensurePersonProfileField();
+        }
+    });
+
+    $('.ace-add-same-as').on('click', function(e) {
+        e.preventDefault();
+        addPersonProfileField();
+    });
+
+    if ($('input[name="organization_type"]:checked').val() === 'person') {
+        ensurePersonProfileField();
+    }
     
     // API Key validation feedback
     $('#openai_api_key').on('blur', function() {
