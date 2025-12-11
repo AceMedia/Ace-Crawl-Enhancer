@@ -30,10 +30,10 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['person'] = isset($options['person']) && is_array($options['person']) ? $options['person'] : [];
     
     // Update general settings
-    $options['general']['separator'] = sanitize_text_field($_POST['separator'] ?? '|');
-    $options['general']['site_name'] = sanitize_text_field($_POST['site_name'] ?? '');
-    $options['general']['home_title'] = sanitize_text_field($_POST['home_title'] ?? '');
-    $options['general']['home_description'] = sanitize_textarea_field($_POST['home_description'] ?? '');
+    $options['general']['separator'] = sanitize_text_field(wp_unslash($_POST['separator'] ?? '|'));
+    $options['general']['site_name'] = sanitize_text_field(wp_unslash($_POST['site_name'] ?? ''));
+    $options['general']['home_title'] = sanitize_text_field(wp_unslash($_POST['home_title'] ?? ''));
+    $options['general']['home_description'] = sanitize_textarea_field(wp_unslash($_POST['home_description'] ?? ''));
     
     // Update title templates for each post type
     $post_types = get_post_types(['public' => true], 'objects');
@@ -43,8 +43,8 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
         $template_key = 'title_template_' . $post_type->name;
         $meta_template_key = 'meta_template_' . $post_type->name;
         
-        $options['templates'][$template_key] = sanitize_text_field($_POST[$template_key] ?? '');
-        $options['templates'][$meta_template_key] = sanitize_textarea_field($_POST[$meta_template_key] ?? '');
+        $options['templates'][$template_key] = sanitize_text_field(wp_unslash($_POST[$template_key] ?? ''));
+        $options['templates'][$meta_template_key] = sanitize_textarea_field(wp_unslash($_POST[$meta_template_key] ?? ''));
     }
     
     // Update archive/special page templates
@@ -53,40 +53,57 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
         $template_key = 'title_template_' . $template_type;
         $meta_template_key = 'meta_template_' . $template_type;
         if (isset($_POST[$template_key])) {
-            $options['templates'][$template_key] = sanitize_text_field($_POST[$template_key]);
+            $options['templates'][$template_key] = sanitize_text_field(wp_unslash($_POST[$template_key]));
         }
         if (isset($_POST[$meta_template_key])) {
-            $options['templates'][$meta_template_key] = sanitize_textarea_field($_POST[$meta_template_key]);
+            $options['templates'][$meta_template_key] = sanitize_textarea_field(wp_unslash($_POST[$meta_template_key]));
+        }
+    }
+
+    // Update custom post type archive templates
+    $custom_post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
+    foreach ($custom_post_types as $post_type) {
+        // Only save if the post type has archives enabled
+        if ($post_type->has_archive) {
+            $archive_title_key = 'title_template_archive_' . $post_type->name;
+            $archive_meta_key = 'meta_template_archive_' . $post_type->name;
+            
+            if (isset($_POST[$archive_title_key])) {
+                $options['templates'][$archive_title_key] = sanitize_text_field(wp_unslash($_POST[$archive_title_key]));
+            }
+            if (isset($_POST[$archive_meta_key])) {
+                $options['templates'][$archive_meta_key] = sanitize_textarea_field(wp_unslash($_POST[$archive_meta_key]));
+            }
         }
     }
     
     // Update social settings
-    $options['social']['facebook_app_id'] = sanitize_text_field($_POST['facebook_app_id'] ?? '');
-    $options['social']['default_image'] = esc_url_raw($_POST['default_image'] ?? '');
+    $options['social']['facebook_app_id'] = sanitize_text_field(wp_unslash($_POST['facebook_app_id'] ?? ''));
+    $options['social']['default_image'] = esc_url_raw(wp_unslash($_POST['default_image'] ?? ''));
     
     // Update organization settings
-    $options['organization']['name'] = sanitize_text_field($_POST['organization_name'] ?? '');
-    $options['organization']['legal_name'] = sanitize_text_field($_POST['organization_legal_name'] ?? '');
-    $options['organization']['alternate_name'] = sanitize_text_field($_POST['organization_alternate_name'] ?? '');
-    $options['organization']['url'] = esc_url_raw($_POST['organization_url'] ?? '');
-    $options['organization']['description'] = sanitize_textarea_field($_POST['organization_description'] ?? '');
+    $options['organization']['name'] = sanitize_text_field(wp_unslash($_POST['organization_name'] ?? ''));
+    $options['organization']['legal_name'] = sanitize_text_field(wp_unslash($_POST['organization_legal_name'] ?? ''));
+    $options['organization']['alternate_name'] = sanitize_text_field(wp_unslash($_POST['organization_alternate_name'] ?? ''));
+    $options['organization']['url'] = esc_url_raw(wp_unslash($_POST['organization_url'] ?? ''));
+    $options['organization']['description'] = sanitize_textarea_field(wp_unslash($_POST['organization_description'] ?? ''));
     $options['organization']['logo_id'] = absint($_POST['organization_logo_id'] ?? 0);
-    $options['organization']['logo_url'] = esc_url_raw($_POST['organization_logo_url'] ?? '');
-    $options['organization']['contact_type'] = sanitize_text_field($_POST['organization_contact_type'] ?? '');
-    $options['organization']['contact_phone'] = sanitize_text_field($_POST['organization_contact_phone'] ?? '');
-    $options['organization']['contact_email'] = sanitize_email($_POST['organization_contact_email'] ?? '');
-    $options['organization']['contact_url'] = esc_url_raw($_POST['organization_contact_url'] ?? '');
-    $twitter_username = sanitize_text_field($_POST['organization_twitter_username'] ?? '');
+    $options['organization']['logo_url'] = esc_url_raw(wp_unslash($_POST['organization_logo_url'] ?? ''));
+    $options['organization']['contact_type'] = sanitize_text_field(wp_unslash($_POST['organization_contact_type'] ?? ''));
+    $options['organization']['contact_phone'] = sanitize_text_field(wp_unslash($_POST['organization_contact_phone'] ?? ''));
+    $options['organization']['contact_email'] = sanitize_email(wp_unslash($_POST['organization_contact_email'] ?? ''));
+    $options['organization']['contact_url'] = esc_url_raw(wp_unslash($_POST['organization_contact_url'] ?? ''));
+    $twitter_username = sanitize_text_field(wp_unslash($_POST['organization_twitter_username'] ?? ''));
     $twitter_username = preg_replace('/\s+/', '', $twitter_username);
     if (!empty($twitter_username)) {
         $twitter_username = '@' . ltrim($twitter_username, '@');
     }
     $options['organization']['twitter_username'] = $twitter_username;
 
-    $options['organization']['social_facebook'] = esc_url_raw($_POST['organization_social_facebook'] ?? '');
-    $options['organization']['social_instagram'] = esc_url_raw($_POST['organization_social_instagram'] ?? '');
-    $options['organization']['social_linkedin'] = esc_url_raw($_POST['organization_social_linkedin'] ?? '');
-    $options['organization']['social_youtube'] = esc_url_raw($_POST['organization_social_youtube'] ?? '');
+    $options['organization']['social_facebook'] = esc_url_raw(wp_unslash($_POST['organization_social_facebook'] ?? ''));
+    $options['organization']['social_instagram'] = esc_url_raw(wp_unslash($_POST['organization_social_instagram'] ?? ''));
+    $options['organization']['social_linkedin'] = esc_url_raw(wp_unslash($_POST['organization_social_linkedin'] ?? ''));
+    $options['organization']['social_youtube'] = esc_url_raw(wp_unslash($_POST['organization_social_youtube'] ?? ''));
 
     if (!empty($twitter_username)) {
         $options['organization']['social_twitter'] = esc_url_raw('https://twitter.com/' . ltrim($twitter_username, '@'));
@@ -94,31 +111,31 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
         $options['organization']['social_twitter'] = '';
     }
 
-    $options['organization']['type'] = sanitize_text_field($_POST['organization_type'] ?? 'organization');
+    $options['organization']['type'] = sanitize_text_field(wp_unslash($_POST['organization_type'] ?? 'organization'));
 
     // Update person settings
-    $options['person']['name'] = sanitize_text_field($_POST['person_name'] ?? '');
-    $options['person']['job_title'] = sanitize_text_field($_POST['person_job_title'] ?? '');
-    $options['person']['url'] = esc_url_raw($_POST['person_url'] ?? '');
-    $options['person']['description'] = sanitize_textarea_field($_POST['person_description'] ?? '');
+    $options['person']['name'] = sanitize_text_field(wp_unslash($_POST['person_name'] ?? ''));
+    $options['person']['job_title'] = sanitize_text_field(wp_unslash($_POST['person_job_title'] ?? ''));
+    $options['person']['url'] = esc_url_raw(wp_unslash($_POST['person_url'] ?? ''));
+    $options['person']['description'] = sanitize_textarea_field(wp_unslash($_POST['person_description'] ?? ''));
     $options['person']['image_id'] = absint($_POST['person_image_id'] ?? 0);
-    $options['person']['image_url'] = esc_url_raw($_POST['person_image_url'] ?? '');
-    $options['person']['twitter_username'] = sanitize_text_field($_POST['person_twitter_username'] ?? '');
+    $options['person']['image_url'] = esc_url_raw(wp_unslash($_POST['person_image_url'] ?? ''));
+    $options['person']['twitter_username'] = sanitize_text_field(wp_unslash($_POST['person_twitter_username'] ?? ''));
 
     if (!empty($options['person']['twitter_username'])) {
         $options['person']['twitter_username'] = '@' . ltrim($options['person']['twitter_username'], '@');
     }
 
-    $person_same_as_input = array_map('trim', (array) ($_POST['person_same_as'] ?? []));
+    $person_same_as_input = array_map('trim', (array) (wp_unslash($_POST['person_same_as'] ?? [])));
     $options['person']['same_as'] = array_values(array_filter(array_unique(array_map('esc_url_raw', $person_same_as_input))));
 
     // Update webmaster verification codes
-    $options['webmaster']['ahrefs'] = sanitize_text_field($_POST['webmaster_ahrefs'] ?? '');
-    $options['webmaster']['baidu'] = sanitize_text_field($_POST['webmaster_baidu'] ?? '');
-    $options['webmaster']['bing'] = sanitize_text_field($_POST['webmaster_bing'] ?? '');
-    $options['webmaster']['google'] = sanitize_text_field($_POST['webmaster_google'] ?? '');
-    $options['webmaster']['pinterest'] = sanitize_text_field($_POST['webmaster_pinterest'] ?? '');
-    $options['webmaster']['yandex'] = sanitize_text_field($_POST['webmaster_yandex'] ?? '');
+    $options['webmaster']['ahrefs'] = sanitize_text_field(wp_unslash($_POST['webmaster_ahrefs'] ?? ''));
+    $options['webmaster']['baidu'] = sanitize_text_field(wp_unslash($_POST['webmaster_baidu'] ?? ''));
+    $options['webmaster']['bing'] = sanitize_text_field(wp_unslash($_POST['webmaster_bing'] ?? ''));
+    $options['webmaster']['google'] = sanitize_text_field(wp_unslash($_POST['webmaster_google'] ?? ''));
+    $options['webmaster']['pinterest'] = sanitize_text_field(wp_unslash($_POST['webmaster_pinterest'] ?? ''));
+    $options['webmaster']['yandex'] = sanitize_text_field(wp_unslash($_POST['webmaster_yandex'] ?? ''));
 
     // Maintain legacy keys for backwards compatibility
     $options['webmaster']['google_verify'] = $options['webmaster']['google'];
@@ -128,13 +145,13 @@ if (isset($_POST['submit']) && wp_verify_nonce($_POST['ace_seo_settings_nonce'],
     $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
     
     // Update AI/Performance settings
-    $options['ai']['openai_api_key'] = sanitize_text_field($_POST['openai_api_key'] ?? '');
+    $options['ai']['openai_api_key'] = sanitize_text_field(wp_unslash($_POST['openai_api_key'] ?? ''));
     $options['ai']['ai_content_analysis'] = isset($_POST['ai_content_analysis']) ? 1 : 0;
     $options['ai']['ai_keyword_suggestions'] = isset($_POST['ai_keyword_suggestions']) ? 1 : 0;
     $options['ai']['ai_content_optimization'] = isset($_POST['ai_content_optimization']) ? 1 : 0;
     $options['ai']['ai_image_generation'] = isset($_POST['ai_image_generation']) ? 1 : 0;
     
-    $options['performance']['pagespeed_api_key'] = sanitize_text_field($_POST['pagespeed_api_key'] ?? '');
+    $options['performance']['pagespeed_api_key'] = sanitize_text_field(wp_unslash($_POST['pagespeed_api_key'] ?? ''));
     $options['performance']['pagespeed_monitoring'] = isset($_POST['pagespeed_monitoring']) ? 1 : 0;
     $options['performance']['pagespeed_alerts'] = isset($_POST['pagespeed_alerts']) ? 1 : 0;
     $options['performance']['core_web_vitals'] = isset($_POST['core_web_vitals']) ? 1 : 0;
@@ -154,6 +171,19 @@ $templates = $options['templates'] ?? [];
 $organization = $options['organization'] ?? [];
 $webmaster = $options['webmaster'] ?? [];
 $person = $options['person'] ?? [];
+
+// Strip any accumulated slashes from template values for display
+if (!empty($templates) && is_array($templates)) {
+    $templates = array_map(function($value) {
+        if (is_string($value)) {
+            // Recursively strip slashes until no more double backslashes
+            while (strpos($value, '\\\\') !== false) {
+                $value = stripslashes($value);
+            }
+        }
+        return $value;
+    }, $templates);
+}
 
 $organization_logo_url = '';
 if (!empty($organization['logo_id'])) {
@@ -313,6 +343,25 @@ $post_type_samples['date'] = [
     'tag' => '',
     'date_archive' => date('F Y')
 ];
+
+// Add sample data for custom post type archives
+$custom_post_types_for_samples = get_post_types(['public' => true, '_builtin' => false], 'objects');
+foreach ($custom_post_types_for_samples as $post_type) {
+    if ($post_type->has_archive) {
+        $post_type_samples['archive_' . $post_type->name] = [
+            'title' => $post_type->labels->name . ' Archive',
+            'excerpt' => 'Browse our ' . strtolower($post_type->labels->name) . ' archive',
+            'author' => '',
+            'date' => date('F j, Y'),
+            'category' => '',
+            'tag' => '',
+            'archive_title' => $post_type->labels->name . ' Archive',
+            'post_type_name' => $post_type->labels->name,
+            'post_type_singular' => $post_type->labels->singular_name,
+            'post_type_slug' => $post_type->name
+        ];
+    }
+}
 ?>
 
 <div class="wrap">
@@ -517,6 +566,90 @@ $post_type_samples['date'] = [
                     <?php endforeach; ?>
                 </table>
             </div>
+
+            <?php 
+            // Get custom post types with archives for the new section
+            $custom_post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
+            $custom_archive_types = array_filter($custom_post_types, function($post_type) {
+                return $post_type->has_archive;
+            });
+            ?>
+
+            <?php if (!empty($custom_archive_types)): ?>
+            <!-- Custom Post Type Archives -->
+            <div class="ace-seo-settings-section">
+                <h2>Custom Post Type Archives</h2>
+                <p class="description">Configure title and meta description templates for custom post type archive pages.</p>
+                
+                <div class="ace-seo-template-variables">
+                    <h4>Available Variables (in addition to general variables):</h4>
+                    <div class="ace-seo-variables-grid">
+                        <div class="ace-seo-variable">
+                            <code>{archive_title}</code>
+                            <span>Post type archive title</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{post_type_name}</code>
+                            <span>Post type plural name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{post_type_singular}</code>
+                            <span>Post type singular name</span>
+                        </div>
+                        <div class="ace-seo-variable">
+                            <code>{post_type_slug}</code>
+                            <span>Post type slug</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <table class="form-table">
+                    <?php foreach ($custom_archive_types as $post_type): 
+                        $archive_title_key = 'title_template_archive_' . $post_type->name;
+                        $archive_meta_key = 'meta_template_archive_' . $post_type->name;
+                        
+                        // Default templates for custom post type archives
+                        $default_title = '{post_type_name} Archive {sep} {site_name}';
+                        $default_meta = 'Browse our {post_type_singular} archive and discover all {post_type_name} entries.';
+                        
+                        $current_title_template = $templates[$archive_title_key] ?? $default_title;
+                        $current_meta_template = $templates[$archive_meta_key] ?? $default_meta;
+                    ?>
+                    <tr>
+                        <th scope="row">
+                            <label for="<?php echo esc_attr($archive_title_key); ?>"><?php echo esc_html($post_type->labels->name); ?> Archive Title</label>
+                        </th>
+                        <td>
+                            <input type="text" 
+                                   id="<?php echo esc_attr($archive_title_key); ?>" 
+                                   name="<?php echo esc_attr($archive_title_key); ?>" 
+                                   value="<?php echo esc_attr($current_title_template); ?>" 
+                                   class="large-text ace-seo-template-input" 
+                                   data-default="<?php echo esc_attr($default_title); ?>"
+                                   data-post-type="archive_<?php echo esc_attr($post_type->name); ?>">
+                            <p class="description">Title template for <?php echo esc_html($post_type->labels->name); ?> archive pages (<?php echo esc_html($post_type->rewrite['slug'] ?? $post_type->name); ?>).</p>
+                            <div class="ace-seo-template-preview" id="preview_<?php echo esc_attr($archive_title_key); ?>"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="<?php echo esc_attr($archive_meta_key); ?>"><?php echo esc_html($post_type->labels->name); ?> Archive Meta Description</label>
+                        </th>
+                        <td>
+                            <textarea id="<?php echo esc_attr($archive_meta_key); ?>" 
+                                      name="<?php echo esc_attr($archive_meta_key); ?>" 
+                                      class="large-text ace-seo-template-input" 
+                                      rows="3" 
+                                      data-default="<?php echo esc_attr($default_meta); ?>"
+                                      data-post-type="archive_<?php echo esc_attr($post_type->name); ?>"><?php echo esc_textarea($current_meta_template); ?></textarea>
+                            <p class="description">Meta description template for <?php echo esc_html($post_type->labels->name); ?> archive pages.</p>
+                            <div class="ace-seo-template-preview" id="preview_<?php echo esc_attr($archive_meta_key); ?>"></div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
+            </div>
+            <?php endif; ?>
             
             <!-- Social Settings -->
             <div class="ace-seo-settings-section">
@@ -1320,7 +1453,11 @@ jQuery(document).ready(function($) {
             '{author_name}': currentTypeData.author_name || currentTypeData.author,
             '{category_name}': currentTypeData.category_name || currentTypeData.category,
             '{tag_name}': currentTypeData.tag_name || currentTypeData.tag,
-            '{date_archive}': currentTypeData.date_archive || currentTypeData.date
+            '{date_archive}': currentTypeData.date_archive || currentTypeData.date,
+            // Custom post type archive variables
+            '{post_type_name}': currentTypeData.post_type_name || '',
+            '{post_type_singular}': currentTypeData.post_type_singular || '',
+            '{post_type_slug}': currentTypeData.post_type_slug || ''
         };
         
         let result = template;

@@ -29,7 +29,11 @@ class AceSeoSchema {
         
         if (!empty($entity)) {
             echo '<script type="application/ld+json">' . "\n";
-            echo wp_json_encode($entity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // Escape for HTML context to prevent XSS via </script> injection
+            $json = wp_json_encode($entity, JSON_UNESCAPED_UNICODE);
+            // Replace </ with <\/ to prevent breaking out of script tag
+            $json = str_replace('</', '<\/', $json);
+            echo $json;
             echo "\n" . '</script>' . "\n";
         }
     }
@@ -49,7 +53,11 @@ class AceSeoSchema {
         
         if (!empty($local_business)) {
             echo '<script type="application/ld+json">' . "\n";
-            echo wp_json_encode($local_business, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // Escape for HTML context to prevent XSS via </script> injection
+            $json = wp_json_encode($local_business, JSON_UNESCAPED_UNICODE);
+            // Replace </ with <\/ to prevent breaking out of script tag
+            $json = str_replace('</', '<\/', $json);
+            echo $json;
             echo "\n" . '</script>' . "\n";
         }
     }

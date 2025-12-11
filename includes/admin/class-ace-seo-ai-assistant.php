@@ -46,9 +46,9 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Insufficient permissions' );
         }
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
         $post_id = intval( $_POST['post_id'] ?? 0 );
         
         if ( empty( $post_content ) ) {
@@ -81,9 +81,9 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Insufficient permissions' );
         }
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
         $post_id = intval( $_POST['post_id'] ?? 0 );
         
         if ( empty( $post_content ) ) {

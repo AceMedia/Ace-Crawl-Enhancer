@@ -205,7 +205,7 @@ class AceSEOMetabox {
                 $input_name = 'yoast_wpseo_' . $field_key;
                 
                 if ( isset( $_POST[ $input_name ] ) ) {
-                    $value = $_POST[ $input_name ];
+                    $value = wp_unslash( $_POST[ $input_name ] );
                     
                     // Sanitize based on field type
                     switch ( $field_config['type'] ) {
@@ -258,7 +258,7 @@ class AceSEOMetabox {
         
         // Handle advanced robots settings (if they come as array)
         if ( isset( $_POST['yoast_wpseo_meta-robots-adv'] ) && is_array( $_POST['yoast_wpseo_meta-robots-adv'] ) ) {
-            $robots_adv = array_map( 'sanitize_text_field', $_POST['yoast_wpseo_meta-robots-adv'] );
+            $robots_adv = array_map( 'sanitize_text_field', wp_unslash( $_POST['yoast_wpseo_meta-robots-adv'] ) );
             update_post_meta( $post_id, '_ace_seo_meta-robots-adv', implode( ',', $robots_adv ) );
         }
     }
@@ -751,12 +751,13 @@ class AceSEOMetabox {
             $key = 'ace_seo_' . $field;
             
             if ( isset( $_POST[$key] ) ) {
-                $value = sanitize_text_field( $_POST[$key] );
+                $value = wp_unslash( $_POST[$key] );
+                $value = sanitize_text_field( $value );
                 
                 if ( $field === 'desc' ) {
-                    $value = sanitize_textarea_field( $_POST[$key] );
+                    $value = sanitize_textarea_field( wp_unslash( $_POST[$key] ) );
                 } elseif ( $field === 'canonical' ) {
-                    $value = esc_url_raw( $_POST[$key] );
+                    $value = esc_url_raw( $value );
                 }
                 
                 if ( ! empty( $value ) ) {

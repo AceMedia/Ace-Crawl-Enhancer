@@ -37,8 +37,8 @@ class AceSEOApiHelper {
             wp_die( 'Insufficient permissions' );
         }
         
-        $api_type = sanitize_text_field( $_POST['api_type'] );
-        $api_key = sanitize_text_field( $_POST['api_key'] );
+        $api_type = sanitize_text_field( wp_unslash( $_POST['api_type'] ) );
+        $api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ) );
         
         switch ( $api_type ) {
             case 'openai':
@@ -60,7 +60,7 @@ class AceSEOApiHelper {
     public function validate_openai_key() {
         check_ajax_referer( 'ace_seo_api_test', 'nonce' );
         
-        $api_key = sanitize_text_field( $_POST['api_key'] );
+        $api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ) );
         $result = $this->test_openai_connection( $api_key );
         
         wp_send_json( $result );
@@ -72,7 +72,7 @@ class AceSEOApiHelper {
     public function validate_pagespeed_key() {
         check_ajax_referer( 'ace_seo_api_test', 'nonce' );
         
-        $api_key = sanitize_text_field( $_POST['api_key'] );
+        $api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ) );
         $result = $this->test_pagespeed_connection( $api_key );
         
         wp_send_json( $result );

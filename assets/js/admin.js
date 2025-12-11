@@ -178,21 +178,51 @@
             $('#yoast_wpseo_twitter-description').on('input', () => this.updateCounter('twitter-description', 200));
             
             // PageSpeed events
-            $('#ace-test-performance').on('click', this.testPageSpeed.bind(this));
-            $('#ace-simulate-performance').on('click', () => this.testPageSpeed('mobile', true));
+            $('#ace-test-performance').on('click', (e) => {
+                e.preventDefault();
+                this.testPageSpeed();
+            });
+            $('#ace-simulate-performance').on('click', (e) => {
+                e.preventDefault();
+                this.testPageSpeed('mobile', true);
+            });
             
             // AI Assistant events
-            $(document).on('click', '.ace-ai-button', this.handleAiButtonClick.bind(this));
-            $(document).on('click', '.ace-modal-close, .ace-modal-overlay', this.closeModal.bind(this));
-            $(document).on('click', '.ace-ai-suggestion-item', this.selectSuggestion.bind(this));
-            $(document).on('click', '#ace-ai-apply-suggestion', this.applySuggestion.bind(this));
+            $(document).on('click', '.ace-ai-button', (e) => {
+                e.preventDefault();
+                this.handleAiButtonClick(e);
+            });
+            $(document).on('click', '.ace-modal-close, .ace-modal-overlay', (e) => {
+                e.preventDefault();
+                this.closeModal(e);
+            });
+            $(document).on('click', '.ace-ai-suggestion-item', (e) => {
+                e.preventDefault();
+                this.selectSuggestion(e);
+            });
+            $(document).on('click', '#ace-ai-apply-suggestion', (e) => {
+                e.preventDefault();
+                this.applySuggestion(e);
+            });
             
             // Comprehensive AI Analysis (sidebar)
-            $('#ace-analyze-all-content').on('click', this.handleComprehensiveAnalysis.bind(this));
+            $('#ace-analyze-all-content').on('click', (e) => {
+                e.preventDefault();
+                this.handleComprehensiveAnalysis(e);
+            });
             
-            $('#ace-test-mobile').on('click', () => this.testPageSpeed('mobile'));
-            $('#ace-test-desktop').on('click', () => this.testPageSpeed('desktop'));
-            $('#ace-view-full-report').on('click', this.viewFullReport.bind(this));
+            $('#ace-test-mobile').on('click', (e) => {
+                e.preventDefault();
+                this.testPageSpeed('mobile');
+            });
+            $('#ace-test-desktop').on('click', (e) => {
+                e.preventDefault();
+                this.testPageSpeed('desktop');
+            });
+            $('#ace-view-full-report').on('click', (e) => {
+                e.preventDefault();
+                this.viewFullReport(e);
+            });
         },
 
         initTabs: function() {

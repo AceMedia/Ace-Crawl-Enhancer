@@ -245,7 +245,11 @@ class ACE_SEO_Frontend_Performance {
             global $post;
             $schema = $this->get_cached_article_schema($post->ID);
             if ($schema) {
-                echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_SLASHES) . '</script>';
+                // Escape for HTML context to prevent XSS via </script> injection
+                $json = wp_json_encode($schema, JSON_UNESCAPED_UNICODE);
+                // Replace </ with <\/ to prevent breaking out of script tag
+                $json = str_replace('</', '<\/', $json);
+                echo '<script type="application/ld+json">' . $json . '</script>';
             }
         }
     }

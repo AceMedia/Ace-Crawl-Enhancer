@@ -49,7 +49,11 @@ class AceSeoFrontend {
 
         if (!empty($schema)) {
             echo '<script type="application/ld+json">' . "\n";
-            echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // Escape for HTML context to prevent XSS via </script> injection
+            $json = wp_json_encode($schema, JSON_UNESCAPED_UNICODE);
+            // Replace </script with <\/script to prevent breaking out of script tag
+            $json = str_replace('</', '<\/', $json);
+            echo $json;
             echo "\n" . '</script>' . "\n";
         }
     }
@@ -178,7 +182,20 @@ class AceSeoFrontend {
                 $obj = get_post_type_object($post_type);
                 $label = $obj && isset($obj->labels->name) ? $obj->labels->name : ucfirst($post_type);
                 $schema['name'] = sprintf(__('%s Archive', 'ace-crawl-enhancer'), $label);
-                $description = sprintf(__('Latest %s entries from %s', 'ace-crawl-enhancer'), strtolower($label), get_bloginfo('name'));
+                
+                // Try to use custom archive meta description template
+                $options = get_option('ace_seo_options', []);
+                $templates = $options['templates'] ?? [];
+                $archive_meta_key = 'meta_template_archive_' . $post_type;
+                
+                if (!empty($templates[$archive_meta_key])) {
+                    // Use custom template with variable replacement
+                    $description = $this->replace_archive_template_variables($templates[$archive_meta_key], $post_type, $obj);
+                } else {
+                    // Fallback to default description
+                    $description = sprintf(__('Latest %s entries from %s', 'ace-crawl-enhancer'), strtolower($label), get_bloginfo('name'));
+                }
+                
                 $schema['mainEntity'] = [
                     '@type' => 'ItemList',
                     'name' => $schema['name'],
@@ -498,7 +515,13 @@ class AceSeoFrontend {
         $url = home_url($request_path ?: '/');
 
         if (!empty($_GET)) {
-            $query_args = array_map('wp_unslash', $_GET);
+            // Sanitize query parameters to prevent XSS
+            $query_args = array();
+            foreach ($_GET as $key => $value) {
+                $safe_key = sanitize_key($key);
+                $safe_value = is_array($value) ? array_map('sanitize_text_field', $value) : sanitize_text_field(wp_unslash($value));
+                $query_args[$safe_key] = $safe_value;
+            }
             $url = add_query_arg($query_args, $url);
         }
 
@@ -578,5 +601,25 @@ class AceSeoFrontend {
                 echo '<meta name="twitter:site" content="' . esc_attr($twitter_handle) . '">' . "\n";
             }
         }
+    }
+
+    /**
+     * Replace template variables for custom post type archives in schema
+     */
+    private function replace_archive_template_variables($template, $post_type, $post_type_obj) {
+        $options = get_option('ace_seo_options', []);
+        $general = $options['general'] ?? [];
+        
+        $variables = [
+            '{site_name}' => $general['site_name'] ?? get_bloginfo('name'),
+            '{sep}' => ' ' . ($general['separator'] ?? '|') . ' ',
+            '{archive_title}' => $post_type_obj->labels->name ?? ucfirst($post_type),
+            '{post_type_name}' => $post_type_obj->labels->name ?? ucfirst($post_type),
+            '{post_type_singular}' => $post_type_obj->labels->singular_name ?? ucfirst($post_type),
+            '{post_type_slug}' => $post_type,
+        ];
+        
+        $result = str_replace(array_keys($variables), array_values($variables), $template);
+        return wp_strip_all_tags($result);
     }
 }

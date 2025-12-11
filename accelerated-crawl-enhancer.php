@@ -292,9 +292,10 @@ class AceCrawlEnhancer {
         // Always load database optimizer for performance
         require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
         
-        // Instantiate database optimizer to register AJAX handlers
+        // Instantiate admin classes to register AJAX handlers and REST routes
         if (is_admin()) {
             new ACE_SEO_Database_Optimizer();
+            new AceSEOPageSpeed();
         }
     }
     
@@ -1364,6 +1365,14 @@ class AceCrawlEnhancer {
             $template = $templates['title_template_tag'] ?? '{tag_name} archives {sep} {site_name}';
         } elseif (is_date()) {
             $template = $templates['title_template_date'] ?? '{date_archive} archives {sep} {site_name}';
+        } elseif (is_post_type_archive()) {
+            // Handle custom post type archives
+            $post_type = get_query_var('post_type');
+            if (is_array($post_type)) {
+                $post_type = reset($post_type);
+            }
+            $archive_template_key = 'title_template_archive_' . $post_type;
+            $template = $templates[$archive_template_key] ?? $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
         } elseif (is_archive()) {
             $template = $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
         }
@@ -1375,6 +1384,13 @@ class AceCrawlEnhancer {
      * Replace template variables with actual values
      */
     private function replace_template_variables($template, $post = null) {
+        // Strip any accumulated slashes from template
+        if (is_string($template)) {
+            while (strpos($template, '\\\\') !== false) {
+                $template = stripslashes($template);
+            }
+        }
+        
         $options = get_option('ace_seo_options', []);
         $general = $options['general'] ?? [];
         
@@ -1398,6 +1414,8 @@ class AceCrawlEnhancer {
             // Remove prefixes like "Category:" or "Tag:" from WordPress archive titles
             $archive_title = get_the_archive_title();
             $archive_title = preg_replace('/^(Category|Tag|Author|Archives?):\s*/', '', $archive_title);
+            // Strip HTML tags including span tags that WordPress may add
+            $archive_title = wp_strip_all_tags($archive_title);
             $variables['{archive_title}'] = $archive_title;
         }
         
@@ -1440,8 +1458,38 @@ class AceCrawlEnhancer {
                 $variables['{date_archive}'] = get_query_var('day') . '/' . get_query_var('monthnum') . '/' . get_query_var('year');
             }
         }
+
+        // Add custom post type archive variables
+        if (is_post_type_archive()) {
+            $post_type = get_query_var('post_type');
+            if (is_array($post_type)) {
+                $post_type = reset($post_type);
+            }
+            if ($post_type) {
+                $post_type_obj = get_post_type_object($post_type);
+                if ($post_type_obj) {
+                    $variables['{post_type_name}'] = $post_type_obj->labels->name;
+                    $variables['{post_type_singular}'] = $post_type_obj->labels->singular_name;
+                    $variables['{post_type_slug}'] = $post_type;
+                    // Update archive_title for post type archives
+                    $variables['{archive_title}'] = $post_type_obj->labels->name;
+                }
+            }
+        }
+
+        // Sanitize all variables to remove HTML tags and handle special characters properly
+        foreach ($variables as $key => $value) {
+            if (is_string($value)) {
+                $variables[$key] = $this->sanitize_seo_text($value);
+            }
+        }
         
-        return str_replace(array_keys($variables), array_values($variables), $template);
+        $result = str_replace(array_keys($variables), array_values($variables), $template);
+        
+        // Final cleanup of the result to ensure no HTML tags slip through
+        $result = $this->sanitize_seo_text($result);
+        
+        return $result;
     }
     
     /**
@@ -1546,21 +1594,22 @@ class AceCrawlEnhancer {
             global $post;
             $seo_title = $this->get_seo_title($post);
             if (!empty($seo_title)) {
-                $title_parts['title'] = $seo_title;
+                // Ensure no HTML tags in title
+                $title_parts['title'] = $this->sanitize_seo_text($seo_title, true);
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage title with synchronization
             $home_title = $this->get_homepage_title();
             if (!empty($home_title)) {
                 $title_parts = [
-                    'title' => $home_title
+                    'title' => $this->sanitize_seo_text($home_title, true)
                 ];
             }
         } elseif (is_category() || is_tag() || is_tax()) {
             // Handle taxonomy pages
             $taxonomy_title = $this->get_taxonomy_title();
             if (!empty($taxonomy_title)) {
-                $title_parts['title'] = $taxonomy_title;
+                $title_parts['title'] = $this->sanitize_seo_text($taxonomy_title, true);
                 if (isset($title_parts['site'])) {
                     $title_parts['site'] = '';
                 }
@@ -1572,9 +1621,9 @@ class AceCrawlEnhancer {
             // Handle special pages (search, archive, author)
             $special_title = $this->process_special_page_title();
             if (!empty($special_title)) {
-                // Replace the entire title with our processed template
+                // Replace the entire title with our processed template, ensuring no HTML tags
                 $title_parts = [
-                    'title' => $special_title
+                    'title' => $this->sanitize_seo_text($special_title, true)
                 ];
                 $title_parts['site'] = '';
                 $title_parts['tagline'] = '';
@@ -1973,12 +2022,44 @@ class AceCrawlEnhancer {
             }
         }
         
-        // Generic archive fallback
-        $post_type = get_post_type();
-        $post_type_obj = get_post_type_object($post_type);
+        // Check for custom post type archive templates
+        if (is_post_type_archive()) {
+            $post_type = get_query_var('post_type');
+            if (is_array($post_type)) {
+                $post_type = reset($post_type);
+            }
+            
+            if ($post_type) {
+                $options = get_option('ace_seo_options', []);
+                $templates = $options['templates'] ?? [];
+                $archive_meta_key = 'meta_template_archive_' . $post_type;
+                
+                // Check if we have a custom meta template for this post type archive
+                if (!empty($templates[$archive_meta_key])) {
+                    return $this->replace_template_variables($templates[$archive_meta_key]);
+                }
+            }
+        }
         
-        if ($post_type_obj) {
-            return sprintf('%s archive on %s', $post_type_obj->labels->name, get_bloginfo('name'));
+        // Generic archive fallback
+        $options = get_option('ace_seo_options', []);
+        $templates = $options['templates'] ?? [];
+        
+        // Check for generic archive meta template
+        if (!empty($templates['meta_template_archive'])) {
+            return $this->replace_template_variables($templates['meta_template_archive']);
+        }
+        
+        // Final fallback based on post type
+        if (is_post_type_archive()) {
+            $post_type = get_query_var('post_type');
+            if (is_array($post_type)) {
+                $post_type = reset($post_type);
+            }
+            $post_type_obj = get_post_type_object($post_type);
+            if ($post_type_obj) {
+                return sprintf('%s archive on %s', $post_type_obj->labels->name, get_bloginfo('name'));
+            }
         }
         
         return 'Archive page on ' . get_bloginfo('name');
@@ -2355,6 +2436,41 @@ class AceCrawlEnhancer {
                 }
             }
         }
+    }
+
+    /**
+     * Sanitize text for SEO output - removes HTML and handles special characters properly
+     *
+     * @param string $text The text to sanitize
+     * @param bool $is_title Whether this is for a title (more aggressive cleaning)
+     * @return string Sanitized text
+     */
+    private function sanitize_seo_text($text, $is_title = false) {
+        if (!is_string($text)) {
+            return '';
+        }
+
+        // Strip all HTML tags including span tags
+        $text = wp_strip_all_tags($text);
+        
+        // Decode HTML entities properly
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Clean up WordPress special characters
+        $text = wp_specialchars_decode($text, ENT_QUOTES);
+        
+        // For titles, be more aggressive about cleaning
+        if ($is_title) {
+            // Remove any remaining problematic characters
+            $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
+            // Clean up multiple spaces
+            $text = preg_replace('/\s+/', ' ', $text);
+        }
+        
+        // Trim whitespace
+        $text = trim($text);
+        
+        return $text;
     }
 }
 

@@ -50,8 +50,8 @@ class AceSEOPageSpeed {
             wp_die( 'Insufficient permissions' );
         }
         
-        $url = esc_url_raw( $_POST['url'] );
-        $strategy = sanitize_text_field( $_POST['strategy'] ?? 'mobile' );
+        $url = esc_url_raw( wp_unslash( $_POST['url'] ) );
+        $strategy = sanitize_text_field( wp_unslash( $_POST['strategy'] ?? 'mobile' ) );
         $simulate = isset( $_POST['simulate'] ) && $_POST['simulate'] === 'true';
         
         if ( empty( $url ) ) {
