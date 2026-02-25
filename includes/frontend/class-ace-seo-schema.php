@@ -14,8 +14,8 @@ class AceSeoSchema {
     }
     
     private function init_hooks() {
-        add_action('wp_head', [$this, 'output_organization_schema'], 15);
-        add_action('wp_head', [$this, 'output_local_business_schema'], 16);
+        // Organization and LocalBusiness are now emitted via the main ACE schema graph;
+        // keep only article enhancements here to avoid duplicate JSON-LD blocks.
         add_filter('ace_seo_schema_article', [$this, 'enhance_article_schema'], 10, 2);
     }
     
@@ -71,7 +71,7 @@ class AceSeoSchema {
 
         $name = !empty($organization_settings['name']) ? $organization_settings['name'] : get_bloginfo('name');
         $url = !empty($organization_settings['url']) ? $organization_settings['url'] : home_url();
-        $description = !empty($organization_settings['description']) ? $organization_settings['description'] : get_bloginfo('description');
+        $description = $organization_settings['description'] ?? '';
 
         $organization = [
             '@context' => 'https://schema.org',
@@ -123,7 +123,7 @@ class AceSeoSchema {
 
         $name = !empty($person['name']) ? $person['name'] : get_bloginfo('name');
         $url = !empty($person['url']) ? $person['url'] : home_url();
-        $description = !empty($person['description']) ? $person['description'] : get_bloginfo('description');
+        $description = $person['description'] ?? '';
 
         $schema = [
             '@context' => 'https://schema.org',

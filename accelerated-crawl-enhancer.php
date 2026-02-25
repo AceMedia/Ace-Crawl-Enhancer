@@ -34,6 +34,8 @@ define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
 define('ACE_SEO_BASENAME', plugin_basename(__FILE__));
 
+require_once ACE_SEO_PATH . 'includes/ace-sitemap-powertools.php';
+
 // Plugin-specific meta keys - no longer use Yoast keys for storage
 define('ACE_SEO_META_PREFIX', '_ace_seo_');
 define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibility with existing templates
@@ -213,6 +215,9 @@ class AceCrawlEnhancer {
         
         // Conditional loading for better performance
         if (!is_admin()) {
+            // Prevent Jetpack SEO from overriding titles (conflicts with ACE manual titles)
+            add_filter('jetpack_seo_custom_titles', '__return_false', 1);
+
             // Frontend-only hooks
             add_action('wp_enqueue_scripts', [$this, 'frontend_scripts']);
             add_action('wp_head', [$this, 'output_head_tags']);
@@ -222,9 +227,10 @@ class AceCrawlEnhancer {
                 add_action('rest_api_init', [$this, 'register_rest_routes']);
             }
             
-            // Frontend SEO output
-            add_filter('wp_title', [$this, 'filter_title'], 50);
-            add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 50);
+            // Frontend SEO output (run late to override theme defaults)
+            // Use a very late priority so we override themes that append site/tagline.
+            add_filter('wp_title', [$this, 'filter_title'], 999);
+            add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 999);
             add_action('wp_head', [$this, 'output_meta_description'], 1);
             add_action('wp_head', [$this, 'output_canonical'], 2);
             add_action('wp_head', [$this, 'output_robots_meta'], 3);
@@ -969,22 +975,7 @@ class AceCrawlEnhancer {
             ACE_SEO_VERSION
         );
         
-        // Enqueue tools script on tools page
-        if ($hook === 'ace-seo_page_ace-seo-tools') {
-            wp_enqueue_script(
-                'ace-seo-tools',
-                ACE_SEO_URL . 'assets/js/tools.js',
-                ['jquery'],
-                ACE_SEO_VERSION,
-                true
-            );
-            
-            // Localize script with AJAX data
-            wp_localize_script('ace-seo-tools', 'aceToolsData', [
-                'nonce' => wp_create_nonce('ace_seo_optimize_db'),
-                'dashboardNonce' => wp_create_nonce('ace_seo_dashboard_nonce'),
-            ]);
-        }
+        // Tools UI is now integrated into the settings page.
     }
     
     /**
@@ -1323,14 +1314,20 @@ class AceCrawlEnhancer {
      * Get SEO title for post
      */
     private function get_seo_title($post) {
+        // 1) ACE manual title
         $seo_title = self::get_meta_value($post->ID, 'title');
-        
-        if (empty($seo_title)) {
-            // Use template system
-            return $this->process_title_template($post);
+        if (!empty($seo_title)) {
+            return $seo_title;
+        }
+
+        // 2) Yoast manual title (respect existing custom content)
+        $yoast_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
+        if (!empty($yoast_title)) {
+            return $yoast_title;
         }
         
-        return $seo_title;
+        // 3) Fallback to template
+        return $this->process_title_template($post);
     }
     
     /**
@@ -1563,14 +1560,20 @@ class AceCrawlEnhancer {
      * Get meta description for post
      */
     private function get_meta_description($post) {
+        // 1) ACE manual meta description
         $meta_desc = self::get_meta_value($post->ID, 'metadesc');
-        
-        if (empty($meta_desc)) {
-            // Use template system
-            return $this->process_meta_template($post);
+        if (!empty($meta_desc)) {
+            return $meta_desc;
+        }
+
+        // 2) Yoast manual meta description (respect existing custom content)
+        $yoast_desc = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
+        if (!empty($yoast_desc)) {
+            return $yoast_desc;
         }
         
-        return $meta_desc;
+        // 3) Template fallback
+        return $this->process_meta_template($post);
     }
     
     /**
@@ -1590,6 +1593,12 @@ class AceCrawlEnhancer {
      * Filter document title
      */
     public function filter_document_title_parts($title_parts) {
+        if (is_home() || is_front_page()) {
+            if (isset($title_parts['tagline'])) {
+                $title_parts['tagline'] = '';
+            }
+        }
+
         if (is_singular()) {
             global $post;
             $seo_title = $this->get_seo_title($post);
@@ -1602,7 +1611,11 @@ class AceCrawlEnhancer {
             $home_title = $this->get_homepage_title();
             if (!empty($home_title)) {
                 $title_parts = [
-                    'title' => $this->sanitize_seo_text($home_title, true)
+                    'title'   => $this->sanitize_seo_text($home_title, true),
+                    // Explicitly clear site/tagline/page so themes can't append them to manual titles
+                    'site'    => '',
+                    'tagline' => '',
+                    'page'    => '',
                 ];
             }
         } elseif (is_category() || is_tag() || is_tax()) {
@@ -1645,8 +1658,9 @@ class AceCrawlEnhancer {
         $show_on_front = get_option('show_on_front');
         
         if ($show_on_front === 'page' && $page_on_front) {
-            // Static homepage - check page meta first, then plugin settings
+            // Static homepage - check page meta first, then Yoast, then plugin settings
             $page_meta_title = self::get_meta_value($page_on_front, 'title');
+            $yoast_title = get_post_meta($page_on_front, '_yoast_wpseo_title', true);
             
             if (!empty($page_meta_title)) {
                 // Sync page meta to plugin settings if different
@@ -1655,6 +1669,8 @@ class AceCrawlEnhancer {
                     update_option('ace_seo_options', $options);
                 }
                 return $page_meta_title;
+            } elseif (!empty($yoast_title)) {
+                return $yoast_title;
             } elseif (!empty($settings_title)) {
                 // Sync plugin settings to page meta
                 update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'title', $settings_title);
@@ -1742,7 +1758,7 @@ class AceCrawlEnhancer {
                 update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $settings_desc);
                 return $settings_desc;
             } else {
-                // Generate from page content
+                // Generate from page content only when both settings and page meta are empty
                 $page = get_post($page_on_front);
                 if ($page) {
                     $auto_desc = $this->extract_paragraph_content($page->post_content);
@@ -1757,14 +1773,14 @@ class AceCrawlEnhancer {
                 }
             }
         } else {
-            // Blog homepage - use plugin settings or site tagline
+            // Blog homepage - use plugin settings only (do not fall back to tagline)
             if (!empty($settings_desc)) {
                 return $settings_desc;
             }
         }
-        
-        // Final fallback to site tagline
-        return get_bloginfo('description');
+
+        // No tagline fallback to avoid injecting site description into manual titles
+        return '';
     }
     
     /**
@@ -2388,7 +2404,37 @@ class AceCrawlEnhancer {
      * Filter title (legacy compatibility)
      */
     public function filter_title($title) {
-        return $title; // Document title parts filter handles this now
+        // Legacy wp_title support for themes still using it; keep in sync with document_title_parts logic.
+        if (is_home() || is_front_page()) {
+            $home_title = $this->get_homepage_title();
+            if (!empty($home_title)) {
+                return $this->sanitize_seo_text($home_title, true);
+            }
+        }
+
+        if (is_singular()) {
+            global $post;
+            $seo_title = $this->get_seo_title($post);
+            if (!empty($seo_title)) {
+                return $this->sanitize_seo_text($seo_title, true);
+            }
+        }
+
+        if (is_category() || is_tag() || is_tax()) {
+            $taxonomy_title = $this->get_taxonomy_title();
+            if (!empty($taxonomy_title)) {
+                return $this->sanitize_seo_text($taxonomy_title, true);
+            }
+        }
+
+        if (is_search() || is_archive() || is_author()) {
+            $special_title = $this->process_special_page_title();
+            if (!empty($special_title)) {
+                return $this->sanitize_seo_text($special_title, true);
+            }
+        }
+
+        return $title;
     }
     
     /**

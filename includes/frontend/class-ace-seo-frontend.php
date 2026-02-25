@@ -18,6 +18,12 @@ class AceSeoFrontend {
 
         // Remove other SEO plugin outputs to avoid conflicts
         add_action('init', [$this, 'remove_conflicting_outputs'], 1);
+
+        // Adjust Jetpack OG tags instead of disabling everything: overwrite the bits we control.
+        add_filter('jetpack_open_graph_tags', [$this, 'override_jetpack_og_tags'], 20);
+
+        // Start output buffering to strip lingering OG title/description from other sources on the homepage.
+        add_action('template_redirect', [$this, 'start_output_buffer'], 0);
     }
 
     public function remove_conflicting_outputs() {
@@ -29,29 +35,66 @@ class AceSeoFrontend {
         // Remove other common SEO plugins
         remove_action('wp_head', 'rel_canonical');
 
-        // Disable Jetpack's Open Graph tags so ACE controls social meta
-        add_filter('jetpack_enable_open_graph', '__return_false', 99);
+        // Remove Jetpack OG meta output (we'll supply our own).
+        remove_action('wp_head', 'jetpack_og_tags');
+        remove_action('wp_head', 'jetpack_seo_meta_tags');
+
+        // Keep Jetpack enabled but override its OG fields via filter (see override_jetpack_og_tags) as a safety net.
+    }
+
+    public function start_output_buffer() {
+        if (is_admin()) {
+            return;
+        }
+        ob_start([$this, 'filter_head_output']);
+    }
+
+    /**
+     * Strip any remaining og:title / og:description injected by theme/plugins before output.
+     */
+    public function filter_head_output($html) {
+        // Only act on the head section to avoid over-stripping.
+        if (stripos($html, '<head') === false) {
+            return $html;
+        }
+
+        $pattern = '/<meta[^>]+property=["\']og:(title|description)["\'][^>]*>/i';
+        return preg_replace($pattern, '', $html);
     }
 
     public function output_schema_markup() {
         $schema = [];
+        $graph = [];
 
         if (is_front_page()) {
-            $schema = $this->generate_website_schema();
+            $graph[] = $this->generate_website_schema();
         } elseif (is_home()) {
-            $schema = $this->generate_archive_schema('home');
+            $graph[] = $this->generate_archive_schema('home');
         } elseif (is_author() || is_search() || is_archive()) {
-            $schema = $this->generate_archive_schema();
+            $graph[] = $this->generate_archive_schema();
         } elseif (is_singular()) {
             global $post;
-            $schema = $this->generate_article_schema($post);
+            $graph[] = $this->generate_article_schema($post);
         }
 
-        if (!empty($schema)) {
+        // Attach publisher/organization node once (shared)
+        $publisher = $this->get_publisher_schema();
+        if (!empty($publisher)) {
+            // Ensure WebSite nodes reference the shared publisher by @id (no duplicates)
+            foreach ($graph as &$node) {
+                if (isset($node['@type']) && $node['@type'] === 'WebSite') {
+                    $node['publisher'] = ['@id' => $publisher['@id']];
+                }
+            }
+            unset($node); // break reference
+
+            $graph[] = $publisher;
+        }
+
+        if (!empty($graph)) {
+            $output = count($graph) === 1 ? $graph[0] : [ '@context' => 'https://schema.org', '@graph' => $graph ];
             echo '<script type="application/ld+json">' . "\n";
-            // Escape for HTML context to prevent XSS via </script> injection
-            $json = wp_json_encode($schema, JSON_UNESCAPED_UNICODE);
-            // Replace </script with <\/script to prevent breaking out of script tag
+            $json = wp_json_encode($output, JSON_UNESCAPED_UNICODE);
             $json = str_replace('</', '<\/', $json);
             echo $json;
             echo "\n" . '</script>' . "\n";
@@ -59,10 +102,15 @@ class AceSeoFrontend {
     }
 
     private function generate_article_schema($post) {
+        $manual_title = AceCrawlEnhancer::get_meta_value($post->ID, 'title');
+        if (empty($manual_title)) {
+            $manual_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
+        }
+
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'Article',
-            'headline' => get_the_title($post),
+            'headline' => $manual_title ? $manual_title : get_the_title($post),
             'description' => $this->get_meta_description($post),
             'url' => get_permalink($post),
             'datePublished' => get_the_date('c', $post),
@@ -87,12 +135,129 @@ class AceSeoFrontend {
         return $schema;
     }
 
+    /**
+     * Override Jetpack OG tags for fields we explicitly control (title/description/url).
+     */
+    public function override_jetpack_og_tags($tags) {
+        // Strip Jetpack's core OG fields so ACE outputs are the only ones for title/url/description.
+        unset($tags['og:title'], $tags['og:url'], $tags['og:description']);
+        unset($tags['twitter:title'], $tags['twitter:description']);
+        return $tags;
+    }
+
+    /**
+     * Derive the current page meta description following ACE rules (manual > Yoast > template/settings; no tagline fallback).
+     */
+    private function get_current_meta_description() {
+        if (is_singular()) {
+            global $post;
+            if ($post) {
+                $meta = AceCrawlEnhancer::get_meta_value($post->ID, 'metadesc');
+                if (!empty($meta)) {
+                    return $meta;
+                }
+                $yoast = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
+                if (!empty($yoast)) {
+                    return $yoast;
+                }
+                // Fallback to excerpt/content snippet
+                if (!empty($post->post_excerpt)) {
+                    return wp_trim_words(strip_tags($post->post_excerpt), 25);
+                }
+                return wp_trim_words(strip_tags($post->post_content), 25);
+            }
+        }
+
+        if (is_home() || is_front_page()) {
+            $options = get_option('ace_seo_options', []);
+            $settings_desc = $options['general']['home_description'] ?? '';
+
+            $page_on_front = get_option('page_on_front');
+            $show_on_front = get_option('show_on_front');
+            if ($show_on_front === 'page' && $page_on_front) {
+                $page_meta_desc = AceCrawlEnhancer::get_meta_value($page_on_front, 'metadesc');
+                $yoast_desc = get_post_meta($page_on_front, '_yoast_wpseo_metadesc', true);
+                if (!empty($page_meta_desc)) {
+                    return $page_meta_desc;
+                }
+                if (!empty($yoast_desc)) {
+                    return $yoast_desc;
+                }
+                if (!empty($settings_desc)) {
+                    return $settings_desc;
+                }
+                // last resort: content snippet of the static page
+                $page = get_post($page_on_front);
+                if ($page) {
+                    return wp_trim_words(strip_tags($page->post_content), 25);
+                }
+            } else {
+                if (!empty($settings_desc)) {
+                    return $settings_desc;
+                }
+            }
+        }
+
+        if (is_category() || is_tag() || is_tax()) {
+            $term = get_queried_object();
+            if ($term instanceof WP_Term) {
+                $desc = term_description($term);
+                if (!empty($desc)) {
+                    return wp_strip_all_tags($desc);
+                }
+            }
+        }
+
+        if (is_search()) {
+            $query = get_search_query();
+            if ($query) {
+                return sprintf(__('Search results for "%s"', 'ace-crawl-enhancer'), $query);
+            }
+        }
+
+        // No tagline fallback; return empty to let Jetpack omit the tag if we have nothing explicit.
+        return '';
+    }
+
     private function generate_website_schema() {
+        $options = get_option('ace_seo_options', []);
+        $home_title = $options['general']['home_title'] ?? '';
+        $home_description = $options['general']['home_description'] ?? '';
+
+        // Prefer page-level manual/Yoast values when the homepage is a static page.
+        $page_on_front = get_option('page_on_front');
+        $show_on_front = get_option('show_on_front');
+        if ($show_on_front === 'page' && $page_on_front) {
+            $ace_page_title = AceCrawlEnhancer::get_meta_value($page_on_front, 'title');
+            $ace_page_desc  = AceCrawlEnhancer::get_meta_value($page_on_front, 'metadesc');
+            $yoast_page_title = get_post_meta($page_on_front, '_yoast_wpseo_title', true);
+            $yoast_page_desc  = get_post_meta($page_on_front, '_yoast_wpseo_metadesc', true);
+
+            // Name: Yoast custom title > ACE page title > ACE settings title > site name
+            $home_title = $yoast_page_title ?: ($ace_page_title ?: ($home_title ?: get_bloginfo('name')));
+
+            // Description: Yoast custom meta desc > ACE page meta desc > ACE settings desc > empty
+            $home_description = $yoast_page_desc ?: ($ace_page_desc ?: ($home_description ?: ''));
+        } else {
+            // Blog homepage: still allow Yoast settings if set on the posts page (rare), else ACE settings
+            $posts_page = get_option('page_for_posts');
+            if ($posts_page) {
+                $yoast_posts_title = get_post_meta($posts_page, '_yoast_wpseo_title', true);
+                $yoast_posts_desc  = get_post_meta($posts_page, '_yoast_wpseo_metadesc', true);
+                if (!empty($yoast_posts_title)) {
+                    $home_title = $yoast_posts_title;
+                }
+                if (!empty($yoast_posts_desc)) {
+                    $home_description = $yoast_posts_desc;
+                }
+            }
+        }
+
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'WebSite',
-            'name' => get_bloginfo('name'),
-            'description' => get_bloginfo('description'),
+            'name' => !empty($home_title) ? $home_title : get_bloginfo('name'),
+            'description' => !empty($home_description) ? $home_description : '',
             'url' => home_url(),
             'publisher' => $this->get_publisher_schema(),
             'potentialAction' => [
@@ -210,10 +375,7 @@ class AceSeoFrontend {
             ];
         }
 
-        if (empty($description)) {
-            $description = get_bloginfo('description');
-        }
-
+        // Avoid site tagline fallback to prevent unintended text injection
         if (!empty($description)) {
             $schema['description'] = $description;
         }
@@ -233,6 +395,7 @@ class AceSeoFrontend {
         $url = !empty($organization['url']) ? $organization['url'] : home_url();
 
         $publisher = [
+            '@context' => 'https://schema.org',
             '@type' => 'Organization',
             '@id' => trailingslashit($url) . '#organization',
             'name' => $name,
@@ -247,9 +410,12 @@ class AceSeoFrontend {
             $publisher['alternateName'] = $organization['alternate_name'];
         }
 
-        $description = !empty($organization['description']) ? $organization['description'] : get_bloginfo('description');
-        if (!empty($description)) {
-            $publisher['description'] = wp_strip_all_tags($description);
+        // Description: only include if explicitly set and not equal to the WP tagline
+        if (!empty($organization['description'])) {
+            $tagline = get_bloginfo('description');
+            if (trim($organization['description']) !== trim($tagline)) {
+                $publisher['description'] = wp_strip_all_tags($organization['description']);
+            }
         }
 
         $logo = $this->build_logo_schema($organization, $options);

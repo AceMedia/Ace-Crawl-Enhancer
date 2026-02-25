@@ -26,6 +26,9 @@ class AceSEOActivator {
         
         // Set default options
         self::set_default_options();
+
+        // Tune sitemap defaults for large sites.
+        self::maybe_configure_sitemap_defaults();
         
         // Create necessary database tables
         self::create_tables();
@@ -33,9 +36,11 @@ class AceSEOActivator {
         // Schedule database optimization for background processing
         self::schedule_database_optimization();
         
-        // Set up rewrite rules
-        self::setup_rewrites();
-        
+        // Add sitemap powertools rewrites if available
+        if ( function_exists( 'ace_sitemap_powertools_add_rewrite_rules' ) ) {
+            ace_sitemap_powertools_add_rewrite_rules();
+        }
+
         // Schedule any cron jobs
         self::schedule_events();
         
@@ -94,7 +99,6 @@ class AceSEOActivator {
                     'default_image' => '',
                 ),
                 'advanced' => array(
-                    'xml_sitemap' => 1,
                     'clean_permalinks' => 0,
                 ),
                 'ai' => array(
@@ -121,7 +125,6 @@ class AceSEOActivator {
                 'site_description' => get_bloginfo( 'description' ),
                 'separator' => '-',
                 'schema_enabled' => true,
-                'sitemap_enabled' => true,
                 'conflict_detection' => true
             );
             update_option( 'ace_seo_settings', $default_settings );
@@ -153,6 +156,37 @@ class AceSEOActivator {
             update_option( 'ace_seo_advanced_settings', $advanced_settings );
         }
     }
+
+    private static function maybe_configure_sitemap_defaults() {
+        if ( ! function_exists( 'wp_count_posts' ) ) {
+            return;
+        }
+
+        $counts = wp_count_posts( 'post' );
+        $published = isset( $counts->publish ) ? (int) $counts->publish : 0;
+        $threshold = (int) apply_filters( 'ace_sitemap_powertools_large_site_threshold', 1000 );
+
+        if ( $published < $threshold ) {
+            return;
+        }
+
+        $options = get_option( 'ace_sitemap_powertools_options' );
+        if ( ! is_array( $options ) ) {
+            $options = array();
+        }
+
+        if ( array_key_exists( 'enable_index_lastmod', $options ) ) {
+            return;
+        }
+
+        if ( function_exists( 'ace_sitemap_powertools_default_options' ) ) {
+            $options = array_merge( ace_sitemap_powertools_default_options(), $options );
+        }
+
+        $options['enable_index_lastmod'] = 0;
+        update_option( 'ace_sitemap_powertools_options', $options );
+        update_option( 'ace_sitemap_powertools_large_site_notice', 1 );
+    }
     
     /**
      * Create necessary database tables
@@ -180,26 +214,6 @@ class AceSEOActivator {
         
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         dbDelta( $analytics_sql );
-    }
-    
-    /**
-     * Setup rewrite rules for sitemaps
-     */
-    private static function setup_rewrites() {
-        // Add sitemap rewrite rules
-        add_rewrite_rule( 
-            '^sitemap\.xml$', 
-            'index.php?ace_seo_sitemap=index', 
-            'top' 
-        );
-        add_rewrite_rule( 
-            '^sitemap-([^/]+)\.xml$', 
-            'index.php?ace_seo_sitemap=$matches[1]', 
-            'top' 
-        );
-        
-        // Flush rewrite rules
-        flush_rewrite_rules();
     }
     
     /**
@@ -244,16 +258,10 @@ class AceSEOActivator {
      * Schedule cron events
      */
     private static function schedule_events() {
-        // Schedule sitemap generation
-        if ( ! wp_next_scheduled( 'ace_seo_generate_sitemap' ) ) {
-            wp_schedule_event( time(), 'daily', 'ace_seo_generate_sitemap' );
-        }
-        
-        // Schedule analytics cleanup
-        if ( ! wp_next_scheduled( 'ace_seo_cleanup_analytics' ) ) {
-            wp_schedule_event( time(), 'weekly', 'ace_seo_cleanup_analytics' );
-        }
-        
+        // Cleanup legacy cron hooks removed from the plugin.
+        wp_clear_scheduled_hook( 'ace_seo_generate_sitemap' );
+        wp_clear_scheduled_hook( 'ace_seo_cleanup_analytics' );
+
         // Hook the background database optimization task
         add_action( 'ace_seo_optimize_database', array( __CLASS__, 'optimize_database' ) );
     }
@@ -282,8 +290,6 @@ class AceSEODeactivator {
      * Clear scheduled cron events
      */
     private static function clear_scheduled_events() {
-        wp_clear_scheduled_hook( 'ace_seo_generate_sitemap' );
-        wp_clear_scheduled_hook( 'ace_seo_cleanup_analytics' );
         wp_clear_scheduled_hook( 'ace_seo_optimize_database' );
         
         // Clear optimization flags

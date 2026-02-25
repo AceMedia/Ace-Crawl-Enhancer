@@ -3,10 +3,13 @@
   "version": "1.0.3",
   "private": true,
   "scripts": {
-    "build": "wp-scripts build",
-    "start": "wp-scripts start"
+    "build": "wp-scripts build && npm run build:admin-css",
+    "start": "wp-scripts start",
+    "build:admin-css": "sass styles/scss/admin.scss assets/css/admin-redis.css --style=compressed",
+    "watch:admin-css": "sass styles/scss/admin.scss assets/css/admin-redis.css --style=expanded --watch"
   },
   "devDependencies": {
-    "@wordpress/scripts": "^27.9.0"
+    "@wordpress/scripts": "^27.9.0",
+    "sass": "^1.77.8"
   }
 }
