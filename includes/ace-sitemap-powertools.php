@@ -928,6 +928,62 @@ function ace_sitemap_powertools_serve_custom_routes() {
 }
 add_action( 'template_redirect', 'ace_sitemap_powertools_serve_custom_routes', 0 );
 
+/**
+ * Return 410 Gone for legacy sitemap URL patterns that no longer exist on this site.
+ *
+ * Runs at template_redirect priority -1, before the serve function, so the
+ * response exits immediately with no sitemap processing cost.
+ *
+ * Each site maintains its own pattern list via the filter below. Add patterns
+ * when migrating away from another sitemap plugin that left old URLs indexed.
+ *
+ * @return void
+ */
+function ace_sitemap_powertools_handle_legacy_gone(): void {
+    $path = isset( $_SERVER['REQUEST_URI'] )
+        ? wp_parse_url( (string) $_SERVER['REQUEST_URI'], PHP_URL_PATH )
+        : '';
+
+    if ( ! $path ) {
+        return;
+    }
+
+    $path = ltrim( $path, '/' );
+
+    /**
+     * Regex patterns matched against the URL path, leading slash stripped,
+     * that should return 410 Gone.
+     *
+     * @param string[] $patterns Array of PCRE regex patterns.
+     */
+    $patterns = apply_filters(
+        'ace_sitemap_powertools_legacy_gone_patterns',
+        array(
+            '~^post-sitemap\d*(-\d+)?\.xml$~i',
+            '~^image-sitemap(-\d+)?\.xml$~i',
+            '~^news-sitemap(-\d+)?\.xml$~i',
+            '~^sitemap-\d+\.xml$~i',
+        )
+    );
+
+    foreach ( $patterns as $pattern ) {
+        if ( preg_match( $pattern, $path ) ) {
+            nocache_headers();
+            status_header( 410 );
+
+            if ( ! headers_sent() ) {
+                header( 'Content-Type: text/html; charset=UTF-8' );
+            }
+
+            echo '<!DOCTYPE html><html><head><title>410 Gone</title></head><body>'
+                . '<h1>Gone</h1><p>This sitemap URL no longer exists.</p>'
+                . '</body></html>';
+            exit;
+        }
+    }
+}
+add_action( 'template_redirect', 'ace_sitemap_powertools_handle_legacy_gone', -1 );
+
 function ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps ) {
     $sitemap_list = null;
 
