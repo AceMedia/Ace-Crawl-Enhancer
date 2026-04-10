@@ -562,6 +562,9 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_serve_custom_routes">Serve clean routes</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[serve_custom_routes]" id="sitemap_serve_custom_routes" value="1" <?php checked(!empty($sitemap_options['serve_custom_routes'])); ?> /><p class="description">Serve clean routes directly (fallback if rewrites fail).</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_legacy_redirects">Legacy redirects</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_legacy_redirects]" id="sitemap_enable_legacy_redirects" value="1" <?php checked(!empty($sitemap_options['enable_legacy_redirects'])); ?> /><p class="description">Redirect legacy wp-sitemap URLs to clean URLs.</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_disable_canonical_redirects">Disable canonical redirects</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[disable_canonical_redirects]" id="sitemap_disable_canonical_redirects" value="1" <?php checked(!empty($sitemap_options['disable_canonical_redirects'])); ?> /><p class="description">Prevent canonical redirects for sitemap URLs.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_archive_fallback">Root tag archive fallback</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_root_tag_archive_fallback]" id="sitemap_enable_root_tag_archive_fallback" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_archive_fallback'])); ?> /><p class="description">Allow root-level tag archives like <code>/slug/</code> when there is no slug collision.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_links">Root tag links</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_root_tag_links]" id="sitemap_enable_root_tag_links" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_links'])); ?> /><p class="description">Generate root-level tag links when a tag slug is safe to use.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_tag_base_redirect">Tag base redirect</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_tag_base_redirect]" id="sitemap_enable_tag_base_redirect" value="1" <?php checked(!empty($sitemap_options['enable_tag_base_redirect'])); ?> /><p class="description">Redirect legacy <code>/tag/slug/</code> requests to root-level tag URLs. Default off for crawl-audit friendliness.</p></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-providers" class="ace-settings-group">
@@ -586,6 +589,75 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_lastmod">Index lastmod</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_index_lastmod]" id="sitemap_enable_index_lastmod" value="1" <?php checked(!empty($sitemap_options['enable_index_lastmod'])); ?> /><p class="description">Adds <code>lastmod</code> to the sitemap index for posts/pages/news entries only. Disabling reduces heavy cold-load queries on large sites while keeping per-URL <code>lastmod</code> in the actual post sitemaps.</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_cache_ttl">Sitemap cache TTL (seconds)</label></div><div class="setting-field"><input type="number" name="ace_sitemap_powertools_options[sitemap_cache_ttl]" id="sitemap_cache_ttl" min="60" value="<?php echo esc_attr((int)($sitemap_options['sitemap_cache_ttl'] ?? 600)); ?>" class="small-text" /><p class="description">Cache duration for sitemap index and pages (minimum 60 seconds).</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_purge_cache">Purge sitemap cache</label></div><div class="setting-field"><?php wp_nonce_field('ace_sitemap_purge_cache', 'ace_sitemap_powertools_purge_cache_nonce'); ?><button type="button" name="ace_sitemap_powertools_purge_cache" id="sitemap_purge_cache" class="button">Purge sitemap cache</button><p class="description">Clears the persistent sitemap cache so the next request rebuilds fresh data.</p><p class="description"><?php $cache_version = function_exists('ace_sitemap_powertools_get_cache_version') ? (int) ace_sitemap_powertools_get_cache_version() : 0; $cache_ttl = isset($sitemap_options['sitemap_cache_ttl']) ? (int) $sitemap_options['sitemap_cache_ttl'] : 0; if ($cache_ttl < 60) { $cache_ttl = 60; } echo 'Cache version: <code>' . esc_html($cache_version) . '</code> · TTL: <code>' . esc_html($cache_ttl) . 's</code> · Index lastmod: <code>' . esc_html(!empty($sitemap_options['enable_index_lastmod']) ? 'on' : 'off') . '</code>'; ?></p><div id="sitemap-purge-result" class="ace-optimization-result" style="display: none; margin-top: 10px;"></div></div></div>
+                        </fieldset>
+
+                        <fieldset id="sitemaps-detected" class="ace-settings-group">
+                            <legend><span class="dashicons dashicons-search" aria-hidden="true"></span>Detected Plugin Sitemaps</legend>
+                            <?php
+                            $detected_provider_choices = function_exists('ace_sitemap_powertools_detected_custom_providers') ? ace_sitemap_powertools_detected_custom_providers() : [];
+                            $detected_taxonomy_choices = function_exists('ace_sitemap_powertools_detected_custom_taxonomies') ? ace_sitemap_powertools_detected_custom_taxonomies() : [];
+                            $detected_post_type_choices = function_exists('ace_sitemap_powertools_detected_custom_post_types') ? ace_sitemap_powertools_detected_custom_post_types() : [];
+                            $excluded_providers = isset($sitemap_options['excluded_sitemap_providers']) && is_array($sitemap_options['excluded_sitemap_providers']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_providers']) : [];
+                            $excluded_taxonomies = isset($sitemap_options['excluded_sitemap_taxonomies']) && is_array($sitemap_options['excluded_sitemap_taxonomies']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_taxonomies']) : [];
+                            $excluded_post_types = isset($sitemap_options['excluded_sitemap_post_types']) && is_array($sitemap_options['excluded_sitemap_post_types']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_post_types']) : [];
+                            ?>
+
+                            <div class="setting-row">
+                                <div class="setting-label"><label>Third-party providers</label></div>
+                                <div class="setting-field">
+                                    <?php if (empty($detected_provider_choices)) : ?>
+                                        <p class="description">No third-party sitemap providers detected.</p>
+                                    <?php else : ?>
+                                        <?php foreach ($detected_provider_choices as $value => $choice) : ?>
+                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" />
+                                            <label style="display:block;margin-bottom:8px;">
+                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_providers, true)); ?> />
+                                                <?php echo esc_html($choice['label']); ?>
+                                                <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    <p class="description">Unchecked providers are excluded from the sitemap index entirely.</p>
+                                </div>
+                            </div>
+
+                            <div class="setting-row">
+                                <div class="setting-label"><label>Custom taxonomy sitemaps</label></div>
+                                <div class="setting-field">
+                                    <?php if (empty($detected_taxonomy_choices)) : ?>
+                                        <p class="description">No custom public taxonomies detected.</p>
+                                    <?php else : ?>
+                                        <?php foreach ($detected_taxonomy_choices as $value => $choice) : ?>
+                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" />
+                                            <label style="display:block;margin-bottom:8px;">
+                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_taxonomies, true)); ?> />
+                                                <?php echo esc_html($choice['label']); ?>
+                                                <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    <p class="description">Unchecked taxonomy sitemaps are excluded from both the sitemap index and clean routes.</p>
+                                </div>
+                            </div>
+
+                            <div class="setting-row">
+                                <div class="setting-label"><label>Custom post type sitemaps</label></div>
+                                <div class="setting-field">
+                                    <?php if (empty($detected_post_type_choices)) : ?>
+                                        <p class="description">No custom public post types detected.</p>
+                                    <?php else : ?>
+                                        <?php foreach ($detected_post_type_choices as $value => $choice) : ?>
+                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" />
+                                            <label style="display:block;margin-bottom:8px;">
+                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_post_types, true)); ?> />
+                                                <?php echo esc_html($choice['label']); ?>
+                                                <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    <p class="description">Unchecked post type sitemaps are excluded from both the sitemap index and clean routes.</p>
+                                </div>
+                            </div>
                         </fieldset>
                     </div>
                 </div>

@@ -28,6 +28,12 @@ function ace_sitemap_powertools_default_options() {
         'enable_sitemap_cache'     => 1,
         'enable_index_lastmod'     => 1,
         'sitemap_cache_ttl'        => 600,
+        'excluded_sitemap_providers'   => array(),
+        'excluded_sitemap_post_types'  => array(),
+        'excluded_sitemap_taxonomies'  => array( 'ace_event' ),
+        'enable_root_tag_archive_fallback' => 1,
+        'enable_root_tag_links'           => 1,
+        'enable_tag_base_redirect'        => 0,
     );
 }
 
@@ -51,6 +57,275 @@ function ace_sitemap_powertools_get_option( $key ) {
 function ace_sitemap_powertools_is_enabled( $key ) {
     return (bool) ace_sitemap_powertools_get_option( $key );
 }
+
+function ace_sitemap_powertools_excluded_sitemap_post_types() {
+    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_post_types' );
+    if ( ! is_array( $saved ) ) {
+        $saved = array();
+    }
+
+    return (array) apply_filters(
+        'ace_sitemap_powertools_excluded_sitemap_post_types',
+        array_values( array_unique( array_map( 'sanitize_key', $saved ) ) )
+    );
+}
+
+function ace_sitemap_powertools_excluded_sitemap_taxonomies() {
+    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_taxonomies' );
+    if ( ! is_array( $saved ) ) {
+        $saved = array( 'ace_event' );
+    }
+
+    return (array) apply_filters(
+        'ace_sitemap_powertools_excluded_sitemap_taxonomies',
+        array_values( array_unique( array_merge( array( 'post_format' ), array_map( 'sanitize_key', $saved ) ) ) )
+    );
+}
+
+function ace_sitemap_powertools_excluded_sitemap_providers() {
+    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_providers' );
+    if ( ! is_array( $saved ) ) {
+        $saved = array();
+    }
+
+    return (array) apply_filters(
+        'ace_sitemap_powertools_excluded_sitemap_providers',
+        array_values( array_unique( array_map( 'sanitize_key', $saved ) ) )
+    );
+}
+
+function ace_sitemap_powertools_detected_custom_providers() {
+    if ( ! function_exists( 'wp_sitemaps_get_server' ) ) {
+        return array();
+    }
+
+    $providers = wp_sitemaps_get_server()->registry->get_providers();
+    if ( ! is_array( $providers ) ) {
+        return array();
+    }
+
+    $items = array();
+    foreach ( $providers as $name => $provider ) {
+        if ( in_array( $name, array( 'posts', 'taxonomies', 'users', 'news', 'authors' ), true ) ) {
+            continue;
+        }
+
+        $items[ $name ] = array(
+            'label'       => $name,
+            'description' => is_object( $provider ) ? get_class( $provider ) : 'Provider',
+        );
+    }
+
+    ksort( $items );
+    return $items;
+}
+
+function ace_sitemap_powertools_detected_custom_post_types() {
+    $post_types = get_post_types( array( 'public' => true ), 'objects' );
+    if ( ! is_array( $post_types ) ) {
+        return array();
+    }
+
+    $items = array();
+    foreach ( $post_types as $name => $object ) {
+        if ( in_array( $name, array( 'post', 'page', 'attachment' ), true ) ) {
+            continue;
+        }
+
+        $slug = $name;
+        if ( isset( $object->rewrite['slug'] ) && is_string( $object->rewrite['slug'] ) ) {
+            $slug = trim( $object->rewrite['slug'], '/' );
+        }
+
+        $items[ $name ] = array(
+            'label'       => isset( $object->labels->name ) ? $object->labels->name : $name,
+            'description' => 'Post type slug: ' . $slug,
+        );
+    }
+
+    ksort( $items );
+    return $items;
+}
+
+function ace_sitemap_powertools_detected_custom_taxonomies() {
+    $taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
+    if ( ! is_array( $taxonomies ) ) {
+        return array();
+    }
+
+    $items = array();
+    foreach ( $taxonomies as $name => $object ) {
+        if ( in_array( $name, array( 'category', 'post_tag', 'post_format' ), true ) ) {
+            continue;
+        }
+
+        $slug = $name;
+        if ( isset( $object->rewrite['slug'] ) && is_string( $object->rewrite['slug'] ) ) {
+            $slug = trim( $object->rewrite['slug'], '/' );
+        }
+
+        $items[ $name ] = array(
+            'label'       => isset( $object->labels->name ) ? $object->labels->name : $name,
+            'description' => 'Taxonomy slug: ' . $slug,
+        );
+    }
+
+    ksort( $items );
+    return $items;
+}
+
+function ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) {
+    $slug = sanitize_title( (string) $slug );
+    if ( '' === $slug ) {
+        return false;
+    }
+
+    if ( get_category_by_slug( $slug ) instanceof WP_Term ) {
+        return false;
+    }
+
+    if ( get_page_by_path( $slug, OBJECT, 'page' ) ) {
+        return false;
+    }
+
+    $post_types = get_post_types(
+        array(
+            'publicly_queryable' => true,
+        ),
+        'names'
+    );
+    unset( $post_types['attachment'] );
+
+    if ( ! empty( $post_types ) && get_page_by_path( $slug, OBJECT, array_values( $post_types ) ) ) {
+        return false;
+    }
+
+    return true;
+}
+
+function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) {
+    if ( is_admin() || ! ace_sitemap_powertools_root_tag_archives_enabled() ) {
+        return $query_vars;
+    }
+
+    if ( ! empty( $_GET ) ) {
+        return $query_vars;
+    }
+
+    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    if ( '' === $request_uri ) {
+        return $query_vars;
+    }
+
+    $path = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+    $path = trim( $path, '/' );
+    if ( '' === $path ) {
+        return $query_vars;
+    }
+
+    $home_path = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
+    $home_path = trim( $home_path, '/' );
+    if ( '' !== $home_path ) {
+        if ( $path === $home_path ) {
+            $path = '';
+        } elseif ( 0 === strpos( $path, $home_path . '/' ) ) {
+            $path = substr( $path, strlen( $home_path ) + 1 );
+        }
+    }
+
+    if ( '' === $path || false !== strpos( $path, '/' ) ) {
+        return $query_vars;
+    }
+
+    $slug = sanitize_title( $path );
+    if ( '' === $slug || in_array( $slug, array( 'tag', 'category' ), true ) ) {
+        return $query_vars;
+    }
+
+    foreach ( array( 'tag', 'tag_id', 'taxonomy', 'term', 'post_type', 'attachment' ) as $key ) {
+        if ( ! empty( $query_vars[ $key ] ) ) {
+            return $query_vars;
+        }
+    }
+
+    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) ) {
+        return $query_vars;
+    }
+
+    $tag = get_term_by( 'slug', $slug, 'post_tag' );
+    if ( ! $tag || is_wp_error( $tag ) ) {
+        return $query_vars;
+    }
+
+    return array( 'tag' => $slug );
+}
+add_filter( 'request', 'ace_sitemap_powertools_resolve_root_slug_to_tag_archive', 20 );
+
+function ace_sitemap_powertools_use_root_level_tag_links( $termlink, $term, $taxonomy ) {
+    if ( 'post_tag' !== $taxonomy || ! $term instanceof WP_Term || ! ace_sitemap_powertools_root_tag_links_enabled() ) {
+        return $termlink;
+    }
+
+    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $term->slug ) ) {
+        return $termlink;
+    }
+
+    return home_url( user_trailingslashit( $term->slug ) );
+}
+add_filter( 'term_link', 'ace_sitemap_powertools_use_root_level_tag_links', 20, 3 );
+
+function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
+    if ( is_admin() || ! is_tag() || ! ace_sitemap_powertools_tag_base_redirect_enabled() ) {
+        return;
+    }
+
+    $term = get_queried_object();
+    if ( ! $term instanceof WP_Term || empty( $term->slug ) ) {
+        return;
+    }
+
+    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $term->slug ) ) {
+        return;
+    }
+
+    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    if ( '' === $request_uri ) {
+        return;
+    }
+
+    $path = (string) wp_parse_url( $request_uri, PHP_URL_PATH );
+    $path = trim( $path, '/' );
+
+    $home_path = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
+    $home_path = trim( $home_path, '/' );
+    if ( '' !== $home_path ) {
+        if ( $path === $home_path ) {
+            $path = '';
+        } elseif ( 0 === strpos( $path, $home_path . '/' ) ) {
+            $path = substr( $path, strlen( $home_path ) + 1 );
+        }
+    }
+
+    $prefix = 'tag/' . $term->slug;
+    if ( $path !== $prefix && 0 !== strpos( $path, $prefix . '/' ) ) {
+        return;
+    }
+
+    $suffix = substr( $path, strlen( $prefix ) );
+    if ( false === $suffix ) {
+        $suffix = '';
+    }
+
+    $target = home_url( user_trailingslashit( $term->slug . ltrim( $suffix, '/' ) ) );
+    $query_string = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';
+    if ( '' !== $query_string ) {
+        $target .= ( false === strpos( $target, '?' ) ? '?' : '&' ) . $query_string;
+    }
+
+    wp_safe_redirect( $target, 301 );
+    exit;
+}
+add_action( 'template_redirect', 'ace_sitemap_powertools_redirect_tag_base_to_root_slug', 1 );
 
 function ace_sitemap_powertools_register_settings() {
     register_setting( 'ace_sitemap_powertools', 'ace_sitemap_powertools_options', 'ace_sitemap_powertools_sanitize_options' );
@@ -108,6 +383,42 @@ function ace_sitemap_powertools_register_settings() {
         array(
             'key' => 'disable_canonical_redirects',
             'label' => 'Prevent canonical redirects for sitemap URLs.',
+        )
+    );
+
+    add_settings_field(
+        'enable_root_tag_archive_fallback',
+        'Root Tag Archive Fallback',
+        'ace_sitemap_powertools_field_checkbox',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_routing',
+        array(
+            'key' => 'enable_root_tag_archive_fallback',
+            'label' => 'Allow root-level tag archives like /slug/ when there is no slug collision.',
+        )
+    );
+
+    add_settings_field(
+        'enable_root_tag_links',
+        'Root Tag Links',
+        'ace_sitemap_powertools_field_checkbox',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_routing',
+        array(
+            'key' => 'enable_root_tag_links',
+            'label' => 'Generate root-level tag links when a tag slug is safe to use.',
+        )
+    );
+
+    add_settings_field(
+        'enable_tag_base_redirect',
+        'Tag Base Redirect',
+        'ace_sitemap_powertools_field_checkbox',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_routing',
+        array(
+            'key' => 'enable_tag_base_redirect',
+            'label' => 'Redirect /tag/slug/ requests to /slug/ when the root-level route is safe.',
         )
     );
 
@@ -182,6 +493,52 @@ function ace_sitemap_powertools_register_settings() {
         array(
             'key' => 'enable_custom_header',
             'label' => 'Show logo, title, and description in the XSL header.',
+        )
+    );
+
+    add_settings_section(
+        'ace_sitemap_powertools_section_detected',
+        'Detected Plugin Sitemaps',
+        '__return_false',
+        'ace-sitemap-powertools'
+    );
+
+    add_settings_field(
+        'excluded_sitemap_providers',
+        'Third-Party Providers',
+        'ace_sitemap_powertools_field_detected_sitemaps',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_detected',
+        array(
+            'key' => 'excluded_sitemap_providers',
+            'choices' => ace_sitemap_powertools_detected_custom_providers(),
+            'empty_label' => 'No third-party sitemap providers detected.',
+        )
+    );
+
+    add_settings_field(
+        'excluded_sitemap_taxonomies',
+        'Custom Taxonomy Sitemaps',
+        'ace_sitemap_powertools_field_detected_sitemaps',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_detected',
+        array(
+            'key' => 'excluded_sitemap_taxonomies',
+            'choices' => ace_sitemap_powertools_detected_custom_taxonomies(),
+            'empty_label' => 'No custom public taxonomies detected.',
+        )
+    );
+
+    add_settings_field(
+        'excluded_sitemap_post_types',
+        'Custom Post Type Sitemaps',
+        'ace_sitemap_powertools_field_detected_sitemaps',
+        'ace-sitemap-powertools',
+        'ace_sitemap_powertools_section_detected',
+        array(
+            'key' => 'excluded_sitemap_post_types',
+            'choices' => ace_sitemap_powertools_detected_custom_post_types(),
+            'empty_label' => 'No custom public post types detected.',
         )
     );
 
@@ -284,8 +641,16 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
         'disable_canonical_redirects',
         'enable_sitemap_cache',
         'enable_index_lastmod',
+        'enable_root_tag_archive_fallback',
+        'enable_root_tag_links',
+        'enable_tag_base_redirect',
     );
     $integers = array( 'post_max_urls', 'sitemap_cache_ttl' );
+    $arrays = array(
+        'excluded_sitemap_providers',
+        'excluded_sitemap_post_types',
+        'excluded_sitemap_taxonomies',
+    );
 
     $output = array();
 
@@ -296,6 +661,28 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
     foreach ( $integers as $key ) {
         $value = isset( $input[ $key ] ) ? absint( $input[ $key ] ) : 0;
         $output[ $key ] = $value;
+    }
+
+    foreach ( $arrays as $key ) {
+        $values = isset( $input[ $key ] ) && is_array( $input[ $key ] ) ? $input[ $key ] : array();
+        $output[ $key ] = array_values( array_unique( array_map( 'sanitize_key', $values ) ) );
+    }
+
+    $detected_toggle_map = array(
+        'excluded_sitemap_providers'  => 'provider',
+        'excluded_sitemap_post_types' => 'post_type',
+        'excluded_sitemap_taxonomies' => 'taxonomy',
+    );
+
+    foreach ( $detected_toggle_map as $option_key => $detected_type ) {
+        $detected_key = 'detected_sitemap_' . $detected_type . 's';
+        $enabled_key  = 'enabled_sitemap_' . $detected_type . 's';
+        $detected     = isset( $input[ $detected_key ] ) && is_array( $input[ $detected_key ] ) ? array_values( array_unique( array_map( 'sanitize_key', $input[ $detected_key ] ) ) ) : array();
+        $enabled      = isset( $input[ $enabled_key ] ) && is_array( $input[ $enabled_key ] ) ? array_values( array_unique( array_map( 'sanitize_key', $input[ $enabled_key ] ) ) ) : array();
+
+        if ( ! empty( $detected ) ) {
+            $output[ $option_key ] = array_values( array_diff( $detected, $enabled ) );
+        }
     }
 
     return array_merge( $defaults, $output );
@@ -330,6 +717,18 @@ function ace_sitemap_powertools_route_description( $route ) {
     }
 
     return $subtype ? $provider . ': ' . $subtype : $provider;
+}
+
+function ace_sitemap_powertools_root_tag_archives_enabled() {
+    return (bool) ace_sitemap_powertools_get_option( 'enable_root_tag_archive_fallback' );
+}
+
+function ace_sitemap_powertools_root_tag_links_enabled() {
+    return (bool) ace_sitemap_powertools_get_option( 'enable_root_tag_links' );
+}
+
+function ace_sitemap_powertools_tag_base_redirect_enabled() {
+    return (bool) ace_sitemap_powertools_get_option( 'enable_tag_base_redirect' );
 }
 
 function ace_sitemap_powertools_clean_urls_description() {
@@ -369,10 +768,9 @@ function ace_sitemap_powertools_clean_urls_description() {
         'ace_sitemap_powertools_excluded_clean_slugs',
         array( 'popular' )
     );
-    $excluded_post_types = apply_filters(
-        'ace_sitemap_powertools_excluded_clean_post_types',
-        array()
-    );
+    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
+    $excluded_providers  = ace_sitemap_powertools_excluded_sitemap_providers();
 
     $core = array( 'posts', 'taxonomies', 'users' );
     $extra = array();
@@ -446,6 +844,24 @@ function ace_sitemap_powertools_clean_urls_description() {
         $excluded_items[] = '<li><code>/' . esc_html( $slug ) . '-1.xml</code> (post type: ' . esc_html( $post_type ) . ')</li>';
     }
 
+    foreach ( $excluded_taxonomies as $taxonomy ) {
+        $taxonomy_object = get_taxonomy( $taxonomy );
+        if ( ! $taxonomy_object ) {
+            continue;
+        }
+
+        $slug = $taxonomy;
+        if ( isset( $taxonomy_object->rewrite['slug'] ) && is_string( $taxonomy_object->rewrite['slug'] ) ) {
+            $slug = trim( $taxonomy_object->rewrite['slug'], '/' );
+        }
+
+        $excluded_items[] = '<li><code>/' . esc_html( $slug ) . '-1.xml</code> (taxonomy: ' . esc_html( $taxonomy ) . ')</li>';
+    }
+
+    foreach ( $excluded_providers as $provider_name ) {
+        $excluded_items[] = '<li><strong>' . esc_html( $provider_name ) . '</strong> (provider disabled)</li>';
+    }
+
     if ( $excluded_items ) {
         $html .= '<p class="description">Plugin-managed sitemap routes (excluded from clean URLs):</p>';
         $html .= '<ul class="ace-sitemap-powertools-route-list">' . implode( '', $excluded_items ) . '</ul>';
@@ -480,6 +896,35 @@ function ace_sitemap_powertools_field_number( $args ) {
     if ( $label ) {
         echo '<p class="description">' . esc_html( $label ) . '</p>';
     }
+}
+
+function ace_sitemap_powertools_field_detected_sitemaps( $args ) {
+    $options     = ace_sitemap_powertools_get_options();
+    $key         = $args['key'];
+    $choices     = isset( $args['choices'] ) && is_array( $args['choices'] ) ? $args['choices'] : array();
+    $empty_label = isset( $args['empty_label'] ) ? $args['empty_label'] : 'No items detected.';
+    $excluded    = isset( $options[ $key ] ) && is_array( $options[ $key ] ) ? array_map( 'sanitize_key', $options[ $key ] ) : array();
+
+    if ( empty( $choices ) ) {
+        echo '<p class="description">' . esc_html( $empty_label ) . '</p>';
+        return;
+    }
+
+    foreach ( $choices as $value => $choice ) {
+        $label       = isset( $choice['label'] ) ? $choice['label'] : $value;
+        $description = isset( $choice['description'] ) ? $choice['description'] : '';
+        $checked     = ! in_array( sanitize_key( $value ), $excluded, true );
+
+        echo '<label style="display:block;margin-bottom:8px;">';
+        echo '<input type="checkbox" name="ace_sitemap_powertools_options[' . esc_attr( $key ) . '][]" value="' . esc_attr( $value ) . '" ' . checked( $checked, true, false ) . ' />';
+        echo ' ' . esc_html( $label );
+        if ( $description ) {
+            echo ' <span class="description">(' . esc_html( $description ) . ')</span>';
+        }
+        echo '</label>';
+    }
+
+    echo '<p class="description">Unchecked items will be excluded from the sitemap index and sitemap routes.</p>';
 }
 
 function ace_sitemap_powertools_render_settings_page() {
@@ -573,10 +1018,8 @@ function ace_sitemap_powertools_custom_routes() {
         'ace_sitemap_powertools_excluded_clean_slugs',
         array( 'popular' )
     );
-    $excluded_post_types = apply_filters(
-        'ace_sitemap_powertools_excluded_clean_post_types',
-        array()
-    );
+    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
 
     $routes = array();
 
@@ -596,6 +1039,38 @@ function ace_sitemap_powertools_custom_routes() {
 
     if ( ace_sitemap_powertools_is_enabled( 'enable_tags_route' ) ) {
         $routes['tags'] = array( 'provider' => 'taxonomies', 'subtype' => 'post_tag' );
+    }
+
+    $taxonomies = get_taxonomies(
+        array(
+            'public' => true,
+        ),
+        'objects'
+    );
+
+    foreach ( $taxonomies as $taxonomy => $taxonomy_object ) {
+        if ( in_array( $taxonomy, array( 'category', 'post_tag' ), true ) ) {
+            continue;
+        }
+
+        if ( in_array( $taxonomy, $excluded_taxonomies, true ) ) {
+            continue;
+        }
+
+        $slug = $taxonomy;
+        if ( isset( $taxonomy_object->rewrite['slug'] ) && is_string( $taxonomy_object->rewrite['slug'] ) ) {
+            $slug = $taxonomy_object->rewrite['slug'];
+        }
+
+        $slug = trim( (string) $slug, '/' );
+        if ( '' === $slug || isset( $routes[ $slug ] ) || in_array( $slug, $excluded_slugs, true ) ) {
+            continue;
+        }
+
+        $routes[ $slug ] = array(
+            'provider' => 'taxonomies',
+            'subtype'  => $taxonomy,
+        );
     }
 
     $post_types = get_post_types( array( 'public' => true ), 'objects' );
@@ -1089,6 +1564,7 @@ function ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list ) 
         return;
     }
 
+    ace_sitemap_powertools_send_response_cache_headers();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_index_xml( $sitemap_list );
     if ( ! empty( $xml ) ) {
@@ -1101,10 +1577,28 @@ function ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list ) {
         return;
     }
 
+    ace_sitemap_powertools_send_response_cache_headers();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_xml( $url_list );
     if ( ! empty( $xml ) ) {
         echo $xml;
+    }
+}
+
+function ace_sitemap_powertools_send_response_cache_headers() {
+    $ttl = (int) apply_filters(
+        'ace_sitemap_powertools_response_cache_ttl',
+        ace_sitemap_powertools_get_cache_ttl()
+    );
+
+    if ( $ttl < 60 ) {
+        $ttl = 60;
+    }
+
+    if ( ! headers_sent() ) {
+        header( 'Cache-Control: public, max-age=' . $ttl . ', must-revalidate' );
+        header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $ttl ) . ' GMT' );
+        header( 'X-Robots-Tag: noindex, follow', true );
     }
 }
 
@@ -1188,6 +1682,7 @@ function ace_sitemap_powertools_get_human_theme_override_css() {
 }
 
 function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
+    ace_sitemap_powertools_send_response_cache_headers();
     header( 'Content-Type: text/html; charset=UTF-8' );
     status_header( 200 );
 
@@ -1540,8 +2035,24 @@ function ace_sitemap_powertools_disable_users_provider( $provider, $name ) {
 }
 add_filter( 'wp_sitemaps_add_provider', 'ace_sitemap_powertools_disable_users_provider', 20, 2 );
 
+function ace_sitemap_powertools_disable_excluded_providers( $provider, $name ) {
+    $excluded_providers = ace_sitemap_powertools_excluded_sitemap_providers();
+    if ( in_array( sanitize_key( (string) $name ), $excluded_providers, true ) ) {
+        return false;
+    }
+
+    return $provider;
+}
+add_filter( 'wp_sitemaps_add_provider', 'ace_sitemap_powertools_disable_excluded_providers', 25, 2 );
+
 function ace_sitemap_powertools_post_types_filter( $post_types ) {
     if ( ! ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+        $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+        foreach ( $excluded_post_types as $post_type ) {
+            if ( isset( $post_types[ $post_type ] ) ) {
+                unset( $post_types[ $post_type ] );
+            }
+        }
         return $post_types;
     }
 
@@ -1549,24 +2060,80 @@ function ace_sitemap_powertools_post_types_filter( $post_types ) {
         unset( $post_types['post'] );
     }
 
+    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+    foreach ( $excluded_post_types as $post_type ) {
+        if ( isset( $post_types[ $post_type ] ) ) {
+            unset( $post_types[ $post_type ] );
+        }
+    }
+
     return $post_types;
 }
 add_filter( 'wp_sitemaps_post_types', 'ace_sitemap_powertools_post_types_filter' );
+
+function ace_sitemap_powertools_taxonomies_filter( $taxonomies ) {
+    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
+
+    foreach ( $excluded_taxonomies as $taxonomy ) {
+        if ( isset( $taxonomies[ $taxonomy ] ) ) {
+            unset( $taxonomies[ $taxonomy ] );
+        }
+    }
+
+    return $taxonomies;
+}
+add_filter( 'wp_sitemaps_taxonomies', 'ace_sitemap_powertools_taxonomies_filter' );
 
 function ace_sitemap_powertools_posts_query_args( $args, $post_type ) {
     if ( ! is_array( $args ) ) {
         return $args;
     }
 
-    if ( 'post' !== $post_type ) {
-        return $args;
+    if ( 'post' === $post_type ) {
+        $args['orderby'] = array(
+            'modified' => 'DESC',
+            'ID'       => 'DESC',
+        );
+        $args['order'] = 'DESC';
     }
 
-    $args['orderby'] = array(
-        'modified' => 'DESC',
-        'ID'       => 'DESC',
+    $noindex_meta_query = array(
+        'relation' => 'AND',
+        array(
+            'relation' => 'OR',
+            array(
+                'key'     => '_ace_seo_meta-robots-noindex',
+                'compare' => 'NOT EXISTS',
+            ),
+            array(
+                'key'     => '_ace_seo_meta-robots-noindex',
+                'value'   => '1',
+                'compare' => '!=',
+            ),
+        ),
+        array(
+            'relation' => 'OR',
+            array(
+                'key'     => '_yoast_wpseo_meta-robots-noindex',
+                'compare' => 'NOT EXISTS',
+            ),
+            array(
+                'key'     => '_yoast_wpseo_meta-robots-noindex',
+                'value'   => '1',
+                'compare' => '!=',
+            ),
+        ),
     );
-    $args['order'] = 'DESC';
+
+    if ( isset( $args['meta_query'] ) && is_array( $args['meta_query'] ) ) {
+        $args['meta_query'] = array_merge(
+            array( 'relation' => 'AND' ),
+            $args['meta_query'],
+            array( $noindex_meta_query )
+        );
+    } else {
+        $args['meta_query'] = $noindex_meta_query;
+    }
 
     return $args;
 }
