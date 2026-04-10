@@ -24,7 +24,7 @@ function ace_sitemap_powertools_default_options() {
         'enable_recent_marker'     => 1,
         'enable_legacy_redirects'  => 1,
         'disable_canonical_redirects' => 1,
-        'post_max_urls'            => 0,
+        'post_max_urls'            => 250,
         'enable_sitemap_cache'     => 1,
         'enable_index_lastmod'     => 1,
         'sitemap_cache_ttl'        => 600,
@@ -52,6 +52,16 @@ function ace_sitemap_powertools_get_option( $key ) {
     $options = ace_sitemap_powertools_get_options();
 
     return isset( $options[ $key ] ) ? $options[ $key ] : null;
+}
+
+function ace_sitemap_powertools_effective_post_max_urls() {
+    $limit = (int) ace_sitemap_powertools_get_option( 'post_max_urls' );
+
+    if ( $limit < 1 ) {
+        $limit = 250;
+    }
+
+    return max( 1, $limit );
 }
 
 function ace_sitemap_powertools_is_enabled( $key ) {
@@ -581,8 +591,8 @@ function ace_sitemap_powertools_register_settings() {
         'ace_sitemap_powertools_section_performance',
         array(
             'key' => 'post_max_urls',
-            'label' => 'Max URLs per posts sitemap (0 = WordPress default).',
-            'min' => 0,
+            'label' => 'Max URLs per posts sitemap. Uses a safe default of 250 when empty or set below 1.',
+            'min' => 1,
         )
     );
 
@@ -1155,6 +1165,160 @@ function ace_sitemap_powertools_bump_cache_version() {
     update_option( 'ace_sitemap_cache_version', $version + 1 );
 }
 
+function ace_sitemap_powertools_bump_cache_version_debounced( $scope ) {
+    $scope = sanitize_key( (string) $scope );
+    if ( '' === $scope ) {
+        $scope = 'global';
+    }
+
+    $lock_key = 'ace_sitemap_cache_bump_' . $scope;
+    if ( get_transient( $lock_key ) ) {
+        return false;
+    }
+
+    set_transient( $lock_key, 1, 15 );
+    ace_sitemap_powertools_bump_cache_version();
+    return true;
+}
+
+function ace_sitemap_powertools_is_public_sitemap_post( $post ) {
+    if ( ! ( $post instanceof WP_Post ) ) {
+        return false;
+    }
+
+    $post_type_object = get_post_type_object( $post->post_type );
+    if ( ! $post_type_object ) {
+        return false;
+    }
+
+    return is_post_type_viewable( $post_type_object );
+}
+
+function ace_sitemap_powertools_maybe_bump_cache_version_on_save( $post_id, $post, $update ) {
+    if ( ! $update || ! ( $post instanceof WP_Post ) ) {
+        return;
+    }
+
+    if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+        return;
+    }
+
+    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+        return;
+    }
+
+    if ( 'publish' !== $post->post_status ) {
+        return;
+    }
+
+    ace_sitemap_powertools_bump_cache_version_debounced( 'save_post_' . (int) $post_id );
+}
+
+function ace_sitemap_powertools_maybe_bump_cache_version_on_transition( $new_status, $old_status, $post ) {
+    if ( ! ( $post instanceof WP_Post ) ) {
+        return;
+    }
+
+    if ( wp_is_post_autosave( $post->ID ) || wp_is_post_revision( $post->ID ) ) {
+        return;
+    }
+
+    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+        return;
+    }
+
+    if ( $new_status === $old_status ) {
+        return;
+    }
+
+    if ( 'publish' !== $new_status && 'publish' !== $old_status ) {
+        return;
+    }
+
+    ace_sitemap_powertools_bump_cache_version_debounced( 'transition_post_' . (int) $post->ID );
+}
+
+function ace_sitemap_powertools_maybe_bump_cache_version_on_delete( $post_id, $post ) {
+    if ( ! ( $post instanceof WP_Post ) ) {
+        return;
+    }
+
+    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+        return;
+    }
+
+    if ( 'publish' !== $post->post_status ) {
+        return;
+    }
+
+    ace_sitemap_powertools_bump_cache_version_debounced( 'delete_post_' . (int) $post_id );
+}
+
+function ace_sitemap_powertools_cache_get_stale( $key ) {
+    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+        return null;
+    }
+
+    $option_key = ace_sitemap_powertools_cache_option_key( $key );
+    $stored     = get_option( $option_key );
+
+    if ( ! is_array( $stored ) || ! array_key_exists( 'data', $stored ) ) {
+        return null;
+    }
+
+    return $stored['data'];
+}
+
+function ace_sitemap_powertools_cache_lock_key( $key ) {
+    return 'ace_sitemap_cache_lock_' . md5( (string) $key );
+}
+
+function ace_sitemap_powertools_cache_acquire_lock( $key ) {
+    $lock_key = ace_sitemap_powertools_cache_lock_key( $key );
+    if ( get_transient( $lock_key ) ) {
+        return false;
+    }
+
+    set_transient( $lock_key, 1, 30 );
+    return true;
+}
+
+function ace_sitemap_powertools_cache_release_lock( $key ) {
+    delete_transient( ace_sitemap_powertools_cache_lock_key( $key ) );
+}
+
+function ace_sitemap_powertools_cache_remember( $key, $callback, $fallback = null ) {
+    $cached = ace_sitemap_powertools_cache_get( $key );
+    if ( null !== $cached ) {
+        return $cached;
+    }
+
+    $stale = ace_sitemap_powertools_cache_get_stale( $key );
+    if ( ! ace_sitemap_powertools_cache_acquire_lock( $key ) ) {
+        if ( null !== $stale ) {
+            return $stale;
+        }
+
+        for ( $attempt = 0; $attempt < 3; $attempt++ ) {
+            usleep( 250000 );
+            $cached = ace_sitemap_powertools_cache_get( $key );
+            if ( null !== $cached ) {
+                return $cached;
+            }
+        }
+
+        return $fallback;
+    }
+
+    try {
+        $value = is_callable( $callback ) ? call_user_func( $callback ) : $fallback;
+        ace_sitemap_powertools_cache_set( $key, $value );
+        return $value;
+    } finally {
+        ace_sitemap_powertools_cache_release_lock( $key );
+    }
+}
+
 function ace_sitemap_powertools_get_cache_ttl() {
     $ttl = (int) ace_sitemap_powertools_get_option( 'sitemap_cache_ttl' );
     if ( $ttl < 60 ) {
@@ -1217,10 +1381,10 @@ function ace_sitemap_powertools_cache_set( $key, $value ) {
     update_option( $option_key, array( 't' => time(), 'data' => $value ), false );
 }
 
-// Invalidate sitemap cache when content changes.
-add_action( 'save_post', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
-add_action( 'deleted_post', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
-add_action( 'transition_post_status', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
+// Invalidate sitemap cache only when public sitemap content changes.
+add_action( 'save_post', 'ace_sitemap_powertools_maybe_bump_cache_version_on_save', 20, 3 );
+add_action( 'deleted_post', 'ace_sitemap_powertools_maybe_bump_cache_version_on_delete', 20, 2 );
+add_action( 'transition_post_status', 'ace_sitemap_powertools_maybe_bump_cache_version_on_transition', 20, 3 );
 add_action( 'edited_term', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
 add_action( 'delete_term', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
 add_action( 'user_register', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
@@ -2084,6 +2248,259 @@ function ace_sitemap_powertools_taxonomies_filter( $taxonomies ) {
 }
 add_filter( 'wp_sitemaps_taxonomies', 'ace_sitemap_powertools_taxonomies_filter' );
 
+function ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) {
+    if ( ! post_type_exists( $post_type ) ) {
+        return false;
+    }
+
+    $post_type_object = get_post_type_object( $post_type );
+    if ( ! $post_type_object || ! is_post_type_viewable( $post_type_object ) ) {
+        return false;
+    }
+
+    return true;
+}
+
+function ace_sitemap_powertools_posts_order_sql( $post_type ) {
+    global $wpdb;
+
+    if ( 'post' === $post_type ) {
+        return "{$wpdb->posts}.post_modified DESC, {$wpdb->posts}.ID DESC";
+    }
+
+    return "{$wpdb->posts}.ID ASC";
+}
+
+function ace_sitemap_powertools_get_noindex_meta_map( $post_ids ) {
+    global $wpdb;
+
+    $post_ids = array_values( array_filter( array_map( 'intval', (array) $post_ids ) ) );
+    if ( empty( $post_ids ) ) {
+        return array();
+    }
+
+    $placeholders = implode( ', ', array_fill( 0, count( $post_ids ), '%d' ) );
+    $sql          = $wpdb->prepare(
+        "SELECT post_id, meta_key, meta_value
+        FROM {$wpdb->postmeta}
+        WHERE post_id IN ({$placeholders})
+            AND meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')",
+        $post_ids
+    );
+    $rows         = $wpdb->get_results( $sql );
+    $excluded_ids = array();
+
+    if ( $rows ) {
+        foreach ( $rows as $row ) {
+            if ( isset( $row->meta_value ) && '1' === (string) $row->meta_value ) {
+                $excluded_ids[ (int) $row->post_id ] = true;
+            }
+        }
+    }
+
+    return $excluded_ids;
+}
+
+function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page ) {
+    global $wpdb;
+
+    $page_num = max( 1, (int) $page_num );
+    $per_page = max( 1, (int) $per_page );
+    $offset   = ( $page_num - 1 ) * $per_page;
+    $collected_ids = array();
+    $visible_seen  = 0;
+    $scan_offset   = 0;
+    $batch_size    = max( 250, $per_page * 2 );
+    $order_sql     = ace_sitemap_powertools_posts_order_sql( $post_type );
+
+    while ( count( $collected_ids ) < $per_page ) {
+        $sql = $wpdb->prepare(
+            "SELECT ID
+            FROM {$wpdb->posts}
+            WHERE post_type = %s
+                AND post_status = 'publish'
+            ORDER BY {$order_sql}
+            LIMIT %d, %d",
+            $post_type,
+            $scan_offset,
+            $batch_size
+        );
+        $candidate_ids = array_map( 'intval', (array) $wpdb->get_col( $sql ) );
+
+        if ( empty( $candidate_ids ) ) {
+            break;
+        }
+
+        $excluded_ids = ace_sitemap_powertools_get_noindex_meta_map( $candidate_ids );
+        foreach ( $candidate_ids as $candidate_id ) {
+            if ( isset( $excluded_ids[ $candidate_id ] ) ) {
+                continue;
+            }
+
+            if ( $visible_seen < $offset ) {
+                ++$visible_seen;
+                continue;
+            }
+
+            $collected_ids[] = $candidate_id;
+            if ( count( $collected_ids ) >= $per_page ) {
+                break;
+            }
+        }
+
+        if ( count( $candidate_ids ) < $batch_size ) {
+            break;
+        }
+
+        $scan_offset += $batch_size;
+    }
+
+    return $collected_ids;
+}
+
+function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
+    global $wpdb;
+
+    $published_count = (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(ID)
+            FROM {$wpdb->posts}
+            WHERE post_type = %s
+                AND post_status = 'publish'",
+            $post_type
+        )
+    );
+
+    if ( $published_count < 1 ) {
+        return 0;
+    }
+
+    $excluded_count = (int) $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(DISTINCT pm.post_id)
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p
+                ON p.ID = pm.post_id
+            WHERE p.post_type = %s
+                AND p.post_status = 'publish'
+                AND pm.meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')
+                AND pm.meta_value = '1'",
+            $post_type
+        )
+    );
+
+    return max( 0, $published_count - $excluded_count );
+}
+
+function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num ) {
+    $per_page = ace_sitemap_powertools_effective_post_max_urls();
+    $post_ids = ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page );
+
+    if ( empty( $post_ids ) ) {
+        $url_list = array();
+    } else {
+        $posts = get_posts(
+            array(
+                'post_type'              => $post_type,
+                'post_status'            => 'publish',
+                'post__in'               => $post_ids,
+                'orderby'                => 'post__in',
+                'posts_per_page'         => count( $post_ids ),
+                'suppress_filters'       => true,
+                'update_post_meta_cache' => false,
+                'update_post_term_cache' => false,
+            )
+        );
+
+        $url_list = array();
+
+        if ( 'page' === $post_type && 1 === (int) $page_num && 'posts' === get_option( 'show_on_front' ) ) {
+            $sitemap_entry = array(
+                'loc' => home_url( '/' ),
+            );
+
+            $latest_posts = get_posts(
+                array(
+                    'post_type'              => 'post',
+                    'post_status'            => 'publish',
+                    'orderby'                => 'date',
+                    'order'                  => 'DESC',
+                    'numberposts'            => 1,
+                    'suppress_filters'       => true,
+                    'update_post_meta_cache' => false,
+                    'update_post_term_cache' => false,
+                )
+            );
+
+            if ( ! empty( $latest_posts[0]->post_modified_gmt ) ) {
+                $sitemap_entry['lastmod'] = wp_date( DATE_W3C, strtotime( $latest_posts[0]->post_modified_gmt ) );
+            }
+
+            $url_list[] = apply_filters( 'wp_sitemaps_posts_show_on_front_entry', $sitemap_entry );
+        }
+
+        foreach ( $posts as $post ) {
+            $sitemap_entry = array(
+                'loc'     => get_permalink( $post ),
+                'lastmod' => wp_date( DATE_W3C, strtotime( $post->post_modified_gmt ) ),
+            );
+
+            $url_list[] = apply_filters( 'wp_sitemaps_posts_entry', $sitemap_entry, $post, $post_type );
+        }
+    }
+
+    return $url_list;
+}
+
+function ace_sitemap_powertools_posts_pre_url_list( $url_list, $post_type, $page_num ) {
+    if ( null !== $url_list || ! ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) ) {
+        return $url_list;
+    }
+
+    $cache_key = sprintf(
+        'posts_url_list_v%d_%s_%d_%d',
+        ace_sitemap_powertools_get_cache_version(),
+        sanitize_key( $post_type ),
+        (int) $page_num,
+        ace_sitemap_powertools_effective_post_max_urls()
+    );
+
+    return ace_sitemap_powertools_cache_remember(
+        $cache_key,
+        function () use ( $post_type, $page_num ) {
+            return ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num );
+        },
+        array()
+    );
+}
+add_filter( 'wp_sitemaps_posts_pre_url_list', 'ace_sitemap_powertools_posts_pre_url_list', 10, 3 );
+
+function ace_sitemap_powertools_posts_pre_max_num_pages( $max_num_pages, $post_type ) {
+    if ( null !== $max_num_pages || ! ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) ) {
+        return $max_num_pages;
+    }
+
+    $cache_key = sprintf(
+        'posts_max_pages_v%d_%s_%d',
+        ace_sitemap_powertools_get_cache_version(),
+        sanitize_key( $post_type ),
+        ace_sitemap_powertools_effective_post_max_urls()
+    );
+
+    return (int) ace_sitemap_powertools_cache_remember(
+        $cache_key,
+        function () use ( $post_type ) {
+            $visible_count  = ace_sitemap_powertools_get_visible_post_count( $post_type );
+            $max_num_pages  = (int) ceil( $visible_count / ace_sitemap_powertools_effective_post_max_urls() );
+            $min_num_pages  = ( 'page' === $post_type && 'posts' === get_option( 'show_on_front' ) ) ? 1 : 0;
+
+            return max( $min_num_pages, $max_num_pages );
+        },
+        0
+    );
+}
+add_filter( 'wp_sitemaps_posts_pre_max_num_pages', 'ace_sitemap_powertools_posts_pre_max_num_pages', 10, 2 );
+
 function ace_sitemap_powertools_posts_query_args( $args, $post_type ) {
     if ( ! is_array( $args ) ) {
         return $args;
@@ -2097,53 +2514,13 @@ function ace_sitemap_powertools_posts_query_args( $args, $post_type ) {
         $args['order'] = 'DESC';
     }
 
-    $noindex_meta_query = array(
-        'relation' => 'AND',
-        array(
-            'relation' => 'OR',
-            array(
-                'key'     => '_ace_seo_meta-robots-noindex',
-                'compare' => 'NOT EXISTS',
-            ),
-            array(
-                'key'     => '_ace_seo_meta-robots-noindex',
-                'value'   => '1',
-                'compare' => '!=',
-            ),
-        ),
-        array(
-            'relation' => 'OR',
-            array(
-                'key'     => '_yoast_wpseo_meta-robots-noindex',
-                'compare' => 'NOT EXISTS',
-            ),
-            array(
-                'key'     => '_yoast_wpseo_meta-robots-noindex',
-                'value'   => '1',
-                'compare' => '!=',
-            ),
-        ),
-    );
-
-    if ( isset( $args['meta_query'] ) && is_array( $args['meta_query'] ) ) {
-        $args['meta_query'] = array_merge(
-            array( 'relation' => 'AND' ),
-            $args['meta_query'],
-            array( $noindex_meta_query )
-        );
-    } else {
-        $args['meta_query'] = $noindex_meta_query;
-    }
-
     return $args;
 }
 add_filter( 'wp_sitemaps_posts_query_args', 'ace_sitemap_powertools_posts_query_args', 10, 2 );
 
 function ace_sitemap_powertools_max_urls( $max_urls, $object_type ) {
-    $limit = (int) ace_sitemap_powertools_get_option( 'post_max_urls' );
-
-    if ( $limit > 0 && 'post' === $object_type ) {
-        return $limit;
+    if ( 'post' === $object_type ) {
+        return ace_sitemap_powertools_effective_post_max_urls();
     }
 
     return $max_urls;
