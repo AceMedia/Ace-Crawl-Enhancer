@@ -54,6 +54,22 @@ function ace_sitemap_powertools_get_option( $key ) {
     return isset( $options[ $key ] ) ? $options[ $key ] : null;
 }
 
+function ace_sitemap_powertools_has_redis_cache_plugin() {
+    return defined( 'ACE_REDIS_CACHE_PLUGIN_FILE' ) || function_exists( 'ace_redis_cache' ) || class_exists( 'AceMedia\\RedisCache\\AceRedisCache' );
+}
+
+function ace_sitemap_powertools_redis_cache_available() {
+    if ( ! ace_sitemap_powertools_has_redis_cache_plugin() ) {
+        return false;
+    }
+
+    if ( function_exists( 'wp_using_ext_object_cache' ) ) {
+        return wp_using_ext_object_cache();
+    }
+
+    return true;
+}
+
 function ace_sitemap_powertools_effective_post_max_urls() {
     $limit = (int) ace_sitemap_powertools_get_option( 'post_max_urls' );
 
@@ -673,6 +689,10 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
         $output[ $key ] = $value;
     }
 
+    if ( ! ace_sitemap_powertools_has_redis_cache_plugin() ) {
+        $output['enable_sitemap_cache'] = 0;
+    }
+
     foreach ( $arrays as $key ) {
         $values = isset( $input[ $key ] ) && is_array( $input[ $key ] ) ? $input[ $key ] : array();
         $output[ $key ] = array_values( array_unique( array_map( 'sanitize_key', $values ) ) );
@@ -1156,11 +1176,31 @@ function ace_sitemap_powertools_add_rewrite_rules() {
 add_action( 'init', 'ace_sitemap_powertools_add_rewrite_rules' );
 
 function ace_sitemap_powertools_get_cache_version() {
-    $version = get_option( 'ace_sitemap_cache_version', 1 );
-    return (int) $version > 0 ? (int) $version : 1;
+    $version = 0;
+
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        $version = (int) wp_cache_get( 'ace_sitemap_cache_version', 'ace_sitemap_meta' );
+        if ( $version < 1 ) {
+            $version = 1;
+            wp_cache_set( 'ace_sitemap_cache_version', $version, 'ace_sitemap_meta' );
+        }
+    } else {
+        $version = (int) get_option( 'ace_sitemap_cache_version', 1 );
+    }
+
+    return $version > 0 ? $version : 1;
 }
 
 function ace_sitemap_powertools_bump_cache_version() {
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        $version = (int) wp_cache_incr( 'ace_sitemap_cache_version', 1, 'ace_sitemap_meta' );
+        if ( $version < 1 ) {
+            $current = ace_sitemap_powertools_get_cache_version();
+            wp_cache_set( 'ace_sitemap_cache_version', $current + 1, 'ace_sitemap_meta' );
+        }
+        return;
+    }
+
     $version = ace_sitemap_powertools_get_cache_version();
     update_option( 'ace_sitemap_cache_version', $version + 1 );
 }
@@ -1172,11 +1212,17 @@ function ace_sitemap_powertools_bump_cache_version_debounced( $scope ) {
     }
 
     $lock_key = 'ace_sitemap_cache_bump_' . $scope;
-    if ( get_transient( $lock_key ) ) {
-        return false;
-    }
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        if ( ! wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 15 ) ) {
+            return false;
+        }
+    } else {
+        if ( get_transient( $lock_key ) ) {
+            return false;
+        }
 
-    set_transient( $lock_key, 1, 15 );
+        set_transient( $lock_key, 1, 15 );
+    }
     ace_sitemap_powertools_bump_cache_version();
     return true;
 }
@@ -1259,6 +1305,12 @@ function ace_sitemap_powertools_cache_get_stale( $key ) {
         return null;
     }
 
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        $found  = false;
+        $stale  = wp_cache_get( 'stale:' . $key, 'ace_sitemap', false, $found );
+        return $found ? $stale : null;
+    }
+
     $option_key = ace_sitemap_powertools_cache_option_key( $key );
     $stored     = get_option( $option_key );
 
@@ -1275,15 +1327,23 @@ function ace_sitemap_powertools_cache_lock_key( $key ) {
 
 function ace_sitemap_powertools_cache_acquire_lock( $key ) {
     $lock_key = ace_sitemap_powertools_cache_lock_key( $key );
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        return wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 30 );
+    }
+
     if ( get_transient( $lock_key ) ) {
         return false;
     }
-
     set_transient( $lock_key, 1, 30 );
     return true;
 }
 
 function ace_sitemap_powertools_cache_release_lock( $key ) {
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        wp_cache_delete( ace_sitemap_powertools_cache_lock_key( $key ), 'ace_sitemap_locks' );
+        return;
+    }
+
     delete_transient( ace_sitemap_powertools_cache_lock_key( $key ) );
 }
 
@@ -1328,10 +1388,15 @@ function ace_sitemap_powertools_get_cache_ttl() {
 }
 
 function ace_sitemap_powertools_cache_enabled() {
-    return ace_sitemap_powertools_is_enabled( 'enable_sitemap_cache' );
+    return ace_sitemap_powertools_is_enabled( 'enable_sitemap_cache' ) && ace_sitemap_powertools_redis_cache_available();
 }
 
 function ace_sitemap_powertools_purge_cache() {
+    if ( ace_sitemap_powertools_redis_cache_available() ) {
+        ace_sitemap_powertools_bump_cache_version();
+        return;
+    }
+
     global $wpdb;
 
     if ( ! $wpdb ) {
@@ -1357,18 +1422,22 @@ function ace_sitemap_powertools_cache_get( $key ) {
         return $cached;
     }
 
-    $option_key = ace_sitemap_powertools_cache_option_key( $key );
-    $stored = get_option( $option_key );
-    if ( ! is_array( $stored ) || ! isset( $stored['t'] ) || ! array_key_exists( 'data', $stored ) ) {
-        return null;
+    if ( ! ace_sitemap_powertools_redis_cache_available() ) {
+        $option_key = ace_sitemap_powertools_cache_option_key( $key );
+        $stored = get_option( $option_key );
+        if ( ! is_array( $stored ) || ! isset( $stored['t'] ) || ! array_key_exists( 'data', $stored ) ) {
+            return null;
+        }
+
+        $ttl = ace_sitemap_powertools_get_cache_ttl();
+        if ( $ttl > 0 && ( time() - (int) $stored['t'] ) > $ttl ) {
+            return null;
+        }
+
+        return $stored['data'];
     }
 
-    $ttl = ace_sitemap_powertools_get_cache_ttl();
-    if ( $ttl > 0 && ( time() - (int) $stored['t'] ) > $ttl ) {
-        return null;
-    }
-
-    return $stored['data'];
+    return null;
 }
 
 function ace_sitemap_powertools_cache_set( $key, $value ) {
@@ -1376,10 +1445,46 @@ function ace_sitemap_powertools_cache_set( $key, $value ) {
         return;
     }
 
-    wp_cache_set( $key, $value, 'ace_sitemap', ace_sitemap_powertools_get_cache_ttl() );
-    $option_key = ace_sitemap_powertools_cache_option_key( $key );
-    update_option( $option_key, array( 't' => time(), 'data' => $value ), false );
+    $ttl = ace_sitemap_powertools_get_cache_ttl();
+    wp_cache_set( $key, $value, 'ace_sitemap', $ttl );
+    wp_cache_set( 'stale:' . $key, $value, 'ace_sitemap', max( $ttl * 2, $ttl + 60 ) );
+
+    if ( ! ace_sitemap_powertools_redis_cache_available() ) {
+        $option_key = ace_sitemap_powertools_cache_option_key( $key );
+        update_option( $option_key, array( 't' => time(), 'data' => $value ), false );
+    }
 }
+
+function ace_sitemap_powertools_filter_redis_cache_exclusions( $exclusions ) {
+    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+        return $exclusions;
+    }
+
+    $exclusions[] = 'sitemap.xml';
+    $exclusions[] = 'wp-sitemap';
+    $exclusions[] = 'sitemap-stylesheet';
+
+    $routes = function_exists( 'ace_sitemap_powertools_custom_routes' ) ? ace_sitemap_powertools_custom_routes() : array();
+    foreach ( array_keys( (array) $routes ) as $slug ) {
+        $slug = trim( (string) $slug );
+        if ( '' !== $slug ) {
+            $exclusions[] = $slug . '.xml';
+            $exclusions[] = $slug . '-';
+        }
+    }
+
+    return array_values( array_unique( array_filter( $exclusions ) ) );
+}
+add_filter( 'ace_redis_cache_excluded_urls', 'ace_sitemap_powertools_filter_redis_cache_exclusions' );
+
+function ace_sitemap_powertools_filter_redis_sitemap_prime_delay( $delay ) {
+    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+        return $delay;
+    }
+
+    return max( 300, ace_sitemap_powertools_get_cache_ttl() );
+}
+add_filter( 'ace_rc_sitemap_prime_delay', 'ace_sitemap_powertools_filter_redis_sitemap_prime_delay' );
 
 // Invalidate sitemap cache only when public sitemap content changes.
 add_action( 'save_post', 'ace_sitemap_powertools_maybe_bump_cache_version_on_save', 20, 3 );
