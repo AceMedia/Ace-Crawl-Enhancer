@@ -2255,9 +2255,9 @@
    ========================================== */
 
 /* Add New Term Form */
-.ace-seo-taxonomy-fields {
+.form-field.ace-seo-taxonomy-fields {
     margin-top: 20px !important;
-    padding: 20px;
+    padding: 20px !important;
     border: 1px solid #c3c4c7;
     border-radius: 6px;
     background: #fff;
@@ -2745,9 +2745,9 @@
         height: 20px !important;
     }
     
-    .ace-seo-taxonomy-fields {
+    .form-field.ace-seo-taxonomy-fields {
         margin: 10px 0;
-        padding: 15px;
+        padding: 15px !important;
     }
     
     .ace-seo-taxonomy-fields input[type="text"],
