@@ -1855,12 +1855,25 @@ class AceCrawlEnhancer {
      * Get taxonomy meta with Yoast fallback and migration
      */
     public static function get_taxonomy_meta($term_id, $taxonomy, $key) {
+        // Per-request cache: this is called multiple times per page for title, desc, etc.
+        static $meta_cache = [];
+        $cache_key = "{$term_id}:{$taxonomy}:{$key}";
+        if ( array_key_exists( $cache_key, $meta_cache ) ) {
+            return $meta_cache[ $cache_key ];
+        }
+
         // First try to get ACE SEO meta
         $value = get_term_meta($term_id, ACE_SEO_META_PREFIX . $key, true);
         
         // If no ACE meta exists, check for Yoast data and migrate it
         if (empty($value)) {
-            $yoast_tax_meta = get_option('wpseo_taxonomy_meta', []);
+            // Cache the (potentially large) option for the duration of the request.
+            static $yoast_tax_meta_loaded = false;
+            static $yoast_tax_meta = [];
+            if ( ! $yoast_tax_meta_loaded ) {
+                $yoast_tax_meta        = get_option( 'wpseo_taxonomy_meta', [] );
+                $yoast_tax_meta_loaded = true;
+            }
             
             if (isset($yoast_tax_meta[$taxonomy][$term_id])) {
                 // Map ACE keys to Yoast keys
@@ -1894,7 +1907,7 @@ class AceCrawlEnhancer {
             }
         }
         
-        return $value;
+        return $meta_cache[ $cache_key ] = $value;
     }
     
     /**

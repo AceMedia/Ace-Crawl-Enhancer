@@ -169,7 +169,7 @@ class AceSeoFrontend {
         }
 
         if (is_home() || is_front_page()) {
-            $options = get_option('ace_seo_options', []);
+            $options = $this->get_seo_options();
             $settings_desc = $options['general']['home_description'] ?? '';
 
             $page_on_front = get_option('page_on_front');
@@ -220,7 +220,7 @@ class AceSeoFrontend {
     }
 
     private function generate_website_schema() {
-        $options = get_option('ace_seo_options', []);
+        $options = $this->get_seo_options();
         $home_title = $options['general']['home_title'] ?? '';
         $home_description = $options['general']['home_description'] ?? '';
 
@@ -349,7 +349,7 @@ class AceSeoFrontend {
                 $schema['name'] = sprintf(__('%s Archive', 'ace-crawl-enhancer'), $label);
                 
                 // Try to use custom archive meta description template
-                $options = get_option('ace_seo_options', []);
+                $options = $this->get_seo_options();
                 $templates = $options['templates'] ?? [];
                 $archive_meta_key = 'meta_template_archive_' . $post_type;
                 
@@ -384,11 +384,17 @@ class AceSeoFrontend {
     }
 
     private function get_publisher_schema() {
-        $options = get_option('ace_seo_options', []);
+        // Memoize: schema is constant within a single request.
+        static $cached = null;
+        if ( $cached !== null ) {
+            return $cached;
+        }
+
+        $options = $this->get_seo_options();
         $organization = $options['organization'] ?? [];
 
         if (($organization['type'] ?? 'organization') === 'person') {
-            return $this->get_person_publisher_schema($options);
+            return $cached = $this->get_person_publisher_schema($options);
         }
 
         $name = !empty($organization['name']) ? $organization['name'] : get_bloginfo('name');
@@ -440,7 +446,16 @@ class AceSeoFrontend {
          * @param array $organization  Saved organization settings.
          * @param array $options       All Ace SEO options.
          */
-        return apply_filters('ace_seo_publisher_schema', $publisher, $organization, $options);
+        return $cached = apply_filters('ace_seo_publisher_schema', $publisher, $organization, $options);
+    }
+
+    /** Per-request cache for ace_seo_options to avoid repeated get_option() calls. */
+    private function get_seo_options() {
+        static $options = null;
+        if ( $options === null ) {
+            $options = get_option( 'ace_seo_options', [] );
+        }
+        return $options;
     }
 
     private function get_person_publisher_schema($options) {
@@ -713,7 +728,7 @@ class AceSeoFrontend {
         echo '<meta name="generator" content="Ace SEO ' . ACE_SEO_VERSION . '">' . "\n";
 
         // Add site verification meta if set
-        $options = get_option('ace_seo_options', []);
+        $options = $this->get_seo_options();
 
         $google_code = $options['webmaster']['google'] ?? ($options['webmaster']['google_verify'] ?? '');
         if (!empty($google_code)) {
@@ -773,7 +788,7 @@ class AceSeoFrontend {
      * Replace template variables for custom post type archives in schema
      */
     private function replace_archive_template_variables($template, $post_type, $post_type_obj) {
-        $options = get_option('ace_seo_options', []);
+        $options = $this->get_seo_options();
         $general = $options['general'] ?? [];
         
         $variables = [
