@@ -997,6 +997,36 @@ class AceCrawlEnhancer {
                 return current_user_can('edit_posts');
             },
         ]);
+
+        register_rest_route('ace-seo/v1', '/performance/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'callback' => [$this, 'rest_get_performance'],
+            'permission_callback' => function() {
+                return current_user_can('edit_posts');
+            },
+        ]);
+    }
+
+    /**
+     * REST: Get stored PageSpeed performance data for a post.
+     * Returns the mobile subset of _ace_seo_pagespeed_report, matching
+     * the shape expected by loadExistingPageSpeedData() in admin.js.
+     */
+    public function rest_get_performance($request) {
+        $post_id = (int) $request['id'];
+        $post = get_post($post_id);
+
+        if (!$post) {
+            return new WP_Error('invalid_post', 'Post not found', ['status' => 404]);
+        }
+
+        $report = get_post_meta($post_id, '_ace_seo_pagespeed_report', true);
+
+        if (empty($report) || !isset($report['mobile'])) {
+            return new WP_Error('no_data', 'No performance data available', ['status' => 404]);
+        }
+
+        return rest_ensure_response($report['mobile']);
     }
     
     /**
