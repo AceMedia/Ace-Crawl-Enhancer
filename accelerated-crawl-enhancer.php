@@ -1022,8 +1022,10 @@ class AceCrawlEnhancer {
 
         $report = get_post_meta($post_id, '_ace_seo_pagespeed_report', true);
 
+        // Return {has_data: false} so JS success handler calls showNoDataMessage()
+        // without triggering a red network error in DevTools.
         if (empty($report) || !isset($report['mobile'])) {
-            return new WP_Error('no_data', 'No performance data available', ['status' => 404]);
+            return rest_ensure_response(['has_data' => false]);
         }
 
         return rest_ensure_response($report['mobile']);
