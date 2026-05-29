@@ -979,12 +979,14 @@
                     xhr.setRequestHeader('X-WP-Nonce', aceSeoAdmin.nonce);
                 },
                 success: (response) => {
-                    this.displayPageSpeedData(response);
-                },
-                error: (xhr) => {
-                    if (xhr.status === 404) {
+                    if ( response && response.has_data === false ) {
                         this.showNoDataMessage();
+                    } else {
+                        this.displayPageSpeedData(response);
                     }
+                },
+                error: () => {
+                    this.showNoDataMessage();
                 }
             });
         },

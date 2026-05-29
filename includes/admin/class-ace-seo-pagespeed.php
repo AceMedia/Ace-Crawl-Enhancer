@@ -421,9 +421,9 @@ class AceSEOPageSpeed {
         $performance_data = get_post_meta( $post_id, '_ace_seo_pagespeed_report', true );
         
         if ( empty( $performance_data ) ) {
-            return new WP_Error( 'no_data', 'No performance data found', array( 'status' => 404 ) );
+            return rest_ensure_response( array( 'has_data' => false ) );
         }
-        
+
         return rest_ensure_response( $performance_data );
     }
     
