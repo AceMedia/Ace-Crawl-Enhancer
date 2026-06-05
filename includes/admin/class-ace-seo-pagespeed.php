@@ -49,21 +49,19 @@ class AceSEOPageSpeed {
         if ( ! current_user_can( 'edit_posts' ) ) {
             wp_die( 'Insufficient permissions' );
         }
+
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( 120 );
+        }
         
         $url = esc_url_raw( wp_unslash( $_POST['url'] ) );
         $strategy = sanitize_text_field( wp_unslash( $_POST['strategy'] ?? 'mobile' ) );
-        $simulate = isset( $_POST['simulate'] ) && $_POST['simulate'] === 'true';
         
         if ( empty( $url ) ) {
             wp_send_json_error( array( 'message' => 'URL is required' ) );
         }
         
-        // If it's a local URL and simulate is requested, generate mock data
-        if ( $simulate && $this->is_local_url( $url ) ) {
-            $result = $this->generate_mock_pagespeed_data( $url );
-        } else {
-            $result = $this->run_pagespeed_test( $url, $strategy );
-        }
+        $result = $this->run_pagespeed_test( $url, $strategy );
         
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( array( 
@@ -623,80 +621,6 @@ class AceSEOPageSpeed {
             'Test on production after deployment',
             'Use browser developer tools for basic performance insights',
             'Consider local performance testing tools like Lighthouse CLI'
-        );
-    }
-    
-    /**
-     * Generate mock PageSpeed data for local development
-     */
-    private function generate_mock_pagespeed_data( $url ) {
-        // Generate realistic but random performance metrics for local testing
-        $performance_score = rand( 65, 95 );
-        $accessibility_score = rand( 85, 100 );
-        $best_practices_score = rand( 80, 100 );
-        $seo_score = rand( 90, 100 );
-        
-        // Generate Core Web Vitals based on performance score
-        $lcp_good = $performance_score > 80;
-        $fid_good = $performance_score > 70;
-        $cls_good = $performance_score > 75;
-        
-        return array(
-            'performance_score' => $performance_score,
-            'accessibility_score' => $accessibility_score,
-            'best_practices_score' => $best_practices_score,
-            'seo_score' => $seo_score,
-            'core_web_vitals' => array(
-                'lcp' => array(
-                    'value' => $lcp_good ? rand( 1500, 2400 ) : rand( 2500, 4500 ),
-                    'displayValue' => $lcp_good ? '2.1 s' : '3.2 s',
-                    'score' => $lcp_good ? 0.9 : 0.4,
-                    'rating' => $lcp_good ? 'good' : 'poor',
-                ),
-                'fid' => array(
-                    'value' => $fid_good ? rand( 50, 90 ) : rand( 150, 300 ),
-                    'displayValue' => $fid_good ? '70 ms' : '200 ms',
-                    'score' => $fid_good ? 0.95 : 0.3,
-                    'rating' => $fid_good ? 'good' : 'poor',
-                ),
-                'cls' => array(
-                    'value' => $cls_good ? 0.05 : 0.25,
-                    'displayValue' => $cls_good ? '0.05' : '0.25',
-                    'score' => $cls_good ? 0.9 : 0.4,
-                    'rating' => $cls_good ? 'good' : 'poor',
-                ),
-            ),
-            'performance_metrics' => array(
-                'first_contentful_paint' => array(
-                    'value' => rand( 1200, 2000 ),
-                    'displayValue' => '1.5 s',
-                ),
-                'speed_index' => array(
-                    'value' => rand( 2000, 4000 ),
-                    'displayValue' => '3.1 s',
-                ),
-                'total_blocking_time' => array(
-                    'value' => rand( 100, 600 ),
-                    'displayValue' => '300 ms',
-                ),
-            ),
-            'opportunities' => array(
-                array(
-                    'title' => 'Optimize images',
-                    'description' => 'Properly size images to save cellular data and improve load time.',
-                    'savings_ms' => rand( 500, 2000 ),
-                    'savings_bytes' => rand( 50000, 200000 ),
-                ),
-                array(
-                    'title' => 'Eliminate render-blocking resources',
-                    'description' => 'Resources are blocking the first paint of your page.',
-                    'savings_ms' => rand( 300, 1000 ),
-                    'savings_bytes' => 0,
-                ),
-            ),
-            'overall_rating' => $performance_score >= 90 ? 'good' : ( $performance_score >= 50 ? 'needs-improvement' : 'poor' ),
-            'is_simulated' => true,
-            'simulation_note' => 'This is simulated data for local development. Deploy to a public URL for real PageSpeed analysis.'
         );
     }
 }

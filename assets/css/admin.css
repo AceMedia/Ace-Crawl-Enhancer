@@ -1775,21 +1775,6 @@
     color: white;
 }
 
-/* Simulation Notice Styles */
-.ace-simulation-notice {
-    background: #e1f5fe;
-    border: 1px solid #4fc3f7;
-    border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 16px;
-}
-
-.ace-simulation-notice p {
-    margin: 0;
-    color: #0277bd;
-    font-size: 13px;
-}
-
 /* Content Analysis Tab Styles */
 .ace-ai-analysis-section {
     padding: 20px;

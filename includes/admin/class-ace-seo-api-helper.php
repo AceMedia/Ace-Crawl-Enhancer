@@ -493,7 +493,7 @@ class AceSEOApiHelper {
         }
 
         $request_args = array(
-            'timeout' => 30,
+            'timeout' => 90,
         );
 
         if ( $api_key === '' ) {
@@ -519,6 +519,14 @@ class AceSEOApiHelper {
         $response = wp_remote_get( $api_url, $request_args );
         
         if ( is_wp_error( $response ) ) {
+            if ( strpos( $response->get_error_message(), 'timed out' ) !== false ) {
+                return new WP_Error(
+                    'pagespeed_timeout',
+                    'PageSpeed Insights did not respond within 90 seconds. Google can be slow for first-time URL tests; try again shortly or open the full report in PageSpeed Insights.',
+                    $response->get_error_data()
+                );
+            }
+
             return $response;
         }
 

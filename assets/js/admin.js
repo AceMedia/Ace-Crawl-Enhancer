@@ -182,10 +182,6 @@
                 e.preventDefault();
                 this.testPageSpeed();
             });
-            $('#ace-simulate-performance').on('click', (e) => {
-                e.preventDefault();
-                this.testPageSpeed('mobile', true);
-            });
             
             // AI Assistant events
             $(document).on('click', '.ace-ai-button', (e) => {
@@ -1004,19 +1000,14 @@
             });
         },
 
-        testPageSpeed: function(strategy = 'mobile', simulate = false) {
-            const $button = simulate ? $('#ace-simulate-performance') : $('#ace-test-performance');
+        testPageSpeed: function(strategy = 'mobile') {
+            const $button = $('#ace-test-performance');
             const $status = $('#ace-performance-status');
             
             // Show loading state
             $button.prop('disabled', true);
-            if (simulate) {
-                $button.text('Generating...');
-                $status.find('.ace-performance-text').text('Generating sample performance data...');
-            } else {
-                $button.text('Testing...');
-                $status.find('.ace-performance-text').text('Running PageSpeed test...');
-            }
+            $button.text('Testing...');
+            $status.find('.ace-performance-text').text('Running PageSpeed test...');
             
             const currentUrl = this.getCurrentPageSpeedUrl();
             
@@ -1027,17 +1018,12 @@
                     action: 'ace_seo_test_pagespeed',
                     url: currentUrl,
                     strategy: strategy,
-                    simulate: simulate,
                     nonce: aceSeoAdmin.performanceNonce
                 },
                 success: (response) => {
                     if (response.success) {
                         this.displayPageSpeedData(response.data);
                         this.updatePerformanceScore(response.data.performance_score);
-                        
-                        if (response.data.is_simulated) {
-                            this.showSimulationNotice(response.data.simulation_note);
-                        }
                     } else {
                         if (response.data && response.data.is_local) {
                             this.showLocalDevelopmentMessage(response.data);
@@ -1051,11 +1037,7 @@
                 },
                 complete: () => {
                     $button.prop('disabled', false);
-                    if (simulate) {
-                        $button.text('📊 Simulate Data');
-                    } else {
-                        $button.text('Test Performance');
-                    }
+                    $button.text('Test Performance');
                 }
             });
         },
@@ -1177,17 +1159,6 @@
             message += '</div>';
             
             $status.html(message);
-        },
-
-        showSimulationNotice: function(note) {
-            const $results = $('#ace-performance-results');
-            
-            // Add simulation notice to results
-            const notice = '<div class="ace-simulation-notice">' +
-                          '<p><strong>ℹ️ Simulated Data:</strong> ' + note + '</p>' +
-                          '</div>';
-            
-            $results.prepend(notice);
         },
 
         viewFullReport: function() {

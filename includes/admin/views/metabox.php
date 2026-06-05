@@ -523,9 +523,6 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         <button type="button" class="ace-btn ace-btn-primary" id="ace-test-performance">
                             Test Performance
                         </button>
-                        <button type="button" class="ace-btn ace-btn-secondary" id="ace-simulate-performance" title="Generate sample data for local development">
-                            📊 Simulate Data
-                        </button>
                     </div>
                 </div>
             </div>
