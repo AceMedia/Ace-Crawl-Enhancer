@@ -1057,24 +1057,45 @@
             $('#seo-score').text(data.seo_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.seo_score));
 
             const strategy = data.strategy ? data.strategy.charAt(0).toUpperCase() + data.strategy.slice(1) : 'Page';
-            const source = data.source === 'field' ? 'Chrome UX Report field data' : 'Lighthouse lab data';
-            $('#ace-performance-context').text(`${strategy} results. Core Web Vitals shown from ${source}.`);
+            const source = data.source === 'url' ? 'URL-level Chrome UX Report field data' : (data.source === 'origin' ? 'origin-level Chrome UX Report field data' : 'Lighthouse lab data');
+            $('#ace-performance-context').text(`${strategy} results. Field data shown from ${source}.`);
             
-            // Update Core Web Vitals
+            const populateVitals = (prefix, vitals) => {
+                if (!vitals) return;
+
+                const safePrefix = prefix + '-';
+                if (vitals.lcp) {
+                    $(`#${safePrefix}lcp-value`).text(vitals.lcp.displayValue);
+                    $(`#${safePrefix}lcp-rating`).text(vitals.lcp.rating).attr('class', 'ace-cwv-rating rating-' + vitals.lcp.rating);
+                }
+
+                const inp = vitals.inp || vitals.fid;
+                if (inp) {
+                    $(`#${safePrefix}inp-value`).text(inp.displayValue);
+                    $(`#${safePrefix}inp-rating`).text(inp.rating).attr('class', 'ace-cwv-rating rating-' + inp.rating);
+                }
+
+                if (vitals.cls) {
+                    $(`#${safePrefix}cls-value`).text(vitals.cls.displayValue);
+                    $(`#${safePrefix}cls-rating`).text(vitals.cls.rating).attr('class', 'ace-cwv-rating rating-' + vitals.cls.rating);
+                }
+            };
+
+            populateVitals('field', data.field_web_vitals ? data.field_web_vitals.metrics : null);
+            populateVitals('lab', data.lab_web_vitals ? data.lab_web_vitals.metrics : data.core_web_vitals);
+
+            // Keep legacy single-panel fields in sync with lab data for backwards compatibility.
             if (data.core_web_vitals) {
                 const cwv = data.core_web_vitals;
-                
                 if (cwv.lcp) {
                     $('#lcp-value').text(cwv.lcp.displayValue);
                     $('#lcp-rating').text(cwv.lcp.rating).attr('class', 'ace-cwv-rating rating-' + cwv.lcp.rating);
                 }
-                
                 const inp = cwv.inp || cwv.fid;
                 if (inp) {
                     $('#fid-value').text(inp.displayValue);
                     $('#fid-rating').text(inp.rating).attr('class', 'ace-cwv-rating rating-' + inp.rating);
                 }
-                
                 if (cwv.cls) {
                     $('#cls-value').text(cwv.cls.displayValue);
                     $('#cls-rating').text(cwv.cls.rating).attr('class', 'ace-cwv-rating rating-' + cwv.cls.rating);

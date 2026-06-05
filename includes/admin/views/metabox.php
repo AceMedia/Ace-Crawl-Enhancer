@@ -547,11 +547,10 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         <div class="ace-score-value" id="seo-score">—</div>
                     </div>
                 </div>
-                <p class="ace-seo-description" id="ace-performance-context"></p>
-                
                 <!-- Core Web Vitals -->
                 <div class="ace-core-web-vitals">
                     <h5>Core Web Vitals</h5>
+                    <p class="ace-seo-description" id="ace-performance-context"></p>
                     <div class="ace-cwv-metrics">
                         <div class="ace-cwv-item">
                             <div class="ace-cwv-label">Largest Contentful Paint (LCP)</div>
@@ -567,6 +566,49 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <div class="ace-cwv-label">Cumulative Layout Shift (CLS)</div>
                             <div class="ace-cwv-value" id="cls-value">—</div>
                             <div class="ace-cwv-rating" id="cls-rating"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="ace-performance-source-panels">
+                    <div class="ace-performance-source-panel">
+                        <h5>Field Data</h5>
+                        <div class="ace-cwv-metrics">
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Largest Contentful Paint (LCP)</div>
+                                <div class="ace-cwv-value" id="field-lcp-value">—</div>
+                                <div class="ace-cwv-rating" id="field-lcp-rating"></div>
+                            </div>
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Interaction to Next Paint (INP)</div>
+                                <div class="ace-cwv-value" id="field-inp-value">—</div>
+                                <div class="ace-cwv-rating" id="field-inp-rating"></div>
+                            </div>
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Cumulative Layout Shift (CLS)</div>
+                                <div class="ace-cwv-value" id="field-cls-value">—</div>
+                                <div class="ace-cwv-rating" id="field-cls-rating"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ace-performance-source-panel">
+                        <h5>Lab Data</h5>
+                        <div class="ace-cwv-metrics">
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Largest Contentful Paint (LCP)</div>
+                                <div class="ace-cwv-value" id="lab-lcp-value">—</div>
+                                <div class="ace-cwv-rating" id="lab-lcp-rating"></div>
+                            </div>
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Interaction to Next Paint (INP)</div>
+                                <div class="ace-cwv-value" id="lab-inp-value">—</div>
+                                <div class="ace-cwv-rating" id="lab-inp-rating"></div>
+                            </div>
+                            <div class="ace-cwv-item">
+                                <div class="ace-cwv-label">Cumulative Layout Shift (CLS)</div>
+                                <div class="ace-cwv-value" id="lab-cls-value">—</div>
+                                <div class="ace-cwv-rating" id="lab-cls-rating"></div>
+                            </div>
                         </div>
                     </div>
                 </div>

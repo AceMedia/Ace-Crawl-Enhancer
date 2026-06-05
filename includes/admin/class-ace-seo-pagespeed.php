@@ -193,18 +193,28 @@ class AceSEOPageSpeed {
         $lighthouse = $data['lighthouseResult'];
         $categories = $lighthouse['categories'] ?? array();
         $audits = $lighthouse['audits'] ?? array();
-        $field_metrics = $data['loadingExperience']['metrics'] ?? array();
-        $field_source = ! empty( $field_metrics );
+        $url_field_metrics = $data['loadingExperience']['metrics'] ?? array();
+        $origin_field_metrics = $data['originLoadingExperience']['metrics'] ?? array();
+        $field_source = ! empty( $url_field_metrics ) ? 'url' : ( ! empty( $origin_field_metrics ) ? 'origin' : '' );
         
         // Core Web Vitals
-        $core_web_vitals = array(
-            'lcp' => $this->get_lcp_metric( $field_metrics, $audits ),
-            'inp' => $this->get_inp_metric( $field_metrics, $audits ),
-            'cls' => $this->get_cls_metric( $field_metrics, $audits ),
+        $field_web_vitals = array(
+            'scope' => $field_source,
+            'overall_category' => $data['loadingExperience']['overall_category'] ?? '',
+            'metrics' => $this->build_field_web_vitals( $url_field_metrics, $origin_field_metrics ),
         );
 
-        // Backwards compatibility for existing JavaScript/selectors that expect a FID key.
-        $core_web_vitals['fid'] = $core_web_vitals['inp'];
+        $lab_web_vitals = array(
+            'scope' => 'lighthouse',
+            'metrics' => array(
+                'lcp' => $this->get_lcp_metric( array(), $audits ),
+                'inp' => $this->get_inp_metric( array(), $audits ),
+                'cls' => $this->get_cls_metric( array(), $audits ),
+            ),
+        );
+
+        // Backwards compatibility for existing JavaScript selectors that expect the old key.
+        $lab_web_vitals['metrics']['fid'] = $lab_web_vitals['metrics']['inp'];
         
         // Performance metrics
         $performance_metrics = array(
@@ -237,16 +247,29 @@ class AceSEOPageSpeed {
         
         return array(
             'strategy' => $strategy,
-            'source' => $field_source ? 'field' : 'lab',
+            'source' => $field_source ?: 'lab',
             'field_overall_category' => $data['loadingExperience']['overall_category'] ?? '',
+            'field_web_vitals' => $field_web_vitals,
+            'lab_web_vitals' => $lab_web_vitals,
             'performance_score' => round( ( $categories['performance']['score'] ?? 0 ) * 100 ),
             'accessibility_score' => round( ( $categories['accessibility']['score'] ?? 0 ) * 100 ),
             'best_practices_score' => round( ( $categories['best-practices']['score'] ?? 0 ) * 100 ),
             'seo_score' => round( ( $categories['seo']['score'] ?? 0 ) * 100 ),
-            'core_web_vitals' => $core_web_vitals,
+            'core_web_vitals' => $lab_web_vitals['metrics'],
             'performance_metrics' => $performance_metrics,
             'opportunities' => array_slice( $opportunities, 0, 5 ), // Top 5 opportunities
             'overall_rating' => $this->get_overall_performance_rating( $categories['performance']['score'] ?? 0 ),
+        );
+    }
+
+    /**
+     * Build field data web vitals from URL-level and origin-level metrics.
+     */
+    private function build_field_web_vitals( $url_field_metrics, $origin_field_metrics ) {
+        return array(
+            'lcp' => $this->build_field_metric( $url_field_metrics, $origin_field_metrics, 'LARGEST_CONTENTFUL_PAINT_MS', 'lcp' ),
+            'inp' => $this->build_field_metric( $url_field_metrics, $origin_field_metrics, 'INTERACTION_TO_NEXT_PAINT', 'inp' ),
+            'cls' => $this->build_field_metric( $url_field_metrics, $origin_field_metrics, 'CUMULATIVE_LAYOUT_SHIFT_SCORE', 'cls' ),
         );
     }
     
@@ -530,17 +553,6 @@ class AceSEOPageSpeed {
      * Get LCP metric, preferring CrUX field data where available.
      */
     private function get_lcp_metric( $field_metrics, $audits ) {
-        if ( isset( $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['percentile'] ) ) {
-            $value = (int) $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['percentile'];
-            return array(
-                'value' => $value,
-                'displayValue' => $this->format_milliseconds( $value ),
-                'score' => null,
-                'rating' => $this->normalise_pagespeed_category( $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['category'] ?? '' ),
-                'source' => 'field',
-            );
-        }
-
         $value = $audits['largest-contentful-paint']['numericValue'] ?? 0;
         return array(
             'value' => $value,
@@ -555,17 +567,6 @@ class AceSEOPageSpeed {
      * Get INP metric, preferring CrUX field data where available.
      */
     private function get_inp_metric( $field_metrics, $audits ) {
-        if ( isset( $field_metrics['INTERACTION_TO_NEXT_PAINT']['percentile'] ) ) {
-            $value = (int) $field_metrics['INTERACTION_TO_NEXT_PAINT']['percentile'];
-            return array(
-                'value' => $value,
-                'displayValue' => $value . ' ms',
-                'score' => null,
-                'rating' => $this->normalise_pagespeed_category( $field_metrics['INTERACTION_TO_NEXT_PAINT']['category'] ?? '' ),
-                'source' => 'field',
-            );
-        }
-
         $value = $audits['interaction-to-next-paint']['numericValue'] ?? ( $audits['max-potential-fid']['numericValue'] ?? 0 );
         return array(
             'value' => $value,
@@ -589,19 +590,6 @@ class AceSEOPageSpeed {
      * Get CLS metric, preferring CrUX field data where available.
      */
     private function get_cls_metric( $field_metrics, $audits ) {
-        if ( isset( $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['percentile'] ) ) {
-            $value = (float) $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['percentile'];
-            $value = $value > 1 ? $value / 100 : $value;
-
-            return array(
-                'value' => $value,
-                'displayValue' => $this->format_cls( $value ),
-                'score' => null,
-                'rating' => $this->normalise_pagespeed_category( $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['category'] ?? '' ),
-                'source' => 'field',
-            );
-        }
-
         $value = $audits['cumulative-layout-shift']['numericValue'] ?? 0;
         return array(
             'value' => $value,
@@ -609,6 +597,40 @@ class AceSEOPageSpeed {
             'score' => $audits['cumulative-layout-shift']['score'] ?? 0,
             'rating' => $this->get_cls_rating( $value ),
             'source' => 'lab',
+        );
+    }
+
+    /**
+     * Build a field metric, preferring URL-level data and then origin-level data.
+     */
+    private function build_field_metric( $url_field_metrics, $origin_field_metrics, $metric_key, $metric_type ) {
+        $metric = $url_field_metrics[ $metric_key ] ?? ( $origin_field_metrics[ $metric_key ] ?? array() );
+        if ( empty( $metric ) || ! isset( $metric['percentile'] ) ) {
+            return array(
+                'value' => null,
+                'displayValue' => 'N/A',
+                'score' => null,
+                'rating' => 'unknown',
+                'source' => 'field',
+                'scope' => 'none',
+            );
+        }
+
+        $value = $metric['percentile'];
+        if ( $metric_type === 'cls' ) {
+            $value = (float) $value;
+            $value = $value > 1 ? $value / 100 : $value;
+        } else {
+            $value = (int) $value;
+        }
+
+        return array(
+            'value' => $value,
+            'displayValue' => $metric_type === 'cls' ? $this->format_cls( $value ) : $this->format_milliseconds( $value ),
+            'score' => null,
+            'rating' => $this->normalise_pagespeed_category( $metric['category'] ?? '' ),
+            'source' => 'field',
+            'scope' => isset( $url_field_metrics[ $metric_key ] ) ? 'url' : 'origin',
         );
     }
     
