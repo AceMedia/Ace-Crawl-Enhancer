@@ -538,6 +538,14 @@ class AceSEOApiHelper {
             return new WP_Error( 'pagespeed_invalid_response', 'PageSpeed Insights returned an invalid response.' );
         }
 
+        if ( ! isset( $decoded['lighthouseResult'] ) ) {
+            $message = isset( $decoded['error']['message'] )
+                ? $decoded['error']['message']
+                : 'PageSpeed Insights did not return a Lighthouse report for this URL.';
+
+            return new WP_Error( 'pagespeed_missing_lighthouse', $message, $decoded );
+        }
+
         set_transient( $cache_key, $decoded, 10 * MINUTE_IN_SECONDS );
         return $decoded;
     }

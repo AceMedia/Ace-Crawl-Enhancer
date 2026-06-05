@@ -367,6 +367,7 @@ class AceSEOMetabox {
         $current_title = '';
         $current_content = '';
         $current_type = '';
+        $current_url = '';
         $is_taxonomy = false;
         
         if ( $post ) {
@@ -375,6 +376,7 @@ class AceSEOMetabox {
             $current_title = $post->post_title;
             $current_content = wp_trim_words( strip_tags( $post->post_content ), 25 );
             $current_type = $post->post_type;
+            $current_url = get_permalink( $post );
             
             $featured_image_id = get_post_thumbnail_id( $post->ID );
             $featured_image_url = $featured_image_id ? wp_get_attachment_image_url( $featured_image_id, 'large' ) : '';
@@ -399,6 +401,7 @@ class AceSEOMetabox {
             'nonce' => wp_create_nonce( 'wp_rest' ),
             'performanceNonce' => wp_create_nonce( 'ace_seo_performance_test' ),
             'postId' => $current_id,
+            'postUrl' => $current_url,
             'postTitle' => $current_title,
             'postContent' => $current_content,
             'postType' => $current_type,

@@ -968,6 +968,19 @@
             this.loadExistingPageSpeedData();
         },
 
+        getCurrentPageSpeedUrl: function() {
+            if (typeof aceSeoAdmin !== 'undefined' && aceSeoAdmin.postUrl) {
+                return aceSeoAdmin.postUrl;
+            }
+
+            const slug = $('#post_name').val();
+            if (slug) {
+                return window.location.origin + '/' + slug.replace(/^\/+/, '');
+            }
+
+            return window.location.href;
+        },
+
         loadExistingPageSpeedData: function() {
             const postId = aceSeoAdmin.postId;
             if (!postId) return;
@@ -1005,7 +1018,7 @@
                 $status.find('.ace-performance-text').text('Running PageSpeed test...');
             }
             
-            const currentUrl = window.location.origin + '/' + $('#post_name').val() || window.location.href;
+            const currentUrl = this.getCurrentPageSpeedUrl();
             
             $.ajax({
                 url: aceSeoAdmin.ajaxurl,
@@ -1178,7 +1191,7 @@
         },
 
         viewFullReport: function() {
-            const currentUrl = window.location.origin + '/' + $('#post_name').val() || window.location.href;
+            const currentUrl = this.getCurrentPageSpeedUrl();
             const pagespeedUrl = `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(currentUrl)}`;
             window.open(pagespeedUrl, '_blank');
         },

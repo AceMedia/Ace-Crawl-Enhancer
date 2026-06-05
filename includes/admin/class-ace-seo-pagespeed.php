@@ -185,7 +185,11 @@ class AceSEOPageSpeed {
      */
     private function parse_pagespeed_data( $data ) {
         if ( ! isset( $data['lighthouseResult'] ) ) {
-            return new WP_Error( 'invalid_data', 'Invalid PageSpeed response' );
+            $message = isset( $data['error']['message'] )
+                ? $data['error']['message']
+                : 'PageSpeed Insights did not return a Lighthouse report for this URL.';
+
+            return new WP_Error( 'invalid_data', $message, $data );
         }
         
         $lighthouse = $data['lighthouseResult'];
