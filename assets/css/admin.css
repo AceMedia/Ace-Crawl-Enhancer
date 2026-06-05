@@ -2257,11 +2257,16 @@
 /* Add New Term Form */
 .form-field.ace-seo-taxonomy-fields {
     margin-top: 20px !important;
-    padding: 20px !important;
+    padding: 20px 24px !important;
     border: 1px solid #c3c4c7;
     border-radius: 6px;
     background: #fff;
     box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    box-sizing: border-box;
+}
+
+.ace-seo-taxonomy-fields {
+    padding: 20px 24px;
 }
 
 .ace-seo-taxonomy-fields h3 {
@@ -2271,11 +2276,12 @@
     font-weight: 600;
 }
 
-.ace-seo-taxonomy-fields .form-field {
-    margin-bottom: 20px;
+.ace-seo-taxonomy-fields .ace-seo-taxonomy-field {
+    margin: 0 0 20px;
+    padding: 0;
 }
 
-.ace-seo-taxonomy-fields .form-field:last-child {
+.ace-seo-taxonomy-fields .ace-seo-taxonomy-field:last-child {
     margin-bottom: 0;
 }
 
@@ -2291,7 +2297,7 @@
 .ace-seo-taxonomy-fields textarea,
 .ace-seo-taxonomy-fields select {
     width: 100%;
-    max-width: 500px;
+    max-width: 100%;
     padding: 8px 12px;
     border: 1px solid #c3c4c7;
     border-radius: 4px;
@@ -2299,6 +2305,7 @@
     line-height: 1.4;
     background: #fff;
     transition: border-color 0.15s ease;
+    box-sizing: border-box;
 }
 
 .ace-seo-taxonomy-fields input:focus,
@@ -2309,10 +2316,20 @@
     outline: none;
 }
 
+.ace-seo-taxonomy-fields .description {
+    margin: 8px 0 0;
+}
+
+.ace-seo-taxonomy-fields .ace-title-counter,
+.ace-seo-taxonomy-fields .ace-desc-counter {
+    margin-top: 8px;
+}
+
 /* Edit Term Form */
 .ace-seo-taxonomy-section th {
-    padding: 20px 0 10px 0 !important;
+    padding: 24px 0 14px !important;
     border-bottom: 1px solid #c3c4c7;
+    vertical-align: top;
 }
 
 .ace-seo-taxonomy-section th h3 {
@@ -2325,7 +2342,53 @@
 .ace-seo-taxonomy-section .description {
     color: #0073aa;
     font-weight: 500;
-    margin-top: 5px;
+    margin-top: 6px;
+}
+
+.term-php .ace-seo-taxonomy-row th,
+.term-php .ace-seo-taxonomy-row td {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    vertical-align: top;
+}
+
+.term-php .ace-seo-taxonomy-row th {
+    width: 180px;
+    padding-right: 24px;
+}
+
+.term-php .ace-seo-taxonomy-row td {
+    padding-left: 0;
+}
+
+.term-php .ace-seo-taxonomy-row td input[type="text"],
+.term-php .ace-seo-taxonomy-row td input[type="url"],
+.term-php .ace-seo-taxonomy-row td textarea,
+.term-php .ace-seo-taxonomy-row td select {
+    width: 100%;
+    max-width: 640px;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.term-php .ace-seo-taxonomy-row td .description {
+    margin: 8px 0 0;
+    color: #50575e;
+    font-weight: 400;
+}
+
+.term-php .ace-seo-taxonomy-row td .ace-title-counter,
+.term-php .ace-seo-taxonomy-row td .ace-desc-counter {
+    max-width: 640px;
+    margin-top: 8px;
+}
+
+.term-php .ace-seo-taxonomy-row td .ace-template-variables,
+.edit-tags-php .ace-seo-taxonomy-fields .ace-template-variables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 /* Character Counter Styles */
@@ -2755,6 +2818,17 @@
     .ace-seo-taxonomy-fields textarea,
     .ace-seo-taxonomy-fields select {
         max-width: 100%;
+    }
+
+    .term-php .ace-seo-taxonomy-row th,
+    .term-php .ace-seo-taxonomy-row td {
+        display: block;
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    .term-php .ace-seo-taxonomy-row th {
+        padding-bottom: 6px;
     }
 }
 

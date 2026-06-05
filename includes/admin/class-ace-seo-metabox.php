@@ -428,7 +428,7 @@ class AceSEOMetabox {
         <div class="form-field ace-seo-taxonomy-fields">
             <h3><?php _e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
             
-            <div class="form-field">
+            <div class="ace-seo-taxonomy-field">
                 <label for="ace_seo_title"><?php _e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
                 <input type="text" name="ace_seo_title" id="ace_seo_title" value="" size="40" />
                 <p class="description">
@@ -451,7 +451,7 @@ class AceSEOMetabox {
                 </div>
             </div>
             
-            <div class="form-field">
+            <div class="ace-seo-taxonomy-field">
                 <label for="ace_seo_desc"><?php _e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
                 <textarea name="ace_seo_desc" id="ace_seo_desc" rows="3" cols="40"></textarea>
                 <p class="description">
@@ -473,19 +473,19 @@ class AceSEOMetabox {
                 </div>
             </div>
             
-            <div class="form-field">
+            <div class="ace-seo-taxonomy-field">
                 <label for="ace_seo_canonical"><?php _e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
                 <input type="url" name="ace_seo_canonical" id="ace_seo_canonical" value="" size="40" />
                 <p class="description"><?php _e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
             </div>
             
-            <div class="form-field">
+            <div class="ace-seo-taxonomy-field">
                 <label for="ace_seo_focuskw"><?php _e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
                 <input type="text" name="ace_seo_focuskw" id="ace_seo_focuskw" value="" size="40" />
                 <p class="description"><?php _e( 'Primary keyword to optimize this term for.', 'ace-crawl-enhancer' ); ?></p>
             </div>
             
-            <div class="form-field">
+            <div class="ace-seo-taxonomy-field">
                 <label for="ace_seo_noindex"><?php _e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
                 <select name="ace_seo_noindex" id="ace_seo_noindex">
                     <option value="default"><?php _e( 'Default (follow site settings)', 'ace-crawl-enhancer' ); ?></option>
@@ -495,35 +495,6 @@ class AceSEOMetabox {
                 <p class="description"><?php _e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
             </div>
         </div>
-        
-        <style>
-        .ace-seo-taxonomy-fields {
-            margin-top: 20px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background: #f9f9f9;
-        }
-        .ace-counter-text {
-            font-size: 12px;
-            color: #666;
-        }
-        .ace-counter-bar {
-            width: 100%;
-            height: 4px;
-            background: #ddd;
-            border-radius: 2px;
-            margin-top: 5px;
-        }
-        .ace-counter-progress {
-            height: 100%;
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-        .ace-counter-progress.good { background: #46b450; }
-        .ace-counter-progress.warning { background: #ffb900; }
-        .ace-counter-progress.error { background: #dc3232; }
-        </style>
         <?php
     }
     
@@ -580,7 +551,7 @@ class AceSEOMetabox {
             </th>
         </tr>
         
-        <tr class="form-field">
+        <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
                 <label for="ace_seo_title"><?php _e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
             </th>
@@ -607,7 +578,7 @@ class AceSEOMetabox {
             </td>
         </tr>
         
-        <tr class="form-field">
+        <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
                 <label for="ace_seo_desc"><?php _e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
             </th>
@@ -633,7 +604,7 @@ class AceSEOMetabox {
             </td>
         </tr>
         
-        <tr class="form-field">
+        <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
                 <label for="ace_seo_canonical"><?php _e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
             </th>
@@ -643,7 +614,7 @@ class AceSEOMetabox {
             </td>
         </tr>
         
-        <tr class="form-field">
+        <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
                 <label for="ace_seo_focuskw"><?php _e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
             </th>
@@ -653,7 +624,7 @@ class AceSEOMetabox {
             </td>
         </tr>
         
-        <tr class="form-field">
+        <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
                 <label for="ace_seo_noindex"><?php _e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
             </th>
@@ -666,32 +637,6 @@ class AceSEOMetabox {
                 <p class="description"><?php _e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
-        
-        <style>
-        .ace-seo-taxonomy-section th {
-            padding: 20px 0 10px 0;
-        }
-        .ace-counter-text {
-            font-size: 12px;
-            color: #666;
-        }
-        .ace-counter-bar {
-            width: 100%;
-            height: 4px;
-            background: #ddd;
-            border-radius: 2px;
-            margin-top: 5px;
-        }
-        .ace-counter-progress {
-            height: 100%;
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-        .ace-counter-progress.good { background: #46b450; }
-        .ace-counter-progress.warning { background: #ffb900; }
-        .ace-counter-progress.error { background: #dc3232; }
-        </style>
-        
         <script>
         jQuery(document).ready(function($) {
             // Character counters for taxonomy fields
