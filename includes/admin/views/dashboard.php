@@ -136,6 +136,21 @@ if (!defined('ABSPATH')) {
                     </div>
                 </div>
             </div>
+
+            <!-- Google Signals Card -->
+            <div class="ace-seo-card">
+                <div class="ace-seo-card-header">
+                    <h3>Google Signals</h3>
+                </div>
+                <div class="ace-seo-card-body">
+                    <div id="ace-google-signals-container">
+                        <div class="ace-loading">
+                            <div class="ace-spinner"></div>
+                            <p>Loading Google connection status...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -785,9 +785,26 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
 
                         <fieldset id="performance-pagespeed" class="ace-settings-group">
                             <legend><span class="dashicons dashicons-performance" aria-hidden="true"></span>PageSpeed</legend>
+                        <?php
+                        $pagespeed_status = class_exists('AceSEOApiHelper')
+                            ? AceSEOApiHelper::get_pagespeed_connection_status()
+                            : ['connected' => false, 'source' => 'none', 'message' => 'PageSpeed connection status is unavailable.'];
+                        ?>
+                        <div class="setting-row">
+                            <div class="setting-label">Google Connection</div>
+                            <div class="setting-field">
+                                <p class="description">
+                                    <strong><?php echo $pagespeed_status['connected'] ? 'Connected' : 'Not connected'; ?>:</strong>
+                                    <?php echo esc_html($pagespeed_status['message']); ?>
+                                </p>
+                            </div>
+                        </div>
                         <div class="setting-row">
                             <div class="setting-label"><label for="pagespeed_api_key">PageSpeed API Key</label></div>
-                            <div class="setting-field"><input type="password" name="pagespeed_api_key" id="pagespeed_api_key" value="<?php echo esc_attr($options['performance']['pagespeed_api_key'] ?? ''); ?>" class="regular-text" /></div>
+                            <div class="setting-field">
+                                <input type="password" name="pagespeed_api_key" id="pagespeed_api_key" value="<?php echo esc_attr($options['performance']['pagespeed_api_key'] ?? ''); ?>" class="regular-text" />
+                                <p class="description">Optional. If this is blank, Ace will try to use the existing Google Site Kit connection.</p>
+                            </div>
                         </div>
                         <div class="setting-row"><div class="setting-label"><label for="pagespeed_monitoring">PageSpeed Monitoring</label></div><div class="setting-field"><input type="checkbox" name="pagespeed_monitoring" id="pagespeed_monitoring" value="1" <?php checked($options['performance']['pagespeed_monitoring'] ?? 0); ?> /></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="pagespeed_alerts">PageSpeed Alerts</label></div><div class="setting-field"><input type="checkbox" name="pagespeed_alerts" id="pagespeed_alerts" value="1" <?php checked($options['performance']['pagespeed_alerts'] ?? 0); ?> /></div></div>

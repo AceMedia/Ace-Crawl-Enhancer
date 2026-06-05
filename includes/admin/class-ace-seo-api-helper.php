@@ -240,8 +240,59 @@ class AceSEOApiHelper {
         $options = get_option( 'ace_seo_options', array() );
         $performance_settings = $options['performance'] ?? array();
         
-        return ! empty( $performance_settings['pagespeed_api_key'] ) && 
-               $performance_settings['pagespeed_monitoring'];
+        return self::has_pagespeed_connection() && $performance_settings['pagespeed_monitoring'];
+    }
+
+    /**
+     * Check if PageSpeed can run using either a manual key or Site Kit.
+     */
+    public static function has_pagespeed_connection() {
+        if ( self::get_pagespeed_key() !== '' ) {
+            return true;
+        }
+
+        if ( ! class_exists( 'AceSEOSiteKit' ) ) {
+            return false;
+        }
+
+        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
+        return ! is_wp_error( $token ) && $token !== false;
+    }
+
+    /**
+     * Return PageSpeed connection status for settings and diagnostics.
+     */
+    public static function get_pagespeed_connection_status() {
+        if ( self::get_pagespeed_key() !== '' ) {
+            return array(
+                'connected' => true,
+                'source'    => 'manual_key',
+                'message'   => 'Using the PageSpeed API key saved in Ace settings.',
+            );
+        }
+
+        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+            return array(
+                'connected' => false,
+                'source'    => 'none',
+                'message'   => 'Add a PageSpeed API key or connect Google Site Kit.',
+            );
+        }
+
+        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
+        if ( is_wp_error( $token ) ) {
+            return array(
+                'connected' => false,
+                'source'    => 'sitekit',
+                'message'   => $token->get_error_message(),
+            );
+        }
+
+        return array(
+            'connected' => true,
+            'source'    => 'sitekit',
+            'message'   => 'Using the Google Site Kit connection.',
+        );
     }
     
     /**
@@ -424,28 +475,71 @@ class AceSEOApiHelper {
      */
     public static function make_pagespeed_request( $url, $strategy = 'mobile' ) {
         $api_key = self::get_pagespeed_key();
-        
-        if ( empty( $api_key ) ) {
-            return new WP_Error( 'no_api_key', 'PageSpeed Insights API key not configured' );
+
+        $strategy = in_array( $strategy, array( 'mobile', 'desktop' ), true ) ? $strategy : 'mobile';
+        $cache_key = 'ace_seo_pagespeed_' . md5( $url . '|' . $strategy . '|' . ( $api_key !== '' ? 'manual' : 'sitekit' ) );
+        $cached = get_transient( $cache_key );
+        if ( $cached !== false ) {
+            return $cached;
         }
-        
-        $api_url = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?' . http_build_query( array(
+
+        $query_args = array(
             'url' => $url,
-            'key' => $api_key,
             'strategy' => $strategy,
-            'category' => 'performance,accessibility,best-practices,seo',
-        ) );
-        
-        $response = wp_remote_get( $api_url, array(
+        );
+
+        if ( $api_key !== '' ) {
+            $query_args['key'] = $api_key;
+        }
+
+        $request_args = array(
             'timeout' => 30,
-        ) );
+        );
+
+        if ( $api_key === '' ) {
+            if ( ! class_exists( 'AceSEOSiteKit' ) ) {
+                return new WP_Error( 'no_pagespeed_connection', 'PageSpeed Insights is not configured. Add an API key or connect Google Site Kit.' );
+            }
+
+            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
+            if ( is_wp_error( $token ) ) {
+                return $token;
+            }
+
+            $request_args['headers'] = array(
+                'Authorization' => 'Bearer ' . $token,
+            );
+        }
+
+        $api_url = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?' . http_build_query( $query_args );
+        foreach ( array( 'performance', 'accessibility', 'best-practices', 'seo' ) as $category ) {
+            $api_url .= '&category=' . rawurlencode( $category );
+        }
+
+        $response = wp_remote_get( $api_url, $request_args );
         
         if ( is_wp_error( $response ) ) {
             return $response;
         }
-        
+
+        $response_code = wp_remote_retrieve_response_code( $response );
         $body = wp_remote_retrieve_body( $response );
-        return json_decode( $body, true );
+        $decoded = json_decode( $body, true );
+
+        if ( $response_code < 200 || $response_code >= 300 ) {
+            $message = is_array( $decoded ) && isset( $decoded['error']['message'] )
+                ? $decoded['error']['message']
+                : 'PageSpeed Insights request failed with HTTP ' . $response_code . '.';
+
+            return new WP_Error( 'pagespeed_request_failed', $message, array( 'status' => $response_code ) );
+        }
+
+        if ( ! is_array( $decoded ) ) {
+            return new WP_Error( 'pagespeed_invalid_response', 'PageSpeed Insights returned an invalid response.' );
+        }
+
+        set_transient( $cache_key, $decoded, 10 * MINUTE_IN_SECONDS );
+        return $decoded;
     }
     
     /**

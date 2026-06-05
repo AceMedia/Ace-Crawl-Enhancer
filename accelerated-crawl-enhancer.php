@@ -284,23 +284,34 @@ class AceCrawlEnhancer {
      * Initialize admin components
      */
     private function init_admin() {
+        $load_google_services = is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST );
+
         if (is_admin()) {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-ai-assistant.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard.php';
+        }
+
+        if ( $load_google_services ) {
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-google-data.php';
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
         }
         
         // Always load database optimizer for performance
         require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
         
         // Instantiate admin classes to register AJAX handlers and REST routes
-        if (is_admin()) {
+        if ( is_admin() ) {
             new ACE_SEO_Database_Optimizer();
+        }
+
+        if ( $load_google_services ) {
+            new AceSEOGoogleData();
             new AceSEOPageSpeed();
         }
     }

@@ -19,6 +19,7 @@
             $(document).on('click', '.ace-refresh-activity', this.refreshActivity.bind(this));
             $(document).on('click', '.ace-refresh-analysis', this.refreshAnalysis.bind(this));
             $(document).on('click', '.ace-refresh-database', this.refreshDatabase.bind(this));
+            $(document).on('click', '.ace-refresh-google-signals', this.refreshGoogleSignals.bind(this));
             
             // Database optimization handlers
             $(document).on('click', '#ace-optimize-database', this.startDatabaseOptimization.bind(this));
@@ -33,6 +34,7 @@
             setTimeout(() => this.loadRecentActivity(), 500);
             setTimeout(() => this.loadContentAnalysis(), 1000);
             setTimeout(() => this.loadDatabasePerformance(), 1500);
+            setTimeout(() => this.loadGoogleSignals(), 2000);
         },
         
         loadDashboardStats: function() {
@@ -405,6 +407,38 @@
         refreshAnalysis: function(e) {
             e.preventDefault();
             this.loadContentAnalysis();
+        },
+
+        loadGoogleSignals: function() {
+            const $container = $('#ace-google-signals-container');
+
+            if (!$container.length) return;
+
+            this.showLoading($container, 'Loading Google signals...');
+
+            $.ajax({
+                url: aceSEODashboard.ajaxurl,
+                method: 'POST',
+                data: {
+                    action: 'ace_seo_load_google_signals',
+                    nonce: aceSEODashboard.nonce
+                },
+                success: (response) => {
+                    if (response.status === 'success') {
+                        $container.html(response.data.html);
+                    } else {
+                        this.showError($container, response.message || aceSEODashboard.strings.error);
+                    }
+                },
+                error: () => {
+                    this.showError($container, aceSEODashboard.strings.error);
+                }
+            });
+        },
+
+        refreshGoogleSignals: function(e) {
+            e.preventDefault();
+            this.loadGoogleSignals();
         },
         
         loadDatabasePerformance: function() {
