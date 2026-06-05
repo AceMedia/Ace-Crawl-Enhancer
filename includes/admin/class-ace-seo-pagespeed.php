@@ -175,13 +175,13 @@ class AceSEOPageSpeed {
             return $pagespeed_data;
         }
         
-        return $this->parse_pagespeed_data( $pagespeed_data );
+        return $this->parse_pagespeed_data( $pagespeed_data, $strategy );
     }
     
     /**
      * Parse PageSpeed Insights API response
      */
-    private function parse_pagespeed_data( $data ) {
+    private function parse_pagespeed_data( $data, $strategy = 'mobile' ) {
         if ( ! isset( $data['lighthouseResult'] ) ) {
             $message = isset( $data['error']['message'] )
                 ? $data['error']['message']
@@ -193,28 +193,18 @@ class AceSEOPageSpeed {
         $lighthouse = $data['lighthouseResult'];
         $categories = $lighthouse['categories'] ?? array();
         $audits = $lighthouse['audits'] ?? array();
+        $field_metrics = $data['loadingExperience']['metrics'] ?? array();
+        $field_source = ! empty( $field_metrics );
         
         // Core Web Vitals
         $core_web_vitals = array(
-            'lcp' => array(
-                'value' => $audits['largest-contentful-paint']['numericValue'] ?? 0,
-                'displayValue' => $audits['largest-contentful-paint']['displayValue'] ?? 'N/A',
-                'score' => $audits['largest-contentful-paint']['score'] ?? 0,
-                'rating' => $this->get_lcp_rating( $audits['largest-contentful-paint']['numericValue'] ?? 0 ),
-            ),
-            'fid' => array(
-                'value' => $audits['max-potential-fid']['numericValue'] ?? 0,
-                'displayValue' => $audits['max-potential-fid']['displayValue'] ?? 'N/A',
-                'score' => $audits['max-potential-fid']['score'] ?? 0,
-                'rating' => $this->get_fid_rating( $audits['max-potential-fid']['numericValue'] ?? 0 ),
-            ),
-            'cls' => array(
-                'value' => $audits['cumulative-layout-shift']['numericValue'] ?? 0,
-                'displayValue' => $audits['cumulative-layout-shift']['displayValue'] ?? 'N/A',
-                'score' => $audits['cumulative-layout-shift']['score'] ?? 0,
-                'rating' => $this->get_cls_rating( $audits['cumulative-layout-shift']['numericValue'] ?? 0 ),
-            ),
+            'lcp' => $this->get_lcp_metric( $field_metrics, $audits ),
+            'inp' => $this->get_inp_metric( $field_metrics, $audits ),
+            'cls' => $this->get_cls_metric( $field_metrics, $audits ),
         );
+
+        // Backwards compatibility for existing JavaScript/selectors that expect a FID key.
+        $core_web_vitals['fid'] = $core_web_vitals['inp'];
         
         // Performance metrics
         $performance_metrics = array(
@@ -246,6 +236,9 @@ class AceSEOPageSpeed {
         }
         
         return array(
+            'strategy' => $strategy,
+            'source' => $field_source ? 'field' : 'lab',
+            'field_overall_category' => $data['loadingExperience']['overall_category'] ?? '',
             'performance_score' => round( ( $categories['performance']['score'] ?? 0 ) * 100 ),
             'accessibility_score' => round( ( $categories['accessibility']['score'] ?? 0 ) * 100 ),
             'best_practices_score' => round( ( $categories['best-practices']['score'] ?? 0 ) * 100 ),
@@ -532,14 +525,91 @@ class AceSEOPageSpeed {
         if ( $value_ms <= 4000 ) return 'needs-improvement';
         return 'poor';
     }
+
+    /**
+     * Get LCP metric, preferring CrUX field data where available.
+     */
+    private function get_lcp_metric( $field_metrics, $audits ) {
+        if ( isset( $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['percentile'] ) ) {
+            $value = (int) $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['percentile'];
+            return array(
+                'value' => $value,
+                'displayValue' => $this->format_milliseconds( $value ),
+                'score' => null,
+                'rating' => $this->normalise_pagespeed_category( $field_metrics['LARGEST_CONTENTFUL_PAINT_MS']['category'] ?? '' ),
+                'source' => 'field',
+            );
+        }
+
+        $value = $audits['largest-contentful-paint']['numericValue'] ?? 0;
+        return array(
+            'value' => $value,
+            'displayValue' => $audits['largest-contentful-paint']['displayValue'] ?? 'N/A',
+            'score' => $audits['largest-contentful-paint']['score'] ?? 0,
+            'rating' => $this->get_lcp_rating( $value ),
+            'source' => 'lab',
+        );
+    }
     
     /**
-     * Get FID rating
+     * Get INP metric, preferring CrUX field data where available.
      */
-    private function get_fid_rating( $value_ms ) {
-        if ( $value_ms <= 100 ) return 'good';
-        if ( $value_ms <= 300 ) return 'needs-improvement';
+    private function get_inp_metric( $field_metrics, $audits ) {
+        if ( isset( $field_metrics['INTERACTION_TO_NEXT_PAINT']['percentile'] ) ) {
+            $value = (int) $field_metrics['INTERACTION_TO_NEXT_PAINT']['percentile'];
+            return array(
+                'value' => $value,
+                'displayValue' => $value . ' ms',
+                'score' => null,
+                'rating' => $this->normalise_pagespeed_category( $field_metrics['INTERACTION_TO_NEXT_PAINT']['category'] ?? '' ),
+                'source' => 'field',
+            );
+        }
+
+        $value = $audits['interaction-to-next-paint']['numericValue'] ?? ( $audits['max-potential-fid']['numericValue'] ?? 0 );
+        return array(
+            'value' => $value,
+            'displayValue' => $audits['interaction-to-next-paint']['displayValue'] ?? ( $audits['max-potential-fid']['displayValue'] ?? 'N/A' ),
+            'score' => $audits['interaction-to-next-paint']['score'] ?? ( $audits['max-potential-fid']['score'] ?? 0 ),
+            'rating' => $this->get_inp_rating( $value ),
+            'source' => 'lab',
+        );
+    }
+
+    /**
+     * Get INP rating.
+     */
+    private function get_inp_rating( $value_ms ) {
+        if ( $value_ms <= 200 ) return 'good';
+        if ( $value_ms <= 500 ) return 'needs-improvement';
         return 'poor';
+    }
+
+    /**
+     * Get CLS metric, preferring CrUX field data where available.
+     */
+    private function get_cls_metric( $field_metrics, $audits ) {
+        if ( isset( $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['percentile'] ) ) {
+            $value = (float) $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['percentile'];
+            $value = $value > 1 ? $value / 100 : $value;
+
+            return array(
+                'value' => $value,
+                'displayValue' => $this->format_cls( $value ),
+                'score' => null,
+                'rating' => $this->normalise_pagespeed_category( $field_metrics['CUMULATIVE_LAYOUT_SHIFT_SCORE']['category'] ?? '' ),
+                'source' => 'field',
+            );
+        }
+
+        $value = $audits['cumulative-layout-shift']['numericValue'] ?? 0;
+        return array(
+            'value' => $value,
+            'displayValue' => $audits['cumulative-layout-shift']['displayValue'] ?? 'N/A',
+            'score' => $audits['cumulative-layout-shift']['score'] ?? 0,
+            'rating' => $this->get_cls_rating( $value ),
+            'source' => 'lab',
+        );
     }
     
     /**
@@ -549,6 +619,38 @@ class AceSEOPageSpeed {
         if ( $value <= 0.1 ) return 'good';
         if ( $value <= 0.25 ) return 'needs-improvement';
         return 'poor';
+    }
+
+    /**
+     * Normalise PageSpeed field categories to CSS-friendly ratings.
+     */
+    private function normalise_pagespeed_category( $category ) {
+        switch ( strtoupper( (string) $category ) ) {
+            case 'FAST':
+                return 'good';
+            case 'AVERAGE':
+                return 'needs-improvement';
+            case 'SLOW':
+                return 'poor';
+            default:
+                return 'unknown';
+        }
+    }
+
+    /**
+     * Format milliseconds like PageSpeed.
+     */
+    private function format_milliseconds( $value_ms ) {
+        return $value_ms >= 1000
+            ? round( $value_ms / 1000, 1 ) . ' s'
+            : round( $value_ms ) . ' ms';
+    }
+
+    /**
+     * Format CLS without noisy trailing zeroes.
+     */
+    private function format_cls( $value ) {
+        return rtrim( rtrim( number_format( (float) $value, 3, '.', '' ), '0' ), '.' );
     }
     
     /**

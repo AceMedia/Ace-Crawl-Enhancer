@@ -1006,7 +1006,7 @@
             
             // Show loading state
             $button.prop('disabled', true);
-            $button.text('Testing...');
+            $button.text(strategy === 'desktop' ? 'Testing Desktop...' : 'Testing Mobile...');
             $status.find('.ace-performance-text').text('Running PageSpeed test...');
             
             const currentUrl = this.getCurrentPageSpeedUrl();
@@ -1037,7 +1037,7 @@
                 },
                 complete: () => {
                     $button.prop('disabled', false);
-                    $button.text('Test Performance');
+                    $button.text('Test Mobile Performance');
                 }
             });
         },
@@ -1055,6 +1055,10 @@
             $('#accessibility-score').text(data.accessibility_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.accessibility_score));
             $('#best-practices-score').text(data.best_practices_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.best_practices_score));
             $('#seo-score').text(data.seo_score + '%').attr('class', 'ace-score-value ' + this.getScoreClass(data.seo_score));
+
+            const strategy = data.strategy ? data.strategy.charAt(0).toUpperCase() + data.strategy.slice(1) : 'Page';
+            const source = data.source === 'field' ? 'Chrome UX Report field data' : 'Lighthouse lab data';
+            $('#ace-performance-context').text(`${strategy} results. Core Web Vitals shown from ${source}.`);
             
             // Update Core Web Vitals
             if (data.core_web_vitals) {
@@ -1065,9 +1069,10 @@
                     $('#lcp-rating').text(cwv.lcp.rating).attr('class', 'ace-cwv-rating rating-' + cwv.lcp.rating);
                 }
                 
-                if (cwv.fid) {
-                    $('#fid-value').text(cwv.fid.displayValue);
-                    $('#fid-rating').text(cwv.fid.rating).attr('class', 'ace-cwv-rating rating-' + cwv.fid.rating);
+                const inp = cwv.inp || cwv.fid;
+                if (inp) {
+                    $('#fid-value').text(inp.displayValue);
+                    $('#fid-rating').text(inp.rating).attr('class', 'ace-cwv-rating rating-' + inp.rating);
                 }
                 
                 if (cwv.cls) {
@@ -1124,7 +1129,7 @@
 
         showNoDataMessage: function() {
             const $status = $('#ace-performance-status');
-            $status.find('.ace-performance-text').text('No performance data available. Click "Test Performance" to analyze this page.');
+            $status.find('.ace-performance-text').text('No performance data available. Click "Test Mobile Performance" to analyze this page.');
         },
 
         showErrorMessage: function(message) {

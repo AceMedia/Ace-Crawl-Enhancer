@@ -521,7 +521,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     <span class="ace-performance-text">No performance data available</span>
                     <div class="ace-performance-buttons">
                         <button type="button" class="ace-btn ace-btn-primary" id="ace-test-performance">
-                            Test Performance
+                            Test Mobile Performance
                         </button>
                     </div>
                 </div>
@@ -547,6 +547,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         <div class="ace-score-value" id="seo-score">—</div>
                     </div>
                 </div>
+                <p class="ace-seo-description" id="ace-performance-context"></p>
                 
                 <!-- Core Web Vitals -->
                 <div class="ace-core-web-vitals">
@@ -558,7 +559,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <div class="ace-cwv-rating" id="lcp-rating"></div>
                         </div>
                         <div class="ace-cwv-item">
-                            <div class="ace-cwv-label">First Input Delay (FID)</div>
+                            <div class="ace-cwv-label">Interaction to Next Paint (INP)</div>
                             <div class="ace-cwv-value" id="fid-value">—</div>
                             <div class="ace-cwv-rating" id="fid-rating"></div>
                         </div>
