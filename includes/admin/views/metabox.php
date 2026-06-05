@@ -639,7 +639,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             <div class="ace-performance-history" id="ace-performance-history">
                 <h5>Performance History</h5>
                 <p class="ace-seo-description">
-                    Track performance changes over time to monitor optimization efforts.
+                    Track the last few mobile and desktop tests for this page.
                 </p>
                 <div class="ace-performance-timeline" id="performance-timeline">
                     <!-- Timeline will be populated via JavaScript -->

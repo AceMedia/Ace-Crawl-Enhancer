@@ -962,6 +962,7 @@
         // PageSpeed functionality
         initPageSpeed: function() {
             this.loadExistingPageSpeedData();
+            this.loadPerformanceHistory();
         },
 
         getCurrentPageSpeedUrl: function() {
@@ -1018,12 +1019,14 @@
                     action: 'ace_seo_test_pagespeed',
                     url: currentUrl,
                     strategy: strategy,
+                    post_id: (typeof aceSeoAdmin !== 'undefined' && aceSeoAdmin.postId) ? aceSeoAdmin.postId : 0,
                     nonce: aceSeoAdmin.performanceNonce
                 },
                 success: (response) => {
                     if (response.success) {
                         this.displayPageSpeedData(response.data);
                         this.updatePerformanceScore(response.data.performance_score);
+                        this.loadPerformanceHistory();
                     } else {
                         if (response.data && response.data.is_local) {
                             this.showLocalDevelopmentMessage(response.data);
@@ -1130,6 +1133,56 @@
                         <span class="ace-savings">Potential savings: ${savings}</span>
                     </div>
                 `);
+            });
+        },
+
+        loadPerformanceHistory: function() {
+            const $timeline = $('#performance-timeline');
+
+            if (!$timeline.length || !aceSeoAdmin.postId) return;
+
+            $timeline.html('<p>Loading history...</p>');
+
+            $.ajax({
+                url: `${aceSeoAdmin.restUrl}performance/history/${aceSeoAdmin.postId}`,
+                method: 'GET',
+                beforeSend: function(xhr) {
+                    xhr.setRequestHeader('X-WP-Nonce', aceSeoAdmin.nonce);
+                },
+                success: (response) => {
+                    const history = response && response.history ? response.history : [];
+                    if (!history.length) {
+                        $timeline.html('<p>No performance runs recorded yet.</p>');
+                        return;
+                    }
+
+                    let html = '';
+                    history.forEach((entry) => {
+                        html += `
+                            <div class="ace-history-entry">
+                                <div class="ace-history-header">
+                                    <strong>${entry.strategy || 'mobile'} ${entry.source === 'field' ? 'field' : 'lab'} run</strong>
+                                    <span>${entry.timestamp || ''}</span>
+                                </div>
+                                <div class="ace-history-grid">
+                                    <span>LCP ${entry.field_lcp || entry.lab_lcp || '—'}</span>
+                                    <span>INP ${entry.field_inp || entry.lab_inp || '—'}</span>
+                                    <span>CLS ${entry.field_cls || entry.lab_cls || '—'}</span>
+                                    <span>Score ${entry.performance_score ?? '—'}%</span>
+                                </div>
+                                <div class="ace-history-meta">
+                                    <span>Field: ${entry.field_scope || 'none'}</span>
+                                    <span>Overall: ${entry.field_overall_category || 'n/a'}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    $timeline.html(html);
+                },
+                error: () => {
+                    $timeline.html('<p>Could not load performance history.</p>');
+                }
             });
         },
 

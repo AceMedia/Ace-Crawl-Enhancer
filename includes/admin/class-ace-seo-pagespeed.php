@@ -56,6 +56,7 @@ class AceSEOPageSpeed {
         
         $url = esc_url_raw( wp_unslash( $_POST['url'] ) );
         $strategy = sanitize_text_field( wp_unslash( $_POST['strategy'] ?? 'mobile' ) );
+        $post_id = absint( $_POST['post_id'] ?? 0 );
         
         if ( empty( $url ) ) {
             wp_send_json_error( array( 'message' => 'URL is required' ) );
@@ -69,6 +70,10 @@ class AceSEOPageSpeed {
                 'is_local' => $result->get_error_data()['is_local'] ?? false,
                 'suggestions' => $result->get_error_data()['suggestions'] ?? array()
             ) );
+        }
+
+        if ( $post_id ) {
+            $this->store_performance_history( $post_id, $url, $strategy, $result );
         }
         
         wp_send_json_success( $result );
@@ -263,6 +268,46 @@ class AceSEOPageSpeed {
     }
 
     /**
+     * Store a bounded performance history record for a post.
+     */
+    private function store_performance_history( $post_id, $url, $strategy, $result ) {
+        $history = get_post_meta( $post_id, '_ace_seo_pagespeed_history', true );
+        $history = is_array( $history ) ? $history : array();
+
+        $history[] = array(
+            'timestamp' => current_time( 'mysql' ),
+            'url' => $url,
+            'strategy' => $strategy,
+            'source' => $result['source'] ?? 'lab',
+            'field_scope' => $result['field_web_vitals']['scope'] ?? '',
+            'field_overall_category' => $result['field_overall_category'] ?? '',
+            'performance_score' => $result['performance_score'] ?? 0,
+            'accessibility_score' => $result['accessibility_score'] ?? 0,
+            'best_practices_score' => $result['best_practices_score'] ?? 0,
+            'seo_score' => $result['seo_score'] ?? 0,
+            'field_lcp' => $result['field_web_vitals']['metrics']['lcp']['displayValue'] ?? '',
+            'lab_lcp' => $result['lab_web_vitals']['metrics']['lcp']['displayValue'] ?? ( $result['core_web_vitals']['lcp']['displayValue'] ?? '' ),
+            'field_inp' => $result['field_web_vitals']['metrics']['inp']['displayValue'] ?? '',
+            'lab_inp' => $result['lab_web_vitals']['metrics']['inp']['displayValue'] ?? ( $result['core_web_vitals']['inp']['displayValue'] ?? '' ),
+            'field_cls' => $result['field_web_vitals']['metrics']['cls']['displayValue'] ?? '',
+            'lab_cls' => $result['lab_web_vitals']['metrics']['cls']['displayValue'] ?? ( $result['core_web_vitals']['cls']['displayValue'] ?? '' ),
+        );
+
+        $history = array_slice( $history, -10 );
+        update_post_meta( $post_id, '_ace_seo_pagespeed_history', $history );
+    }
+
+    /**
+     * Get recent performance history for a post.
+     */
+    private function get_performance_history( $post_id ) {
+        $history = get_post_meta( $post_id, '_ace_seo_pagespeed_history', true );
+        $history = is_array( $history ) ? $history : array();
+
+        return array_reverse( array_slice( $history, -10 ) );
+    }
+
+    /**
      * Build field data web vitals from URL-level and origin-level metrics.
      */
     private function build_field_web_vitals( $url_field_metrics, $origin_field_metrics ) {
@@ -429,6 +474,14 @@ class AceSEOPageSpeed {
                 return current_user_can( 'edit_posts' );
             },
         ) );
+
+        register_rest_route( 'ace-seo/v1', '/performance/history/(?P<id>\d+)', array(
+            'methods' => 'GET',
+            'callback' => array( $this, 'rest_get_performance_history' ),
+            'permission_callback' => function() {
+                return current_user_can( 'edit_posts' );
+            },
+        ) );
     }
     
     /**
@@ -452,6 +505,7 @@ class AceSEOPageSpeed {
         $params = $request->get_json_params();
         $url = esc_url_raw( $params['url'] ?? '' );
         $strategy = sanitize_text_field( $params['strategy'] ?? 'mobile' );
+        $post_id = absint( $params['post_id'] ?? 0 );
         
         if ( empty( $url ) ) {
             return new WP_Error( 'missing_url', 'URL is required', array( 'status' => 400 ) );
@@ -462,8 +516,29 @@ class AceSEOPageSpeed {
         if ( is_wp_error( $result ) ) {
             return $result;
         }
+
+        if ( $post_id ) {
+            $this->store_performance_history( $post_id, $url, $strategy, $result );
+        }
         
         return rest_ensure_response( $result );
+    }
+
+    /**
+     * REST: Get recent performance history.
+     */
+    public function rest_get_performance_history( $request ) {
+        $post_id = absint( $request['id'] ?? 0 );
+        if ( ! $post_id ) {
+            return rest_ensure_response( array( 'has_data' => false, 'history' => array() ) );
+        }
+
+        return rest_ensure_response(
+            array(
+                'has_data' => true,
+                'history'  => $this->get_performance_history( $post_id ),
+            )
+        );
     }
     
     /**

@@ -1678,8 +1678,54 @@
     border-radius: 4px;
     padding: 16px;
     background: #f9f9f9;
-    text-align: center;
     color: #666;
+}
+
+.ace-history-entry {
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    background: #fff;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+.ace-history-entry:last-child {
+    margin-bottom: 0;
+}
+
+.ace-history-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.ace-history-header span {
+    color: #646970;
+}
+
+.ace-history-grid,
+.ace-history-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 12px;
+}
+
+.ace-history-grid span,
+.ace-history-meta span {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #f6f7f7;
+    color: #1d2327;
+}
+
+.ace-performance-timeline > p {
+    margin: 0;
+    color: #646970;
     font-style: italic;
 }
 
