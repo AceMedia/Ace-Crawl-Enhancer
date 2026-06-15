@@ -1407,6 +1407,65 @@ function ace_sitemap_powertools_purge_cache() {
     ace_sitemap_powertools_bump_cache_version();
 }
 
+/**
+ * Garbage-collect the DB-backed sitemap cache.
+ *
+ * Historically these `ace_sitemap_cache_*` rows were written to wp_options as a
+ * fallback when no persistent object cache was present, with no expiry or cleanup —
+ * which let wp_options bloat to multiple GB. Deletes are batched with a bounded loop
+ * so a large backlog can't hold a long table lock or run away. cache_set() no longer
+ * writes these rows on any code path, so this is a cleanup of legacy data only.
+ *
+ * @return int Number of rows deleted.
+ */
+function ace_sitemap_powertools_gc_option_cache() {
+    global $wpdb;
+
+    if ( ! $wpdb ) {
+        return 0;
+    }
+
+    $batch       = 1000;
+    $max_batches = 50; // hard cap: at most 50k rows per run, keeps locks/runtime bounded
+    $deleted     = 0;
+
+    for ( $i = 0; $i < $max_batches; $i++ ) {
+        $rows = $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'ace_sitemap_cache_%' LIMIT {$batch}" );
+        if ( ! $rows ) {
+            break;
+        }
+        $deleted += (int) $rows;
+    }
+
+    if ( $deleted > 0 && function_exists( 'error_log' ) ) {
+        error_log( sprintf( 'Ace-Crawl-Enhancer: removed %d legacy ace_sitemap_cache_* option rows.', $deleted ) );
+    }
+
+    return $deleted;
+}
+
+/**
+ * One-time cleanup of legacy DB-backed sitemap cache rows.
+ *
+ * Because cache_set() no longer writes these rows, the bloat is purely historical, so a
+ * permanent cron isn't warranted — we purge once (flag-gated) after this code is in place.
+ * On sites that never had the bloat this is a single indexed DELETE returning 0 rows.
+ * Runs over several admin requests if there is a very large backlog (50k/run cap).
+ */
+function ace_sitemap_powertools_maybe_purge_legacy_cache() {
+    if ( get_option( 'ace_sitemap_powertools_legacy_cache_purged' ) ) {
+        return;
+    }
+
+    $deleted = ace_sitemap_powertools_gc_option_cache();
+
+    // Only mark complete once a run comes back under the per-run cap (i.e. backlog drained).
+    if ( $deleted < 50000 ) {
+        update_option( 'ace_sitemap_powertools_legacy_cache_purged', 1, false );
+    }
+}
+add_action( 'admin_init', 'ace_sitemap_powertools_maybe_purge_legacy_cache' );
+
 function ace_sitemap_powertools_cache_option_key( $key ) {
     return 'ace_sitemap_cache_' . md5( (string) $key );
 }
@@ -1449,10 +1508,12 @@ function ace_sitemap_powertools_cache_set( $key, $value ) {
     wp_cache_set( $key, $value, 'ace_sitemap', $ttl );
     wp_cache_set( 'stale:' . $key, $value, 'ace_sitemap', max( $ttl * 2, $ttl + 60 ) );
 
-    if ( ! ace_sitemap_powertools_redis_cache_available() ) {
-        $option_key = ace_sitemap_powertools_cache_option_key( $key );
-        update_option( $option_key, array( 't' => time(), 'data' => $value ), false );
-    }
+    // NOTE: we deliberately do NOT fall back to update_option() here. cache_enabled()
+    // already requires a persistent object cache (redis_cache_available()), so this is
+    // only reached when Redis is the backing store. Writing each sitemap chunk (~0.4 MB)
+    // to wp_options as a permanent, never-expiring row is what previously bloated
+    // wp_options to multiple GB. Legacy rows are cleared once by
+    // ace_sitemap_powertools_maybe_purge_legacy_cache().
 }
 
 function ace_sitemap_powertools_filter_redis_cache_exclusions( $exclusions ) {
