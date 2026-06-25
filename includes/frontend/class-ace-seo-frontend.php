@@ -50,16 +50,40 @@ class AceSeoFrontend {
     }
 
     /**
-     * Strip any remaining og:title / og:description injected by theme/plugins before output.
+     * De-duplicate og:title / og:description in the head.
+     *
+     * ACE emits its own og:title/og:description (marked with data-ace-seo="1").
+     * Themes and other plugins may inject their own copies. To guarantee exactly
+     * one canonical pair — ACE's — we capture ACE's marked tags, strip *every*
+     * og:title/og:description in the head, then re-inject ACE's pair once before
+     * </head>. (Previously this stripped all of them, including ACE's own, so the
+     * tags vanished site-wide.)
      */
     public function filter_head_output($html) {
-        // Only act on the head section to avoid over-stripping.
+        // Only act on pages that actually have a head section.
         if (stripos($html, '<head') === false) {
             return $html;
         }
 
-        $pattern = '/<meta[^>]+property=["\']og:(title|description)["\'][^>]*>/i';
-        return preg_replace($pattern, '', $html);
+        // Capture ACE's own canonical pair before stripping (markers removed).
+        $preserve = '';
+        if (preg_match('/<meta[^>]+property=["\']og:title["\'][^>]*data-ace-seo=["\']1["\'][^>]*>/i', $html, $m)) {
+            $preserve .= preg_replace('/\s*data-ace-seo=["\']1["\']/i', '', $m[0]) . "\n";
+        }
+        if (preg_match('/<meta[^>]+property=["\']og:description["\'][^>]*data-ace-seo=["\']1["\'][^>]*>/i', $html, $m)) {
+            $preserve .= preg_replace('/\s*data-ace-seo=["\']1["\']/i', '', $m[0]) . "\n";
+        }
+
+        // Strip ALL og:title / og:description (ACE's own marked copies and any
+        // duplicates injected by themes or other plugins).
+        $html = preg_replace('/[ \t]*<meta[^>]+property=["\']og:(title|description)["\'][^>]*>\n?/i', '', $html);
+
+        // Re-inject ACE's canonical pair once, immediately before </head>.
+        if ('' !== $preserve) {
+            $html = preg_replace('/<\/head>/i', $preserve . '</head>', $html, 1);
+        }
+
+        return $html;
     }
 
     public function output_schema_markup() {
