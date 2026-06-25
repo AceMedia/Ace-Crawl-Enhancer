@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.4');
+define('ACE_SEO_VERSION', '1.0.5');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -1374,15 +1374,29 @@ class AceCrawlEnhancer {
     }
     
     /**
+     * Resolve a title/description template, treating an empty saved value as "use the default".
+     *
+     * A plain `$templates[$key] ?? $default` only falls back when the key is null/unset. The
+     * settings screen can persist an *empty string* for a template (e.g. title_template_product
+     * = ''), which `??` happily returns — blanking og:title/og:description, twitter:title/
+     * description and the document title on products, categories, archives, search, author and
+     * tag pages. Trimming and checking for '' here restores the intended default.
+     */
+    private function resolve_template($templates, $key, $default) {
+        $template = isset($templates[$key]) && is_string($templates[$key]) ? trim($templates[$key]) : '';
+        return '' !== $template ? $template : $default;
+    }
+
+    /**
      * Process title template for a post
      */
     private function process_title_template($post) {
         $options = get_option('ace_seo_options', []);
         $templates = $options['templates'] ?? [];
-        
+
         $template_key = 'title_template_' . $post->post_type;
-        $template = $templates[$template_key] ?? '{title} {sep} {site_name}';
-        
+        $template = $this->resolve_template($templates, $template_key, '{title} {sep} {site_name}');
+
         return $this->replace_template_variables($template, $post);
     }
     
@@ -1396,15 +1410,15 @@ class AceCrawlEnhancer {
         $template = '{archive_title} {sep} {site_name}'; // Default fallback
         
         if (is_search()) {
-            $template = $templates['title_template_search'] ?? 'Search results for "{search_term}" {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_search', 'Search results for "{search_term}" {sep} {site_name}');
         } elseif (is_author()) {
-            $template = $templates['title_template_author'] ?? 'Articles by {author_name} {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_author', 'Articles by {author_name} {sep} {site_name}');
         } elseif (is_category()) {
-            $template = $templates['title_template_category'] ?? '{category_name} archives {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_category', '{category_name} archives {sep} {site_name}');
         } elseif (is_tag()) {
-            $template = $templates['title_template_tag'] ?? '{tag_name} archives {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_tag', '{tag_name} archives {sep} {site_name}');
         } elseif (is_date()) {
-            $template = $templates['title_template_date'] ?? '{date_archive} archives {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_date', '{date_archive} archives {sep} {site_name}');
         } elseif (is_post_type_archive()) {
             // Handle custom post type archives
             $post_type = get_query_var('post_type');
@@ -1412,9 +1426,9 @@ class AceCrawlEnhancer {
                 $post_type = reset($post_type);
             }
             $archive_template_key = 'title_template_archive_' . $post_type;
-            $template = $templates[$archive_template_key] ?? $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
+            $template = $this->resolve_template($templates, $archive_template_key, $this->resolve_template($templates, 'title_template_archive', '{archive_title} {sep} {site_name}'));
         } elseif (is_archive()) {
-            $template = $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_archive', '{archive_title} {sep} {site_name}');
         }
         
         return $this->replace_template_variables($template);
@@ -1627,7 +1641,7 @@ class AceCrawlEnhancer {
         $templates = $options['templates'] ?? [];
         
         $template_key = 'meta_template_' . $post->post_type;
-        $template = $templates[$template_key] ?? '{excerpt}';
+        $template = $this->resolve_template($templates, $template_key, '{excerpt}');
         
         return $this->replace_template_variables($template, $post);
     }
@@ -1976,12 +1990,12 @@ class AceCrawlEnhancer {
         
         // Get appropriate template based on taxonomy type
         if (is_category()) {
-            $template = $templates['title_template_category'] ?? '{category_name} {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_category', '{category_name} {sep} {site_name}');
         } elseif (is_tag()) {
-            $template = $templates['title_template_tag'] ?? '{tag_name} {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_tag', '{tag_name} {sep} {site_name}');
         } else {
             // Custom taxonomy - use generic archive template
-            $template = $templates['title_template_archive'] ?? '{archive_title} {sep} {site_name}';
+            $template = $this->resolve_template($templates, 'title_template_archive', '{archive_title} {sep} {site_name}');
         }
         
         return $this->replace_template_variables($template);
@@ -2015,12 +2029,12 @@ class AceCrawlEnhancer {
         
         // Get appropriate meta template based on taxonomy type
         if (is_category()) {
-            $template = $templates['meta_template_category'] ?? 'Browse {category_name} articles and content.';
+            $template = $this->resolve_template($templates, 'meta_template_category', 'Browse {category_name} articles and content.');
         } elseif (is_tag()) {
-            $template = $templates['meta_template_tag'] ?? 'Articles tagged with {tag_name}.';
+            $template = $this->resolve_template($templates, 'meta_template_tag', 'Articles tagged with {tag_name}.');
         } else {
             // Custom taxonomy - use generic template
-            $template = $templates['meta_template_archive'] ?? 'Browse {archive_title} content.';
+            $template = $this->resolve_template($templates, 'meta_template_archive', 'Browse {archive_title} content.');
         }
         
         return $this->replace_template_variables($template);
@@ -2264,7 +2278,9 @@ class AceCrawlEnhancer {
             
             // OG URL
             echo '<meta property="og:url" content="' . esc_url(get_permalink($post)) . '">' . "\n";
-            echo '<meta property="og:type" content="article">' . "\n";
+            // WooCommerce products are products, not articles.
+            $og_type = ('product' === get_post_type($post)) ? 'product' : 'article';
+            echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
         } elseif (is_home() || is_front_page()) {
             // Handle homepage Open Graph tags
             // OG Title for homepage - use synchronized title
