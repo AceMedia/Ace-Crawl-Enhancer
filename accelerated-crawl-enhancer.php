@@ -3,7 +3,7 @@
  * Ace Crawl Enhancer - Advanced SEO Plugin
  *
  * @package AceCrawlEnhancer
- * @version 1.0.3
+ * @version 1.0.4
  * @author AceMedia
  * @description A modern SEO plugin with seamless Yoast migration, AI-powered optimization, and advanced performance features
  * 
@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.3');
+define('ACE_SEO_VERSION', '1.0.4');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -2230,7 +2230,9 @@ class AceCrawlEnhancer {
      * Output Open Graph tags
      */
     public function output_opengraph_tags() {
-        if (is_singular()) {
+        // A static front page is also "singular"; let it fall through to the
+        // homepage branch so it gets og:type=website (not article).
+        if (is_singular() && ! is_front_page()) {
             global $post;
             
             // OG Title
@@ -2239,7 +2241,7 @@ class AceCrawlEnhancer {
                 $og_title = $this->get_seo_title($post);
             }
             if (!empty($og_title)) {
-                echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+                echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
             
             // OG Description
@@ -2248,7 +2250,7 @@ class AceCrawlEnhancer {
                 $og_desc = $this->get_meta_description($post);
             }
             if (!empty($og_desc)) {
-                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '">' . "\n";
+                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
             
             // OG Image
@@ -2268,15 +2270,25 @@ class AceCrawlEnhancer {
             // OG Title for homepage - use synchronized title
             $og_title = $this->get_homepage_title();
             if (!empty($og_title)) {
-                echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+                echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
             
             // OG Description for homepage - use synchronized description
             $og_desc = $this->get_homepage_meta_description();
             if (!empty($og_desc)) {
-                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '">' . "\n";
+                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
-            
+
+            // OG Image for homepage - from the front/posts page meta, then thumbnail.
+            $home_id  = is_front_page() ? (int) get_option('page_on_front') : (int) get_option('page_for_posts');
+            $og_image = $home_id ? self::get_meta_value($home_id, 'opengraph-image') : '';
+            if (empty($og_image) && $home_id && has_post_thumbnail($home_id)) {
+                $og_image = get_the_post_thumbnail_url($home_id, 'large');
+            }
+            if (!empty($og_image)) {
+                echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
+            }
+
             // OG URL for homepage
             echo '<meta property="og:url" content="' . esc_url(home_url()) . '">' . "\n";
             echo '<meta property="og:type" content="website">' . "\n";
@@ -2284,7 +2296,7 @@ class AceCrawlEnhancer {
             // Handle special pages
             $og_title = $this->process_special_page_title();
             if (!empty($og_title)) {
-                echo '<meta property="og:title" content="' . esc_attr($og_title) . '">' . "\n";
+                echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
             
             // OG URL for special pages
