@@ -2314,7 +2314,21 @@ class AceCrawlEnhancer {
             if (!empty($og_title)) {
                 echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
-            
+
+            // Optional OG description + image for archives/terms. Empty by default (no change
+            // to existing behaviour) — sites can enrich via these filters, e.g. supply a term's
+            // representative image and a tailored description.
+            $og_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
+            $og_desc  = apply_filters('ace_seo_archive_og_description', '', $og_term);
+            if (!empty($og_desc)) {
+                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
+            }
+            $og_image = apply_filters('ace_seo_archive_og_image', '', $og_term);
+            if (!empty($og_image)) {
+                echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
+                echo '<meta name="twitter:image" content="' . esc_url($og_image) . '">' . "\n";
+            }
+
             // OG URL for special pages
             $current_url = home_url(add_query_arg(null, null));
             echo '<meta property="og:url" content="' . esc_url($current_url) . '">' . "\n";
