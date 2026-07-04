@@ -1895,6 +1895,7 @@ function ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list ) 
     }
 
     ace_sitemap_powertools_send_response_cache_headers();
+    ace_sitemap_powertools_send_success_status();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_index_xml( $sitemap_list );
     if ( ! empty( $xml ) ) {
@@ -1908,11 +1909,22 @@ function ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list ) {
     }
 
     ace_sitemap_powertools_send_response_cache_headers();
+    ace_sitemap_powertools_send_success_status();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_xml( $url_list );
     if ( ! empty( $xml ) ) {
         echo $xml;
     }
+}
+
+function ace_sitemap_powertools_send_success_status() {
+    global $wp_query;
+
+    if ( $wp_query instanceof WP_Query ) {
+        $wp_query->is_404 = false;
+    }
+
+    status_header( 200 );
 }
 
 function ace_sitemap_powertools_send_response_cache_headers() {
