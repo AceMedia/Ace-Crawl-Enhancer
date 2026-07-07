@@ -149,7 +149,7 @@ class AceSEOPageSpeed {
         }
         
         // Store monitoring data
-        update_option( 'ace_seo_performance_monitoring', $monitoring_results );
+        update_option( 'ace_seo_performance_monitoring', $monitoring_results, false );
         
         wp_send_json_success( $monitoring_results );
     }

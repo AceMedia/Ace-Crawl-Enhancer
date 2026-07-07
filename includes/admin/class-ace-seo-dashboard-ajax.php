@@ -422,7 +422,7 @@ class ACE_SEO_Dashboard_Ajax {
             
             // Reset optimization pending if progress shows completed
             if ($optimization_pending && $progress['completed']) {
-                update_option('ace_seo_db_optimization_pending', false);
+                update_option('ace_seo_db_optimization_pending', false, false);
                 $optimization_pending = false;
                 error_log('ACE SEO: Reset optimization pending flag - optimization completed');
             }

@@ -45,8 +45,8 @@ class AceSEOActivator {
         self::schedule_events();
         
         // Set activation flag
-        update_option( 'ace_seo_activation_date', current_time( 'mysql' ) );
-        update_option( 'ace_seo_version', ACE_SEO_VERSION );
+        update_option( 'ace_seo_activation_date', current_time( 'mysql' ), false );
+        update_option( 'ace_seo_version', ACE_SEO_VERSION, false );
     }
     
     /**
@@ -185,7 +185,7 @@ class AceSEOActivator {
 
         $options['enable_index_lastmod'] = 0;
         update_option( 'ace_sitemap_powertools_options', $options );
-        update_option( 'ace_sitemap_powertools_large_site_notice', 1 );
+        update_option( 'ace_sitemap_powertools_large_site_notice', 1, false );
     }
     
     /**
@@ -226,8 +226,8 @@ class AceSEOActivator {
             wp_schedule_single_event( time() + 30, 'ace_seo_optimize_database' );
             
             // Set a flag that optimization is pending
-            update_option( 'ace_seo_db_optimization_pending', true );
-            update_option( 'ace_seo_db_optimization_scheduled', current_time( 'mysql' ) );
+            update_option( 'ace_seo_db_optimization_pending', true, false );
+            update_option( 'ace_seo_db_optimization_scheduled', current_time( 'mysql' ), false );
         }
     }
     
@@ -248,8 +248,8 @@ class AceSEOActivator {
                 
                 // Clear pending flag and store completion status
                 delete_option( 'ace_seo_db_optimization_pending' );
-                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ) );
-                update_option( 'ace_seo_db_optimization_results', $results );
+                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ), false );
+                update_option( 'ace_seo_db_optimization_results', $results, false );
             }
         }
     }

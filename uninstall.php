@@ -49,7 +49,19 @@ class AceSEOUninstaller {
             'ace_seo_version',
             'ace_seo_activation_date',
             'ace_seo_usage_stats',
-            'ace_seo_wizard_completed'
+            'ace_seo_wizard_completed',
+            'ace_seo_options',
+            'ace_seo_db_optimized',
+            'ace_seo_db_optimization_results',
+            'ace_seo_db_optimization_pending',
+            'ace_seo_db_optimization_scheduled',
+            'ace_seo_optimization_progress',
+            'ace_seo_performance_monitoring',
+            'ace_sitemap_powertools_options',
+            'ace_sitemap_powertools_purge_notice',
+            'ace_sitemap_powertools_large_site_notice',
+            'ace_sitemap_powertools_legacy_cache_purged',
+            'ace_sitemap_cache_version'
         );
         
         foreach ( $options_to_remove as $option ) {

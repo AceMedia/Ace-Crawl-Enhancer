@@ -43,11 +43,11 @@ theme-append title convention (see gotchas).
 
 ## Gotchas (hard-won — do not rediscover these)
 
-- **Manual `_ace_seo_title` on singular posts must be stored WITHOUT the brand** — the `is_singular`
-  branch of `filter_document_title_parts` doesn't clear `site`/`tagline`, so the theme appends the site
-  name. All live sites (unicarts, SPKF…) store brand-free titles relying on this. Do NOT "fix" the branch
-  unconditionally — it would double-strip or regress every consumer. Any fix must be an opt-in option
-  defaulting to current behaviour.
+- **Manual `_ace_seo_title` on singular posts must be stored WITHOUT the brand** — the theme appends
+  the site name. All live sites (unicarts, SPKF…) store brand-free titles relying on this. Since
+  1.0.6 the `is_singular` branch clears `site`/`tagline` ONLY for template-derived titles (templates
+  contain `{site_name}`); manual titles keep the theme-append behaviour. Do not make that clearing
+  unconditional — it strips the brand from every consumer site's manual titles.
 - The frontend de-dupes OG tags via a full-page output buffer + regex (`filter_head_output`) — fragile;
   archives that want og:description must mark output `data-ace-seo="1"` to survive it.
 - Sitemap hardcodes an `ace_event` taxonomy exclusion (powertools lines ~33/102).

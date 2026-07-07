@@ -19,20 +19,25 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## Phase 0 — Hygiene & safety (small, independent tasks) — issue #10
 
-- [ ] Remove `test-background-optimization.php`, `test-homepage-sync.php`, `fix-slashes.php` from the
-  plugin root (delete; `test-homepage-sync.php` bootstraps WP via relative path and is directly
-  executable in the webroot — mild security smell).
-- [ ] Sync versions: plugin header/constant 1.0.5 vs `package.json` 1.0.3 vs README badges 1.0.3.
-  Single source: plugin header; bump everywhere on release.
-- [ ] Audit option autoload: `ace_seo_options`, `ace_sitemap_powertools_options`, dashboard/PageSpeed
-  caches — anything large or rarely read on the front end should be `autoload=no`.
-- [ ] AI endpoint cost control: endpoints are nonce+`edit_posts` guarded, but contributors can burn
-  OpenAI/DALL·E credit. Add a filterable capability (`ace_seo_ai_capability`, default `edit_posts`)
-  + a simple per-user hourly rate limit (transient counter).
-- [ ] Double-brand title fix, opt-in: new setting "manual titles are complete (don't append site
-  name)" — default OFF to preserve every live site's brand-free convention. When ON, the
-  `is_singular` branch clears `site`/`tagline` like the other branches.
-- [ ] `.agents/`/`.codex/` are empty dirs — remove or populate (AGENTS.md symlink already covers it).
+- [x] Remove `test-background-optimization.php`, `test-homepage-sync.php`, `fix-slashes.php` from the
+  plugin root. (2026-07-07)
+- [x] Sync versions — all bumped to 1.0.6 (plugin header/constant, `package.json`, README badges).
+- [x] Autoload audit: all admin-only bookkeeping options (`ace_seo_performance_monitoring`, db
+  optimisation flags, sitemap notices, version/activation) now written with `autoload=false`, plus a
+  `maybe_upgrade()` routine (on `admin_init`, keyed off `ace_seo_version`) that fixes the flags on
+  existing installs via `wp_set_option_autoload_values()`. `ace_seo_options` and
+  `ace_sitemap_powertools_options` stay autoloaded (front-end reads). Uninstall now also cleans
+  `ace_seo_options` + the bookkeeping/sitemap options it previously missed.
+- [x] AI endpoint cost control: shared `guard()` on all 14 AI AJAX endpoints — nonce + filterable
+  capability (`ace_seo_ai_capability`, default `edit_posts`) + per-user hourly rate limit
+  (`ace_seo_ai_rate_limit`, default 60/h, admins exempt, 0 disables).
+- [x] Double-brand title fix — resolved differently from the original plan: upstream `5740dc8`
+  cleared site/tagline unconditionally, which would have stripped the brand from the live sites'
+  brand-free manual titles; refined to clear site/tagline **only when the title came from a
+  template** (templates contain `{site_name}`). Manual `_ace_seo_title`/`_yoast_wpseo_title` keep
+  the theme-append behaviour. No setting needed. Verified with a stub harness (manual/template/
+  Yoast paths).
+- [x] `.agents/`/`.codex/` empty dirs removed (AGENTS.md symlink covers it).
 
 ## Phase 1 — Schema engine: one graph, declare everything (the big one) — issue #11
 

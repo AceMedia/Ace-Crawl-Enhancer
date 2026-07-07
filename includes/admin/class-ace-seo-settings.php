@@ -556,8 +556,8 @@ class AceSEOSettings {
             error_log('ACE SEO Manual Optimization: Database indexes updated - ' . print_r($results, true));
             
             // Update optimization status
-            update_option('ace_seo_db_optimized', current_time('mysql'));
-            update_option('ace_seo_db_optimization_results', $results);
+            update_option('ace_seo_db_optimized', current_time('mysql'), false);
+            update_option('ace_seo_db_optimization_results', $results, false);
             delete_option('ace_seo_db_optimization_pending');
             
             wp_send_json_success($results);

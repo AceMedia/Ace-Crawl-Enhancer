@@ -27,7 +27,7 @@ class ACE_SEO_Database_Optimizer {
      */
     public function create_indexes() {
         // Mark optimization as pending for activation scenario
-        update_option('ace_seo_db_optimization_pending', true);
+        update_option('ace_seo_db_optimization_pending', true, false);
         
         // Use the progress-enabled version
         $results = $this->create_indexes_with_progress();
@@ -167,7 +167,7 @@ class ACE_SEO_Database_Optimizer {
             'timestamp' => current_time('timestamp')
         );
         
-        update_option('ace_seo_optimization_progress', $progress);
+        update_option('ace_seo_optimization_progress', $progress, false);
     }
     
     /**
@@ -210,7 +210,7 @@ class ACE_SEO_Database_Optimizer {
         $this->set_optimization_progress(100, 'Database optimization completed successfully!', true);
         
         // Update completion timestamp
-        update_option('ace_seo_db_optimized', current_time('mysql'));
+        update_option('ace_seo_db_optimized', current_time('mysql'), false);
         delete_option('ace_seo_db_optimization_pending');
         
         // Log results

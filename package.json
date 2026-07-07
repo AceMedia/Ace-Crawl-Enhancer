@@ -1,6 +1,6 @@
 {
   "name": "ace-crawl-enhancer",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "private": true,
   "scripts": {
     "build": "wp-scripts build && npm run build:admin-css",

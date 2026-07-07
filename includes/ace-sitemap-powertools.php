@@ -1574,7 +1574,7 @@ function ace_sitemap_powertools_handle_purge_cache_request() {
     }
 
     ace_sitemap_powertools_purge_cache();
-    update_option( 'ace_sitemap_powertools_purge_notice', 1 );
+    update_option( 'ace_sitemap_powertools_purge_notice', 1, false );
 }
 add_action( 'admin_init', 'ace_sitemap_powertools_handle_purge_cache_request' );
 

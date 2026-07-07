@@ -35,16 +35,36 @@ class AceSEOAiAssistant {
         add_action( 'wp_ajax_ace_seo_generate_more_images', array( $this, 'ajax_generate_more_images' ) );
         add_action( 'wp_ajax_ace_seo_save_image_to_library', array( $this, 'ajax_save_image_to_library' ) );
     }
-    
+
+    /**
+     * Shared guard for all AI endpoints: nonce, capability, and a per-user
+     * rate limit so lower roles can't burn paid OpenAI/DALL·E credit.
+     */
+    private function guard() {
+        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+
+        $capability = apply_filters( 'ace_seo_ai_capability', 'edit_posts' );
+        if ( ! current_user_can( $capability ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+
+        // Hourly per-user cap on AI requests (0 disables the limit).
+        $limit = (int) apply_filters( 'ace_seo_ai_rate_limit', 60 );
+        if ( $limit > 0 && ! current_user_can( 'manage_options' ) ) {
+            $key   = 'ace_seo_ai_rl_' . get_current_user_id();
+            $count = (int) get_transient( $key );
+            if ( $count >= $limit ) {
+                wp_send_json_error( 'AI request limit reached — try again in an hour.' );
+            }
+            set_transient( $key, $count + 1, HOUR_IN_SECONDS );
+        }
+    }
+
     /**
      * AJAX handler for generating SEO titles
      */
     public function ajax_generate_titles() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
         $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
@@ -75,11 +95,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating meta descriptions
      */
     public function ajax_generate_descriptions() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
         $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
@@ -109,11 +125,7 @@ class AceSEOAiAssistant {
      * AJAX handler for AI content analysis
      */
     public function ajax_analyze_content() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -136,11 +148,7 @@ class AceSEOAiAssistant {
      * AJAX handler for topic suggestions
      */
     public function ajax_suggest_topics() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -163,11 +171,7 @@ class AceSEOAiAssistant {
      * AJAX handler for content improvement suggestions
      */
     public function ajax_improve_content() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -189,11 +193,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating keyword suggestions
      */
     public function ajax_generate_keywords() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
@@ -222,11 +222,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Facebook titles
      */
     public function ajax_generate_facebook_titles() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -253,11 +249,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Facebook descriptions
      */
     public function ajax_generate_facebook_descriptions() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -281,11 +273,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Twitter titles
      */
     public function ajax_generate_twitter_titles() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -313,11 +301,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Twitter descriptions
      */
     public function ajax_generate_twitter_descriptions() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
         $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
@@ -345,11 +329,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Facebook image
      */
     public function ajax_generate_facebook_image() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         // Check if image generation is enabled
         if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
@@ -386,11 +366,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating Twitter image
      */
     public function ajax_generate_twitter_image() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         // Check if image generation is enabled
         if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
@@ -427,11 +403,7 @@ class AceSEOAiAssistant {
      * AJAX handler for regenerating a single image with custom prompt
      */
     public function ajax_regenerate_image() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         // Check if image generation is enabled
         if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
@@ -461,11 +433,7 @@ class AceSEOAiAssistant {
      * AJAX handler for generating additional images
      */
     public function ajax_generate_more_images() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
-        
-        if ( ! current_user_can( 'edit_posts' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        $this->guard();
         
         // Check if image generation is enabled
         if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
