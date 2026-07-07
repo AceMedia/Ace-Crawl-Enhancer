@@ -86,8 +86,12 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
   `businesses` → LocalBusiness, `job_listings` → JobPosting (hiringOrganization = linked
   business or site publisher `@id`), `locations` → Place; address/geo mapped from its
   `address`/`geo_location` meta convention.
-  - [ ] Follow-up in the **Ace-Community-Events repo**: migrate its Event emitter to
-    `ace_seo_register_schema_provider()` so events join the single graph too.
+  - [x] Follow-up **done + LIVE** (2026-07-07): Ace-Community-Events `6afe3eb` registers its Event
+    node into the graph via `ace_seo_register_schema_provider()` (standalone fallback kept for
+    non-Ace-SEO sites). Deployed to sheff.events (SheffEvents `bb03e7ba3`); event pages verified
+    serving ONE `@graph` (WebPage+BreadcrumbList+Organization+Event), down from 2 blocks + a stray
+    Article. Also shipped ace-crawl `12f8ed7`: Article gets an `@id`, and an `ace_seo_emit_article`
+    filter lets typed CPTs (events/businesses/jobs/locations) skip the redundant Article node.
 - [x] **WooCommerce**: Product provider shipped in Phase 1 (`ace_seo_product_schema_enabled`,
   defaults off while Woo core emits its own); `ItemList` now emitted on ALL archives (incl.
   product-category) from the main query — new `ace-seo/archive-items` provider, capped at 10.
