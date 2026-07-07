@@ -23,6 +23,44 @@ class AceSeoSchema {
         AceSeoSchemaGraph::register_provider('ace-seo/product', [$this, 'provide_product']);
         AceSeoSchemaGraph::register_provider('ace-seo/faq', [$this, 'provide_faq']);
         AceSeoSchemaGraph::register_provider('ace-seo/video', [$this, 'provide_video']);
+        AceSeoSchemaGraph::register_provider('ace-seo/archive-items', [$this, 'provide_archive_items']);
+    }
+
+    /**
+     * ItemList of the main-query posts on archive pages (category, tag, CPT
+     * and WooCommerce product-category archives) — feeds list rich results.
+     */
+    public function provide_archive_items($context) {
+        if (!is_archive() && !is_home()) {
+            return null;
+        }
+
+        global $wp_query;
+        $posts = is_object($wp_query) && !empty($wp_query->posts) ? $wp_query->posts : [];
+        if (empty($posts)) {
+            return null;
+        }
+
+        $items = [];
+        $position = 1;
+        foreach (array_slice($posts, 0, 10) as $item_post) {
+            $items[] = [
+                '@type'    => 'ListItem',
+                'position' => $position,
+                'url'      => get_permalink($item_post),
+            ];
+            $position++;
+        }
+
+        $id_base = !empty($context['webpage_id'])
+            ? str_replace('#webpage', '', $context['webpage_id'])
+            : home_url('/');
+
+        return [
+            '@type' => 'ItemList',
+            '@id'   => $id_base . '#itemlist',
+            'itemListElement' => $items,
+        ];
     }
 
     /**

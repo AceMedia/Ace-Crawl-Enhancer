@@ -221,8 +221,13 @@ class AceSeoFrontend {
         /**
          * Filter the schema.org type used for singular content.
          * Return e.g. 'NewsArticle' or 'BlogPosting' per post/post type.
+         * Default comes from settings: schema.article_type_{post_type},
+         * then schema.article_type, then 'Article'.
          */
-        $type = apply_filters('ace_seo_article_schema_type', 'Article', $post);
+        $options = $this->get_seo_options();
+        $default_type = $options['schema']['article_type_' . $post->post_type]
+            ?? ($options['schema']['article_type'] ?? 'Article');
+        $type = apply_filters('ace_seo_article_schema_type', $default_type, $post);
 
         $author_node = null;
         $author_url = get_author_posts_url($post->post_author);

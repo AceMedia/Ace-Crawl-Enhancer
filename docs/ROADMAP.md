@@ -76,19 +76,37 @@ Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitte
 Detection framework: `includes/integrations/class-ace-seo-integrations.php` — each adapter declares
 `is_active()` + registers schema providers / sitemap tweaks. Replaces scattered `class_exists` checks.
 
-- [ ] **Ace-Community-Events** (SheffEvents): `events` CPT → `Event` (uses `geo_location`, `address`,
-  `ticket_url`, `price_from`, `location_id` meta from its v1.1 data model); `businesses` →
-  `LocalBusiness`; `job_listings` → `JobPosting`; `locations` → `Place`. This is what makes
-  sheff.events rank for events.
-- [ ] **WooCommerce** (IEG, unicarts, william): wire Product schema (phase 1 task) + Offer price
-  validity, `ItemList` on product category archives, suppress duplicate Woo-core schema if present.
-- [ ] **ppnews plugins**: `ace-tournament` / `ace-event-hub` → `SportsEvent` (lift the existing
-  JSON-LD pattern from `ppnews/assets/plugins/ace-tournament/tournament.php` into an adapter);
-  posts in news categories → `NewsArticle`.
-- [ ] **Ace-Image-Enhancer**: ensure og:image / ImageObject point at the optimised rendition.
-- [ ] Replace the hardcoded `ace_event` sitemap exclusion with adapter-driven registration.
-- [ ] **SportsClub/LocalBusiness settings**: SPKF currently injects SportsClub schema via theme
-  functions.php — make the org type list cover it so config replaces theme code.
+- [x] **Framework** (2026-07-07): `includes/integrations/class-ace-seo-integrations.php` — adapters
+  run once on `template_redirect` (after all plugins register, before `wp_head`).
+- [x] **Ace-Community-Events** (SheffEvents): IMPORTANT — the current ACE-CE (SheffEvents submodule
+  copy, far ahead of the stale canonical checkout) already emits its OWN Event JSON-LD +
+  BreadcrumbList via its `ACE_SEO` class, and already has IndexNow. The adapter therefore: removes
+  its duplicate BreadcrumbList emitter (the graph now covers every page), keeps its Event emitter
+  (it knows its recurrence/offers/performers meta best), and adds the missing types —
+  `businesses` → LocalBusiness, `job_listings` → JobPosting (hiringOrganization = linked
+  business or site publisher `@id`), `locations` → Place; address/geo mapped from its
+  `address`/`geo_location` meta convention.
+  - [ ] Follow-up in the **Ace-Community-Events repo**: migrate its Event emitter to
+    `ace_seo_register_schema_provider()` so events join the single graph too.
+- [x] **WooCommerce**: Product provider shipped in Phase 1 (`ace_seo_product_schema_enabled`,
+  defaults off while Woo core emits its own); `ItemList` now emitted on ALL archives (incl.
+  product-category) from the main query — new `ace-seo/archive-items` provider, capped at 10.
+  - [ ] Active suppression of Woo core's per-listing Product blocks when Ace SEO owns product
+    schema (needs testing on IEG/unicarts before flipping).
+- [x] **NewsArticle mapping** (ppnews): per-post-type settings key
+  `schema.article_type_{post_type}` / `schema.article_type` feeding the
+  `ace_seo_article_schema_type` filter — set `NewsArticle` in `ace_seo_options` on ppnews. No
+  settings UI yet (option/filter only).
+  - [ ] `ace-tournament`/`ace-event-hub` → SportsEvent adapter: their plugin already emits its own
+    JSON-LD; adapt when ppnews bumps the submodule (or have them self-register via the API).
+- [ ] **Ace-Image-Enhancer**: ensure og:image / ImageObject point at the optimised rendition
+  (needs a look at how it rewrites attachment URLs first).
+- [x] The `ace_event` sitemap exclusion was already option-driven + filterable
+  (`ace_sitemap_powertools_excluded_sitemap_taxonomies`) — no change needed.
+- [x] **SportsClub (SPKF)**: `local.business_type` in `ace_seo_options` is free-form and the
+  front-page LocalBusiness provider emits whatever type is configured (harness-tested with
+  SportsClub) — SPKF can move its theme-injected schema to config once it takes 1.0.6.
+  - [ ] Settings UI for the `local` section (currently config-only via options).
 
 ## Phase 3 — Bots, feeds & instant indexing — issue #13
 
