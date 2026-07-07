@@ -87,65 +87,170 @@ class AceSeoFrontend {
     }
 
     public function output_schema_markup() {
-        $schema = [];
         $graph = [];
+        $publisher = $this->get_publisher_schema();
+        $publisher_ref = !empty($publisher['@id']) ? ['@id' => $publisher['@id']] : null;
+
+        // A WebPage node anchors every page; other nodes reference it by @id.
+        $webpage = $this->generate_webpage_schema();
+        $webpage_ref = ['@id' => $webpage['@id']];
 
         if (is_front_page()) {
-            $graph[] = $this->generate_website_schema();
+            $website = $this->generate_website_schema();
+            if ($publisher_ref) {
+                $website['publisher'] = $publisher_ref;
+            }
+            $webpage['isPartOf'] = ['@id' => $website['@id']];
+            $graph[] = $website;
         } elseif (is_home()) {
             $graph[] = $this->generate_archive_schema('home');
         } elseif (is_author() || is_search() || is_archive()) {
             $graph[] = $this->generate_archive_schema();
         } elseif (is_singular()) {
             global $post;
-            $graph[] = $this->generate_article_schema($post);
-        }
-
-        // Attach publisher/organization node once (shared)
-        $publisher = $this->get_publisher_schema();
-        if (!empty($publisher)) {
-            // Ensure WebSite nodes reference the shared publisher by @id (no duplicates)
-            foreach ($graph as &$node) {
-                if (isset($node['@type']) && $node['@type'] === 'WebSite') {
-                    $node['publisher'] = ['@id' => $publisher['@id']];
+            if ($post) {
+                $article = $this->generate_article_schema($post, $publisher_ref, $webpage_ref);
+                $graph[] = $article['node'];
+                if (!empty($article['author'])) {
+                    $graph[] = $article['author'];
                 }
             }
-            unset($node); // break reference
+        }
 
+        $graph[] = $webpage;
+
+        // Breadcrumb trail as BreadcrumbList (only when there is an actual trail).
+        $breadcrumbs = $this->generate_breadcrumb_schema($webpage_ref);
+        if (!empty($breadcrumbs)) {
+            $webpage_index = count($graph) - 1;
+            $graph[$webpage_index]['breadcrumb'] = ['@id' => $breadcrumbs['@id']];
+            $graph[] = $breadcrumbs;
+        }
+
+        if (!empty($publisher)) {
             $graph[] = $publisher;
         }
 
-        if (!empty($graph)) {
-            $output = count($graph) === 1 ? $graph[0] : [ '@context' => 'https://schema.org', '@graph' => $graph ];
-            echo '<script type="application/ld+json">' . "\n";
-            $json = wp_json_encode($output, JSON_UNESCAPED_UNICODE);
-            $json = str_replace('</', '<\/', $json);
-            echo $json;
-            echo "\n" . '</script>' . "\n";
-        }
+        $context = [
+            'is_front_page'  => is_front_page(),
+            'is_singular'    => is_singular(),
+            'queried_object' => get_queried_object(),
+            'webpage_id'     => $webpage['@id'],
+            'publisher_id'   => $publisher['@id'] ?? '',
+        ];
+
+        AceSeoSchemaGraph::render(AceSeoSchemaGraph::build($graph, $context));
     }
 
-    private function generate_article_schema($post) {
+    /**
+     * WebPage node for the current URL — the anchor other nodes reference.
+     */
+    private function generate_webpage_schema() {
+        $url = $this->get_current_url();
+
+        $webpage = [
+            '@type' => 'WebPage',
+            '@id'   => $url . '#webpage',
+            'url'   => $url,
+            'name'  => wp_strip_all_tags(wp_get_document_title()),
+            'inLanguage' => get_bloginfo('language'),
+        ];
+
+        $description = $this->get_current_meta_description();
+        if (!empty($description)) {
+            $webpage['description'] = $description;
+        }
+
+        return $webpage;
+    }
+
+    /**
+     * BreadcrumbList node from the shared breadcrumb trail.
+     */
+    private function generate_breadcrumb_schema($webpage_ref) {
+        if (!class_exists('ACE_SEO_Breadcrumbs') || is_front_page() || is_404()) {
+            return null;
+        }
+
+        $items = ACE_SEO_Breadcrumbs::get_items();
+        if (count($items) < 2) {
+            return null;
+        }
+
+        $list_items = [];
+        $position = 1;
+        foreach ($items as $item) {
+            if (empty($item['label'])) {
+                continue;
+            }
+            $list_item = [
+                '@type'    => 'ListItem',
+                'position' => $position,
+                'name'     => wp_strip_all_tags($item['label']),
+            ];
+            // The current page omits `item` per Google's guidelines.
+            if (empty($item['is_current']) && !empty($item['url'])) {
+                $list_item['item'] = $item['url'];
+            }
+            $list_items[] = $list_item;
+            $position++;
+        }
+
+        if (count($list_items) < 2) {
+            return null;
+        }
+
+        return [
+            '@type' => 'BreadcrumbList',
+            '@id'   => $webpage_ref['@id'] . '#breadcrumb',
+            'itemListElement' => $list_items,
+        ];
+    }
+
+    /**
+     * Article node + separate @id-linked author Person node.
+     *
+     * @return array{node: array, author: ?array}
+     */
+    private function generate_article_schema($post, $publisher_ref, $webpage_ref) {
         $manual_title = AceCrawlEnhancer::get_meta_value($post->ID, 'title');
         if (empty($manual_title)) {
             $manual_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
         }
 
+        /**
+         * Filter the schema.org type used for singular content.
+         * Return e.g. 'NewsArticle' or 'BlogPosting' per post/post type.
+         */
+        $type = apply_filters('ace_seo_article_schema_type', 'Article', $post);
+
+        $author_node = null;
+        $author_url = get_author_posts_url($post->post_author);
+        $author_name = get_the_author_meta('display_name', $post->post_author);
+        if (!empty($author_name)) {
+            $author_node = [
+                '@type' => 'Person',
+                '@id'   => $author_url . '#author',
+                'name'  => $author_name,
+                'url'   => $author_url,
+            ];
+        }
+
         $schema = [
-            '@context' => 'https://schema.org',
-            '@type' => 'Article',
+            '@type' => $type,
             'headline' => $manual_title ? $manual_title : get_the_title($post),
             'description' => $this->get_meta_description($post),
             'url' => get_permalink($post),
             'datePublished' => get_the_date('c', $post),
             'dateModified' => get_the_modified_date('c', $post),
-            'author' => [
-                '@type' => 'Person',
-                'name' => get_the_author_meta('display_name', $post->post_author),
-                'url' => get_author_posts_url($post->post_author),
-            ],
-            'publisher' => $this->get_publisher_schema(),
         ];
+
+        if ($author_node) {
+            $schema['author'] = ['@id' => $author_node['@id']];
+        }
+        if ($publisher_ref) {
+            $schema['publisher'] = $publisher_ref;
+        }
 
         // Add image if available
         if (has_post_thumbnail($post)) {
@@ -156,7 +261,17 @@ class AceSeoFrontend {
             ];
         }
 
-        return $schema;
+        /**
+         * Filter the article node (word count, reading time, section and
+         * keyword enhancements hook in here — see AceSeoSchema).
+         */
+        $schema = apply_filters('ace_seo_schema_article', $schema, $post);
+
+        // Anchor to the WebPage node last so enhancers can't detach it.
+        $schema['isPartOf'] = $webpage_ref;
+        $schema['mainEntityOfPage'] = $webpage_ref;
+
+        return ['node' => $schema, 'author' => $author_node];
     }
 
     /**
@@ -278,12 +393,11 @@ class AceSeoFrontend {
         }
 
         $schema = [
-            '@context' => 'https://schema.org',
             '@type' => 'WebSite',
+            '@id' => trailingslashit(home_url()) . '#website',
             'name' => !empty($home_title) ? $home_title : get_bloginfo('name'),
             'description' => !empty($home_description) ? $home_description : '',
             'url' => home_url(),
-            'publisher' => $this->get_publisher_schema(),
             'potentialAction' => [
                 '@type' => 'SearchAction',
                 'target' => [
@@ -298,13 +412,15 @@ class AceSeoFrontend {
     }
 
     private function generate_archive_schema($context = '') {
+        $publisher = $this->get_publisher_schema();
         $schema = [
-            '@context' => 'https://schema.org',
             '@type' => 'CollectionPage',
             'name' => wp_strip_all_tags(wp_get_document_title()),
             'url' => $this->get_current_url(),
-            'publisher' => $this->get_publisher_schema(),
         ];
+        if (!empty($publisher['@id'])) {
+            $schema['publisher'] = ['@id' => $publisher['@id']];
+        }
 
         $description = '';
 

@@ -14,9 +14,96 @@ class AceSeoSchema {
     }
     
     private function init_hooks() {
-        // Organization and LocalBusiness are now emitted via the main ACE schema graph;
-        // keep only article enhancements here to avoid duplicate JSON-LD blocks.
+        // Article enhancements (word count, reading time, section, keywords) —
+        // applied by AceSeoFrontend::generate_article_schema().
         add_filter('ace_seo_schema_article', [$this, 'enhance_article_schema'], 10, 2);
+
+        // Built-in graph providers (single-emitter: everything goes through the graph).
+        AceSeoSchemaGraph::register_provider('ace-seo/local-business', [$this, 'provide_local_business']);
+        AceSeoSchemaGraph::register_provider('ace-seo/product', [$this, 'provide_product']);
+        AceSeoSchemaGraph::register_provider('ace-seo/faq', [$this, 'provide_faq']);
+    }
+
+    /**
+     * Front-page LocalBusiness node (type/address gated by settings).
+     */
+    public function provide_local_business($context) {
+        if (empty($context['is_front_page'])) {
+            return null;
+        }
+
+        $options = get_option('ace_seo_options', []);
+        if ((($options['organization']['type'] ?? 'organization') === 'person')) {
+            return null;
+        }
+
+        $business = $this->get_local_business_data();
+        if (empty($business)) {
+            return null;
+        }
+
+        $business['@id'] = trailingslashit(home_url()) . '#localbusiness';
+
+        return $business;
+    }
+
+    /**
+     * WooCommerce Product node on single product pages.
+     *
+     * Defaults to OFF when WooCommerce's own structured data class is present
+     * (Woo core already emits Product JSON-LD); enable via the filter to let
+     * Ace SEO own product schema instead.
+     */
+    public function provide_product($context) {
+        if (empty($context['is_singular']) || !function_exists('wc_get_product') || !is_singular('product')) {
+            return null;
+        }
+
+        $enabled = apply_filters('ace_seo_product_schema_enabled', !class_exists('WC_Structured_Data'));
+        if (!$enabled) {
+            return null;
+        }
+
+        global $post;
+        $product = $post ? $this->generate_product_schema($post->ID) : null;
+        if (empty($product)) {
+            return null;
+        }
+
+        $product['@id'] = get_permalink($post->ID) . '#product';
+
+        return $product;
+    }
+
+    /**
+     * FAQPage node — opt-in per post (the heading-heuristic detection is too
+     * loose to enable everywhere). Enable with the `_ace_seo_faq-schema` post
+     * meta or the `ace_seo_faq_schema_enabled` filter.
+     */
+    public function provide_faq($context) {
+        if (empty($context['is_singular'])) {
+            return null;
+        }
+
+        global $post;
+        if (!$post) {
+            return null;
+        }
+
+        $enabled = (bool) get_post_meta($post->ID, '_ace_seo_faq-schema', true);
+        $enabled = apply_filters('ace_seo_faq_schema_enabled', $enabled, $post);
+        if (!$enabled) {
+            return null;
+        }
+
+        $faq = $this->generate_faq_schema($post->ID);
+        if (empty($faq)) {
+            return null;
+        }
+
+        $faq['@id'] = get_permalink($post->ID) . '#faq';
+
+        return $faq;
     }
     
     public function output_organization_schema() {

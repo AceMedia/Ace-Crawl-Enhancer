@@ -353,11 +353,14 @@ class AceCrawlEnhancer {
      */
     private function init_frontend() {
         require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-breadcrumbs.php';
+        // Always available so other plugins can register schema providers
+        // without guarding for the frontend context.
+        require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema-graph.php';
 
         if (!is_admin()) {
             // Load performance optimizer first for guests
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-performance.php';
-            
+
             // Load core frontend components
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-frontend.php';
             require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';

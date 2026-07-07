@@ -232,63 +232,6 @@ class ACE_SEO_Frontend_Performance {
     }
     
     /**
-     * Output deferred schema markup in footer for better performance
-     */
-    public function output_deferred_schema() {
-        // Only for guests to maximize performance
-        if (!$this->is_guest) {
-            return;
-        }
-        
-        // Move non-critical schema to footer
-        if (is_singular()) {
-            global $post;
-            $schema = $this->get_cached_article_schema($post->ID);
-            if ($schema) {
-                // Escape for HTML context to prevent XSS via </script> injection
-                $json = wp_json_encode($schema, JSON_UNESCAPED_UNICODE);
-                // Replace </ with <\/ to prevent breaking out of script tag
-                $json = str_replace('</', '<\/', $json);
-                echo '<script type="application/ld+json">' . $json . '</script>';
-            }
-        }
-    }
-    
-    /**
-     * Get cached article schema
-     */
-    private function get_cached_article_schema($post_id) {
-        $cache_key = 'ace_seo_schema_' . $post_id;
-        $cached_schema = wp_cache_get($cache_key, 'ace_seo');
-        
-        if ($cached_schema !== false) {
-            return $cached_schema;
-        }
-        
-        // Generate schema using cached meta
-        $title = $this->get_cached_meta($post_id, 'title') ?: get_the_title($post_id);
-        $description = $this->get_cached_meta($post_id, 'metadesc') ?: wp_trim_words(get_post_field('post_content', $post_id), 20);
-        
-        $schema = array(
-            '@context' => 'https://schema.org',
-            '@type' => 'Article',
-            'headline' => $title,
-            'description' => $description,
-            'datePublished' => get_the_date('c', $post_id),
-            'dateModified' => get_the_modified_date('c', $post_id),
-            'author' => array(
-                '@type' => 'Person',
-                'name' => get_the_author_meta('display_name', get_post_field('post_author', $post_id))
-            )
-        );
-        
-        // Cache for 1 hour
-        wp_cache_set($cache_key, $schema, 'ace_seo', 3600);
-        
-        return $schema;
-    }
-    
-    /**
      * Clear cache when post is updated
      */
     public static function clear_post_cache($post_id) {

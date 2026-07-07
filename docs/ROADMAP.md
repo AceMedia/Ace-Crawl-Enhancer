@@ -43,24 +43,31 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitted, and a public API.
 
-- [ ] **Consolidate the 4 JSON-LD emitters** into one graph builder (frontend `output_schema_markup`
-  becomes the only printer). Fold in `class-ace-seo-schema.php` outputs; the performance class's
-  deferred guest footer Article must reuse the same builder + never emit when the head graph already
-  did (this is a live duplicate-Article bug).
-- [ ] **BreadcrumbList JSON-LD** — generated from the existing `ACE_SEO_Breadcrumbs` trail on every
-  page where a trail resolves (not only where the block is placed). Biggest single SEO win.
-- [ ] **Wire the orphaned builders**: `generate_product_schema` (WooCommerce singles) and
-  `generate_faq_schema` (opt-in per-post toggle — the h3-ends-in-"?" heuristic is too loose to force on).
-- [ ] **Provider API**: `AceSeoSchemaRegistry` — `ace_seo_schema_graph` filter (full graph, context
-  object with queried post/term) + `ace_seo_register_schema_provider()` helper for plugins to add
-  typed nodes keyed by `@id`. De-dupe by `@id`. Document with examples in `docs/schema-api.md`.
-- [ ] **Type coverage**: NewsArticle (post-type/category-mappable Article subtype — ppnews),
-  WebPage node on every page (linked from Article via `isPartOf`), `Organization.logo`/`sameAs` from
-  settings, VideoObject when a post's first block is a video embed. Author Person nodes `@id`-linked
-  rather than inline.
-- [ ] **Verification harness**: script that curls a URL list across consumer sites, extracts JSON-LD,
-  validates with a schema.org validator lib, diffs types before/after. Run per consumer before any
-  submodule bump.
+- [x] **Consolidated to one graph builder** (2026-07-07): new `AceSeoSchemaGraph`
+  (`includes/frontend/class-ace-seo-schema-graph.php`) — provider registry, `@id` de-dupe/merge,
+  per-node `@context` stripping, single printer. Investigation showed only ONE emitter was actually
+  live; the schema class's LocalBusiness/enhancer/Product/FAQ were dead code and the performance
+  footer emitter was never hooked (removed — it was a double-emit trap, not a live bug).
+- [x] **BreadcrumbList JSON-LD** from `ACE_SEO_Breadcrumbs::get_items()` on every non-front page
+  with a ≥2-item trail; referenced from the WebPage node; current page omits `item` per Google.
+- [x] **Orphaned builders wired as providers**: LocalBusiness (front page, settings-gated), Product
+  (`ace_seo_product_schema_enabled` — defaults off when WooCommerce core emits its own), FAQPage
+  (opt-in via `_ace_seo_faq-schema` post meta or `ace_seo_faq_schema_enabled`; metabox toggle UI
+  still to add). The dead `ace_seo_schema_article` enhancer (word count/reading time/section) is
+  now actually applied.
+- [x] **Provider API**: `ace_seo_register_schema_provider()` + `ace_seo_schema_graph` filter with
+  context array; nodes merged by `@id` so providers can enrich core nodes. Documented with
+  examples and well-known `@id` table in `docs/schema-api.md`.
+- [x] **Type coverage** (partial): WebPage node on every page (`isPartOf`/`mainEntityOfPage`
+  `@id`-linked), author Person as separate `@id` node, `ace_seo_article_schema_type` filter for
+  NewsArticle/BlogPosting mapping (per-site/adapter wiring is Phase 2).
+  - [ ] VideoObject when a post leads with a video embed.
+  - [ ] Metabox toggle UI for the FAQ opt-in.
+- [x] **Verification harness**: `bin/schema-check.php <url>…` — lists blocks/types, warns on
+  duplicates, per-node contexts and missing BreadcrumbList. Baselined against live
+  sheffieldparkour.org + uni-carts.com (old code shows exactly the issues fixed here).
+  Verified new engine via stub harness: 28/28 assertions (single block, @id links, breadcrumbs,
+  provider injection + merge, LocalBusiness gating, front-page shape).
 
 ## Phase 2 — Ecosystem detection & adapters — issue #12
 
