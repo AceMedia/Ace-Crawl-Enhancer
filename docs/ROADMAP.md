@@ -61,8 +61,10 @@ Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitte
 - [x] **Type coverage** (partial): WebPage node on every page (`isPartOf`/`mainEntityOfPage`
   `@id`-linked), author Person as separate `@id` node, `ace_seo_article_schema_type` filter for
   NewsArticle/BlogPosting mapping (per-site/adapter wiring is Phase 2).
-  - [ ] VideoObject when a post leads with a video embed.
-  - [ ] Metabox toggle UI for the FAQ opt-in.
+  - [x] VideoObject when singular content leads with a video block or YouTube/Vimeo/VideoPress/
+    Dailymotion embed (first 5 top-level blocks; needs a featured image per Google's requirements).
+  - [x] FAQ opt-in metabox toggle (`faq-schema` checkbox in the Advanced tab, saved via the
+    standard meta-fields loop to `_ace_seo_faq-schema`).
 - [x] **Verification harness**: `bin/schema-check.php <url>…` — lists blocks/types, warns on
   duplicates, per-node contexts and missing BreadcrumbList. Baselined against live
   sheffieldparkour.org + uni-carts.com (old code shows exactly the issues fixed here).

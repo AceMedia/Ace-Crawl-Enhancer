@@ -504,6 +504,30 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             </p>
         </div>
 
+        <!-- FAQ Schema -->
+        <div class="ace-seo-field">
+            <label class="ace-seo-label">
+                <strong>FAQ Schema</strong>
+            </label>
+            <?php $faq_schema = AceCrawlEnhancer::get_meta_value($post_id, 'faq-schema'); ?>
+            <div class="ace-seo-checkbox-group">
+                <label class="ace-seo-checkbox-label">
+                    <input
+                        type="checkbox"
+                        name="yoast_wpseo_faq-schema"
+                        value="1"
+                        <?php checked($faq_schema, '1'); ?>
+                    >
+                    <span class="ace-seo-checkmark"></span>
+                    Generate FAQPage structured data from this content
+                </label>
+            </div>
+            <p class="ace-seo-description">
+                Detects question-style headings (ending in “?”) followed by a paragraph and marks
+                them up as FAQ rich-result data. Only enable on genuine FAQ content.
+            </p>
+        </div>
+
     </div>
 
     <!-- Performance Tab -->

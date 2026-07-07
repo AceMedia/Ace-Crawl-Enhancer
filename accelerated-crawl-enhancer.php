@@ -136,6 +136,12 @@ class AceCrawlEnhancer {
                 'description' => 'Title to use in breadcrumb navigation',
                 'default_value' => '',
             ],
+            'faq-schema' => [
+                'type' => 'checkbox',
+                'title' => 'FAQ Schema',
+                'description' => 'Generate FAQPage structured data from question-style headings in this content',
+                'default_value' => '0',
+            ],
         ],
         'social' => [
             'opengraph-title' => [

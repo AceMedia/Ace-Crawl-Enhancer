@@ -22,6 +22,77 @@ class AceSeoSchema {
         AceSeoSchemaGraph::register_provider('ace-seo/local-business', [$this, 'provide_local_business']);
         AceSeoSchemaGraph::register_provider('ace-seo/product', [$this, 'provide_product']);
         AceSeoSchemaGraph::register_provider('ace-seo/faq', [$this, 'provide_faq']);
+        AceSeoSchemaGraph::register_provider('ace-seo/video', [$this, 'provide_video']);
+    }
+
+    /**
+     * VideoObject node when singular content leads with a video block or a
+     * YouTube/Vimeo embed. Google requires name, thumbnailUrl and uploadDate,
+     * so the node is only emitted when a thumbnail is available.
+     */
+    public function provide_video($context) {
+        if (empty($context['is_singular'])) {
+            return null;
+        }
+
+        global $post;
+        if (!$post || !has_blocks($post) || !has_post_thumbnail($post)) {
+            return null;
+        }
+
+        $video = $this->find_lead_video(parse_blocks($post->post_content));
+        if (empty($video)) {
+            return null;
+        }
+
+        $node = [
+            '@type' => 'VideoObject',
+            '@id' => get_permalink($post) . '#video',
+            'name' => get_the_title($post),
+            'description' => $this->get_meta_description($post),
+            'thumbnailUrl' => get_the_post_thumbnail_url($post, 'large'),
+            'uploadDate' => get_the_date('c', $post),
+        ];
+
+        $node[$video['key']] = $video['url'];
+
+        return $node;
+    }
+
+    /**
+     * Find the first video within the leading blocks of the content.
+     *
+     * @return array{key: string, url: string}|null contentUrl (hosted file) or embedUrl.
+     */
+    private function find_lead_video(array $blocks, $depth = 0) {
+        // Only look at the first few top-level blocks — a trailing embed at the
+        // bottom of a long article is not "video content".
+        $blocks = $depth === 0 ? array_slice($blocks, 0, 5) : $blocks;
+
+        foreach ($blocks as $block) {
+            if ($block['blockName'] === 'core/video') {
+                if (preg_match('/src=["\']([^"\']+)["\']/', $block['innerHTML'], $m)) {
+                    return ['key' => 'contentUrl', 'url' => $m[1]];
+                }
+            }
+
+            if ($block['blockName'] === 'core/embed') {
+                $provider = $block['attrs']['providerNameSlug'] ?? '';
+                $url = $block['attrs']['url'] ?? '';
+                if ($url && in_array($provider, ['youtube', 'vimeo', 'videopress', 'dailymotion'], true)) {
+                    return ['key' => 'embedUrl', 'url' => $url];
+                }
+            }
+
+            if (!empty($block['innerBlocks']) && $depth < 2) {
+                $found = $this->find_lead_video($block['innerBlocks'], $depth + 1);
+                if ($found) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
