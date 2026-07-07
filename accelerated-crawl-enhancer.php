@@ -232,6 +232,9 @@ class AceCrawlEnhancer {
             add_filter('wp_title', [$this, 'filter_title'], 999);
             add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 999);
             add_action('wp_head', [$this, 'output_meta_description'], 1);
+            // We emit our own canonical (below) for every page type — drop WordPress core's
+            // rel_canonical so singular pages don't get a second, duplicate <link rel="canonical">.
+            remove_action('wp_head', 'rel_canonical');
             add_action('wp_head', [$this, 'output_canonical'], 2);
             add_action('wp_head', [$this, 'output_robots_meta'], 3);
             add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
@@ -1662,6 +1665,12 @@ class AceCrawlEnhancer {
             if (!empty($seo_title)) {
                 // Ensure no HTML tags in title
                 $title_parts['title'] = $this->sanitize_seo_text($seo_title, true);
+                // The title template already carries {site_name}; clear the parts WordPress would
+                // otherwise append so the site name isn't duplicated ("Post | Site - Site"). Mirrors
+                // the homepage/taxonomy/archive branches below.
+                $title_parts['site']    = '';
+                $title_parts['tagline'] = '';
+                $title_parts['page']    = '';
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage title with synchronization
