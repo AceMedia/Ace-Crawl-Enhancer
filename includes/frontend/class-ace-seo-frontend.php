@@ -108,7 +108,14 @@ class AceSeoFrontend {
             $graph[] = $this->generate_archive_schema();
         } elseif (is_singular()) {
             global $post;
-            if ($post) {
+            /**
+             * Whether to emit an Article node for this singular content. Post
+             * types with their own primary schema type (Event, Product,
+             * LocalBusiness, JobPosting…) should return false so the page isn't
+             * both an Article and its real type. Integration adapters set this
+             * for their CPTs.
+             */
+            if ($post && apply_filters('ace_seo_emit_article', true, $post)) {
                 $article = $this->generate_article_schema($post, $publisher_ref, $webpage_ref);
                 $graph[] = $article['node'];
                 if (!empty($article['author'])) {
@@ -243,6 +250,7 @@ class AceSeoFrontend {
 
         $schema = [
             '@type' => $type,
+            '@id' => get_permalink($post) . '#article',
             'headline' => $manual_title ? $manual_title : get_the_title($post),
             'description' => $this->get_meta_description($post),
             'url' => get_permalink($post),

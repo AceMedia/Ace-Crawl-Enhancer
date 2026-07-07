@@ -46,6 +46,15 @@ class AceSeoIntegrations {
             remove_action('wp_head', ['ACE_SEO', 'breadcrumb_schema'], 21);
         }
 
+        // These CPTs have their own primary schema type (Event / LocalBusiness /
+        // JobPosting / Place), so don't also mark them up as Article.
+        add_filter('ace_seo_emit_article', function ($emit, $post) {
+            if (in_array($post->post_type, ['events', 'businesses', 'job_listings', 'locations'], true)) {
+                return false;
+            }
+            return $emit;
+        }, 10, 2);
+
         ace_seo_register_schema_provider('ace-community-events/business', function ($context) {
             if (!is_singular('businesses')) {
                 return null;
