@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.5');
+define('ACE_SEO_VERSION', '1.0.6');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -212,7 +212,8 @@ class AceCrawlEnhancer {
      */
     private function init_hooks() {
         add_action('init', [$this, 'init']);
-        
+        add_action('admin_init', [$this, 'maybe_upgrade']);
+
         // Conditional loading for better performance
         if (!is_admin()) {
             // Prevent Jetpack SEO from overriding titles (conflicts with ACE manual titles)
@@ -267,7 +268,35 @@ class AceCrawlEnhancer {
         add_action('updated_post_meta', [$this, 'sync_homepage_meta'], 10, 4);
         add_action('updated_option', [$this, 'sync_homepage_settings_to_page'], 10, 3);
     }
-    
+
+    /**
+     * One-time upgrade tasks when the plugin version changes (submodule bumps
+     * don't re-run activation, so this is the only reliable upgrade path).
+     */
+    public function maybe_upgrade() {
+        if (get_option('ace_seo_version') === ACE_SEO_VERSION) {
+            return;
+        }
+
+        // Admin-only bookkeeping options shouldn't load on every front-end request.
+        if (function_exists('wp_set_option_autoload_values')) {
+            wp_set_option_autoload_values([
+                'ace_seo_activation_date'                  => false,
+                'ace_seo_db_optimized'                     => false,
+                'ace_seo_db_optimization_results'          => false,
+                'ace_seo_db_optimization_pending'          => false,
+                'ace_seo_db_optimization_scheduled'        => false,
+                'ace_seo_optimization_progress'            => false,
+                'ace_seo_performance_monitoring'           => false,
+                'ace_sitemap_powertools_purge_notice'      => false,
+                'ace_sitemap_powertools_large_site_notice' => false,
+                'ace_sitemap_powertools_legacy_cache_purged' => false,
+            ]);
+        }
+
+        update_option('ace_seo_version', ACE_SEO_VERSION, false);
+    }
+
     /**
      * Initialize plugin
      */
@@ -1665,12 +1694,19 @@ class AceCrawlEnhancer {
             if (!empty($seo_title)) {
                 // Ensure no HTML tags in title
                 $title_parts['title'] = $this->sanitize_seo_text($seo_title, true);
-                // The title template already carries {site_name}; clear the parts WordPress would
-                // otherwise append so the site name isn't duplicated ("Post | Site - Site"). Mirrors
-                // the homepage/taxonomy/archive branches below.
-                $title_parts['site']    = '';
-                $title_parts['tagline'] = '';
-                $title_parts['page']    = '';
+                // Only clear site/tagline when the title came from a TEMPLATE — templates carry
+                // {site_name}, so leaving the parts intact double-brands ("Post | Site - Site").
+                // Manual _ace_seo_title/_yoast_wpseo_title values are stored WITHOUT the brand on
+                // live sites and rely on the theme appending it — leave their parts untouched.
+                $manual_title = self::get_meta_value($post->ID, 'title');
+                if (empty($manual_title)) {
+                    $manual_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
+                }
+                if (empty($manual_title)) {
+                    $title_parts['site']    = '';
+                    $title_parts['tagline'] = '';
+                    $title_parts['page']    = '';
+                }
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage title with synchronization
@@ -2423,8 +2459,8 @@ class AceCrawlEnhancer {
                 
                 // Clear pending flag and store completion status
                 delete_option( 'ace_seo_db_optimization_pending' );
-                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ) );
-                update_option( 'ace_seo_db_optimization_results', $results );
+                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ), false );
+                update_option( 'ace_seo_db_optimization_results', $results, false );
                 
                 // Optionally send a notification (if user wants it)
                 $this->send_optimization_notification( $results );
