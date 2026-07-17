@@ -405,10 +405,16 @@ class AceSeoFrontend {
             }
         }
 
+        // The WebSite node names the SITE (its brand), not the homepage. Feeding it the home
+        // title made Google treat the long page title as the site name and fall back to the bare
+        // domain for the result's site-name line. The homepage title still drives <title> and
+        // og:title through the WebPage node; here we want the brand only.
+        $brand = !empty($options['general']['site_name']) ? $options['general']['site_name'] : get_bloginfo('name');
+
         $schema = [
             '@type' => 'WebSite',
             '@id' => trailingslashit(home_url()) . '#website',
-            'name' => !empty($home_title) ? $home_title : get_bloginfo('name'),
+            'name' => $brand,
             'description' => !empty($home_description) ? $home_description : '',
             'url' => home_url(),
             'potentialAction' => [
@@ -882,6 +888,16 @@ class AceSeoFrontend {
 
         // Add site verification meta if set
         $options = $this->get_seo_options();
+
+        // og:site_name — the site's brand. This is the primary signal Google uses for the
+        // site-name line in a result, and we remove Jetpack's OG tags in setup_hooks(), so
+        // without this the tag is absent entirely and Google falls back to the bare domain
+        // (showing "example.com" instead of the brand). Use the SEO "site name" setting, else
+        // the WordPress Site Title — never the homepage title, which is a page title, not a brand.
+        $brand = !empty($options['general']['site_name']) ? $options['general']['site_name'] : get_bloginfo('name');
+        if (!empty($brand)) {
+            echo '<meta property="og:site_name" content="' . esc_attr($brand) . '">' . "\n";
+        }
 
         $google_code = $options['webmaster']['google'] ?? ($options['webmaster']['google_verify'] ?? '');
         if (!empty($google_code)) {
