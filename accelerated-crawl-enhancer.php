@@ -2460,9 +2460,8 @@ class AceCrawlEnhancer {
             if (!empty($tw_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($tw_desc) . '">' . "\n";
             }
-            if (!empty($tw_image)) {
-                echo '<meta name="twitter:image" content="' . esc_url($tw_image) . '">' . "\n";
-            }
+            // twitter:image itself is emitted by the Open Graph branch (same filter),
+            // so we only set the card type + description here to avoid a duplicate tag.
         }
     }
     
