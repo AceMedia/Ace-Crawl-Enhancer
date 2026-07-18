@@ -1813,8 +1813,8 @@ class AceCrawlEnhancer {
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage meta description with synchronization
-            $home_desc = $this->get_homepage_meta_description();
-            
+            $home_desc = apply_filters('ace_seo_home_meta_description', $this->get_homepage_meta_description());
+
             if (!empty($home_desc)) {
                 echo '<meta name="description" content="' . esc_attr($home_desc) . '">' . "\n";
             }
@@ -2225,8 +2225,10 @@ class AceCrawlEnhancer {
             }
         } elseif (is_home()) {
             // Blog homepage
-            $canonical = home_url('/');
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            $canonical = apply_filters('ace_seo_home_canonical', home_url('/'));
+            if (!empty($canonical)) {
+                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            }
         } elseif (is_front_page()) {
             // Static front page
             $page_on_front = get_option('page_on_front');
@@ -2235,7 +2237,10 @@ class AceCrawlEnhancer {
             } else {
                 $canonical = home_url('/');
             }
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            $canonical = apply_filters('ace_seo_home_canonical', $canonical);
+            if (!empty($canonical)) {
+                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            }
         } elseif (is_category() || is_tag() || is_tax()) {
             // Taxonomy pages
             $term = get_queried_object();
@@ -2300,6 +2305,31 @@ class AceCrawlEnhancer {
     /**
      * Output Open Graph tags
      */
+    /**
+     * Print an ordered map of Open Graph properties.
+     *
+     * Keeps the two rules the rest of this class already follows: URL-valued properties are
+     * escaped with esc_url, and og:title / og:description carry data-ace-seo="1" so
+     * ACE_SEO_Frontend::filter_head_output() preserves them through the de-duplicating buffer.
+     *
+     * @param array $tags property => content, in emission order.
+     */
+    private function print_og_tags($tags) {
+        if (empty($tags) || !is_array($tags)) {
+            return;
+        }
+        $url_props  = ['og:url', 'og:image', 'og:image:url', 'og:image:secure_url', 'og:video', 'og:audio'];
+        $marked     = ['og:title', 'og:description'];
+        foreach ($tags as $prop => $content) {
+            if ('' === $content || null === $content) {
+                continue;
+            }
+            $value = in_array($prop, $url_props, true) ? esc_url($content) : esc_attr($content);
+            echo '<meta property="' . esc_attr($prop) . '" content="' . $value . '"'
+                . (in_array($prop, $marked, true) ? ' data-ace-seo="1"' : '') . '>' . "\n";
+        }
+    }
+
     public function output_opengraph_tags() {
         // A static front page is also "singular"; let it fall through to the
         // homepage branch so it gets og:type=website (not article).
@@ -2339,18 +2369,19 @@ class AceCrawlEnhancer {
             $og_type = ('product' === get_post_type($post)) ? 'product' : 'article';
             echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
         } elseif (is_home() || is_front_page()) {
-            // Handle homepage Open Graph tags
+            // Handle homepage Open Graph tags.
+            //
+            // Every value below is filterable. Sites that route their own pages through the
+            // front-page query (custom rewrite endpoints that are not real posts) can hook these
+            // to describe THAT page instead of the site, rather than switching this method off
+            // and printing a competing block. Each filter defaults to the value this branch
+            // would otherwise have emitted, so a site that hooks nothing is unaffected.
+            //
             // OG Title for homepage - use synchronized title
-            $og_title = $this->get_homepage_title();
-            if (!empty($og_title)) {
-                echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
-            }
-            
+            $og_title = apply_filters('ace_seo_home_og_title', $this->get_homepage_title());
+
             // OG Description for homepage - use synchronized description
-            $og_desc = $this->get_homepage_meta_description();
-            if (!empty($og_desc)) {
-                echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
-            }
+            $og_desc = apply_filters('ace_seo_home_og_description', $this->get_homepage_meta_description());
 
             // OG Image for homepage - from the front/posts page meta, then thumbnail.
             $home_id  = is_front_page() ? (int) get_option('page_on_front') : (int) get_option('page_for_posts');
@@ -2358,13 +2389,32 @@ class AceCrawlEnhancer {
             if (empty($og_image) && $home_id && has_post_thumbnail($home_id)) {
                 $og_image = get_the_post_thumbnail_url($home_id, 'large');
             }
-            if (!empty($og_image)) {
-                echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
-            }
+            $og_image = apply_filters('ace_seo_home_og_image', $og_image);
 
-            // OG URL for homepage
-            echo '<meta property="og:url" content="' . esc_url(home_url()) . '">' . "\n";
-            echo '<meta property="og:type" content="website">' . "\n";
+            $og_url  = apply_filters('ace_seo_home_og_url', home_url());
+            $og_type = apply_filters('ace_seo_home_og_type', 'website');
+
+            // Assembled in the order this branch has always emitted them. Extra properties
+            // (og:image:width, og:locale, article:*) can be appended via ace_seo_home_og_tags.
+            $og_tags = [];
+            if (!empty($og_title)) {
+                $og_tags['og:title'] = $og_title;
+            }
+            if (!empty($og_desc)) {
+                $og_tags['og:description'] = $og_desc;
+            }
+            if (!empty($og_image)) {
+                $og_tags['og:image'] = $og_image;
+            }
+            if (!empty($og_url)) {
+                $og_tags['og:url'] = $og_url;
+            }
+            if (!empty($og_type)) {
+                $og_tags['og:type'] = $og_type;
+            }
+            $og_tags = apply_filters('ace_seo_home_og_tags', $og_tags);
+
+            $this->print_og_tags($og_tags);
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages
             $og_title = $this->process_special_page_title();
@@ -2429,19 +2479,30 @@ class AceCrawlEnhancer {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
             }
         } elseif (is_home() || is_front_page()) {
-            // Handle homepage Twitter cards
-            echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-            
+            // Handle homepage Twitter cards. Filterable for the same reason as the Open Graph
+            // branch above, and defaulting to the values this branch has always emitted.
+            $twitter_card = apply_filters('ace_seo_home_twitter_card', 'summary_large_image');
+            if (!empty($twitter_card)) {
+                echo '<meta name="twitter:card" content="' . esc_attr($twitter_card) . '">' . "\n";
+            }
+
             // Twitter Title for homepage - use synchronized title
-            $twitter_title = $this->get_homepage_title();
+            $twitter_title = apply_filters('ace_seo_home_twitter_title', $this->get_homepage_title());
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
-            
+
             // Twitter Description for homepage - use synchronized description
-            $twitter_desc = $this->get_homepage_meta_description();
+            $twitter_desc = apply_filters('ace_seo_home_twitter_description', $this->get_homepage_meta_description());
             if (!empty($twitter_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
+            }
+
+            // Twitter Image. No default — the homepage card has never carried one, so an
+            // unhooked site emits exactly what it did before.
+            $twitter_image = apply_filters('ace_seo_home_twitter_image', '');
+            if (!empty($twitter_image)) {
+                echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
             }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages. When the archive supplies a representative image
