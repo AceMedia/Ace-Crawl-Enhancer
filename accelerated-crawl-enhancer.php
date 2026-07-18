@@ -2444,12 +2444,24 @@ class AceCrawlEnhancer {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }
         } elseif (is_search() || is_archive() || is_author()) {
-            // Handle special pages
-            echo '<meta name="twitter:card" content="summary">' . "\n";
-            
+            // Handle special pages. When the archive supplies a representative image
+            // (via ace_seo_archive_og_image), upgrade to the large-image card and add
+            // the matching description/image so the tweet renders a full card, not a
+            // bare title. No image supplied -> unchanged "summary" default.
+            $tw_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
+            $tw_image = apply_filters('ace_seo_archive_og_image', '', $tw_term);
+            echo '<meta name="twitter:card" content="' . (!empty($tw_image) ? 'summary_large_image' : 'summary') . '">' . "\n";
+
             $twitter_title = $this->process_special_page_title();
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
+            }
+            $tw_desc = apply_filters('ace_seo_archive_og_description', '', $tw_term);
+            if (!empty($tw_desc)) {
+                echo '<meta name="twitter:description" content="' . esc_attr($tw_desc) . '">' . "\n";
+            }
+            if (!empty($tw_image)) {
+                echo '<meta name="twitter:image" content="' . esc_url($tw_image) . '">' . "\n";
             }
         }
     }
