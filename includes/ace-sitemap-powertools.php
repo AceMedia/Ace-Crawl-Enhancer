@@ -1881,6 +1881,7 @@ function ace_sitemap_powertools_is_probable_bot_request() {
         'slurp',
         'bingpreview',
         'mediapartners-google',
+			'google-inspectiontool',
         'adsbot',
         'google-read-aloud',
         'googleother',
