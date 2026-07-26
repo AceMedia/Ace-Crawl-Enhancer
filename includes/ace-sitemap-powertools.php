@@ -1920,8 +1920,11 @@ function ace_sitemap_powertools_should_render_human_view() {
 
     $accept = isset( $_SERVER['HTTP_ACCEPT'] ) ? strtolower( (string) $_SERVER['HTTP_ACCEPT'] ) : '';
 
+    // Fail towards XML: a client that sends no Accept header is far more likely a fetcher we
+    // failed to recognise than a person, and a person shown XML loses a stylesheet while a
+    // parser shown HTML loses the sitemap (GSC read the HTML view as "no subsitemaps").
     if ( '' === $accept ) {
-        return true;
+        return false;
     }
 
     return false !== strpos( $accept, 'text/html' );
@@ -1979,6 +1982,10 @@ function ace_sitemap_powertools_send_response_cache_headers() {
         header( 'Cache-Control: public, max-age=' . $ttl . ', must-revalidate' );
         header( 'Expires: ' . gmdate( 'D, d M Y H:i:s', time() + $ttl ) . ' GMT' );
         header( 'X-Robots-Tag: noindex, follow', true );
+        // The same URL serves XML to bots and HTML to people, so shared caches must key on
+        // what decided the format — without this, one cached human view can poison Googlebot
+        // for the whole TTL. UA-vary fragmentation is acceptable on sitemap routes only.
+        header( 'Vary: User-Agent, Accept' );
     }
 }
 
