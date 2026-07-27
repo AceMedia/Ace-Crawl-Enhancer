@@ -3019,7 +3019,14 @@ function ace_sitemap_powertools_should_set_index_lastmod( $provider, $subtype ) 
         return true;
     }
 
-    return false;
+    // Viewable custom types qualify too. On a site whose content lives in a CPT (TalkFuse's
+    // 'story' is 88 of its 99 index entries) the old post/page-only rule left the entire index
+    // bare. The cost fear that motivated the narrow rule does not apply to this implementation:
+    // lastmod is one get_lastpostmodified() per type, memoised per request AND persistently
+    // cached, not a per-sub-sitemap scan.
+    $object = get_post_type_object( $subtype );
+
+    return $object && is_post_type_viewable( $object );
 }
 
 function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $page ) {
