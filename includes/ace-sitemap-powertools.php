@@ -2555,6 +2555,14 @@ function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page
         }
 
         $excluded_ids = ace_sitemap_powertools_get_noindex_meta_map( $candidate_ids );
+        // Site-level opt-out for URLs that are published and indexable but do not belong in a
+        // sitemap — e.g. a page whose canonical points at another URL, which Search Console
+        // would only ever report as "Duplicate, Google chose different canonical". Additive:
+        // defaults to no exclusions, so existing sites are unaffected.
+        $filtered_out = apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+        foreach ( (array) $filtered_out as $fid ) {
+            $excluded_ids[ (int) $fid ] = true;
+        }
         foreach ( $candidate_ids as $candidate_id ) {
             if ( isset( $excluded_ids[ $candidate_id ] ) ) {
                 continue;
@@ -2612,7 +2620,9 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
         )
     );
 
-    return max( 0, $published_count - $excluded_count );
+    $filtered_out = apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+
+    return max( 0, $published_count - $excluded_count - count( array_unique( array_map( 'intval', (array) $filtered_out ) ) ) );
 }
 
 function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num ) {
