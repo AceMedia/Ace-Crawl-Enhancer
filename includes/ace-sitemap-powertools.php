@@ -3007,6 +3007,14 @@ function ace_sitemap_powertools_should_set_index_lastmod( $provider, $subtype ) 
     $provider = sanitize_key( (string) $provider );
     $subtype  = sanitize_key( (string) $subtype );
 
+    // Core's WP_Sitemaps_Posts announces itself as object_type "post" (SINGULAR) in the
+    // wp_sitemaps_index_entry filter, while everything internal here says "posts". The gate
+    // compared against the plural only, so it never matched a single entry core produced and
+    // index lastmod has been dead since it shipped — on every site, post/page included.
+    if ( 'post' === $provider ) {
+        $provider = 'posts';
+    }
+
     if ( 'news' === $provider ) {
         return true;
     }
@@ -3064,7 +3072,7 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
     $post_type = '';
     if ( 'news' === $provider ) {
         $post_type = 'post';
-    } elseif ( 'posts' === $provider ) {
+    } elseif ( 'posts' === $provider || 'post' === $provider ) { // core announces the singular
         $post_type = $subtype ? $subtype : 'post';
     }
 
