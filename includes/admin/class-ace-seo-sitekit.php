@@ -209,12 +209,31 @@ class AceSEOSiteKit {
         }
 
         foreach ( $required_scopes as $scope ) {
-            if ( ! in_array( $scope, $scopes, true ) ) {
-                return false;
+            if ( in_array( $scope, $scopes, true ) ) {
+                continue;
             }
+            // A granted BROADER scope satisfies a request for its read-only variant. Site Kit is
+            // granted the full 'webmasters' scope, never 'webmasters.readonly' separately, so a
+            // caller asking for readonly (Search Console reads) is covered by the full grant.
+            if ( self::scope_is_covered( $scope, $scopes ) ) {
+                continue;
+            }
+            return false;
         }
 
         return true;
+    }
+
+    /**
+     * True when one of the granted scopes is a broader scope that includes the requested one.
+     * Maps a requested read-only scope to the full scope that supersedes it.
+     */
+    private static function scope_is_covered( $required, array $granted ) {
+        $superset = array(
+            'https://www.googleapis.com/auth/webmasters.readonly' => 'https://www.googleapis.com/auth/webmasters',
+            'https://www.googleapis.com/auth/analytics.readonly'  => 'https://www.googleapis.com/auth/analytics',
+        );
+        return isset( $superset[ $required ] ) && in_array( $superset[ $required ], $granted, true );
     }
 
     /**

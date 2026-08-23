@@ -322,7 +322,13 @@ class AceCrawlEnhancer {
      * Initialize admin components
      */
     private function init_admin() {
-        $load_google_services = is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST );
+        $load_google_services = is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'WP_CLI' ) && WP_CLI );
+
+        // The Site Kit token bridge is a dependency-free helper. Load it on EVERY request (admin,
+        // front-end, REST, WP-CLI and cron) so any code - not just the admin dashboard - can borrow
+        // the site's connected Site Kit OAuth token to call Google APIs. It was previously admin-only,
+        // so CLI/cron callers saw class_exists('AceSEOSiteKit') === false.
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
 
         if (is_admin()) {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
@@ -334,7 +340,6 @@ class AceCrawlEnhancer {
         }
 
         if ( $load_google_services ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-google-data.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
