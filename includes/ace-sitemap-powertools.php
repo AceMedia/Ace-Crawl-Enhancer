@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'ACE_SITEMAP_POWERTOOLS_VERSION' ) ) {
-    define( 'ACE_SITEMAP_POWERTOOLS_VERSION', '1.0.3' );
+    define( 'ACE_SITEMAP_POWERTOOLS_VERSION', '1.0.4' );
 }
 
 function ace_sitemap_powertools_default_options() {
@@ -2622,7 +2622,33 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
 
     $filtered_out = apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
 
-    return max( 0, $published_count - $excluded_count - count( array_unique( array_map( 'intval', (array) $filtered_out ) ) ) );
+    // Only subtract per-site excluded ids that are actually published posts of this type and are
+    // NOT already counted in $excluded_count (i.e. not already noindex). Subtracting the raw
+    // filtered-out count blind double-counted any id that was both filtered and noindex, and
+    // counted ids of other post types or non-published ids, so max_num_pages under-reported and
+    // the last page of URLs was silently dropped from the index.
+    $filtered_ids = array_unique( array_map( 'intval', (array) $filtered_out ) );
+    $extra        = 0;
+    if ( $filtered_ids ) {
+        $in    = implode( ',', $filtered_ids );
+        $extra = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(p.ID) FROM {$wpdb->posts} p
+                WHERE p.ID IN ({$in})
+                    AND p.post_type = %s
+                    AND p.post_status = 'publish'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM {$wpdb->postmeta} pm
+                        WHERE pm.post_id = p.ID
+                            AND pm.meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')
+                            AND pm.meta_value = '1'
+                    )",
+                $post_type
+            )
+        );
+    }
+
+    return max( 0, $published_count - $excluded_count - $extra );
 }
 
 function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num ) {
