@@ -359,6 +359,12 @@ class AceCrawlEnhancer {
             new AceSEOSearchConsole();
             new AceSEOPageSpeed();
         }
+
+        // WP-CLI: register the Search Console commands (Site Kit-gated at runtime).
+        if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'AceSEOSearchConsole' ) ) {
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console-cli.php';
+            AceSEOSearchConsoleCli::register();
+        }
     }
     
     /**
