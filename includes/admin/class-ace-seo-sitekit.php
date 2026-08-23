@@ -13,6 +13,7 @@ class AceSEOSiteKit {
 
     const SCOPE_ANALYTICS = 'https://www.googleapis.com/auth/analytics.readonly';
     const SCOPE_SEARCH_CONSOLE = 'https://www.googleapis.com/auth/webmasters.readonly';
+    const SCOPE_SEARCH_CONSOLE_WRITE = 'https://www.googleapis.com/auth/webmasters';
     const SCOPE_PAGESPEED = 'https://www.googleapis.com/auth/pagespeedonline';
 
     /**
