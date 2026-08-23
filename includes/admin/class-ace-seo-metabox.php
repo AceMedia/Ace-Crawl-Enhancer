@@ -75,6 +75,20 @@ class AceSEOMetabox {
                     'default'
                 );
             }
+
+            // Search performance sidebar (Site Kit-gated, additive). Registered only when a
+            // connected Search Console property is available; the render callback fetches the
+            // data lazily over REST so nothing calls Google on the page-load render path.
+            if ( class_exists( 'AceSEOSearchConsole' ) && AceSEOSearchConsole::is_ready() ) {
+                add_meta_box(
+                    'ace-seo-search-performance',
+                    'Search performance',
+                    array( $this, 'render_search_performance_metabox' ),
+                    $post_type,
+                    'side',
+                    'default'
+                );
+            }
         }
     }
     
@@ -175,6 +189,76 @@ class AceSEOMetabox {
         
         <!-- AI Nonce for AJAX requests -->
         <input type="hidden" id="ace_seo_ai_nonce" value="<?php echo wp_create_nonce('ace_seo_ai_nonce'); ?>">
+        <?php
+    }
+
+    /**
+     * Render the Search performance sidebar metabox.
+     *
+     * Additive, Site Kit-gated block. Shows real Search Console impressions,
+     * clicks, average position and the top queries this exact page already
+     * ranks for, plus a generic one-line hint. Data is fetched lazily over the
+     * REST route (never on the render path) and never blocks the rest of the UI.
+     */
+    public function render_search_performance_metabox( $post ) {
+        if ( 'publish' !== $post->post_status ) {
+            echo '<p class="description">Search performance appears here once this content is published and Google has search data for it.</p>';
+            return;
+        }
+
+        $permalink = get_permalink( $post );
+        if ( ! $permalink ) {
+            echo '<p class="description">No permalink is available for this content yet.</p>';
+            return;
+        }
+        ?>
+        <div id="ace-gsc-perf" data-url="<?php echo esc_attr( $permalink ); ?>">
+            <div class="ace-gsc-perf-loading">
+                <span class="dashicons dashicons-update" style="animation: ace-spin 1s linear infinite;"></span>
+                Loading search performance...
+            </div>
+        </div>
+        <script>
+        (function() {
+            var el = document.getElementById('ace-gsc-perf');
+            if (!el || typeof aceSeoAdmin === 'undefined' || !aceSeoAdmin.restUrl) { return; }
+            var url = el.getAttribute('data-url');
+            var esc = function(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
+            fetch(aceSeoAdmin.restUrl + 'google/search-console/page-metrics?days=28&url=' + encodeURIComponent(url), {
+                headers: { 'X-WP-Nonce': aceSeoAdmin.nonce }
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (!d || d.connected === false) {
+                    el.innerHTML = '<p class="description">' + esc((d && d.message) || 'Search performance is unavailable.') + '</p>';
+                    return;
+                }
+                if (!d.impressions) {
+                    el.innerHTML = '<p class="description">No search impressions recorded for this page in the last 28 days.</p>';
+                    return;
+                }
+                var html = '<p style="margin:0 0 8px;"><strong>Last 28 days</strong></p>' +
+                    '<ul style="margin:0 0 10px;list-style:none;padding:0;">' +
+                    '<li>Impressions: <strong>' + esc(d.impressions.toLocaleString()) + '</strong></li>' +
+                    '<li>Clicks: <strong>' + esc(d.clicks.toLocaleString()) + '</strong></li>' +
+                    '<li>CTR: <strong>' + esc(d.ctr) + '%</strong></li>' +
+                    '<li>Avg position: <strong>' + esc(d.position) + '</strong></li>' +
+                    '</ul>';
+                if (d.top_queries && d.top_queries.length) {
+                    html += '<p style="margin:0 0 4px;"><strong>Top queries</strong></p><ol style="margin:0 0 10px;padding-left:18px;">';
+                    d.top_queries.slice(0, 5).forEach(function(q) {
+                        html += '<li>' + esc(q.query) + ' <span class="description">(pos ' + esc(q.position) + ', ' + esc(q.impressions) + ' impr)</span></li>';
+                    });
+                    html += '</ol>';
+                }
+                if (d.hint) {
+                    html += '<p class="description" style="border-left:3px solid #a4286a;padding-left:8px;">' + esc(d.hint) + '</p>';
+                }
+                el.innerHTML = html;
+            }).catch(function() {
+                el.innerHTML = '<p class="description">Could not load search performance.</p>';
+            });
+        })();
+        </script>
+        <style>@keyframes ace-spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}</style>
         <?php
     }
 
