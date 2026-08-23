@@ -271,27 +271,13 @@ class AceSEOApiHelper {
             );
         }
 
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
-            return array(
-                'connected' => false,
-                'source'    => 'none',
-                'message'   => 'Add a PageSpeed API key or connect Google Site Kit.',
-            );
-        }
-
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
-        if ( is_wp_error( $token ) ) {
-            return array(
-                'connected' => false,
-                'source'    => 'sitekit',
-                'message'   => $token->get_error_message(),
-            );
-        }
-
+        // PageSpeed Insights does not use OAuth - Site Kit never grants a pagespeedonline scope - so
+        // with no manual key we call PSI anonymously. That works, just at Google's lower anonymous
+        // quota, so report it as connected-with-a-caveat rather than an error.
         return array(
             'connected' => true,
-            'source'    => 'sitekit',
-            'message'   => 'Using the Google Site Kit connection.',
+            'source'    => 'anonymous',
+            'message'   => 'Using anonymous PageSpeed Insights (limited Google quota). Add a PageSpeed API key above for higher, more reliable limits.',
         );
     }
     
@@ -496,20 +482,11 @@ class AceSEOApiHelper {
             'timeout' => 90,
         );
 
-        if ( $api_key === '' ) {
-            if ( ! class_exists( 'AceSEOSiteKit' ) ) {
-                return new WP_Error( 'no_pagespeed_connection', 'PageSpeed Insights is not configured. Add an API key or connect Google Site Kit.' );
-            }
-
-            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
-            if ( is_wp_error( $token ) ) {
-                return $token;
-            }
-
-            $request_args['headers'] = array(
-                'Authorization' => 'Bearer ' . $token,
-            );
-        }
+        // No manual key: call the PageSpeed Insights API anonymously. Site Kit does NOT grant a
+        // pagespeedonline OAuth scope - its PageSpeed module uses Google's own quota/proxy - so there
+        // is never a token to borrow. Anonymous PSI works at a lower daily quota; a manual API key
+        // raises it and is more reliable. (Previously this returned a "no OAuth token" error and PSI
+        // never ran without a key.)
 
         $api_url = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?' . http_build_query( $query_args );
         foreach ( array( 'performance', 'accessibility', 'best-practices', 'seo' ) as $category ) {

@@ -57,7 +57,10 @@ class AceSEOSiteKit {
 
         $analytics_property = $active ? self::get_analytics_property_id() : '';
         $search_property = $active ? self::get_search_console_property_id() : '';
-        $pagespeed_token = $active ? self::get_access_token( array( self::SCOPE_PAGESPEED ) ) : false;
+        // PageSpeed needs no OAuth token (Site Kit grants no pagespeedonline scope); it is usable
+        // whenever a manual key is set or the Site Kit PageSpeed module is active (anonymous quota).
+        $pagespeed_key   = (string) ( ( get_option( 'ace_seo_options', array() )['performance']['pagespeed_api_key'] ?? '' ) );
+        $pagespeed_ready = ( '' !== trim( $pagespeed_key ) ) || ( $active && in_array( 'pagespeed-insights', (array) get_option( 'googlesitekit_active_modules', array() ), true ) );
 
         return array(
             'plugin_active' => $active,
@@ -71,8 +74,8 @@ class AceSEOSiteKit {
                     'property_id' => $search_property,
                 ),
                 'pagespeed'      => array(
-                    'connected'       => $active && ! is_wp_error( $pagespeed_token ) && $pagespeed_token !== false,
-                    'token_available' => $active && ! is_wp_error( $pagespeed_token ) && $pagespeed_token !== false,
+                    'connected'       => $pagespeed_ready,
+                    'token_available' => '' !== trim( $pagespeed_key ),
                 ),
                 'adsense'        => array(
                     'connected' => $active && ! empty( self::get_module_settings( 'adsense' ) ),
