@@ -2371,8 +2371,13 @@ class AceCrawlEnhancer {
             // (Settings -> Social). Without the last step a post published with no featured
             // image shares with NO card image at all.
             $og_image = self::get_meta_value($post->ID, 'opengraph-image');
+            $og_dims  = null;
             if (empty($og_image) && has_post_thumbnail($post->ID)) {
-                $og_image = get_the_post_thumbnail_url($post->ID, 'large');
+                $og_src = wp_get_attachment_image_src(get_post_thumbnail_id($post->ID), 'large');
+                if ($og_src) {
+                    $og_image = $og_src[0];
+                    $og_dims  = [(int) $og_src[1], (int) $og_src[2]];
+                }
             }
             if (empty($og_image)) {
                 $ace_options = get_option('ace_seo_options', []);
@@ -2380,6 +2385,12 @@ class AceCrawlEnhancer {
             }
             if (!empty($og_image)) {
                 echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
+                // Width/height let scrapers lay the card out on the FIRST share,
+                // before they have fetched the image file themselves.
+                if ($og_dims && $og_dims[0] > 0 && $og_dims[1] > 0) {
+                    echo '<meta property="og:image:width" content="' . $og_dims[0] . '">' . "\n";
+                    echo '<meta property="og:image:height" content="' . $og_dims[1] . '">' . "\n";
+                }
             }
             
             // OG URL
