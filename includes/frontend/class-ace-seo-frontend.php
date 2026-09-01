@@ -803,6 +803,7 @@ class AceSeoFrontend {
             'social_instagram',
             'social_linkedin',
             'social_youtube',
+            'social_bluesky',
         ];
 
         if (!empty($organization['twitter_username'])) {

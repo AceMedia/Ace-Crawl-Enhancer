@@ -444,6 +444,7 @@ class AceSEOSettings {
         $options['organization']['social_instagram'] = esc_url_raw(wp_unslash($_POST['organization_social_instagram'] ?? ''));
         $options['organization']['social_linkedin'] = esc_url_raw(wp_unslash($_POST['organization_social_linkedin'] ?? ''));
         $options['organization']['social_youtube'] = esc_url_raw(wp_unslash($_POST['organization_social_youtube'] ?? ''));
+        $options['organization']['social_bluesky'] = esc_url_raw(wp_unslash($_POST['organization_social_bluesky'] ?? ''));
         $options['organization']['type'] = sanitize_text_field(wp_unslash($_POST['organization_type'] ?? 'organization'));
 
         if (!empty($twitter_username)) {

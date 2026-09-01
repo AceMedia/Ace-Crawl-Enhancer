@@ -503,6 +503,10 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             <div class="setting-label"><label for="organization_social_youtube">Organization YouTube URL</label></div>
                             <div class="setting-field"><input type="url" name="organization_social_youtube" id="organization_social_youtube" value="<?php echo esc_attr($options['organization']['social_youtube'] ?? ''); ?>" class="regular-text" /></div>
                         </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><label for="organization_social_bluesky">Organization Bluesky URL</label></div>
+                            <div class="setting-field"><input type="url" name="organization_social_bluesky" id="organization_social_bluesky" value="<?php echo esc_attr($options['organization']['social_bluesky'] ?? ''); ?>" class="regular-text" /></div>
+                        </div>
                         </fieldset>
 
                         <fieldset id="schema-person" class="ace-settings-group">
