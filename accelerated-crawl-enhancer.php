@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -2367,10 +2367,16 @@ class AceCrawlEnhancer {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
             
-            // OG Image
+            // OG Image: per-post meta -> featured image -> the site's Default Social Image
+            // (Settings -> Social). Without the last step a post published with no featured
+            // image shares with NO card image at all.
             $og_image = self::get_meta_value($post->ID, 'opengraph-image');
             if (empty($og_image) && has_post_thumbnail($post->ID)) {
                 $og_image = get_the_post_thumbnail_url($post->ID, 'large');
+            }
+            if (empty($og_image)) {
+                $ace_options = get_option('ace_seo_options', []);
+                $og_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
             if (!empty($og_image)) {
                 echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
@@ -2483,10 +2489,14 @@ class AceCrawlEnhancer {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }
             
-            // Twitter Image
+            // Twitter Image: same chain as og:image, ending at the Default Social Image.
             $twitter_image = self::get_meta_value($post->ID, 'twitter-image');
             if (empty($twitter_image) && has_post_thumbnail($post->ID)) {
                 $twitter_image = get_the_post_thumbnail_url($post->ID, 'large');
+            }
+            if (empty($twitter_image)) {
+                $ace_options = get_option('ace_seo_options', []);
+                $twitter_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
             if (!empty($twitter_image)) {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
