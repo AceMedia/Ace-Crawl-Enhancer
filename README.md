@@ -249,6 +249,11 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.10 (2026-09-02)
+- Organization schema: new **Bluesky URL** field (Settings → Organization) included in `sameAs` for both the Organization node and the Article publisher.
+- Open Graph: `og:image:width` / `og:image:height` emitted for featured-image cards so scrapers render the image on the first share.
+- (1.0.9) og:image / twitter:image fall back to the Default Social Image; PageSpeed runs anonymously without a key; Search Console block in the post SEO metabox (Site Kit-gated).
+
 ### 1.0.3 (2025-09-16)
 **🔄 Advanced Batch Migration & User Experience Release**
 
