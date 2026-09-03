@@ -1601,9 +1601,13 @@ class AceCrawlEnhancer {
         $result = str_replace(array_keys($variables), array_values($variables), $template);
         // Unresolved placeholders never leak; collapse the gaps they leave behind.
         $result = preg_replace('/\{[a-z_]+\}/', '', $result);
-        $result = preg_replace('/\s*([|\-\x{2013}])\s*(?:[|\-\x{2013}]\s*)+/u', ' $1 ', $result);
-        $result = preg_replace('/\s*,\s*(?:,\s*)+/', ', ', $result);
+        // Runs of separators/commas left by empty placeholders collapse to one: the
+        // strongest separator present wins ("| , " -> " | ", ", , " -> ", ").
+        $result = preg_replace_callback('/(?:\s*[|,\-\x{2013}]\s*){2,}/u', function ($m) {
+            return preg_match('/[|\-\x{2013}]/u', $m[0], $x) ? ' ' . $x[0] . ' ' : ', ';
+        }, $result);
         $result = preg_replace('/\s*\.\s*(?:\.\s*)+/', '. ', $result);
+        $result = preg_replace('/\s+([.,])/', '$1', $result);
         $result = trim(preg_replace('/\s{2,}/', ' ', $result), " |-,");
         
         // Final cleanup of the result to ensure no HTML tags slip through
