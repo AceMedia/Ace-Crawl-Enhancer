@@ -1601,7 +1601,7 @@ class AceCrawlEnhancer {
         $result = str_replace(array_keys($variables), array_values($variables), $template);
         // Unresolved placeholders never leak; collapse the gaps they leave behind.
         $result = preg_replace('/\{[a-z_]+\}/', '', $result);
-        $result = preg_replace('/\s*([|\-\u{2013}])\s*(?:[|\-\u{2013}]\s*)+/u', ' $1 ', $result);
+        $result = preg_replace('/\s*([|\-\x{2013}])\s*(?:[|\-\x{2013}]\s*)+/u', ' $1 ', $result);
         $result = preg_replace('/\s*,\s*(?:,\s*)+/', ', ', $result);
         $result = preg_replace('/\s*\.\s*(?:\.\s*)+/', '. ', $result);
         $result = trim(preg_replace('/\s{2,}/', ' ', $result), " |-,");
