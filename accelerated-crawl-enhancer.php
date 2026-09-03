@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.10
+ * Version: 1.0.11
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.10');
+define('ACE_SEO_VERSION', '1.0.11');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -1595,7 +1595,16 @@ class AceCrawlEnhancer {
             }
         }
         
+        // Let site/CPT plugins add their own placeholders ({venue}, {event_date},
+        // {price}...) so templates can be keyword-rich without per-post meta.
+        $variables = apply_filters('ace_seo_template_variables', $variables, $post);
         $result = str_replace(array_keys($variables), array_values($variables), $template);
+        // Unresolved placeholders never leak; collapse the gaps they leave behind.
+        $result = preg_replace('/\{[a-z_]+\}/', '', $result);
+        $result = preg_replace('/\s*([|\-\u{2013}])\s*(?:[|\-\u{2013}]\s*)+/u', ' $1 ', $result);
+        $result = preg_replace('/\s*,\s*(?:,\s*)+/', ', ', $result);
+        $result = preg_replace('/\s*\.\s*(?:\.\s*)+/', '. ', $result);
+        $result = trim(preg_replace('/\s{2,}/', ' ', $result), " |-,");
         
         // Final cleanup of the result to ensure no HTML tags slip through
         $result = $this->sanitize_seo_text($result);

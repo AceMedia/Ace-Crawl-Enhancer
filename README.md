@@ -249,6 +249,9 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.11 (2026-09-03)
+- Templates: new `ace_seo_template_variables` filter lets site/CPT plugins add placeholders (e.g. `{venue}`, `{event_date}`, `{price}`) to title/meta templates; unresolved placeholders are stripped and the separators they leave are collapsed, so a template never prints `{x}` or a dangling ` | `.
+
 ### 1.0.10 (2026-09-02)
 - Organization schema: new **Bluesky URL** field (Settings → Organization) included in `sameAs` for both the Organization node and the Article publisher.
 - Open Graph: `og:image:width` / `og:image:height` emitted for featured-image cards so scrapers render the image on the first share.
