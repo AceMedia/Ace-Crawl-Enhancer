@@ -78,7 +78,11 @@ class ACE_SEO_Frontend_Performance {
     public function preload_meta_cache() {
         if (is_singular()) {
             global $post;
-            $this->batch_load_meta($post->ID);
+            // A query can be singular without a post in hand: a plugin serving its own view on
+            // a singular-looking request leaves $post null, and reading ->ID off it warns.
+            if ($post instanceof WP_Post) {
+                $this->batch_load_meta($post->ID);
+            }
         } elseif (is_home() && !is_front_page()) {
             // Cache for blog homepage
             $posts_page_id = get_option('page_for_posts');
