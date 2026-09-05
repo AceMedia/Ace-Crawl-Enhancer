@@ -2560,7 +2560,10 @@ class AceCrawlEnhancer {
             $tw_image = apply_filters('ace_seo_archive_og_image', '', $tw_term);
             echo '<meta name="twitter:card" content="' . (!empty($tw_image) ? 'summary_large_image' : 'summary') . '">' . "\n";
 
-            $twitter_title = $this->process_special_page_title();
+            // Filterable like its og siblings above. Without a hook here a site serving an
+            // archive-shaped page under its own identity could set the document title and the
+            // og:title and still have the twitter card announce this site's name instead.
+            $twitter_title = apply_filters('ace_seo_archive_twitter_title', $this->process_special_page_title(), $tw_term);
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
