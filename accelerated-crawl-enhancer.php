@@ -2495,11 +2495,16 @@ class AceCrawlEnhancer {
             
             echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
             
-            // Twitter Title
+            // Twitter Title. Filterable, like the og title on the other branches: a static front
+            // page served under another identity (a member's own domain, a white-labelled site)
+            // is singular as far as WordPress is concerned, so this is the branch that runs for
+            // it - and without a hook there was no way to make the share card say anything but
+            // this site's own name.
             $twitter_title = self::get_meta_value($post->ID, 'twitter-title');
             if (empty($twitter_title)) {
                 $twitter_title = $this->get_seo_title($post);
             }
+            $twitter_title = apply_filters('ace_seo_twitter_title', $twitter_title, $post);
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
