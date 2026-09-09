@@ -28,6 +28,51 @@ class ACE_SEO_Term_Redirect {
 
     public function init() {
         add_action( 'template_redirect', array( $this, 'maybe_redirect' ), 1 );
+        add_filter( 'wp_sitemaps_taxonomies_query_args', array( $this, 'exclude_from_sitemap' ) );
+    }
+
+    /**
+     * Keep redirecting terms out of the sitemap.
+     *
+     * A term that 301s has no business being submitted for crawling: it spends
+     * crawl budget to arrive somewhere else, and the destination is listed in
+     * its own right anyway. Core runs these args through get_terms() for both
+     * the URL list and the page count, so filtering here keeps the entries and
+     * the pagination consistent.
+     *
+     * @param array $args get_terms() arguments.
+     * @return array
+     */
+    public function exclude_from_sitemap( $args ) {
+        $clause = array(
+            'relation' => 'OR',
+            array(
+                'key'     => self::META_KEY,
+                'compare' => 'NOT EXISTS',
+            ),
+            // A term whose target was cleared keeps an empty row on some
+            // sites; it is not redirecting, so it still belongs in the sitemap.
+            array(
+                'key'     => self::META_KEY,
+                'value'   => '',
+                'compare' => '=',
+            ),
+        );
+
+        if ( empty( $args['meta_query'] ) ) {
+            $args['meta_query'] = array( $clause );
+
+            return $args;
+        }
+
+        // Preserve whatever another filter already asked for.
+        $args['meta_query'] = array(
+            'relation' => 'AND',
+            $args['meta_query'],
+            $clause,
+        );
+
+        return $args;
     }
 
     /**
