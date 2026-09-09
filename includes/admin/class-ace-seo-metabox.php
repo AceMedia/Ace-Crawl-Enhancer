@@ -598,6 +598,7 @@ class AceSEOMetabox {
         $canonical = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'canonical' );
         $focuskw = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'focuskw' );
         $noindex = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'noindex' );
+        $redirect = get_term_meta( $term_id, ACE_SEO_META_PREFIX . 'redirect', true );
         
         // Check if values come from Yoast and haven't been migrated yet
         $yoast_tax_meta = get_option( 'wpseo_taxonomy_meta', [] );
@@ -724,6 +725,16 @@ class AceSEOMetabox {
                 <p class="description"><?php _e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
+
+        <tr class="form-field ace-seo-taxonomy-row">
+            <th scope="row">
+                <label for="ace_seo_redirect"><?php _e( 'Redirect Archive To', 'ace-crawl-enhancer' ); ?></label>
+            </th>
+            <td>
+                <input type="text" name="ace_seo_redirect" id="ace_seo_redirect" value="<?php echo esc_attr( $redirect ); ?>" class="regular-text" />
+                <p class="description"><?php _e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
+            </td>
+        </tr>
         <script>
         jQuery(document).ready(function($) {
             // Character counters for taxonomy fields
@@ -776,7 +787,7 @@ class AceSEOMetabox {
             return;
         }
         
-        $fields = array( 'title', 'desc', 'canonical', 'focuskw', 'noindex' );
+        $fields = array( 'title', 'desc', 'canonical', 'focuskw', 'noindex', 'redirect' );
         $fields_saved = 0;
         
         foreach ( $fields as $field ) {
@@ -790,6 +801,12 @@ class AceSEOMetabox {
                     $value = sanitize_textarea_field( wp_unslash( $_POST[$key] ) );
                 } elseif ( $field === 'canonical' ) {
                     $value = esc_url_raw( $value );
+                } elseif ( $field === 'redirect' ) {
+                    // Either a term ID or an absolute URL; anything else is dropped.
+                    $value = is_numeric( $value ) ? (string) absint( $value ) : esc_url_raw( $value );
+                    if ( '0' === $value ) {
+                        $value = '';
+                    }
                 }
                 
                 if ( ! empty( $value ) ) {
