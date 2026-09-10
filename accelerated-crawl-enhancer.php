@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.20
+ * Version: 1.0.21
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.20');
+define('ACE_SEO_VERSION', '1.0.21');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -1833,6 +1833,28 @@ class AceCrawlEnhancer {
     }
     
     /**
+     * Does this title already carry the site name at the end?
+     *
+     * Only the tail counts. A title may legitimately mention the brand in
+     * passing ("Paddy Power's guide to...") and still want the usual suffix;
+     * one that ends with the site name does not.
+     *
+     * @param string $title Title to inspect.
+     * @return bool
+     */
+    private static function title_is_self_branded($title) {
+        $site = trim((string) get_bloginfo('name'));
+        if ('' === $site || '' === trim((string) $title)) {
+            return false;
+        }
+
+        $title = html_entity_decode($title, ENT_QUOTES, 'UTF-8');
+        $tail  = trim(mb_substr($title, -mb_strlen($site)));
+
+        return 0 === strcasecmp($tail, $site);
+    }
+
+    /**
      * Filter document title
      */
     public function filter_document_title_parts($title_parts) {
@@ -1856,7 +1878,11 @@ class AceCrawlEnhancer {
                 if (empty($manual_title)) {
                     $manual_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
                 }
-                if (empty($manual_title)) {
+                // A manual title that already ends in the site name brands
+                // itself — a migrated Yoast template ending %%sitename%% does
+                // exactly that once expanded — so appending the parts as well
+                // gives "Post - Site - Site".
+                if (empty($manual_title) || self::title_is_self_branded($title_parts['title'])) {
                     $title_parts['site']    = '';
                     $title_parts['tagline'] = '';
                     $title_parts['page']    = '';
