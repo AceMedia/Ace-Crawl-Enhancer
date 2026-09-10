@@ -176,35 +176,15 @@ class ACE_SEO_Term_Redirect {
     /**
      * Tidy the path of a resolved URL.
      *
-     * A site whose category base is "." (used to lift category archives to the
-     * root) makes get_term_link() return paths like /./football/. Browsers
-     * normalise that away, but it is not something to put in a Location header
-     * or hand to Google, so collapse the no-op segments and any doubled
-     * slashes before redirecting.
+     * Shares the sitemap's normaliser so a term's redirect target and its
+     * sitemap entry can never disagree about the same URL.
      */
     private function normalise( $url ) {
-        $parts = wp_parse_url( $url );
-        if ( empty( $parts['path'] ) ) {
-            return $url;
+        if ( function_exists( 'ace_sitemap_powertools_normalise_url' ) ) {
+            return ace_sitemap_powertools_normalise_url( $url );
         }
 
-        $path = preg_replace( '#/\.(?=/|$)#', '', $parts['path'] );
-        $path = preg_replace( '#/{2,}#', '/', $path );
-        if ( '' === $path ) {
-            $path = '/';
-        }
-
-        if ( $path === $parts['path'] ) {
-            return $url;
-        }
-
-        $rebuilt = ( isset( $parts['scheme'] ) ? $parts['scheme'] . '://' : '//' )
-            . ( $parts['host'] ?? '' )
-            . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' )
-            . $path
-            . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
-
-        return $rebuilt;
+        return $url;
     }
 
     /**

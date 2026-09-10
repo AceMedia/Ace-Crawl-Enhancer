@@ -2471,6 +2471,65 @@ function ace_sitemap_powertools_taxonomies_filter( $taxonomies ) {
 }
 add_filter( 'wp_sitemaps_taxonomies', 'ace_sitemap_powertools_taxonomies_filter' );
 
+/**
+ * Collapse no-op segments out of a URL's path.
+ *
+ * A site can lift its category archives to the root by setting the category
+ * base to ".", and get_term_link() then hands back paths like /./football/.
+ * The archive resolves either way, so nothing looks broken on the site, but
+ * every term URL in the sitemap goes to search engines with the "/./" still
+ * in it. Normalise the path so what we publish is the URL we actually want
+ * indexed.
+ *
+ * @param string $url URL to tidy.
+ * @return string
+ */
+function ace_sitemap_powertools_normalise_url( $url ) {
+    if ( ! is_string( $url ) || false === strpos( $url, '/' ) ) {
+        return $url;
+    }
+
+    $parts = wp_parse_url( $url );
+    if ( empty( $parts['path'] ) ) {
+        return $url;
+    }
+
+    $path = preg_replace( '#/\.(?=/|$)#', '', $parts['path'] );
+    $path = preg_replace( '#/{2,}#', '/', $path );
+    if ( '' === $path ) {
+        $path = '/';
+    }
+
+    if ( $path === $parts['path'] ) {
+        return $url;
+    }
+
+    return ( isset( $parts['scheme'] ) ? $parts['scheme'] . '://' : '//' )
+        . ( isset( $parts['host'] ) ? $parts['host'] : '' )
+        . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' )
+        . $path
+        . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
+}
+
+/**
+ * Tidy the URL on a taxonomy sitemap entry.
+ *
+ * Only taxonomy entries are filtered: term links are the one place a rewrite
+ * base can inject a no-op segment, and post, page and author URLs are not
+ * built that way.
+ *
+ * @param array $entry Sitemap entry.
+ * @return array
+ */
+function ace_sitemap_powertools_normalise_taxonomy_entry( $entry ) {
+    if ( isset( $entry['loc'] ) ) {
+        $entry['loc'] = ace_sitemap_powertools_normalise_url( $entry['loc'] );
+    }
+
+    return $entry;
+}
+add_filter( 'wp_sitemaps_taxonomies_entry', 'ace_sitemap_powertools_normalise_taxonomy_entry' );
+
 function ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) {
     if ( ! post_type_exists( $post_type ) ) {
         return false;
