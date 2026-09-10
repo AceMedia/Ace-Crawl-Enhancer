@@ -706,6 +706,42 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                 </label>
                             </div>
                         </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <label for="canonical_variants">URL Variants</label>
+                            </div>
+                            <div class="setting-field">
+                                <?php $canonical_variants = $options['advanced']['canonical_variants'] ?? 'clean'; ?>
+                                <select name="canonical_variants" id="canonical_variants" class="ace-seo-select">
+                                    <option value="clean" <?php selected($canonical_variants, 'clean'); ?>>Canonical to the clean URL</option>
+                                    <option value="preserve" <?php selected($canonical_variants, 'preserve'); ?>>Let variants be canonical in their own right</option>
+                                </select>
+                                <p class="description">
+                                    Whether a URL carrying a query string can rank on its own. Choose
+                                    <strong>clean</strong> when query arguments only carry tracking or a
+                                    preview mode &mdash; every variant then points at one indexable URL.
+                                    Choose <strong>variants</strong> when a query argument genuinely
+                                    selects different content people should be able to find, such as an
+                                    individual map or venue view.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <label for="canonical_query_args">Rankable Query Arguments</label>
+                            </div>
+                            <div class="setting-field">
+                                <input type="text" name="canonical_query_args" id="canonical_query_args" class="regular-text"
+                                       value="<?php echo esc_attr($options['advanced']['canonical_query_args'] ?? ''); ?>" />
+                                <p class="description">
+                                    Comma-separated. Only used with <strong>clean</strong> above, where these
+                                    are the exceptions that stay in the canonical URL &mdash; e.g. <code>map, venue</code>.
+                                    Search and pagination arguments are always kept. Leave blank if there are none.
+                                </p>
+                            </div>
+                        </div>
                         </fieldset>
                     </div>
                 </div>

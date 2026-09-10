@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.19
+ * Version: 1.0.20
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.19');
+define('ACE_SEO_VERSION', '1.0.20');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -2423,6 +2423,19 @@ class AceCrawlEnhancer {
     }
 
     /**
+     * Drop named arguments from a URL, leaving no dangling "?".
+     *
+     * @param string $url  URL to clean.
+     * @param array  $args Argument names to remove.
+     * @return string
+     */
+    private static function remove_args($url, array $args) {
+        $url = remove_query_arg($args, $url);
+
+        return rtrim($url, '?');
+    }
+
+    /**
      * Remove query arguments that must never appear in a canonical URL.
      *
      * A site can carry a mode through its internal links by filtering
@@ -2437,6 +2450,19 @@ class AceCrawlEnhancer {
     public static function strip_non_canonical_args($url) {
         if (!is_string($url) || strpos($url, '?') === false) {
             return $url;
+        }
+
+        $settings = get_option('ace_seo_options', array());
+        $advanced = isset($settings['advanced']) && is_array($settings['advanced']) ? $settings['advanced'] : array();
+
+        // Some sites drive real, distinct content from a query argument — an
+        // individual map or venue view — and want those found on their own.
+        // Others only ever carry tracking or a preview mode there. The site
+        // says which it is; the plugin does not guess.
+        if ('preserve' === ($advanced['canonical_variants'] ?? 'clean')) {
+            $denied = (array) apply_filters('ace_seo_non_canonical_query_args', array());
+
+            return empty($denied) ? $url : self::remove_args($url, $denied);
         }
 
         $query = (string) wp_parse_url($url, PHP_URL_QUERY);
@@ -2461,9 +2487,14 @@ class AceCrawlEnhancer {
          * @param array  $allowed Argument names to keep.
          * @param string $url     Canonical URL being built.
          */
+        $configured = array_filter(array_map('trim', explode(',', (string) ($advanced['canonical_query_args'] ?? ''))));
+
         $allowed = (array) apply_filters(
             'ace_seo_canonical_query_args',
-            array('s', 'paged', 'page', 'p', 'page_id', 'cat', 'tag', 'author', 'year', 'monthnum', 'day'),
+            array_merge(
+                array('s', 'paged', 'page', 'p', 'page_id', 'cat', 'tag', 'author', 'year', 'monthnum', 'day'),
+                $configured
+            ),
             $url
         );
 

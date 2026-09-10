@@ -484,6 +484,12 @@ class AceSEOSettings {
         // Update advanced settings
         $options['advanced']['enable_breadcrumbs'] = isset($_POST['enable_breadcrumbs']) ? 1 : 0;
         $options['advanced']['clean_permalinks'] = isset($_POST['clean_permalinks']) ? 1 : 0;
+        $variants = isset($_POST['canonical_variants']) ? sanitize_text_field(wp_unslash($_POST['canonical_variants'])) : 'clean';
+        $options['advanced']['canonical_variants'] = in_array($variants, array('clean', 'preserve'), true) ? $variants : 'clean';
+
+        $args = isset($_POST['canonical_query_args']) ? sanitize_text_field(wp_unslash($_POST['canonical_query_args'])) : '';
+        $args = array_filter(array_map('trim', explode(',', $args)));
+        $options['advanced']['canonical_query_args'] = implode(', ', $args);
         unset($options['advanced']['enable_sitemap']);
         
         // Update AI settings
