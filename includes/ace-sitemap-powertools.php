@@ -2530,6 +2530,26 @@ function ace_sitemap_powertools_normalise_taxonomy_entry( $entry ) {
 }
 add_filter( 'wp_sitemaps_taxonomies_entry', 'ace_sitemap_powertools_normalise_taxonomy_entry' );
 
+/**
+ * Tidy every term link the site builds.
+ *
+ * The canonical and the sitemap were fixed at the point of output, but the
+ * links in menus, category lists and post meta come straight from
+ * get_term_link() and still carried the "/./". They are internal links
+ * pointing at a form the canonical says is not the URL, so normalise at
+ * source and let every consumer inherit it.
+ *
+ * Runs late so it tidies whatever earlier filters — including this
+ * plugin's own root-level tag links at priority 20 — have produced.
+ *
+ * @param string $termlink Term URL.
+ * @return string
+ */
+function ace_sitemap_powertools_normalise_term_link( $termlink ) {
+    return ace_sitemap_powertools_normalise_url( $termlink );
+}
+add_filter( 'term_link', 'ace_sitemap_powertools_normalise_term_link', 99 );
+
 function ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) {
     if ( ! post_type_exists( $post_type ) ) {
         return false;
