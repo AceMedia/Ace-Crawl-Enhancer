@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.14
+ * Version: 1.0.15
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.14');
+define('ACE_SEO_VERSION', '1.0.15');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -2243,20 +2243,15 @@ class AceCrawlEnhancer {
         if (is_singular()) {
             global $post;
             $canonical = self::get_meta_value($post->ID, 'canonical');
-            
+
             if (empty($canonical)) {
                 $canonical = get_permalink($post);
             }
-            
-            if (!empty($canonical)) {
-                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
-            }
+
+            $this->emit_canonical($canonical);
         } elseif (is_home()) {
             // Blog homepage
-            $canonical = apply_filters('ace_seo_home_canonical', home_url('/'));
-            if (!empty($canonical)) {
-                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
-            }
+            $this->emit_canonical(apply_filters('ace_seo_home_canonical', home_url('/')));
         } elseif (is_front_page()) {
             // Static front page
             $page_on_front = get_option('page_on_front');
@@ -2265,35 +2260,53 @@ class AceCrawlEnhancer {
             } else {
                 $canonical = home_url('/');
             }
-            $canonical = apply_filters('ace_seo_home_canonical', $canonical);
-            if (!empty($canonical)) {
-                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
-            }
+            $this->emit_canonical(apply_filters('ace_seo_home_canonical', $canonical));
         } elseif (is_category() || is_tag() || is_tax()) {
             // Taxonomy pages
             $term = get_queried_object();
             if ($term && isset($term->term_id)) {
                 $canonical = get_term_link($term);
                 if (!is_wp_error($canonical)) {
-                    echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+                    $this->emit_canonical($canonical);
                 }
             }
         } elseif (is_author()) {
             // Author pages
             $author = get_queried_object();
             if ($author && isset($author->ID)) {
-                $canonical = get_author_posts_url($author->ID);
-                echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+                $this->emit_canonical(get_author_posts_url($author->ID));
             }
         } elseif (is_search()) {
             // Search pages
-            $canonical = home_url('/') . '?s=' . urlencode(get_search_query());
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            $this->emit_canonical(home_url('/') . '?s=' . urlencode(get_search_query()));
         } elseif (is_archive()) {
             // Other archive pages
-            $canonical = get_pagenum_link(get_query_var('paged') ?: 1, false);
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
+            $this->emit_canonical(get_pagenum_link(get_query_var('paged') ?: 1, false));
         }
+    }
+
+    /**
+     * Print a canonical tag, tidied.
+     *
+     * Every branch above goes through here so the normalising cannot be
+     * forgotten for one page type. A site can lift its category archives to
+     * the root by setting the category base to ".", and get_term_link() then
+     * hands back /./football/ — fine to browse, but not what we want to name
+     * as the canonical URL. Shares the sitemap's normaliser, so a term's
+     * canonical, its sitemap entry and any redirect to it all agree.
+     *
+     * @param string $canonical Canonical URL.
+     */
+    private function emit_canonical($canonical) {
+        if (empty($canonical)) {
+            return;
+        }
+
+        if (function_exists('ace_sitemap_powertools_normalise_url')) {
+            $canonical = ace_sitemap_powertools_normalise_url($canonical);
+        }
+
+        echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     }
     
     /**
