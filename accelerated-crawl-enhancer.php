@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.17
+ * Version: 1.0.18
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.17');
+define('ACE_SEO_VERSION', '1.0.18');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -243,6 +243,7 @@ class AceCrawlEnhancer {
             // rel_canonical so singular pages don't get a second, duplicate <link rel="canonical">.
             remove_action('wp_head', 'rel_canonical');
             add_action('wp_head', [$this, 'output_canonical'], 2);
+            add_action('template_redirect', [$this, 'send_robots_header'], 5);
             add_action('wp_head', [$this, 'output_robots_meta'], 3);
             add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
             add_action('wp_head', [$this, 'output_twitter_tags'], 11);
@@ -2401,6 +2402,30 @@ class AceCrawlEnhancer {
     }
 
     /**
+     * Remove query arguments that must never appear in a canonical URL.
+     *
+     * A site can carry a mode through its internal links by filtering
+     * home_url() and friends — a beta toggle, a preview flag. Those filters
+     * also reach the URL builders the canonical is made from, so the variant
+     * ends up naming itself as canonical, which is an invitation to index it.
+     * Sites declare their own arguments; this plugin knows none of them.
+     *
+     * @param string $url Canonical URL.
+     * @return string
+     */
+    public static function strip_non_canonical_args($url) {
+        $args = (array) apply_filters('ace_seo_non_canonical_query_args', array());
+        if (empty($args) || !is_string($url) || strpos($url, '?') === false) {
+            return $url;
+        }
+
+        $url = remove_query_arg($args, $url);
+
+        // remove_query_arg leaves a bare "?" behind when it takes the last one.
+        return rtrim($url, '?');
+    }
+
+    /**
      * Print a canonical tag, tidied.
      *
      * Every branch above goes through here so the normalising cannot be
@@ -2421,13 +2446,53 @@ class AceCrawlEnhancer {
             $canonical = ace_sitemap_powertools_normalise_url($canonical);
         }
 
+        $canonical = self::strip_non_canonical_args($canonical);
+
         echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     }
     
     /**
      * Output robots meta tags
      */
+    /**
+     * Should this request refuse to be indexed, whatever page it is?
+     *
+     * Generic hook: a site declares its own conditions. Nothing here knows
+     * what a given site's variant requests look like.
+     *
+     * @return bool
+     */
+    public static function force_noindex() {
+        return (bool) apply_filters('ace_seo_force_noindex', false);
+    }
+
+    /**
+     * Send the header form of the same instruction.
+     *
+     * The meta tag only helps for HTML. A header covers feeds, and reaches
+     * anything that reads headers without parsing the body.
+     */
+    public function send_robots_header() {
+        if (headers_sent() || !self::force_noindex()) {
+            return;
+        }
+
+        header('X-Robots-Tag: noindex, follow', true);
+    }
+
     public function output_robots_meta() {
+        // A request can be a variant of a real page — a preview mode, a theme
+        // toggle, anything reached by a query argument nobody should land on
+        // from search. Those must say noindex whatever kind of page they are,
+        // so this runs before the is_singular() branch below (archives and the
+        // homepage never reach it otherwise). "follow" is deliberate: the
+        // content is a duplicate, not something to stop crawling through.
+        if (self::force_noindex()) {
+            echo '<meta name="robots" content="noindex, follow">' . "\n";
+
+            return;
+        }
+
         if (is_singular()) {
             global $post;
             
