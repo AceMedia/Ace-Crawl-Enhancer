@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.16
+ * Version: 1.0.17
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.16');
+define('ACE_SEO_VERSION', '1.0.17');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -698,12 +698,125 @@ class AceCrawlEnhancer {
      * Get meta value with fallback to default and Yoast migration
      * Optimized to use cached data on frontend for better performance
      */
+    /**
+     * Keys whose stored value may carry Yoast replacement variables.
+     */
+    private static $ace_seo_token_keys = array(
+        'title', 'desc', 'opengraph-title', 'opengraph-description',
+        'twitter-title', 'twitter-description',
+    );
+
+    /**
+     * Expand Yoast-style %%variables%% left behind by migrated data.
+     *
+     * Yoast stored titles as templates and expanded them at render time. Values
+     * migrated into this plugin keep that syntax, and without an expander the
+     * raw "%%title%% %%page%%" ends up in the <title> tag. Handled on read so a
+     * post's stored value is never rewritten and the editor keeps showing the
+     * template it was given.
+     *
+     * @param string          $value  Stored value.
+     * @param WP_Post|WP_Term $object Post or term the value belongs to.
+     * @return string
+     */
+    /**
+     * Run a stored value through the token expander when it makes sense to.
+     *
+     * Frontend only: the editor must keep showing the template that was saved,
+     * or an author would unwittingly save the expanded text back over it.
+     *
+     * @param int    $object_id Post or term ID.
+     * @param string $key       Meta key (without prefix).
+     * @param mixed  $value     Stored value.
+     * @param string $context   'post', or the taxonomy name for a term.
+     * @return mixed
+     */
+    private static function maybe_expand($object_id, $key, $value, $context) {
+        if (is_admin() || !is_string($value) || strpos($value, '%%') === false) {
+            return $value;
+        }
+
+        if (!in_array($key, self::$ace_seo_token_keys, true)) {
+            return $value;
+        }
+
+        $object = ('post' === $context)
+            ? get_post($object_id)
+            : get_term($object_id, $context);
+
+        if (!$object || is_wp_error($object)) {
+            return $value;
+        }
+
+        return self::expand_tokens($value, $object);
+    }
+
+    public static function expand_tokens($value, $object) {
+        if (!is_string($value) || strpos($value, '%%') === false) {
+            return $value;
+        }
+
+        $is_term = $object instanceof WP_Term;
+        $paged   = max((int) get_query_var('paged'), (int) get_query_var('page'), 1);
+
+        $replacements = array(
+            '%%sitename%%'    => get_bloginfo('name'),
+            '%%sitedesc%%'    => get_bloginfo('description'),
+            '%%sep%%'         => apply_filters('ace_seo_title_separator', '-'),
+            '%%currentyear%%' => date_i18n('Y'),
+            '%%currentmonth%%'=> date_i18n('F'),
+            '%%currentdate%%' => date_i18n(get_option('date_format')),
+            '%%page%%'        => $paged > 1 ? sprintf(__('Page %d', 'ace-crawl-enhancer'), $paged) : '',
+            '%%pagenumber%%'  => (string) $paged,
+            '%%search_term%%' => get_search_query(),
+        );
+
+        if ($is_term) {
+            $replacements['%%title%%']            = $object->name;
+            $replacements['%%term_title%%']       = $object->name;
+            $replacements['%%term_description%%'] = wp_strip_all_tags($object->description);
+            $replacements['%%category%%']         = $object->name;
+        } elseif ($object instanceof WP_Post) {
+            $categories = get_the_category($object->ID);
+            $primary    = !empty($categories) ? $categories[0]->name : '';
+
+            $replacements['%%title%%']            = $object->post_title;
+            $replacements['%%excerpt%%']          = wp_strip_all_tags(get_the_excerpt($object));
+            $replacements['%%excerpt_only%%']     = wp_strip_all_tags($object->post_excerpt);
+            $replacements['%%date%%']             = get_the_date('', $object);
+            $replacements['%%modified%%']         = get_the_modified_date('', $object);
+            $replacements['%%author%%']           = get_the_author_meta('display_name', $object->post_author);
+            $replacements['%%category%%']         = $primary;
+            $replacements['%%primary_category%%'] = $primary;
+            $replacements['%%post_type%%']        = $object->post_type;
+        }
+
+        /**
+         * Filter the replacement map before it is applied.
+         *
+         * @param array           $replacements Token => value.
+         * @param WP_Post|WP_Term $object       Object being rendered.
+         */
+        $replacements = apply_filters('ace_seo_token_replacements', $replacements, $object);
+
+        $value = strtr($value, $replacements);
+
+        // Drop anything unrecognised rather than printing it, then tidy the
+        // gaps and dangling separators an emptied token leaves behind.
+        $value = preg_replace('/%%[^%\s]+%%/', '', $value);
+        $value = preg_replace('/\s{2,}/', ' ', $value);
+        $value = trim($value);
+        $value = trim($value, " \t-|–—·»«");
+
+        return trim($value);
+    }
+
     public static function get_meta_value($post_id, $key) {
         // On frontend, try to use cached data first for better performance
         if (!is_admin() && class_exists('ACE_SEO_Performance')) {
             $cached_value = ACE_SEO_Performance::get_meta($post_id, $key);
             if ($cached_value !== null) {
-                return $cached_value;
+                return self::maybe_expand($post_id, $key, $cached_value, 'post');
             }
         }
         
@@ -732,7 +845,7 @@ class AceCrawlEnhancer {
             return '';
         }
         
-        return $value;
+        return self::maybe_expand($post_id, $key, $value, 'post');
     }
     
     /**
@@ -2001,7 +2114,7 @@ class AceCrawlEnhancer {
         static $meta_cache = [];
         $cache_key = "{$term_id}:{$taxonomy}:{$key}";
         if ( array_key_exists( $cache_key, $meta_cache ) ) {
-            return $meta_cache[ $cache_key ];
+            return self::maybe_expand($term_id, $key, $meta_cache[ $cache_key ], $taxonomy);
         }
 
         // First try to get ACE SEO meta
@@ -2049,7 +2162,9 @@ class AceCrawlEnhancer {
             }
         }
         
-        return $meta_cache[ $cache_key ] = $value;
+        $meta_cache[ $cache_key ] = $value;
+
+        return self::maybe_expand($term_id, $key, $value, $taxonomy);
     }
     
     /**
