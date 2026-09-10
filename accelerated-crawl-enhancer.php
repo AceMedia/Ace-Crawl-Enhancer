@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.18
+ * Version: 1.0.19
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.18');
+define('ACE_SEO_VERSION', '1.0.19');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -2396,8 +2396,29 @@ class AceCrawlEnhancer {
             // Search pages
             $this->emit_canonical(home_url('/') . '?s=' . urlencode(get_search_query()));
         } elseif (is_archive()) {
-            // Other archive pages
-            $this->emit_canonical(get_pagenum_link(get_query_var('paged') ?: 1, false));
+            // Other archive pages — post type archives, dates, authors handled
+            // above. get_pagenum_link() falls back to the home URL plus the
+            // current query string when it cannot work out the archive's own
+            // link, which points a post type archive at the front page. Ask
+            // for the archive's real link first and only fall back when there
+            // isn't one.
+            $canonical = '';
+
+            if (is_post_type_archive()) {
+                $post_type = get_query_var('post_type');
+                $post_type = is_array($post_type) ? reset($post_type) : $post_type;
+                $link      = $post_type ? get_post_type_archive_link($post_type) : false;
+
+                if ($link) {
+                    $canonical = $link;
+                }
+            }
+
+            if ('' === $canonical) {
+                $canonical = get_pagenum_link(get_query_var('paged') ?: 1, false);
+            }
+
+            $this->emit_canonical($canonical);
         }
     }
 
@@ -2414,15 +2435,62 @@ class AceCrawlEnhancer {
      * @return string
      */
     public static function strip_non_canonical_args($url) {
-        $args = (array) apply_filters('ace_seo_non_canonical_query_args', array());
-        if (empty($args) || !is_string($url) || strpos($url, '?') === false) {
+        if (!is_string($url) || strpos($url, '?') === false) {
             return $url;
         }
 
-        $url = remove_query_arg($args, $url);
+        $query = (string) wp_parse_url($url, PHP_URL_QUERY);
+        if ('' === $query) {
+            return $url;
+        }
 
-        // remove_query_arg leaves a bare "?" behind when it takes the last one.
-        return rtrim($url, '?');
+        parse_str($query, $current);
+        if (empty($current)) {
+            return $url;
+        }
+
+        /**
+         * Query arguments allowed to remain in a canonical URL.
+         *
+         * Everything else goes. A canonical is a statement about which URL a
+         * piece of content lives at, and a tracking parameter does not change
+         * the content — leaving it in turns every shared link (utm_*, gclid,
+         * fbclid) into a duplicate that nominates itself for indexing. Only
+         * arguments that genuinely select different content belong here.
+         *
+         * @param array  $allowed Argument names to keep.
+         * @param string $url     Canonical URL being built.
+         */
+        $allowed = (array) apply_filters(
+            'ace_seo_canonical_query_args',
+            array('s', 'paged', 'page', 'p', 'page_id', 'cat', 'tag', 'author', 'year', 'monthnum', 'day'),
+            $url
+        );
+
+        /**
+         * Additionally drop these, even if something allowed them above.
+         *
+         * Kept as its own hook so a site can name a mode-carrying argument
+         * without having to restate the whole allowlist.
+         *
+         * @param array $args Argument names to remove.
+         */
+        $denied = (array) apply_filters('ace_seo_non_canonical_query_args', array());
+
+        $keep = array();
+        foreach ($current as $key => $value) {
+            if (in_array($key, $denied, true)) {
+                continue;
+            }
+
+            if (in_array($key, $allowed, true)) {
+                $keep[$key] = $value;
+            }
+        }
+
+        $base = strtok($url, '?');
+
+        return empty($keep) ? $base : add_query_arg($keep, $base);
     }
 
     /**
@@ -2467,6 +2535,32 @@ class AceCrawlEnhancer {
     }
 
     /**
+     * Turn stored robots values into directives.
+     *
+     * @param string $noindex  '1' to hide from results.
+     * @param string $nofollow '1' to stop links being followed.
+     * @param string $adv      Comma-separated extra directives.
+     * @return array
+     */
+    private static function collect_robots_directives($noindex, $nofollow, $adv) {
+        $robots = array();
+
+        if ('1' === $noindex) {
+            $robots[] = 'noindex';
+        }
+
+        if ('1' === $nofollow) {
+            $robots[] = 'nofollow';
+        }
+
+        if (!empty($adv)) {
+            $robots = array_merge($robots, array_map('trim', explode(',', $adv)));
+        }
+
+        return $robots;
+    }
+
+    /**
      * Send the header form of the same instruction.
      *
      * The meta tag only helps for HTML. A header covers feeds, and reaches
@@ -2493,33 +2587,45 @@ class AceCrawlEnhancer {
             return;
         }
 
+        $robots = array();
+
         if (is_singular()) {
             global $post;
-            
-            $robots = [];
-            
-            // Check noindex
-            $noindex = self::get_meta_value($post->ID, 'meta-robots-noindex');
-            if ($noindex === '1') {
-                $robots[] = 'noindex';
+
+            $robots = self::collect_robots_directives(
+                self::get_meta_value($post->ID, 'meta-robots-noindex'),
+                self::get_meta_value($post->ID, 'meta-robots-nofollow'),
+                self::get_meta_value($post->ID, 'meta-robots-adv')
+            );
+        } elseif (is_category() || is_tag() || is_tax()) {
+            // A term's Search Engine Visibility setting was being collected in
+            // the admin and then never emitted, because this method only ever
+            // considered singular pages. Terms store a word rather than the
+            // posts' 1/2 flags.
+            $term = get_queried_object();
+
+            if ($term instanceof WP_Term) {
+                $visibility = self::get_taxonomy_meta($term->term_id, $term->taxonomy, 'noindex');
+
+                if ('noindex' === $visibility) {
+                    $robots[] = 'noindex';
+                }
+
+                if ('1' === self::get_taxonomy_meta($term->term_id, $term->taxonomy, 'meta-robots-nofollow')) {
+                    $robots[] = 'nofollow';
+                }
             }
-            
-            // Check nofollow
-            $nofollow = self::get_meta_value($post->ID, 'meta-robots-nofollow');
-            if ($nofollow === '1') {
-                $robots[] = 'nofollow';
-            }
-            
-            // Check advanced robots
-            $robots_adv = self::get_meta_value($post->ID, 'meta-robots-adv');
-            if (!empty($robots_adv)) {
-                $adv_robots = explode(',', $robots_adv);
-                $robots = array_merge($robots, $adv_robots);
-            }
-            
-            if (!empty($robots)) {
-                echo '<meta name="robots" content="' . esc_attr(implode(', ', $robots)) . '">' . "\n";
-            }
+        }
+
+        /**
+         * Filter the robots directives for the current request.
+         *
+         * @param array $robots Directives, e.g. array('noindex').
+         */
+        $robots = (array) apply_filters('ace_seo_robots_directives', $robots);
+
+        if (!empty($robots)) {
+            echo '<meta name="robots" content="' . esc_attr(implode(', ', array_unique(array_filter($robots)))) . '">' . "\n";
         }
     }
     
