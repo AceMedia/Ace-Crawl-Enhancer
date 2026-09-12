@@ -1533,17 +1533,17 @@ class AceCrawlEnhancer {
         // 1) ACE manual title
         $seo_title = self::get_meta_value($post->ID, 'title');
         if (!empty($seo_title)) {
-            return $seo_title;
+            return apply_filters('ace_seo_singular_title', $seo_title, $post);
         }
 
         // 2) Yoast manual title (respect existing custom content)
         $yoast_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
         if (!empty($yoast_title)) {
-            return $yoast_title;
+            return apply_filters('ace_seo_singular_title', $yoast_title, $post);
         }
         
         // 3) Fallback to template
-        return $this->process_title_template($post);
+        return apply_filters('ace_seo_singular_title', $this->process_title_template($post), $post);
     }
     
     /**
@@ -1806,17 +1806,17 @@ class AceCrawlEnhancer {
         // 1) ACE manual meta description
         $meta_desc = self::get_meta_value($post->ID, 'metadesc');
         if (!empty($meta_desc)) {
-            return $meta_desc;
+            return apply_filters('ace_seo_singular_meta_description', $meta_desc, $post);
         }
 
         // 2) Yoast manual meta description (respect existing custom content)
         $yoast_desc = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
         if (!empty($yoast_desc)) {
-            return $yoast_desc;
+            return apply_filters('ace_seo_singular_meta_description', $yoast_desc, $post);
         }
         
         // 3) Template fallback
-        return $this->process_meta_template($post);
+        return apply_filters('ace_seo_singular_meta_description', $this->process_meta_template($post), $post);
     }
     
     /**
@@ -1932,6 +1932,18 @@ class AceCrawlEnhancer {
      * Get homepage title with synchronization between settings and page meta
      */
     private function get_homepage_title() {
+        // WordPress reports the configured posts page as `is_home()`, even when
+        // a different static page is the actual front page. Treat that posts
+        // page as its own SEO document rather than borrowing the front page's
+        // marketing title.
+        if (is_home() && !is_front_page()) {
+            $posts_page_id = (int) get_option('page_for_posts');
+            $posts_page = $posts_page_id ? get_post($posts_page_id) : null;
+            if ($posts_page instanceof WP_Post) {
+                return $this->get_seo_title($posts_page);
+            }
+        }
+
         $options = get_option('ace_seo_options', []);
         $settings_title = $options['general']['home_title'] ?? '';
         
@@ -2017,6 +2029,14 @@ class AceCrawlEnhancer {
      * Get homepage meta description with synchronization between settings and page meta
      */
     private function get_homepage_meta_description() {
+        if (is_home() && !is_front_page()) {
+            $posts_page_id = (int) get_option('page_for_posts');
+            $posts_page = $posts_page_id ? get_post($posts_page_id) : null;
+            if ($posts_page instanceof WP_Post) {
+                return $this->get_meta_description($posts_page);
+            }
+        }
+
         $options = get_option('ace_seo_options', []);
         $settings_desc = $options['general']['home_description'] ?? '';
         
@@ -2390,10 +2410,13 @@ class AceCrawlEnhancer {
                 $canonical = get_permalink($post);
             }
 
-            $this->emit_canonical($canonical);
+            $this->emit_canonical(apply_filters('ace_seo_singular_canonical', $canonical, $post));
         } elseif (is_home()) {
-            // Blog homepage
-            $this->emit_canonical(apply_filters('ace_seo_home_canonical', home_url('/')));
+            // The posts index may live on its own configured page. Its canonical
+            // is that page, not the static front page.
+            $posts_page_id = (int) get_option('page_for_posts');
+            $canonical = $posts_page_id ? get_permalink($posts_page_id) : home_url('/');
+            $this->emit_canonical(apply_filters('ace_seo_home_canonical', $canonical));
         } elseif (is_front_page()) {
             // Static front page
             $page_on_front = get_option('page_on_front');
@@ -2725,6 +2748,7 @@ class AceCrawlEnhancer {
             if (empty($og_title)) {
                 $og_title = $this->get_seo_title($post);
             }
+            $og_title = apply_filters('ace_seo_singular_og_title', $og_title, $post);
             if (!empty($og_title)) {
                 echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
@@ -2734,6 +2758,7 @@ class AceCrawlEnhancer {
             if (empty($og_desc)) {
                 $og_desc = $this->get_meta_description($post);
             }
+            $og_desc = apply_filters('ace_seo_singular_og_description', $og_desc, $post);
             if (!empty($og_desc)) {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
@@ -2765,7 +2790,8 @@ class AceCrawlEnhancer {
             }
             
             // OG URL
-            echo '<meta property="og:url" content="' . esc_url(get_permalink($post)) . '">' . "\n";
+            $og_url = apply_filters('ace_seo_singular_og_url', get_permalink($post), $post);
+            echo '<meta property="og:url" content="' . esc_url($og_url) . '">' . "\n";
             // WooCommerce products are products, not articles.
             $og_type = ('product' === get_post_type($post)) ? 'product' : 'article';
             echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
@@ -2792,7 +2818,8 @@ class AceCrawlEnhancer {
             }
             $og_image = apply_filters('ace_seo_home_og_image', $og_image);
 
-            $og_url  = apply_filters('ace_seo_home_og_url', home_url());
+            $default_og_url = $home_id ? get_permalink($home_id) : home_url('/');
+            $og_url  = apply_filters('ace_seo_home_og_url', $default_og_url);
             $og_type = apply_filters('ace_seo_home_og_type', 'website');
 
             // Assembled in the order this branch has always emitted them. Extra properties
@@ -2872,6 +2899,7 @@ class AceCrawlEnhancer {
             if (empty($twitter_desc)) {
                 $twitter_desc = $this->get_meta_description($post);
             }
+            $twitter_desc = apply_filters('ace_seo_twitter_description', $twitter_desc, $post);
             if (!empty($twitter_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }

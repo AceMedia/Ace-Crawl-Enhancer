@@ -304,19 +304,22 @@ class AceSeoFrontend {
         if (is_singular()) {
             global $post;
             if ($post) {
+                $description = '';
                 $meta = AceCrawlEnhancer::get_meta_value($post->ID, 'metadesc');
                 if (!empty($meta)) {
-                    return $meta;
+                    $description = $meta;
+                } else {
+                    $yoast = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
+                    if (!empty($yoast)) {
+                        $description = $yoast;
+                    } elseif (!empty($post->post_excerpt)) {
+                        // Fallback to excerpt/content snippet.
+                        $description = wp_trim_words(strip_tags($post->post_excerpt), 25);
+                    } else {
+                        $description = wp_trim_words(strip_tags($post->post_content), 25);
+                    }
                 }
-                $yoast = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
-                if (!empty($yoast)) {
-                    return $yoast;
-                }
-                // Fallback to excerpt/content snippet
-                if (!empty($post->post_excerpt)) {
-                    return wp_trim_words(strip_tags($post->post_excerpt), 25);
-                }
-                return wp_trim_words(strip_tags($post->post_content), 25);
+                return apply_filters('ace_seo_singular_meta_description', $description, $post);
             }
         }
 
