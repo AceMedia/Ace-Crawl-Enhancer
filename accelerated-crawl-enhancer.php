@@ -1985,43 +1985,43 @@ class AceCrawlEnhancer {
      * Output meta description
      */
     public function output_meta_description() {
+        $meta_desc = '';
+        $context   = '';
         if (is_singular()) {
             global $post;
             $meta_desc = $this->get_meta_description($post);
-            if (!empty($meta_desc)) {
-                echo '<meta name="description" content="' . esc_attr($meta_desc) . '">' . "\n";
-            }
+            $context   = 'singular';
         } elseif (is_home() || is_front_page()) {
             // Handle homepage meta description with synchronization
-            $home_desc = apply_filters('ace_seo_home_meta_description', $this->get_homepage_meta_description());
-
-            if (!empty($home_desc)) {
-                echo '<meta name="description" content="' . esc_attr($home_desc) . '">' . "\n";
-            }
+            $meta_desc = apply_filters('ace_seo_home_meta_description', $this->get_homepage_meta_description());
+            $context   = 'home';
         } elseif (is_category() || is_tag() || is_tax()) {
-            // Handle taxonomy pages
-            $tax_desc = $this->get_taxonomy_meta_description();
-            if (!empty($tax_desc)) {
-                echo '<meta name="description" content="' . esc_attr($tax_desc) . '">' . "\n";
-            }
+            $meta_desc = $this->get_taxonomy_meta_description();
+            $context   = 'taxonomy';
         } elseif (is_author()) {
-            // Handle author pages
-            $author_desc = $this->get_author_meta_description();
-            if (!empty($author_desc)) {
-                echo '<meta name="description" content="' . esc_attr($author_desc) . '">' . "\n";
-            }
+            $meta_desc = $this->get_author_meta_description();
+            $context   = 'author';
         } elseif (is_search()) {
-            // Handle search pages
-            $search_desc = $this->get_search_meta_description();
-            if (!empty($search_desc)) {
-                echo '<meta name="description" content="' . esc_attr($search_desc) . '">' . "\n";
-            }
+            $meta_desc = $this->get_search_meta_description();
+            $context   = 'search';
         } elseif (is_archive()) {
-            // Handle other archive pages
-            $archive_desc = $this->get_archive_meta_description();
-            if (!empty($archive_desc)) {
-                echo '<meta name="description" content="' . esc_attr($archive_desc) . '">' . "\n";
-            }
+            $meta_desc = $this->get_archive_meta_description();
+            $context   = 'archive';
+        }
+
+        /**
+         * Filter the meta description for the current request, whatever kind of
+         * page it is. The per-branch filters above still run first; this is the
+         * one place a site can shape descriptions for archives, terms and search
+         * results, which have no per-object meta of their own.
+         *
+         * @param string $meta_desc The description about to be printed.
+         * @param string $context   singular|home|taxonomy|author|search|archive.
+         */
+        $meta_desc = apply_filters('ace_seo_meta_description', $meta_desc, $context);
+
+        if (!empty($meta_desc)) {
+            echo '<meta name="description" content="' . esc_attr($meta_desc) . '">' . "\n";
         }
     }
     
@@ -2596,6 +2596,18 @@ class AceCrawlEnhancer {
 
         $canonical = self::strip_non_canonical_args($canonical);
 
+        /**
+         * Filter the canonical URL just before it is printed, for any kind of
+         * page. Paginated archives, for instance, can point at their own page.
+         *
+         * @param string $canonical Canonical URL after normalisation.
+         */
+        $canonical = apply_filters('ace_seo_canonical', $canonical);
+
+        if (empty($canonical)) {
+            return;
+        }
+
         echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     }
     
@@ -2710,6 +2722,45 @@ class AceCrawlEnhancer {
     }
     
     /**
+     * Accept either a bare URL or an array from an image filter and return a
+     * consistent shape. Width, height and alt are optional; scrapers lay the
+     * card out on first share when they are present.
+     *
+     * @param string|array $image URL, or [url|src, width, height, alt].
+     * @return array{url:string,width:int,height:int,alt:string}
+     */
+    private static function normalise_og_image($image) {
+        $out = ['url' => '', 'width' => 0, 'height' => 0, 'alt' => ''];
+        if (is_array($image)) {
+            $out['url']    = (string) ($image['url'] ?? $image['src'] ?? $image[0] ?? '');
+            $out['width']  = (int) ($image['width'] ?? $image[1] ?? 0);
+            $out['height'] = (int) ($image['height'] ?? $image[2] ?? 0);
+            $out['alt']    = (string) ($image['alt'] ?? $image[3] ?? '');
+        } else {
+            $out['url'] = (string) $image;
+        }
+        return $out;
+    }
+
+    /** Print og:image plus its width, height and alt where known. */
+    private function print_og_image(array $image, $twitter = false) {
+        if ('' === $image['url']) {
+            return;
+        }
+        echo '<meta property="og:image" content="' . esc_url($image['url']) . '">' . "\n";
+        if ($image['width'] > 0 && $image['height'] > 0) {
+            echo '<meta property="og:image:width" content="' . (int) $image['width'] . '">' . "\n";
+            echo '<meta property="og:image:height" content="' . (int) $image['height'] . '">' . "\n";
+        }
+        if ('' !== $image['alt']) {
+            echo '<meta property="og:image:alt" content="' . esc_attr($image['alt']) . '">' . "\n";
+        }
+        if ($twitter) {
+            echo '<meta name="twitter:image" content="' . esc_url($image['url']) . '">' . "\n";
+        }
+    }
+
+    /**
      * Output Open Graph tags
      */
     /**
@@ -2779,21 +2830,37 @@ class AceCrawlEnhancer {
                 $ace_options = get_option('ace_seo_options', []);
                 $og_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
-            if (!empty($og_image)) {
-                echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
-                // Width/height let scrapers lay the card out on the FIRST share,
-                // before they have fetched the image file themselves.
-                if ($og_dims && $og_dims[0] > 0 && $og_dims[1] > 0) {
-                    echo '<meta property="og:image:width" content="' . $og_dims[0] . '">' . "\n";
-                    echo '<meta property="og:image:height" content="' . $og_dims[1] . '">' . "\n";
-                }
+            $og_image = self::normalise_og_image($og_image);
+            if ($og_dims && !$og_image['width']) {
+                $og_image['width']  = (int) $og_dims[0];
+                $og_image['height'] = (int) $og_dims[1];
             }
+            /**
+             * Filter the share image for a singular page. Return a URL, or an array
+             * with url, width, height and alt. An empty value leaves the page with
+             * no image tag. The same value feeds twitter:image.
+             *
+             * @param array   $og_image [url, width, height, alt] resolved so far.
+             * @param WP_Post $post
+             */
+            $og_image = self::normalise_og_image(apply_filters('ace_seo_singular_og_image', $og_image, $post));
+            // Width/height let scrapers lay the card out on the FIRST share,
+            // before they have fetched the image file themselves.
+            $this->print_og_image($og_image);
             
             // OG URL
             $og_url = apply_filters('ace_seo_singular_og_url', get_permalink($post), $post);
             echo '<meta property="og:url" content="' . esc_url($og_url) . '">' . "\n";
             // WooCommerce products are products, not articles.
             $og_type = ('product' === get_post_type($post)) ? 'product' : 'article';
+            /**
+             * Filter the og:type of a singular page. A page that is really a hub
+             * or a listing is a "website", not an "article".
+             *
+             * @param string  $og_type
+             * @param WP_Post $post
+             */
+            $og_type = apply_filters('ace_seo_singular_og_type', $og_type, $post);
             echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
         } elseif (is_home() || is_front_page()) {
             // Handle homepage Open Graph tags.
@@ -2816,7 +2883,7 @@ class AceCrawlEnhancer {
             if (empty($og_image) && $home_id && has_post_thumbnail($home_id)) {
                 $og_image = get_the_post_thumbnail_url($home_id, 'large');
             }
-            $og_image = apply_filters('ace_seo_home_og_image', $og_image);
+            $og_image = self::normalise_og_image(apply_filters('ace_seo_home_og_image', $og_image));
 
             $default_og_url = $home_id ? get_permalink($home_id) : home_url('/');
             $og_url  = apply_filters('ace_seo_home_og_url', $default_og_url);
@@ -2831,8 +2898,15 @@ class AceCrawlEnhancer {
             if (!empty($og_desc)) {
                 $og_tags['og:description'] = $og_desc;
             }
-            if (!empty($og_image)) {
-                $og_tags['og:image'] = $og_image;
+            if ('' !== $og_image['url']) {
+                $og_tags['og:image'] = $og_image['url'];
+                if ($og_image['width'] > 0 && $og_image['height'] > 0) {
+                    $og_tags['og:image:width']  = (string) $og_image['width'];
+                    $og_tags['og:image:height'] = (string) $og_image['height'];
+                }
+                if ('' !== $og_image['alt']) {
+                    $og_tags['og:image:alt'] = $og_image['alt'];
+                }
             }
             if (!empty($og_url)) {
                 $og_tags['og:url'] = $og_url;
@@ -2845,24 +2919,24 @@ class AceCrawlEnhancer {
             $this->print_og_tags($og_tags);
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages
-            $og_title = $this->process_special_page_title();
+            $og_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
+            // Filterable like its twitter sibling below, so the share title can
+            // match whatever the document title was resolved to.
+            $og_title = apply_filters('ace_seo_archive_og_title', $this->process_special_page_title(), $og_term);
             if (!empty($og_title)) {
                 echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
 
             // Optional OG description + image for archives/terms. Empty by default (no change
             // to existing behaviour) — sites can enrich via these filters, e.g. supply a term's
-            // representative image and a tailored description.
-            $og_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
+            // representative image and a tailored description. The image may be a URL or an
+            // array with url, width, height and alt.
             $og_desc  = apply_filters('ace_seo_archive_og_description', '', $og_term);
             if (!empty($og_desc)) {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
-            $og_image = apply_filters('ace_seo_archive_og_image', '', $og_term);
-            if (!empty($og_image)) {
-                echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
-                echo '<meta name="twitter:image" content="' . esc_url($og_image) . '">' . "\n";
-            }
+            $og_image = self::normalise_og_image(apply_filters('ace_seo_archive_og_image', '', $og_term));
+            $this->print_og_image($og_image, true);
 
             // OG URL for special pages
             $current_url = home_url(add_query_arg(null, null));
@@ -2913,8 +2987,9 @@ class AceCrawlEnhancer {
                 $ace_options = get_option('ace_seo_options', []);
                 $twitter_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
-            if (!empty($twitter_image)) {
-                echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
+            $twitter_image = self::normalise_og_image(apply_filters('ace_seo_singular_og_image', self::normalise_og_image($twitter_image), $post));
+            if ('' !== $twitter_image['url']) {
+                echo '<meta name="twitter:image" content="' . esc_url($twitter_image['url']) . '">' . "\n";
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage Twitter cards. Filterable for the same reason as the Open Graph
@@ -2938,9 +3013,9 @@ class AceCrawlEnhancer {
 
             // Twitter Image. No default — the homepage card has never carried one, so an
             // unhooked site emits exactly what it did before.
-            $twitter_image = apply_filters('ace_seo_home_twitter_image', '');
-            if (!empty($twitter_image)) {
-                echo '<meta name="twitter:image" content="' . esc_url($twitter_image) . '">' . "\n";
+            $twitter_image = self::normalise_og_image(apply_filters('ace_seo_home_twitter_image', ''));
+            if ('' !== $twitter_image['url']) {
+                echo '<meta name="twitter:image" content="' . esc_url($twitter_image['url']) . '">' . "\n";
             }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages. When the archive supplies a representative image
@@ -2948,8 +3023,8 @@ class AceCrawlEnhancer {
             // the matching description/image so the tweet renders a full card, not a
             // bare title. No image supplied -> unchanged "summary" default.
             $tw_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
-            $tw_image = apply_filters('ace_seo_archive_og_image', '', $tw_term);
-            echo '<meta name="twitter:card" content="' . (!empty($tw_image) ? 'summary_large_image' : 'summary') . '">' . "\n";
+            $tw_image = self::normalise_og_image(apply_filters('ace_seo_archive_og_image', '', $tw_term));
+            echo '<meta name="twitter:card" content="' . ('' !== $tw_image['url'] ? 'summary_large_image' : 'summary') . '">' . "\n";
 
             // Filterable like its og siblings above. Without a hook here a site serving an
             // archive-shaped page under its own identity could set the document title and the
