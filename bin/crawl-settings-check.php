@@ -127,6 +127,14 @@ foreach ( $urls as $url ) {
         $feed['status']
     );
 
+    // A site that is not serving pages has no crawl posture to judge, and every
+    // check below would quietly agree with itself. Deploys pass through this state.
+    if ( 200 !== $home['status'] ) {
+        printf( "   SKIP  home returned %d — not a working site right now (mid-deploy?); nothing to check.\n", $home['status'] );
+        $exit = 1;
+        continue;
+    }
+
     // --- The checks that matter are between the layers, not inside them.
     if ( $blocks_all && 200 === $index_status ) {
         $problems[] = 'robots.txt blocks everything but wp-sitemap.xml still serves 200 — the site is advertising URLs it forbids anyone to fetch.';
