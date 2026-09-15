@@ -81,7 +81,14 @@ function ace_sitemap_powertools_effective_post_max_urls() {
 }
 
 function ace_sitemap_powertools_is_enabled( $key ) {
-    return (bool) ace_sitemap_powertools_get_option( $key );
+    /**
+     * Filter whether a Sitemap Powertools feature is on. Used to switch the whole
+     * feature set off when the site discourages search engines.
+     *
+     * @param bool   $enabled Whether the feature is enabled by its saved option.
+     * @param string $key     Feature key.
+     */
+    return (bool) apply_filters( 'ace_sitemap_powertools_is_enabled', (bool) ace_sitemap_powertools_get_option( $key ), $key );
 }
 
 function ace_sitemap_powertools_excluded_sitemap_post_types() {
@@ -1704,6 +1711,16 @@ function ace_sitemap_powertools_serve_custom_routes() {
 
     $routes = ace_sitemap_powertools_custom_routes();
     if ( ! isset( $routes[ $slug ] ) ) {
+        return;
+    }
+
+    // A discouraged site serves no sitemaps at all.
+    if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged() ) {
+        global $wp_query;
+        if ( $wp_query ) {
+            $wp_query->set_404();
+        }
+        status_header( 404 );
         return;
     }
 

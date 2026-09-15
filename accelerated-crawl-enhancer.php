@@ -34,6 +34,7 @@ define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
 define('ACE_SEO_BASENAME', plugin_basename(__FILE__));
 
+require_once ACE_SEO_PATH . 'includes/ace-seo-discourage.php';
 require_once ACE_SEO_PATH . 'includes/ace-sitemap-powertools.php';
 
 // Plugin-specific meta keys - no longer use Yoast keys for storage
@@ -2667,6 +2668,13 @@ class AceCrawlEnhancer {
     }
 
     public function output_robots_meta() {
+        // The site asks search engines to stay away: core's wp_robots filter
+        // already prints a hard noindex, so anything we added here would only
+        // read as a competing instruction.
+        if (ace_seo_site_is_discouraged()) {
+            return;
+        }
+
         // A request can be a variant of a real page — a preview mode, a theme
         // toggle, anything reached by a query argument nobody should land on
         // from search. Those must say noindex whatever kind of page they are,
