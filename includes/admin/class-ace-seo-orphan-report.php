@@ -43,6 +43,9 @@ class AceSeoOrphanReport {
     /** Wall-clock budget for one tick. Cheap to resume, so stop early rather than risk a timeout. */
     const TICK_BUDGET = 15;
 
+    /** Above this many archive-less candidates, skip the menu/hierarchy refinement. */
+    const REFINE_CAP = 100000;
+
     const DAILY_HOOK = 'ace_seo_orphan_daily';
 
     public static function init() {
@@ -140,8 +143,11 @@ class AceSeoOrphanReport {
     private static function post_types() {
         $types = array();
 
-        foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $type ) {
-            if ( 'attachment' === $type->name || ! $type->publicly_queryable ) {
+        foreach ( get_post_types( array(), 'objects' ) as $type ) {
+            // is_post_type_viewable(), not publicly_queryable: core registers
+            // 'page' with publicly_queryable = false (pages resolve by path, not
+            // query var) and testing that flag silently drops every page.
+            if ( 'attachment' === $type->name || ! is_post_type_viewable( $type ) ) {
                 continue;
             }
 
@@ -182,7 +188,7 @@ class AceSeoOrphanReport {
                 continue;
             }
 
-            if ( $taxonomy->public && $taxonomy->publicly_queryable ) {
+            if ( is_taxonomy_viewable( $taxonomy ) ) {
                 $taxonomies[] = $taxonomy->name;
             }
         }
@@ -273,77 +279,244 @@ class AceSeoOrphanReport {
 
         $taxonomies = self::archive_taxonomies( $post_type );
 
-        // With no archive taxonomy at all, every post of the type depends on being
-        // linked directly — report them as orphaned rather than pretending otherwise.
-        if ( empty( $taxonomies ) ) {
+        if ( 0 === $total ) {
+            return array( 'total' => 0, 'orphans' => 0, 'taxonomies' => $taxonomies, 'samples' => array() );
+        }
+
+        // A post type archive lists every post of the type, so it is a route in on
+        // its own — no taxonomy or menu needed. Checked first because it settles the
+        // whole type in one go: /glossary/ makes every glossary entry reachable,
+        // and counting those as orphans would repeat the mistake this report exists
+        // to correct.
+        $archive = get_post_type_archive_link( $post_type );
+
+        if ( $archive ) {
             return array(
                 'total'      => $total,
-                'orphans'    => $total,
-                'taxonomies' => array(),
-                'samples'    => self::sample_orphans( $post_type, array() ),
-                'note'       => 'no public taxonomy archive for this post type',
+                'orphans'    => 0,
+                'taxonomies' => $taxonomies,
+                'samples'    => array(),
+                // Name the archive rather than say "post type archive": for 'post'
+                // core resolves this to the blog index, which is a different page
+                // from a CPT archive and worth seeing plainly.
+                'route'      => 'archive: ' . wp_make_link_relative( $archive ),
+            );
+        }
+
+        // Step one, and the cheap one: anything in a public archive is reachable.
+        // For a well-categorised post type this returns nothing and we stop here.
+        $candidates = self::posts_without_archive( $post_type, $taxonomies );
+
+        if ( empty( $candidates ) ) {
+            return array( 'total' => $total, 'orphans' => 0, 'taxonomies' => $taxonomies, 'samples' => array() );
+        }
+
+        if ( count( $candidates ) > self::REFINE_CAP ) {
+            return array(
+                'total'      => $total,
+                'orphans'    => count( $candidates ),
+                'taxonomies' => $taxonomies,
+                'samples'    => self::titles_for( array_slice( $candidates, 0, 5 ) ),
+                'note'       => 'too many to refine against menus and hierarchy',
+            );
+        }
+
+        // Step two: an archive is not the only way in. A page is reached through a
+        // menu or its parent, never through a taxonomy — without this every page on
+        // the site reports as orphaned, which is the false positive this exists to avoid.
+        $reachable = self::reachable_without_archive( $post_type );
+        $orphans   = array_values( array_diff( $candidates, $reachable ) );
+
+        return array(
+            'total'      => $total,
+            'orphans'    => count( $orphans ),
+            'taxonomies' => $taxonomies,
+            'samples'    => self::titles_for( array_slice( $orphans, 0, 5 ) ),
+        );
+    }
+
+    /**
+     * Published IDs of a post type that sit in no public archive.
+     *
+     * @param string   $post_type
+     * @param string[] $taxonomies
+     * @return int[]
+     */
+    private static function posts_without_archive( $post_type, $taxonomies ) {
+        global $wpdb;
+
+        if ( empty( $taxonomies ) ) {
+            return array_map(
+                'intval',
+                (array) $wpdb->get_col(
+                    $wpdb->prepare(
+                        "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish'",
+                        $post_type
+                    )
+                )
             );
         }
 
         $placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
 
-        $sql = $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts} p
-             WHERE p.post_type = %s AND p.post_status = 'publish'
-             AND NOT EXISTS (
-                 SELECT 1 FROM {$wpdb->term_relationships} tr
-                 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
-                 WHERE tr.object_id = p.ID AND tt.taxonomy IN ($placeholders)
-             )",
-            array_merge( array( $post_type ), $taxonomies )
-        );
-
-        return array(
-            'total'      => $total,
-            'orphans'    => (int) $wpdb->get_var( $sql ),
-            'taxonomies' => $taxonomies,
-            'samples'    => self::sample_orphans( $post_type, $taxonomies ),
-        );
-    }
-
-    /**
-     * A handful of orphaned posts, so the number leads somewhere actionable.
-     *
-     * @param string   $post_type
-     * @param string[] $taxonomies
-     * @return array[] id => title pairs.
-     */
-    private static function sample_orphans( $post_type, $taxonomies ) {
-        global $wpdb;
-
-        if ( empty( $taxonomies ) ) {
-            $rows = $wpdb->get_results(
+        return array_map(
+            'intval',
+            (array) $wpdb->get_col(
                 $wpdb->prepare(
-                    "SELECT ID, post_title FROM {$wpdb->posts}
-                     WHERE post_type = %s AND post_status = 'publish'
-                     ORDER BY post_date DESC LIMIT 5",
-                    $post_type
-                ),
-                ARRAY_A
-            );
-        } else {
-            $placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
-
-            $rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT p.ID, p.post_title FROM {$wpdb->posts} p
+                    "SELECT p.ID FROM {$wpdb->posts} p
                      WHERE p.post_type = %s AND p.post_status = 'publish'
                      AND NOT EXISTS (
                          SELECT 1 FROM {$wpdb->term_relationships} tr
                          INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
                          WHERE tr.object_id = p.ID AND tt.taxonomy IN ($placeholders)
-                     )
-                     ORDER BY p.post_date DESC LIMIT 5",
+                     )",
                     array_merge( array( $post_type ), $taxonomies )
-                ),
-                ARRAY_A
-            );
+                )
+            )
+        );
+    }
+
+    /**
+     * IDs reachable by something other than a taxonomy archive: a nav menu, the
+     * front or posts page, or an ancestor that is itself reachable.
+     *
+     * Two queries whatever the size; the ancestor walk runs in memory over an
+     * (ID, parent) map rather than as repeated lookups.
+     *
+     * @param string $post_type
+     * @return int[]
+     */
+    private static function reachable_without_archive( $post_type ) {
+        global $wpdb;
+
+        $seeds = array( (int) get_option( 'page_on_front' ), (int) get_option( 'page_for_posts' ) );
+
+        // Anything a nav menu points at has a route in by definition.
+        $menu_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT DISTINCT oid.meta_value
+                 FROM {$wpdb->postmeta} oid
+                 INNER JOIN {$wpdb->postmeta} obj
+                         ON obj.post_id = oid.post_id AND obj.meta_key = '_menu_item_object'
+                 INNER JOIN {$wpdb->posts} mi
+                         ON mi.ID = oid.post_id AND mi.post_type = 'nav_menu_item'
+                 WHERE oid.meta_key = '_menu_item_object_id' AND obj.meta_value = %s",
+                $post_type
+            )
+        );
+
+        $reachable = array_flip( array_filter( array_map( 'intval', array_merge( $seeds, (array) $menu_ids ) ) ) );
+
+        // Block themes do not use nav_menu_item at all — navigation lives in
+        // wp_navigation, templates and template parts. Missing this reports pages
+        // linked from the site header as orphaned.
+        $blocks = $wpdb->get_col(
+            "SELECT post_content FROM {$wpdb->posts}
+             WHERE post_type IN ( 'wp_navigation', 'wp_template', 'wp_template_part', 'wp_block' )
+             AND post_status = 'publish' AND post_content <> ''"
+        );
+
+        foreach ( (array) $blocks as $content ) {
+            // wp:page-list renders every published page, so its presence anywhere
+            // in the navigation means no page can be orphaned.
+            if ( 'page' === $post_type && false !== strpos( $content, 'wp:page-list' ) ) {
+                return array_map(
+                    'intval',
+                    (array) $wpdb->get_col(
+                        $wpdb->prepare(
+                            "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish'",
+                            $post_type
+                        )
+                    )
+                );
+            }
+
+            // Explicit navigation links carry the id they point at.
+            if ( preg_match_all( '~<!--\s+wp:navigation-link\s+(\{.*?\})\s*/?-->~s', $content, $matches ) ) {
+                foreach ( $matches[1] as $json ) {
+                    $attrs = json_decode( $json, true );
+
+                    if ( ! is_array( $attrs ) || empty( $attrs['id'] ) ) {
+                        continue;
+                    }
+
+                    $kind = $attrs['kind'] ?? '';
+                    $type = $attrs['type'] ?? '';
+
+                    if ( 'post-type' === $kind && $type !== $post_type ) {
+                        continue;
+                    }
+
+                    $reachable[ (int) $attrs['id'] ] = true;
+                }
+            }
         }
+
+        /**
+         * Filter IDs treated as reachable without an archive — for sites whose
+         * navigation this cannot see, such as links hard-coded in a template.
+         *
+         * @param int[]  $ids
+         * @param string $post_type
+         */
+        foreach ( (array) apply_filters( 'ace_seo_orphan_reachable_ids', array(), $post_type ) as $extra ) {
+            $reachable[ (int) $extra ] = true;
+        }
+
+        // A child is reachable when its parent is: parents link to their children,
+        // and that is how a page tree is navigated.
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT ID, post_parent FROM {$wpdb->posts}
+                 WHERE post_type = %s AND post_status = 'publish' AND post_parent <> 0",
+                $post_type
+            ),
+            ARRAY_A
+        );
+
+        // Walk down until a pass adds nothing; bounded so a parent cycle cannot spin.
+        for ( $depth = 0; $depth < 20; $depth++ ) {
+            $added = 0;
+
+            foreach ( (array) $rows as $row ) {
+                $id = (int) $row['ID'];
+
+                if ( isset( $reachable[ $id ] ) ) {
+                    continue;
+                }
+
+                if ( isset( $reachable[ (int) $row['post_parent'] ] ) ) {
+                    $reachable[ $id ] = true;
+                    $added++;
+                }
+            }
+
+            if ( 0 === $added ) {
+                break;
+            }
+        }
+
+        return array_keys( $reachable );
+    }
+
+    /**
+     * @param int[] $ids
+     * @return array[]
+     */
+    private static function titles_for( $ids ) {
+        global $wpdb;
+
+        if ( empty( $ids ) ) {
+            return array();
+        }
+
+        $ids          = array_map( 'intval', $ids );
+        $placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare( "SELECT ID, post_title FROM {$wpdb->posts} WHERE ID IN ($placeholders)", $ids ),
+            ARRAY_A
+        );
 
         return is_array( $rows ) ? $rows : array();
     }

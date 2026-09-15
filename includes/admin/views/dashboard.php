@@ -125,6 +125,7 @@ if (!defined('ABSPATH')) {
                                     <th><?php esc_html_e( 'Post type', 'ace-crawl-enhancer' ); ?></th>
                                     <th class="num"><?php esc_html_e( 'Published', 'ace-crawl-enhancer' ); ?></th>
                                     <th class="num"><?php esc_html_e( 'Orphaned', 'ace-crawl-enhancer' ); ?></th>
+                                    <th><?php esc_html_e( 'Route in', 'ace-crawl-enhancer' ); ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -142,6 +143,18 @@ if (!defined('ABSPATH')) {
                                     <td class="num"><?php echo esc_html( number_format_i18n( $ace_data['total'] ) ); ?></td>
                                     <td class="num<?php echo $ace_data['orphans'] > 0 ? ' ace-orphan-warn' : ''; ?>">
                                         <?php echo esc_html( number_format_i18n( $ace_data['orphans'] ) ); ?>
+                                    </td>
+                                    <td class="description">
+                                        <?php
+                                        if ( ! empty( $ace_data['route'] ) ) {
+                                            echo esc_html( $ace_data['route'] );
+                                        } elseif ( ! empty( $ace_data['taxonomies'] ) ) {
+                                            /* translators: %s: comma-separated taxonomy names. */
+                                            printf( esc_html__( 'archives: %s', 'ace-crawl-enhancer' ), esc_html( implode( ', ', $ace_data['taxonomies'] ) ) );
+                                        } else {
+                                            esc_html_e( 'menu / hierarchy', 'ace-crawl-enhancer' );
+                                        }
+                                        ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.23-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.24-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.24 (2026-09-15)
+- Reachability now counts every route in, not just taxonomy archives: **post type archives** (a CPT archive lists the whole type), **pages** (which core registers as not publicly queryable, so they were missing entirely), **block-theme navigation** (`wp_navigation`, templates and template parts — block themes never create `nav_menu_item`, and `wp:page-list` links every page), classic menus, the front and posts pages, and page hierarchy. Missing any of these reported reachable content as orphaned, which is the error the report exists to correct.
+- New filter `ace_seo_orphan_reachable_ids` for navigation a query cannot see, such as links hard-coded in a template.
 
 ### 1.0.23 (2026-09-15)
 - **Content reachability card on the dashboard.** Counts, per post type, how much content sits in no public archive at all — the posts nothing but a sitemap can reach. Posts that are merely deep in an archive are excluded, because they are reachable; that distinction is why external crawlers report orphan counts orders of magnitude higher (a post on page 1,400 of a category is reachable, just far back). An archive-depth table alongside it shows where the depth actually is.
