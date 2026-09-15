@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.24-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.25-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,12 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.25 (2026-09-15)
+- **SEO columns on the post list screens**, alongside the existing SEO score: indexability (and whether it comes from the post or the site-wide Reading setting), SEO title, meta description with length, canonical and social image. All optional through Screen Options and hidden by default, so nobody's list changes unless they ask. Zero extra queries for a 20-row page — the list table has already primed the meta.
+- **An SEO filter dropdown** on those screens. "Noindex only" is the fast one: a rare value through the meta_key index, 0.005s across 33k posts.
+- Filters that search for an ABSENCE (missing description/title/keyword, indexable-only) and meta-backed sorting are offered only below `ace_seo_admin_sort_max_posts` (default 20,000). They join postmeta and walk most of the table — "missing meta description" measured 8.5s across 33k posts — and that query shape is what saturated MySQL on a large site here before. Small sites get the full set; large ones keep the cheap filter and are not handed the loaded gun.
+- New filters `ace_seo_admin_column_post_types`, `ace_seo_admin_sort_max_posts`.
 
 ### 1.0.24 (2026-09-15)
 - Reachability now counts every route in, not just taxonomy archives: **post type archives** (a CPT archive lists the whole type), **pages** (which core registers as not publicly queryable, so they were missing entirely), **block-theme navigation** (`wp_navigation`, templates and template parts — block themes never create `nav_menu_item`, and `wp:page-list` links every page), classic menus, the front and posts pages, and page hierarchy. Missing any of these reported reachable content as orphaned, which is the error the report exists to correct.
