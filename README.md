@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.6-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.22-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,13 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.22 (2026-09-15)
+- **Search engine visibility is now honoured across the plugin.** Core reacts to Settings → Reading with a `noindex` tag and nothing else, so sitemaps, the Sitemap Powertools custom routes, sitemap links and per-post robots meta all carried on regardless. `ace_seo_site_is_discouraged()` gates the lot; `X-Robots-Tag` covers feeds, attachments and images, which a `<meta>` tag cannot reach.
+- **A physical `robots.txt` is reported in the admin.** The web server serves one before PHP runs, so it silently overrides every crawl setting here. The notice offers to move it aside only when it is actually defeating the visibility setting — a static file on a public site is a normal way to run things.
+- **New `ACE_SEO_DISCOURAGE_MODE` constant** (`'block'` default, `'deindex'` opt-in). De-index mode allows crawling and serves `noindex, follow` with sitemaps up, for a site indexed by mistake: a crawler refused the page never reads the noindex on it, so blocking is what keeps stale results alive. Inert on a public site.
+- **New `bin/crawl-settings-check.php`** — checks robots.txt, robots directives, sitemaps and feeds against each other across environments. Exits 1 only on a genuine conflict.
+- New filter `ace_sitemap_powertools_is_enabled`.
 
 ### 1.0.11 (2026-09-03)
 - Templates: new `ace_seo_template_variables` filter lets site/CPT plugins add placeholders (e.g. `{venue}`, `{event_date}`, `{price}`) to title/meta templates; unresolved placeholders are stripped and the separators they leave are collapsed, so a template never prints `{x}` or a dangling ` | `.
