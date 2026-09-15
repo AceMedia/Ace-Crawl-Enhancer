@@ -129,7 +129,8 @@ foreach ( $urls as $url ) {
 
     // A site that is not serving pages has no crawl posture to judge, and every
     // check below would quietly agree with itself. Deploys pass through this state.
-    if ( 200 !== $home['status'] ) {
+    // Any 2xx counts: the CDN in front of live answers 202, not 200.
+    if ( $home['status'] < 200 || $home['status'] >= 300 ) {
         printf( "   SKIP  home returned %d — not a working site right now (mid-deploy?); nothing to check.\n", $home['status'] );
         $exit = 1;
         continue;
