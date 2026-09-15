@@ -16,6 +16,47 @@ TalkFuse.com, unicarts (WooCommerce), william-unicycle. Also rsynced (not submod
 `yoast_wpseo_` form-field prefix, existing `ace_seo_*` / `ace_sitemap_powertools_*` filters, or the
 theme-append title convention (see gotchas).
 
+## Native WordPress first (check before writing anything)
+
+This plugin is not the only thing deciding what crawlers are told. WordPress core has
+its own settings for most of what an SEO plugin does, and the web server outranks both.
+Work that ignores a native setting doesn't conflict loudly — it produces a site that
+quietly does something nobody asked for, which is how a ticked "Discourage search
+engines" sat there being ignored while a staging site got indexed.
+
+**Before adding or changing any crawl/index behaviour, answer these:**
+
+| Native thing | Where | What it means for us |
+|---|---|---|
+| `blog_public` | Settings → Reading | The master switch. Honour it via `ace_seo_site_is_discouraged()`; never add a parallel "noindex site" setting. |
+| A **physical `robots.txt`** | Served root (a level above `ABSPATH` on subdirectory installs) | The server returns it before PHP runs. No filter can override it. Detected and reported by `includes/admin/ace-seo-robots-file.php`. |
+| `wp_robots` filter | Core, since 5.7 | Core owns the robots `<meta>` tag. Add directives through the filter; don't echo a second tag beside it. |
+| `wp_sitemaps_enabled` | Core sitemaps | Core disables its own sitemaps when discouraged. Powertools routes are ours, so they need their own gate — `ace_sitemap_powertools_is_enabled`. |
+| `rel_canonical` | Core | We remove it and emit our own. Removing it twice, or neither, both show up as duplicate/absent canonicals. |
+| `page_on_front` / `page_for_posts` | Settings → Reading | A static front page is `is_singular()`, which routes it down branches meant for posts. |
+| `exclude_from_search`, `public`, `show_in_search` | Post type / taxonomy registration | A type the site already excluded shouldn't be re-advertised by our sitemaps. |
+| `permalink_structure` | Settings → Permalinks | Sitemap routes are rewrite-backed; a permalink change needs a rewrite flush. |
+
+Two rules that follow from the table:
+
+1. **Look for the native option before building a setting.** If WordPress already models
+   it, honour it — a second switch means two sources of truth and a site that obeys
+   whichever code ran last.
+2. **A `<meta>` tag only exists in HTML.** Feeds, attachments, PDFs and images need
+   `X-Robots-Tag`, which is why the discourage path sends both.
+
+**Check it rather than reasoning about it** — the failures here are contradictions
+*between* layers, so they survive reading any single file:
+
+```
+php bin/crawl-settings-check.php https://site.example/ https://dev.site.example/
+```
+
+Exits 1 on a real conflict (static robots.txt shadowing the plugin, noindex pages still
+in a served sitemap, a feed with no directive, robots.txt advertising a 404 sitemap).
+Run it before and after any indexing change, on every environment — the environments
+drift from each other, and that drift is the bug.
+
 ## Architecture map
 
 - `accelerated-crawl-enhancer.php` (2.6k lines, singleton `AceCrawlEnhancer`) — meta fields definition,
