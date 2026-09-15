@@ -634,6 +634,12 @@ class AceSEOSettings {
             
             // Clear all cache
             $cleared = ACE_SEO_Dashboard_Cache::clear_cache();
+
+            // The AJAX payload caches expire on time rather than on save — on a site
+            // publishing every few minutes, clearing them per save would keep them
+            // permanently cold and undo the point of caching them. This button is
+            // the deliberate way to force them fresh.
+            ACE_SEO_Dashboard_Cache::payload_flush();
             
             // Get updated cache status after clearing
             $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();

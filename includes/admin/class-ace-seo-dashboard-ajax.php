@@ -74,6 +74,15 @@ class ACE_SEO_Dashboard_Ajax {
         if (!current_user_can('manage_options')) {
             wp_die('Insufficient permissions');
         }
+
+        // Served from cache when warm. These aggregates are around half a
+        // second of database work each and were recomputed on every single
+        // dashboard load, by every admin, uncached.
+        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'stats' );
+
+        if ( false !== $ace_cached ) {
+            wp_send_json( $ace_cached );
+        }
         
         global $wpdb;
         
@@ -138,6 +147,10 @@ class ACE_SEO_Dashboard_Ajax {
             );
         }
         
+        if ( isset( $response['status'] ) && 'success' === $response['status'] ) {
+            ACE_SEO_Dashboard_Cache::payload_set( 'stats', $response );
+        }
+
         wp_send_json($response);
     }
     
@@ -153,6 +166,15 @@ class ACE_SEO_Dashboard_Ajax {
         // Check user permissions
         if (!current_user_can('manage_options')) {
             wp_die('Insufficient permissions');
+        }
+
+        // Served from cache when warm. These aggregates are around half a
+        // second of database work each and were recomputed on every single
+        // dashboard load, by every admin, uncached.
+        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'recent_activity' );
+
+        if ( false !== $ace_cached ) {
+            wp_send_json( $ace_cached );
         }
         
         $limit = intval($_POST['limit'] ?? 5);
@@ -190,10 +212,10 @@ class ACE_SEO_Dashboard_Ajax {
                 );
             }
             
-            wp_send_json(array(
-                'status' => 'success',
-                'data' => $recent_posts
-            ));
+            $ace_payload = array( 'status' => 'success', 'data' => $recent_posts );
+            ACE_SEO_Dashboard_Cache::payload_set( 'recent_activity', $ace_payload );
+
+            wp_send_json( $ace_payload );
             
         } catch (Exception $e) {
             wp_send_json(array(
@@ -215,6 +237,15 @@ class ACE_SEO_Dashboard_Ajax {
         // Check user permissions
         if (!current_user_can('manage_options')) {
             wp_die('Insufficient permissions');
+        }
+
+        // Served from cache when warm. These aggregates are around half a
+        // second of database work each and were recomputed on every single
+        // dashboard load, by every admin, uncached.
+        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'content_analysis' );
+
+        if ( false !== $ace_cached ) {
+            wp_send_json( $ace_cached );
         }
         
         global $wpdb;
@@ -278,10 +309,10 @@ class ACE_SEO_Dashboard_Ajax {
                 'timestamp' => current_time('mysql')
             );
             
-            wp_send_json(array(
-                'status' => 'success',
-                'data' => $analysis
-            ));
+            $ace_payload = array( 'status' => 'success', 'data' => $analysis );
+            ACE_SEO_Dashboard_Cache::payload_set( 'content_analysis', $ace_payload );
+
+            wp_send_json( $ace_payload );
             
         } catch (Exception $e) {
             wp_send_json(array(

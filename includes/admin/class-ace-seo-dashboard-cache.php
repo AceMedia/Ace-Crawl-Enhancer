@@ -18,6 +18,46 @@ class ACE_SEO_Dashboard_Cache {
     const RECENT_POSTS_TRANSIENT = 'ace_seo_recent_posts';
     
     /**
+     * Read a cached dashboard payload.
+     *
+     * Transients rather than wp_cache_*: where a persistent object cache is
+     * installed a transient IS the object cache (so these land in Redis), and
+     * where one is not it still persists between requests instead of being
+     * recomputed by every page load.
+     *
+     * @param string $key
+     * @return mixed|false
+     */
+    public static function payload_get( $key ) {
+        return get_transient( 'ace_seo_dash_' . $key );
+    }
+
+    /**
+     * Cache a dashboard payload.
+     *
+     * @param string $key
+     * @param mixed  $value
+     * @param int    $ttl
+     * @return void
+     */
+    public static function payload_set( $key, $value, $ttl = self::CACHE_DURATION ) {
+        set_transient( 'ace_seo_dash_' . $key, $value, $ttl );
+    }
+
+    /**
+     * Forget every cached dashboard payload.
+     *
+     * @return void
+     */
+    public static function payload_flush() {
+        global $wpdb;
+
+        foreach ( array( 'stats', 'recent_activity', 'content_analysis', 'database_performance' ) as $key ) {
+            delete_transient( 'ace_seo_dash_' . $key );
+        }
+    }
+
+    /**
      * Get cached dashboard statistics
      */
     public static function get_dashboard_stats() {

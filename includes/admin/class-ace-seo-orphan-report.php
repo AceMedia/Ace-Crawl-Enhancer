@@ -43,6 +43,9 @@ class AceSeoOrphanReport {
     /** Wall-clock budget for one tick. Cheap to resume, so stop early rather than risk a timeout. */
     const TICK_BUDGET = 15;
 
+    /** How long an explicit "scan now" request may spend before handing the rest to cron. */
+    const REQUEST_BUDGET = 10;
+
     /** Above this many archive-less candidates, skip the menu/hierarchy refinement. */
     const REFINE_CAP = 100000;
 
@@ -52,10 +55,34 @@ class AceSeoOrphanReport {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan_tick' ) );
         add_action( self::DAILY_HOOK, array( __CLASS__, 'maybe_refresh' ) );
         add_action( 'admin_post_ace_seo_scan_orphans', array( __CLASS__, 'handle_scan_request' ) );
+        add_action( 'admin_notices', array( __CLASS__, 'scan_result_notice' ) );
 
         if ( ! wp_next_scheduled( self::DAILY_HOOK ) ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::DAILY_HOOK );
         }
+    }
+
+    /**
+     * Say what the scan did, since it now finishes before the page comes back.
+     *
+     * @return void
+     */
+    public static function scan_result_notice() {
+        if ( ! current_user_can( 'manage_options' ) || empty( $_GET['ace_seo_orphan_scan'] ) ) {
+            return;
+        }
+
+        $done = 'done' === sanitize_key( wp_unslash( $_GET['ace_seo_orphan_scan'] ) );
+
+        printf(
+            '<div class="notice %s is-dismissible"><p>%s</p></div>',
+            $done ? 'notice-success' : 'notice-info',
+            esc_html(
+                $done
+                    ? __( 'Reachability scan complete.', 'ace-crawl-enhancer' )
+                    : __( 'Reachability scan started and is finishing in the background — reload in a moment.', 'ace-crawl-enhancer' )
+            )
+        );
     }
 
     /**
@@ -93,9 +120,33 @@ class AceSeoOrphanReport {
         check_admin_referer( 'ace_seo_scan_orphans' );
 
         delete_transient( self::TRANSIENT );
-        self::schedule_scan();
+        delete_option( self::PROGRESS_OPTION );
 
-        wp_safe_redirect( add_query_arg( 'ace_seo_orphan_scan', 'queued', wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) ) );
+        // Run it here rather than queue it. WP-Cron only fires on an uncached
+        // front-end hit, so on a cached or low-traffic site a queued scan can sit
+        // due-now indefinitely — which is what "check back shortly" turned into.
+        // This is an explicit request, not a page render, and the work is a handful
+        // of indexed counts, so doing it inline is both safe and what was asked for.
+        $deadline = microtime( true ) + self::REQUEST_BUDGET;
+
+        do {
+            self::run_scan_tick();
+
+            if ( self::get_report() ) {
+                $status = 'done';
+                break;
+            }
+
+            $status = 'queued';
+        } while ( microtime( true ) < $deadline );
+
+        // Anything left (a very large site, many post types) finishes in the
+        // background from where this got to.
+        if ( 'done' !== $status ) {
+            self::schedule_scan();
+        }
+
+        wp_safe_redirect( add_query_arg( 'ace_seo_orphan_scan', $status, wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) ) );
         exit;
     }
 
@@ -123,7 +174,9 @@ class AceSeoOrphanReport {
             return true;
         }
 
-        update_option( self::PROGRESS_OPTION, array( 'done' => array(), 'started' => time() ), false );
+        if ( false === get_option( self::PROGRESS_OPTION ) ) {
+            update_option( self::PROGRESS_OPTION, array( 'done' => array(), 'started' => time() ), false );
+        }
 
         return (bool) wp_schedule_single_event( time() + 5, self::CRON_HOOK );
     }

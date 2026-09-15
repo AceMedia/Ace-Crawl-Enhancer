@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.25-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.26-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,11 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.26 (2026-09-15)
+- **Fixed: the reachability scan never finished.** It queued a cron event, but WP-Cron only fires on an uncached front-end hit, so on a cached or quiet site the job sat due-now indefinitely and the card stayed on "check back shortly". An explicit scan request now runs inline (0.009s across 33k posts) and only hands the remainder to cron if it exceeds its budget.
+- **Dashboard aggregates are cached.** Stats, recent activity and content analysis each cost around half a second of database work and were recomputed on every dashboard load, by every admin, with no caching at all. Now cached for an hour via transients, which land in Redis wherever a persistent object cache is installed. Database performance is deliberately left uncached — it reports live optimisation progress.
+- These payloads expire on time rather than on save: on a site publishing every few minutes, clearing per save would keep them permanently cold. The Clear Cache button forces them fresh.
 
 ### 1.0.25 (2026-09-15)
 - **SEO columns on the post list screens**, alongside the existing SEO score: indexability (and whether it comes from the post or the site-wide Reading setting), SEO title, meta description with length, canonical and social image. All optional through Screen Options and hidden by default, so nobody's list changes unless they ask. Zero extra queries for a 20-row page — the list table has already primed the meta.
