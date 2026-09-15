@@ -58,6 +58,24 @@ function ace_seo_force_noindex_robots( $robots ) {
 add_filter( 'wp_robots', 'ace_seo_force_noindex_robots', PHP_INT_MAX );
 
 /**
+ * Send the same directives as an HTTP header.
+ *
+ * A <meta> tag only exists inside HTML, which leaves everything else on the site
+ * advertising itself: RSS and Atom feeds, attachments, PDFs, images, plain files.
+ * X-Robots-Tag applies to any response, so it closes that gap.
+ *
+ * @return void
+ */
+function ace_seo_send_noindex_header() {
+    if ( is_admin() || headers_sent() || ! ace_seo_site_is_discouraged() ) {
+        return;
+    }
+
+    header( 'X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex', true );
+}
+add_action( 'send_headers', 'ace_seo_send_noindex_header' );
+
+/**
  * Belt and braces for robots.txt: core already adds "Disallow: /" when the site is
  * discouraged, but it also leaves any Sitemap: lines other code appended. Replace
  * the whole body so nothing points a crawler back at the content.
