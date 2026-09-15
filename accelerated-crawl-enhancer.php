@@ -333,6 +333,7 @@ class AceCrawlEnhancer {
         require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
 
         if (is_admin()) {
+            require_once ACE_SEO_PATH . 'includes/admin/ace-seo-robots-file.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';

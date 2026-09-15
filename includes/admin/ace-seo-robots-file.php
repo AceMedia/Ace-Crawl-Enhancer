@@ -1,0 +1,182 @@
+<?php
+/**
+ * Detect a physical robots.txt that overrides the plugin.
+ *
+ * WordPress generates robots.txt through the robots_txt filter, which is how this
+ * plugin controls crawl rules and advertises the sitemap. That only works while no
+ * real file exists: a robots.txt on disk is served by the web server before PHP
+ * runs, so no filter, hook or priority can intercept it. A stale one silently
+ * overrides every crawl setting in the plugin — including "Discourage search
+ * engines from indexing this site", which then appears to do nothing.
+ *
+ * Nothing here can be fixed at runtime, so the plugin does the next best thing:
+ * says so, shows what the file contains, and offers to move it aside.
+ *
+ * @package AceCrawlEnhancer
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Absolute path to the robots.txt that would shadow the generated one, or '' if
+ * there isn't one.
+ *
+ * The file has to sit in the directory the site is served from, which is not
+ * necessarily ABSPATH — a WordPress core installed in a subdirectory (core/,
+ * wp/) serves robots.txt from the parent. get_home_path() resolves that.
+ *
+ * @return string
+ */
+function ace_seo_shadowing_robots_file() {
+    $root = untrailingslashit( ABSPATH );
+
+    // Whatever the site URL has that the home URL doesn't is the subdirectory
+    // core was installed into; strip it off ABSPATH to reach the served root.
+    // (get_home_path() would answer this, but it reads SCRIPT_FILENAME and so
+    // returns "/" outside a browser request — WP-CLI, cron, REST.)
+    $site_path = trim( (string) wp_parse_url( site_url(), PHP_URL_PATH ), '/' );
+    $home_path = trim( (string) wp_parse_url( home_url(), PHP_URL_PATH ), '/' );
+
+    if ( '' !== $site_path && 0 === strpos( $site_path, $home_path ) ) {
+        $subdir = trim( substr( $site_path, strlen( $home_path ) ), '/' );
+
+        if ( '' !== $subdir ) {
+            $suffix = '/' . $subdir;
+
+            if ( substr( $root, -strlen( $suffix ) ) === $suffix ) {
+                $root = substr( $root, 0, -strlen( $suffix ) );
+            }
+        }
+    }
+
+    $path = $root . '/robots.txt';
+
+    return ( is_file( $path ) && is_readable( $path ) ) ? $path : '';
+}
+
+/**
+ * Warn about the shadowing file on the screens where it matters: the plugin's own
+ * pages, and Settings → Reading, where the visibility checkbox it defeats lives.
+ *
+ * @return void
+ */
+function ace_seo_robots_file_notice() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+    if ( ! $screen ) {
+        return;
+    }
+
+    $relevant = 'options-reading' === $screen->id || false !== strpos( (string) $screen->id, 'ace-seo' );
+    if ( ! $relevant ) {
+        return;
+    }
+
+    $path = ace_seo_shadowing_robots_file();
+    if ( '' === $path ) {
+        return;
+    }
+
+    $contents = (string) file_get_contents( $path );
+    $preview  = trim( $contents );
+    if ( '' === $preview ) {
+        $preview = __( '(empty)', 'ace-crawl-enhancer' );
+    } elseif ( strlen( $preview ) > 1000 ) {
+        $preview = substr( $preview, 0, 1000 ) . "\n…";
+    }
+
+    echo '<div class="notice notice-warning"><p><strong>'
+        . esc_html__( 'A robots.txt file is overriding Ace Crawl Enhancer.', 'ace-crawl-enhancer' )
+        . '</strong> '
+        . esc_html__( 'Your web server serves this file directly, before WordPress runs, so none of the crawl rules below take effect — including the search engine visibility setting.', 'ace-crawl-enhancer' )
+        . '</p>';
+
+    echo '<p><code>' . esc_html( $path ) . '</code></p>';
+    echo '<pre style="max-height:12em;overflow:auto;background:#f6f7f7;padding:.75em;margin:0 0 1em">'
+        . esc_html( $preview ) . '</pre>';
+
+    if ( ! wp_is_writable( dirname( $path ) ) ) {
+        echo '<p>' . esc_html__( 'Its directory is not writable, so it has to be removed by hand. Once it is gone, WordPress serves robots.txt itself.', 'ace-crawl-enhancer' ) . '</p></div>';
+
+        return;
+    }
+
+    $url = wp_nonce_url(
+        admin_url( 'admin-post.php?action=ace_seo_disable_robots_file' ),
+        'ace_seo_disable_robots_file'
+    );
+
+    echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary">'
+        . esc_html__( 'Move this file aside', 'ace-crawl-enhancer' )
+        . '</a> <span class="description">'
+        . esc_html__( 'Renames it rather than deleting it, so nothing is lost and it can be put back.', 'ace-crawl-enhancer' )
+        . '</span></p></div>';
+}
+add_action( 'admin_notices', 'ace_seo_robots_file_notice' );
+
+/**
+ * Rename the shadowing file so the web server stops serving it.
+ *
+ * Renaming rather than deleting: the file may hold rules somebody meant to keep,
+ * and this is reversible with a single mv.
+ *
+ * @return void
+ */
+function ace_seo_disable_robots_file() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'You are not allowed to do this.', 'ace-crawl-enhancer' ), 403 );
+    }
+
+    check_admin_referer( 'ace_seo_disable_robots_file' );
+
+    $path   = ace_seo_shadowing_robots_file();
+    $result = 'missing';
+
+    if ( '' !== $path ) {
+        $target = dirname( $path ) . '/robots.txt.disabled-' . gmdate( 'Ymd-His' );
+        $result = @rename( $path, $target ) ? 'renamed' : 'failed';
+    }
+
+    wp_safe_redirect(
+        add_query_arg(
+            'ace_seo_robots_file',
+            $result,
+            wp_get_referer() ?: admin_url( 'options-reading.php' )
+        )
+    );
+    exit;
+}
+add_action( 'admin_post_ace_seo_disable_robots_file', 'ace_seo_disable_robots_file' );
+
+/**
+ * Report the outcome of the rename.
+ *
+ * @return void
+ */
+function ace_seo_robots_file_result_notice() {
+    if ( ! current_user_can( 'manage_options' ) || empty( $_GET['ace_seo_robots_file'] ) ) {
+        return;
+    }
+
+    switch ( sanitize_key( wp_unslash( $_GET['ace_seo_robots_file'] ) ) ) {
+        case 'renamed':
+            $class   = 'notice-success';
+            $message = __( 'robots.txt moved aside. WordPress now serves it, so your crawl settings apply.', 'ace-crawl-enhancer' );
+            break;
+        case 'missing':
+            $class   = 'notice-info';
+            $message = __( 'There is no robots.txt file to move — WordPress is already serving it.', 'ace-crawl-enhancer' );
+            break;
+        default:
+            $class   = 'notice-error';
+            $message = __( 'The robots.txt file could not be renamed. It will need moving by hand.', 'ace-crawl-enhancer' );
+    }
+
+    printf( '<div class="notice %s is-dismissible"><p>%s</p></div>', esc_attr( $class ), esc_html( $message ) );
+}
+add_action( 'admin_notices', 'ace_seo_robots_file_result_notice' );
