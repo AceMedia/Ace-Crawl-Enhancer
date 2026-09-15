@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.22-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.23-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,11 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.23 (2026-09-15)
+- **Content reachability card on the dashboard.** Counts, per post type, how much content sits in no public archive at all — the posts nothing but a sitemap can reach. Posts that are merely deep in an archive are excluded, because they are reachable; that distinction is why external crawlers report orphan counts orders of magnitude higher (a post on page 1,400 of a category is reachable, just far back). An archive-depth table alongside it shows where the depth actually is.
+- Counted in SQL via `NOT EXISTS` against `term_relationships` (whose primary key makes it an index lookup, not a scan), one post type per cron tick with a wall-clock budget, cached for a day in a transient — so it lands in Redis wherever a persistent object cache is installed. The dashboard only ever reads the cache; it never computes. ~0.4s for 33k posts.
+- New filters `ace_seo_orphan_post_types`, `ace_seo_orphan_ignored_taxonomies`.
 
 ### 1.0.22 (2026-09-15)
 - **Search engine visibility is now honoured across the plugin.** Core reacts to Settings → Reading with a `noindex` tag and nothing else, so sitemaps, the Sitemap Powertools custom routes, sitemap links and per-post robots meta all carried on regardless. `ace_seo_site_is_discouraged()` gates the lot; `X-Robots-Tag` covers feeds, attachments and images, which a `<meta>` tag cannot reach.

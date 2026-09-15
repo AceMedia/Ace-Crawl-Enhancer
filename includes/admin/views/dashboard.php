@@ -95,6 +95,106 @@ if (!defined('ABSPATH')) {
                 </div>
             </div>
             
+            <!-- Reachability / Orphan Card -->
+            <div class="ace-seo-card">
+                <div class="ace-seo-card-header">
+                    <h3>🧭 Content reachability</h3>
+                </div>
+                <div class="ace-seo-card-body">
+                    <?php
+                    $ace_orphan = class_exists( 'AceSeoOrphanReport' ) ? AceSeoOrphanReport::get_report() : null;
+
+                    if ( null === $ace_orphan ) :
+                        ?>
+                        <p class="description">
+                            <?php esc_html_e( 'No reachability scan yet. It runs in the background and counts, per post type, how much content sits in no public archive at all.', 'ace-crawl-enhancer' ); ?>
+                        </p>
+                        <p<?php echo class_exists( 'AceSeoOrphanReport' ) ? '' : ' hidden'; ?>>
+                            <?php if ( class_exists( 'AceSeoOrphanReport' ) && AceSeoOrphanReport::is_scanning() ) : ?>
+                                <em><?php esc_html_e( 'Scan queued — check back shortly.', 'ace-crawl-enhancer' ); ?></em>
+                            <?php else : ?>
+                                <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_scan_orphans' ), 'ace_seo_scan_orphans' ) ); ?>" class="button">
+                                    <?php esc_html_e( 'Run reachability scan', 'ace-crawl-enhancer' ); ?>
+                                </a>
+                            <?php endif; ?>
+                        </p>
+                    <?php else : ?>
+                        <table class="widefat striped ace-seo-orphan-table">
+                            <thead>
+                                <tr>
+                                    <th><?php esc_html_e( 'Post type', 'ace-crawl-enhancer' ); ?></th>
+                                    <th class="num"><?php esc_html_e( 'Published', 'ace-crawl-enhancer' ); ?></th>
+                                    <th class="num"><?php esc_html_e( 'Orphaned', 'ace-crawl-enhancer' ); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ( $ace_orphan['post_types'] as $ace_type => $ace_data ) : ?>
+                                <tr>
+                                    <td>
+                                        <?php
+                                        $ace_obj = get_post_type_object( $ace_type );
+                                        echo esc_html( $ace_obj ? $ace_obj->labels->name : $ace_type );
+                                        ?>
+                                        <?php if ( ! empty( $ace_data['note'] ) ) : ?>
+                                            <span class="description">— <?php echo esc_html( $ace_data['note'] ); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="num"><?php echo esc_html( number_format_i18n( $ace_data['total'] ) ); ?></td>
+                                    <td class="num<?php echo $ace_data['orphans'] > 0 ? ' ace-orphan-warn' : ''; ?>">
+                                        <?php echo esc_html( number_format_i18n( $ace_data['orphans'] ) ); ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+
+                        <p class="description" style="margin-top:10px">
+                            <?php
+                            printf(
+                                /* translators: %d: archive page number. */
+                                esc_html__( 'Orphaned means the post is in no public archive, so only a sitemap can reach it. Posts that sit deep in an archive are NOT counted here — they are reachable, just far back, which is why external crawlers report far higher numbers. The deepest archives below run to page %d.', 'ace-crawl-enhancer' ),
+                                (int) ( $ace_orphan['archives'][0]['pages_deep'] ?? 0 )
+                            );
+                            ?>
+                        </p>
+
+                        <?php if ( ! empty( $ace_orphan['archives'] ) ) : ?>
+                            <table class="widefat striped ace-seo-orphan-table" style="margin-top:8px">
+                                <thead>
+                                    <tr>
+                                        <th><?php esc_html_e( 'Archive', 'ace-crawl-enhancer' ); ?></th>
+                                        <th class="num"><?php esc_html_e( 'Terms', 'ace-crawl-enhancer' ); ?></th>
+                                        <th class="num"><?php esc_html_e( 'Largest', 'ace-crawl-enhancer' ); ?></th>
+                                        <th class="num"><?php esc_html_e( 'Pages deep', 'ace-crawl-enhancer' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ( array_slice( $ace_orphan['archives'], 0, 5 ) as $ace_arch ) : ?>
+                                    <tr>
+                                        <td><?php echo esc_html( $ace_arch['taxonomy'] ); ?></td>
+                                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $ace_arch['terms'] ) ); ?></td>
+                                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $ace_arch['biggest'] ) ); ?></td>
+                                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $ace_arch['pages_deep'] ) ); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+
+                        <p class="description" style="margin-top:10px">
+                            <?php
+                            printf(
+                                /* translators: %s: human-readable time difference. */
+                                esc_html__( 'Scanned %s ago.', 'ace-crawl-enhancer' ),
+                                esc_html( human_time_diff( (int) $ace_orphan['generated'] ) )
+                            );
+                            ?>
+                            <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_scan_orphans' ), 'ace_seo_scan_orphans' ) ); ?>"><?php esc_html_e( 'Rescan', 'ace-crawl-enhancer' ); ?></a>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- Tips & Best Practices Card -->
             <div class="ace-seo-card">
                 <div class="ace-seo-card-header">
@@ -331,6 +431,9 @@ if (!defined('ABSPATH')) {
     color: #666;
     font-weight: 500;
 }
+
+.ace-seo-orphan-table .num { text-align: right; }
+.ace-seo-orphan-table .ace-orphan-warn { color: #b32d2e; font-weight: 600; }
 
 /* Content Analysis Styles */
 .ace-content-analysis .ace-content-breakdown {

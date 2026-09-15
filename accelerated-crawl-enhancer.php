@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.22
+ * Version: 1.0.23
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.22');
+define('ACE_SEO_VERSION', '1.0.23');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -331,6 +331,11 @@ class AceCrawlEnhancer {
         // the site's connected Site Kit OAuth token to call Google APIs. It was previously admin-only,
         // so CLI/cron callers saw class_exists('AceSEOSiteKit') === false.
         require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
+
+        // Cron is not an admin request, so the orphan report cannot live behind
+        // is_admin() — its scan would never run.
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-orphan-report.php';
+        AceSeoOrphanReport::init();
 
         if (is_admin()) {
             require_once ACE_SEO_PATH . 'includes/admin/ace-seo-robots-file.php';
