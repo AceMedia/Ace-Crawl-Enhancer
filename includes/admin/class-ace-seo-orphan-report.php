@@ -54,35 +54,11 @@ class AceSeoOrphanReport {
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan_tick' ) );
         add_action( self::DAILY_HOOK, array( __CLASS__, 'maybe_refresh' ) );
-        add_action( 'admin_post_ace_seo_scan_orphans', array( __CLASS__, 'handle_scan_request' ) );
-        add_action( 'admin_notices', array( __CLASS__, 'scan_result_notice' ) );
+        add_action( 'wp_ajax_ace_seo_load_orphan_report', array( __CLASS__, 'ajax_report' ) );
 
         if ( ! wp_next_scheduled( self::DAILY_HOOK ) ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::DAILY_HOOK );
         }
-    }
-
-    /**
-     * Say what the scan did, since it now finishes before the page comes back.
-     *
-     * @return void
-     */
-    public static function scan_result_notice() {
-        if ( ! current_user_can( 'manage_options' ) || empty( $_GET['ace_seo_orphan_scan'] ) ) {
-            return;
-        }
-
-        $done = 'done' === sanitize_key( wp_unslash( $_GET['ace_seo_orphan_scan'] ) );
-
-        printf(
-            '<div class="notice %s is-dismissible"><p>%s</p></div>',
-            $done ? 'notice-success' : 'notice-info',
-            esc_html(
-                $done
-                    ? __( 'Reachability scan complete.', 'ace-crawl-enhancer' )
-                    : __( 'Reachability scan started and is finishing in the background — reload in a moment.', 'ace-crawl-enhancer' )
-            )
-        );
     }
 
     /**
@@ -105,49 +81,162 @@ class AceSeoOrphanReport {
     }
 
     /**
-     * Queue a scan from the dashboard button.
+     * Return the report as rendered HTML, optionally scanning first.
      *
-     * The request only schedules; it never scans inline, so the click returns
-     * immediately however much content the site has.
+     * The card loads through the same progressive AJAX as the rest of the
+     * dashboard, so asking for a scan never reloads the page.
      *
      * @return void
      */
-    public static function handle_scan_request() {
+    public static function ajax_report() {
+        if ( ! wp_verify_nonce( $_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce' ) ) {
+            wp_send_json( array( 'status' => 'error', 'message' => __( 'Invalid nonce', 'ace-crawl-enhancer' ) ) );
+        }
+
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'You are not allowed to do this.', 'ace-crawl-enhancer' ), 403 );
+            wp_send_json( array( 'status' => 'error', 'message' => __( 'Insufficient permissions', 'ace-crawl-enhancer' ) ) );
         }
 
-        check_admin_referer( 'ace_seo_scan_orphans' );
+        $scan = ! empty( $_POST['scan'] );
 
-        delete_transient( self::TRANSIENT );
-        delete_option( self::PROGRESS_OPTION );
+        if ( $scan ) {
+            delete_transient( self::TRANSIENT );
+            delete_option( self::PROGRESS_OPTION );
 
-        // Run it here rather than queue it. WP-Cron only fires on an uncached
-        // front-end hit, so on a cached or low-traffic site a queued scan can sit
-        // due-now indefinitely — which is what "check back shortly" turned into.
-        // This is an explicit request, not a page render, and the work is a handful
-        // of indexed counts, so doing it inline is both safe and what was asked for.
-        $deadline = microtime( true ) + self::REQUEST_BUDGET;
+            // Run it here rather than queue it. WP-Cron only fires on an uncached
+            // front-end hit, so on a cached or quiet site a queued scan can sit due
+            // indefinitely. This is an explicit request and the work is a handful of
+            // indexed counts.
+            $deadline = microtime( true ) + self::REQUEST_BUDGET;
 
-        do {
-            self::run_scan_tick();
+            do {
+                self::run_scan_tick();
 
-            if ( self::get_report() ) {
-                $status = 'done';
-                break;
+                if ( self::get_report() ) {
+                    break;
+                }
+            } while ( microtime( true ) < $deadline );
+
+            if ( ! self::get_report() ) {
+                self::schedule_scan();
             }
-
-            $status = 'queued';
-        } while ( microtime( true ) < $deadline );
-
-        // Anything left (a very large site, many post types) finishes in the
-        // background from where this got to.
-        if ( 'done' !== $status ) {
-            self::schedule_scan();
         }
 
-        wp_safe_redirect( add_query_arg( 'ace_seo_orphan_scan', $status, wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) ) );
-        exit;
+        wp_send_json(
+            array(
+                'status' => 'success',
+                'data'   => array(
+                    'html'    => self::render_html(),
+                    'scanned' => (bool) self::get_report(),
+                ),
+            )
+        );
+    }
+
+    /**
+     * The card's inner HTML, for the AJAX container.
+     *
+     * @return string
+     */
+    public static function render_html() {
+        $report = self::get_report();
+
+        ob_start();
+
+        if ( null === $report ) {
+            ?>
+            <p class="description">
+                <?php esc_html_e( 'No reachability scan yet. It counts, per post type, how much content sits in no public archive at all — the pages nothing but a sitemap can reach.', 'ace-crawl-enhancer' ); ?>
+            </p>
+            <p><button type="button" class="button ace-scan-orphans"><?php esc_html_e( 'Run reachability scan', 'ace-crawl-enhancer' ); ?></button></p>
+            <?php
+
+            return (string) ob_get_clean();
+        }
+
+        $deepest = (int) ( $report['archives'][0]['pages_deep'] ?? 0 );
+        ?>
+        <table class="widefat striped ace-seo-orphan-table">
+            <thead>
+                <tr>
+                    <th><?php esc_html_e( 'Post type', 'ace-crawl-enhancer' ); ?></th>
+                    <th class="num"><?php esc_html_e( 'Published', 'ace-crawl-enhancer' ); ?></th>
+                    <th class="num"><?php esc_html_e( 'Orphaned', 'ace-crawl-enhancer' ); ?></th>
+                    <th><?php esc_html_e( 'Route in', 'ace-crawl-enhancer' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $report['post_types'] as $type => $data ) : ?>
+                <?php $obj = get_post_type_object( $type ); ?>
+                <tr>
+                    <td><?php echo esc_html( $obj ? $obj->labels->name : $type ); ?></td>
+                    <td class="num"><?php echo esc_html( number_format_i18n( $data['total'] ) ); ?></td>
+                    <td class="num<?php echo $data['orphans'] > 0 ? ' ace-orphan-warn' : ''; ?>">
+                        <?php echo esc_html( number_format_i18n( $data['orphans'] ) ); ?>
+                    </td>
+                    <td class="description">
+                        <?php
+                        if ( ! empty( $data['route'] ) ) {
+                            echo esc_html( $data['route'] );
+                        } elseif ( ! empty( $data['taxonomies'] ) ) {
+                            /* translators: %s: comma-separated taxonomy names. */
+                            printf( esc_html__( 'archives: %s', 'ace-crawl-enhancer' ), esc_html( implode( ', ', $data['taxonomies'] ) ) );
+                        } else {
+                            esc_html_e( 'menu / hierarchy', 'ace-crawl-enhancer' );
+                        }
+                        ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <p class="description" style="margin-top:10px">
+            <?php
+            printf(
+                /* translators: %d: archive page number. */
+                esc_html__( 'Orphaned means the post is in no public archive, so only a sitemap can reach it. Posts sitting deep in an archive are NOT counted — they are reachable, just far back, which is why external crawlers report far higher numbers. The deepest archive here runs to page %d.', 'ace-crawl-enhancer' ),
+                $deepest
+            );
+            ?>
+        </p>
+
+        <?php if ( ! empty( $report['archives'] ) ) : ?>
+            <table class="widefat striped ace-seo-orphan-table" style="margin-top:8px">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e( 'Archive', 'ace-crawl-enhancer' ); ?></th>
+                        <th class="num"><?php esc_html_e( 'Terms', 'ace-crawl-enhancer' ); ?></th>
+                        <th class="num"><?php esc_html_e( 'Largest', 'ace-crawl-enhancer' ); ?></th>
+                        <th class="num"><?php esc_html_e( 'Pages deep', 'ace-crawl-enhancer' ); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ( array_slice( $report['archives'], 0, 5 ) as $archive ) : ?>
+                    <tr>
+                        <td><?php echo esc_html( $archive['taxonomy'] ); ?></td>
+                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $archive['terms'] ) ); ?></td>
+                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $archive['biggest'] ) ); ?></td>
+                        <td class="num"><?php echo esc_html( number_format_i18n( (int) $archive['pages_deep'] ) ); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+
+        <p class="description" style="margin-top:10px">
+            <?php
+            printf(
+                /* translators: %s: human-readable time difference. */
+                esc_html__( 'Scanned %s ago.', 'ace-crawl-enhancer' ),
+                esc_html( human_time_diff( (int) $report['generated'] ) )
+            );
+            ?>
+            <button type="button" class="button-link ace-scan-orphans"><?php esc_html_e( 'Rescan', 'ace-crawl-enhancer' ); ?></button>
+        </p>
+        <?php
+
+        return (string) ob_get_clean();
     }
 
     /**
