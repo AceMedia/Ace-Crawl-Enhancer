@@ -1714,8 +1714,10 @@ function ace_sitemap_powertools_serve_custom_routes() {
         return;
     }
 
-    // A discouraged site serves no sitemaps at all.
-    if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged() ) {
+    // A discouraged site serves no sitemaps — unless it is trying to get out of the
+    // index, where the sitemap is what brings a crawler back to read each noindex.
+    if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged()
+        && 'block' === ace_seo_discourage_mode() ) {
         global $wp_query;
         if ( $wp_query ) {
             $wp_query->set_404();

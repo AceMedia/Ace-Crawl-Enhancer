@@ -31,6 +31,50 @@ function ace_seo_site_is_discouraged() {
 }
 
 /**
+ * How a discouraged site should behave.
+ *
+ * 'block'   — keep crawlers out entirely. Right for a site that was never indexed.
+ * 'deindex' — let crawlers in and tell them noindex, so pages already in the index
+ *             actually leave it. This is the counterintuitive half: a crawler that
+ *             is refused the page never reads the noindex on it, so blocking the
+ *             site is what keeps stale results alive. Sitemaps stay served on
+ *             purpose here — they are what brings a crawler back to each URL to
+ *             see the directive.
+ *
+ * Set per environment with ACE_SEO_DISCOURAGE_MODE in wp-config.php, since which
+ * one is right depends on the site's history rather than on its code. Both modes
+ * are inert while the site is public.
+ *
+ * @return string 'block' or 'deindex'.
+ */
+function ace_seo_discourage_mode() {
+    $mode = defined( 'ACE_SEO_DISCOURAGE_MODE' ) ? (string) ACE_SEO_DISCOURAGE_MODE : 'block';
+
+    /**
+     * Filter the discourage mode.
+     *
+     * @param string $mode 'block' or 'deindex'.
+     */
+    $mode = (string) apply_filters( 'ace_seo_discourage_mode', $mode );
+
+    return 'deindex' === $mode ? 'deindex' : 'block';
+}
+
+/**
+ * The robots directives for the current mode, as a comma-separated string.
+ *
+ * 'follow' in de-index mode is deliberate: the crawler should keep walking the
+ * site, because every page it reaches is another one that needs to see a noindex.
+ *
+ * @return string
+ */
+function ace_seo_discourage_directives() {
+    return 'deindex' === ace_seo_discourage_mode()
+        ? 'noindex, follow'
+        : 'noindex, nofollow, noarchive, nosnippet, noimageindex';
+}
+
+/**
  * Force a hard noindex on every page, overriding anything a theme, another plugin
  * or a per-post meta value asked for.
  *
@@ -47,11 +91,22 @@ function ace_seo_force_noindex_robots( $robots ) {
     unset( $robots['index'], $robots['follow'], $robots['archive'], $robots['snippet'], $robots['imageindex'] );
     unset( $robots['max-snippet'], $robots['max-image-preview'], $robots['max-video-preview'] );
 
-    $robots['noindex']       = true;
-    $robots['nofollow']      = true;
-    $robots['noarchive']     = true;
-    $robots['nosnippet']     = true;
-    $robots['noimageindex']  = true;
+    $robots['noindex'] = true;
+
+    if ( 'deindex' === ace_seo_discourage_mode() ) {
+        // Core adds nofollow of its own accord once the site is discouraged, and
+        // "nofollow, follow" is a directive a crawler is entitled to read either way.
+        unset( $robots['nofollow'], $robots['noarchive'], $robots['nosnippet'], $robots['noimageindex'] );
+
+        $robots['follow'] = true;
+
+        return $robots;
+    }
+
+    $robots['nofollow']     = true;
+    $robots['noarchive']    = true;
+    $robots['nosnippet']    = true;
+    $robots['noimageindex'] = true;
 
     return $robots;
 }
@@ -71,7 +126,7 @@ function ace_seo_send_noindex_header() {
         return;
     }
 
-    header( 'X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex', true );
+    header( 'X-Robots-Tag: ' . ace_seo_discourage_directives(), true );
 }
 add_action( 'send_headers', 'ace_seo_send_noindex_header' );
 
@@ -89,13 +144,32 @@ function ace_seo_filter_robots_txt( $output, $public ) {
         return $output;
     }
 
+    $path = (string) wp_parse_url( site_url(), PHP_URL_PATH );
+    $path = '/' === $path ? '' : untrailingslashit( (string) $path );
+
+    if ( 'deindex' === ace_seo_discourage_mode() ) {
+        // Crawling has to be allowed for the noindex on each page to be read at
+        // all, and the sitemap is what sends a crawler back round to read them.
+        return "User-agent: *\n"
+            . "Disallow: $path/wp-admin/\n"
+            . "Allow: $path/wp-admin/admin-ajax.php\n\n"
+            . 'Sitemap: ' . home_url( '/wp-sitemap.xml' ) . "\n";
+    }
+
     return "User-agent: *\nDisallow: /\n";
 }
 add_filter( 'robots_txt', 'ace_seo_filter_robots_txt', PHP_INT_MAX, 2 );
 
 // No sitemaps at all while discouraged — core's index, our providers, our routes.
 add_filter( 'wp_sitemaps_enabled', function ( $enabled ) {
-    return ace_seo_site_is_discouraged() ? false : $enabled;
+    if ( ! ace_seo_site_is_discouraged() ) {
+        return $enabled;
+    }
+
+    // Core switches its own sitemaps off from blog_public, so de-index mode has to
+    // turn them back on rather than merely decline to disable them: without the
+    // registered providers the custom routes have nothing to render and 404.
+    return 'deindex' === ace_seo_discourage_mode();
 }, PHP_INT_MAX );
 
 /**
@@ -108,7 +182,7 @@ add_filter( 'wp_sitemaps_enabled', function ( $enabled ) {
  * @return bool
  */
 add_filter( 'ace_sitemap_powertools_is_enabled', function ( $enabled, $key ) {
-    return ace_seo_site_is_discouraged() ? false : $enabled;
+    return ( ace_seo_site_is_discouraged() && 'block' === ace_seo_discourage_mode() ) ? false : $enabled;
 }, PHP_INT_MAX, 2 );
 
 /**

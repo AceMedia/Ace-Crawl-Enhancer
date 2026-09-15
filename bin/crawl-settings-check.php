@@ -128,8 +128,11 @@ foreach ( $urls as $url ) {
     );
 
     // --- The checks that matter are between the layers, not inside them.
-    if ( $noindex && 200 === $index_status ) {
-        $problems[] = 'Pages say noindex but wp-sitemap.xml still serves 200 — the site is advertising for crawling exactly what it asks not to be indexed.';
+    if ( $blocks_all && 200 === $index_status ) {
+        $problems[] = 'robots.txt blocks everything but wp-sitemap.xml still serves 200 — the site is advertising URLs it forbids anyone to fetch.';
+    } elseif ( $noindex && 200 === $index_status ) {
+        $notes[] = 'noindex pages, crawlable, sitemap served — the de-index posture: the sitemap is what brings a crawler back to each URL to read the noindex. '
+            . 'Switch back to blocking once the pages have dropped out.';
     }
 
     if ( ! $noindex && $blocks_all ) {
