@@ -260,6 +260,11 @@ class AceSeoFrontend {
 
         if ($author_node) {
             $schema['author'] = ['@id' => $author_node['@id']];
+        } elseif ($publisher_ref) {
+            // Imports and system-authored posts can legitimately have author ID 0.
+            // In that case the publishing organisation is the truthful author; an
+            // invented Person node is worse than an explicit organisational byline.
+            $schema['author'] = $publisher_ref;
         }
         if ($publisher_ref) {
             $schema['publisher'] = $publisher_ref;
