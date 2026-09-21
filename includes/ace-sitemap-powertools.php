@@ -706,14 +706,14 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
     }
 
     $detected_toggle_map = array(
-        'excluded_sitemap_providers'  => 'provider',
-        'excluded_sitemap_post_types' => 'post_type',
-        'excluded_sitemap_taxonomies' => 'taxonomy',
+        'excluded_sitemap_providers'  => 'providers',
+        'excluded_sitemap_post_types' => 'post_types',
+        'excluded_sitemap_taxonomies' => 'taxonomies',
     );
 
-    foreach ( $detected_toggle_map as $option_key => $detected_type ) {
-        $detected_key = 'detected_sitemap_' . $detected_type . 's';
-        $enabled_key  = 'enabled_sitemap_' . $detected_type . 's';
+    foreach ( $detected_toggle_map as $option_key => $detected_plural ) {
+        $detected_key = 'detected_sitemap_' . $detected_plural;
+        $enabled_key  = 'enabled_sitemap_' . $detected_plural;
         $detected     = isset( $input[ $detected_key ] ) && is_array( $input[ $detected_key ] ) ? array_values( array_unique( array_map( 'sanitize_key', $input[ $detected_key ] ) ) ) : array();
         $enabled      = isset( $input[ $enabled_key ] ) && is_array( $input[ $enabled_key ] ) ? array_values( array_unique( array_map( 'sanitize_key', $input[ $enabled_key ] ) ) ) : array();
 
