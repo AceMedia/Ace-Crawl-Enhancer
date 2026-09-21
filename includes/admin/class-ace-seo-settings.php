@@ -510,6 +510,7 @@ class AceSEOSettings {
         $options['performance']['core_web_vitals'] = isset($_POST['core_web_vitals']) ? 1 : 0;
 
         $sitemap_options_updated = false;
+        $sanitized_sitemap_options = null;
         if (isset($_POST['ace_sitemap_powertools_options'])) {
             $raw_sitemap_options = wp_unslash($_POST['ace_sitemap_powertools_options']);
             if (!is_array($raw_sitemap_options)) {
@@ -530,6 +531,16 @@ class AceSEOSettings {
         
         if ($updated || $sitemap_options_updated) {
             wp_send_json_success(['message' => 'Settings saved successfully']);
+        }
+
+        // update_option() returns false for an unchanged value as well as a failed write,
+        // so it only counts as a failure when what is stored differs from what was submitted.
+        $options_stored = get_option('ace_seo_options') == $options;
+        $sitemap_stored = null === $sanitized_sitemap_options
+            || get_option('ace_sitemap_powertools_options') == $sanitized_sitemap_options;
+
+        if ($options_stored && $sitemap_stored) {
+            wp_send_json_success(['message' => 'No changes to save']);
         } else {
             wp_send_json_error('Failed to save settings');
         }
