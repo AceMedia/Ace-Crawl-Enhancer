@@ -241,7 +241,13 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         return $query_vars;
     }
 
-    if ( ! empty( $_GET ) ) {
+    // A query string only matters when it carries something WordPress itself would act on (?s=, ?p=,
+    // ?preview= …). Tracking and cache-busting arguments (utm_*, fbclid, gclid) are not query vars, and
+    // bailing on those 404'd every campaign link to a root-level tag.
+    global $wp;
+    $public_vars  = ( $wp instanceof WP && is_array( $wp->public_query_vars ) ) ? $wp->public_query_vars : array();
+    $steering_get = array_diff( array_intersect( array_keys( $_GET ), $public_vars ), array( 'paged' ) );
+    if ( ! empty( $steering_get ) ) {
         return $query_vars;
     }
 
@@ -264,6 +270,13 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         } elseif ( 0 === strpos( $path, $home_path . '/' ) ) {
             $path = substr( $path, strlen( $home_path ) + 1 );
         }
+    }
+
+    // /slug/ or its pagination, /slug/page/N/ — nothing deeper.
+    $path_paged = 0;
+    if ( preg_match( '#^([^/]+)/page/([0-9]+)$#', $path, $paged_match ) ) {
+        $path       = $paged_match[1];
+        $path_paged = absint( $paged_match[2] );
     }
 
     if ( '' === $path || false !== strpos( $path, '/' ) ) {
@@ -290,7 +303,13 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         return $query_vars;
     }
 
-    return array( 'tag' => $slug );
+    $resolved = array( 'tag' => $slug );
+    $paged = $path_paged ? $path_paged : absint( $query_vars['paged'] ?? 0 );
+    if ( $paged > 1 ) {
+        $resolved['paged'] = $paged;
+    }
+
+    return $resolved;
 }
 add_filter( 'request', 'ace_sitemap_powertools_resolve_root_slug_to_tag_archive', 20 );
 

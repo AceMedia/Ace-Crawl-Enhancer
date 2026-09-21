@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.30-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.31-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,11 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.31 (2026-09-21)
+
+- Root-level tag archives no longer 404 when the URL carries a query string. The fallback bailed on any `$_GET` at all, so every campaign link (`utm_*`, `fbclid`, `gclid`) to a root tag was a 404; it now only steps aside for arguments WordPress itself acts on (`?s=`, `?p=`, `?preview=` …). The canonical stays the clean URL.
+- Root-level tag pagination (`/slug/page/2/`) now resolves; it 404'd before, with or without a query string.
 
 ### 1.0.30 (2026-09-21)
 
