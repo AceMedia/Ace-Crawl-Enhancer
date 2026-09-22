@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.34
+ * Version: 1.0.35
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.34');
+define('ACE_SEO_VERSION', '1.0.35');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -93,6 +93,18 @@ class AceCrawlEnhancer {
             ],
         ],
         'advanced' => [
+            'unavailable_after' => [
+                'type' => 'text',
+                'title' => 'Unavailable after',
+                'description' => 'YYYY-MM-DD. From that day search engines drop the page from results (robots unavailable_after); it stays published. Time-boxed post types can get this automatically on publish (Ace SEO → Retention).',
+                'default_value' => '',
+            ],
+            'redirect_to' => [
+                'type' => 'text',
+                'title' => 'Redirect to',
+                'description' => 'A URL to send this post to with a 301 — a stronger page on the same subject — or the word "gone" to answer 410. Leave blank for neither.',
+                'default_value' => '',
+            ],
             'meta-robots-noindex' => [
                 'type' => 'select',
                 'title' => 'Search Engine Visibility',

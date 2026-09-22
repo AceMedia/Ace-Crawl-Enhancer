@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.34-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.35-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,12 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.35 (2026-09-22)
+
+- New: **lifetimes** — `unavailable_after` set at publish. Days from publish per post type, with term rules (`taxonomy:slug=days`, longest match wins) that override the type's; a date set by hand is never overwritten. Ace SEO → Retention; filter `ace_seo_retention_lifetime_days`.
+- New: **redirect map** on the Retention screen (and `wp ace-crawl retention redirects`): every post answering a 301 or **410 Gone**, an add form (post ID or URL → target, or "gone"), and a new `gone` bulk action. A 410'd post stays in the database; clearing the entry brings it back. The 410 message is filterable (`ace_seo_retention_gone_message`).
+- New: **Unavailable after** and **Redirect to** fields on the post's Advanced SEO tab — the same meta the bulk actions write, tidied on save (dates normalised, a non-URL that is not "gone" is dropped).
 
 ### 1.0.34 (2026-09-22)
 

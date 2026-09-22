@@ -44,6 +44,7 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
             add_action( 'admin_post_ace_seo_retention_options', array( __CLASS__, 'handle_options' ) );
+            add_action( 'admin_post_ace_seo_retention_redirect', array( __CLASS__, 'handle_redirect' ) );
         }
     }
 
@@ -529,6 +530,28 @@ class AceSeoRetentionReport {
         exit;
     }
 
+    /** The redirect map's add form: a post (ID or its URL) to a target URL, or to 410. */
+    public static function handle_redirect() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_redirect' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        $from = trim( (string) wp_unslash( $_POST['from'] ?? '' ) );
+        $id   = ctype_digit( $from ) ? (int) $from : (int) url_to_postid( $from );
+        $to   = trim( (string) wp_unslash( $_POST['to'] ?? '' ) );
+        if ( ! $id ) {
+            $msg = 'That source is not a post on this site (give a post ID or its URL).';
+        } elseif ( 'gone' === strtolower( $to ) ) {
+            $r   = AceSeoRetentionActions::apply( array( $id ), 'gone', array(), 'admin' );
+            $msg = $r['applied'] ? 'Now answering 410 for post ' . $id . '.' : 'Not applied (' . ( $r['error'] ?: 'skipped' ) . ').';
+        } else {
+            $r   = AceSeoRetentionActions::apply( array( $id ), 'redirect', array( 'url' => $to ), 'admin' );
+            $msg = $r['applied'] ? 'Redirect set for post ' . $id . '.' : 'Not applied (' . ( $r['error'] ?: 'a post cannot redirect to itself' ) . ').';
+        }
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention#redirects' ) );
+        exit;
+    }
+
     public static function handle_export() {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_export' ) ) {
             wp_die( 'Not allowed.' );
@@ -675,6 +698,46 @@ class AceSeoRetentionReport {
                 <p><button class="button">Save</button></p>
             </form>
 
+            <h2 style="margin-top:2em">Lifetimes: unavailable_after at publish</h2>
+            <p>Time-boxed content — a match preview, a weekend tips piece — gets its <code>unavailable_after</code> date the moment it is published, so it leaves search results on schedule without anyone coming back to it. Days from publish, per post type; a term rule overrides the type's. Blank means no lifetime. A date set by hand on the post is never overwritten.</p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <?php wp_nonce_field( 'ace_seo_retention_options' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_options">
+                <input type="hidden" name="notice_enabled" value="<?php echo esc_attr( (int) ! empty( $o['notice_enabled'] ) ); ?>">
+                <input type="hidden" name="notice_years" value="<?php echo esc_attr( (int) $o['notice_years'] ); ?>">
+                <input type="hidden" name="notice_text" value="<?php echo esc_attr( $o['notice_text'] ); ?>">
+                <table class="form-table" style="max-width:600px"><tbody>
+                <?php foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $pt ) : if ( 'attachment' === $pt->name ) { continue; } ?>
+                    <tr><th scope="row"><?php echo esc_html( $pt->labels->name ); ?></th><td><input type="number" min="0" name="lifetimes[<?php echo esc_attr( $pt->name ); ?>]" value="<?php echo esc_attr( (int) ( $o['lifetimes'][ $pt->name ] ?? 0 ) ?: '' ); ?>" style="width:6em"> days</td></tr>
+                <?php endforeach; ?>
+                <tr><th scope="row">Term rules</th><td><textarea name="lifetime_rules" rows="4" class="large-text" placeholder="category:match-previews=10&#10;post_tag:weekend-tips=4"><?php foreach ( (array) $o['lifetime_rules'] as $k => $d ) { echo esc_html( $k . '=' . $d ) . "\n"; } ?></textarea><span class="description">One per line, <code>taxonomy:slug=days</code>. Where several match, the longest wins.</span></td></tr>
+                </tbody></table>
+                <p><button class="button">Save lifetimes</button></p>
+            </form>
+
+            <h2 id="redirects" style="margin-top:2em">Redirect map</h2>
+            <p>Posts that answer with a 301 to a stronger page, or with 410 Gone. All of these are still in the database: clearing the entry (bulk action above, or the post's Advanced SEO tab) brings the page straight back.</p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin-bottom:1em">
+                <?php wp_nonce_field( 'ace_seo_retention_redirect' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_redirect">
+                <input type="text" name="from" placeholder="Post ID or its URL" style="width:22em" required>
+                <span>→</span>
+                <input type="text" name="to" placeholder="Target URL, or the word gone" style="width:22em" required>
+                <button class="button">Add</button>
+            </form>
+            <?php $map = AceSeoRetentionActions::redirects( 500 ); if ( $map ) : ?>
+                <table class="widefat striped" style="max-width:1100px">
+                    <thead><tr><th>From</th><th>To</th><th>Post</th></tr></thead>
+                    <tbody>
+                    <?php foreach ( $map as $m ) : ?>
+                        <tr><td><a href="<?php echo esc_url( $m['from'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_make_link_relative( $m['from'] ) ); ?></a></td><td><?php echo $m['gone'] ? '<strong>410 Gone</strong>' : '301 → ' . esc_html( $m['to'] ); ?></td><td><a href="<?php echo esc_url( get_edit_post_link( $m['id'] ) ); ?>"><?php echo esc_html( $m['title'] ?: '#' . $m['id'] ); ?></a> <span style="color:#666">(<?php echo esc_html( $m['type'] ); ?> <?php echo (int) $m['id']; ?>)</span></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else : ?>
+                <p><em>No redirects yet.</em></p>
+            <?php endif; ?>
+
             <?php $log = AceSeoRetentionActions::recent_log( 30 ); if ( $log ) : ?>
                 <h2 style="margin-top:2em">Recent actions</h2>
                 <table class="widefat striped" style="max-width:900px">
@@ -707,6 +770,7 @@ class AceSeoRetentionReport {
         WP_CLI::add_command( 'ace-crawl retention report', array( __CLASS__, 'cli_report' ) );
         WP_CLI::add_command( 'ace-crawl retention clear', array( __CLASS__, 'cli_clear' ) );
         WP_CLI::add_command( 'ace-crawl retention apply', array( __CLASS__, 'cli_apply' ) );
+        WP_CLI::add_command( 'ace-crawl retention redirects', array( __CLASS__, 'cli_redirects' ) );
     }
 
     /**
@@ -830,6 +894,19 @@ class AceSeoRetentionReport {
             WP_CLI::error( $r['error'] );
         }
         WP_CLI::success( sprintf( '%s: applied to %s post(s), %s skipped.', $action, number_format_i18n( $r['applied'] ), number_format_i18n( $r['skipped'] ) ) );
+    }
+
+    /**
+     * List the redirect map (301s and 410s).
+     *
+     * ## OPTIONS
+     *
+     * [--format=<format>]
+     * : table, csv or json. Default table.
+     */
+    public static function cli_redirects( $args, $assoc ) {
+        $rows = array_map( function ( $m ) { $m['to'] = $m['gone'] ? '410' : $m['to']; unset( $m['gone'] ); return $m; }, AceSeoRetentionActions::redirects( 100000 ) );
+        WP_CLI\Utils\format_items( $assoc['format'] ?? 'table', $rows, array( 'id', 'type', 'from', 'to', 'title' ) );
     }
 
     public static function cli_clear() {

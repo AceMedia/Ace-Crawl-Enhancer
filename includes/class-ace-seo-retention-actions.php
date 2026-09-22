@@ -37,7 +37,8 @@ class AceSeoRetentionActions {
         'unavailable-after' => 'Set an unavailable_after date',
         'clear-unavailable' => 'Clear the unavailable_after date',
         'redirect'          => 'Redirect (301) to a URL',
-        'clear-redirect'    => 'Clear the redirect',
+        'gone'              => 'Answer 410 Gone (kept in the database)',
+        'clear-redirect'    => 'Clear the redirect / 410',
         'news-exclude'      => 'Keep out of the news sitemap',
         'news-include'      => 'Back into the news sitemap',
         'notice-show'       => 'Always show the dated-content notice',
@@ -50,6 +51,9 @@ class AceSeoRetentionActions {
         add_action( 'template_redirect', array( __CLASS__, 'maybe_redirect' ), 2 );
         add_filter( 'the_content', array( __CLASS__, 'dated_content_notice' ), 5 );
         add_filter( 'ace_sitemap_powertools_news_query_args', array( __CLASS__, 'news_sitemap_exclusions' ) );
+        add_action( 'transition_post_status', array( __CLASS__, 'lifetime_on_publish' ), 10, 3 );
+        add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
+        add_action( 'added_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
     }
 
     /* ---- Settings ------------------------------------------------------------------------------ */
@@ -60,19 +64,44 @@ class AceSeoRetentionActions {
             'notice_years'   => 3,
             /* translators: {years} the post's age in whole years, {date} its publish date. */
             'notice_text'    => 'This article was published {date}. Details, prices and dates may have changed since.',
+            // Lifetimes: days from publish to unavailable_after, per post type; term rules ("taxonomy:slug"
+            // => days) override the type's, longest match wins. A time-boxed match preview lives a week;
+            // an evergreen guide has no lifetime at all.
+            'lifetimes'      => array(),
+            'lifetime_rules' => array(),
         );
         $saved = get_option( self::OPTION, array() );
         return apply_filters( 'ace_seo_retention_options', array_merge( $defaults, is_array( $saved ) ? array_intersect_key( $saved, $defaults ) : array() ) );
     }
 
     public static function save_options( array $input ) {
-        $clean = array(
+        $current = get_option( self::OPTION, array() );
+        $current = is_array( $current ) ? $current : array();
+        $clean   = array_merge( $current, array(
             'notice_enabled' => ! empty( $input['notice_enabled'] ) ? 1 : 0,
             'notice_years'   => max( 1, min( 30, (int) ( $input['notice_years'] ?? 3 ) ) ),
             'notice_text'    => sanitize_text_field( (string) ( $input['notice_text'] ?? '' ) ),
-        );
+        ) );
         if ( '' === $clean['notice_text'] ) {
             unset( $clean['notice_text'] );
+        }
+        if ( isset( $input['lifetimes'] ) && is_array( $input['lifetimes'] ) ) {
+            $clean['lifetimes'] = array();
+            foreach ( $input['lifetimes'] as $type => $days ) {
+                $type = sanitize_key( $type );
+                $days = max( 0, (int) $days );
+                if ( $type && $days > 0 && post_type_exists( $type ) ) {
+                    $clean['lifetimes'][ $type ] = $days;
+                }
+            }
+        }
+        if ( isset( $input['lifetime_rules'] ) ) {
+            $clean['lifetime_rules'] = array();
+            foreach ( preg_split( '/[\r\n,]+/', (string) $input['lifetime_rules'] ) as $line ) {
+                if ( preg_match( '/^\s*([a-z0-9_-]+)\s*:\s*([^=\s]+)\s*=\s*(\d+)\s*$/i', $line, $m ) && taxonomy_exists( sanitize_key( $m[1] ) ) && (int) $m[3] > 0 ) {
+                    $clean['lifetime_rules'][ sanitize_key( $m[1] ) . ':' . sanitize_title( $m[2] ) ] = (int) $m[3];
+                }
+            }
         }
         update_option( self::OPTION, $clean, false );
         return self::options();
@@ -99,10 +128,13 @@ class AceSeoRetentionActions {
             }
         }
         if ( 'redirect' === $action ) {
-            $url = esc_url_raw( trim( (string) ( $args['url'] ?? '' ) ) );
-            if ( '' === $url ) {
-                return array( 'applied' => 0, 'skipped' => 0, 'error' => 'A URL is needed for a redirect.' );
+            $url = self::normalise_target( $args['url'] ?? '' );
+            if ( '' === $url || 'gone' === $url ) {
+                return array( 'applied' => 0, 'skipped' => 0, 'error' => 'A URL (absolute, or a path on this site) is needed for a redirect.' );
             }
+        }
+        if ( 'gone' === $action ) {
+            $url = 'gone';
         }
 
         $applied = 0;
@@ -132,6 +164,7 @@ class AceSeoRetentionActions {
                     delete_post_meta( $id, self::META_UNAVAILABLE );
                     break;
                 case 'redirect':
+                case 'gone':
                     update_post_meta( $id, self::META_REDIRECT, $url );
                     break;
                 case 'clear-redirect':
@@ -189,6 +222,91 @@ class AceSeoRetentionActions {
         return is_array( $log ) ? array_reverse( array_slice( $log, -$limit ) ) : array();
     }
 
+    /* ---- Lifetimes: unavailable_after set at publish ------------------------------------------ */
+
+    /** Days a post of this type, with these terms, should live in search results; 0 for no lifetime. */
+    public static function lifetime_for( $post ) {
+        $post = get_post( $post );
+        if ( ! $post ) {
+            return 0;
+        }
+        $o         = self::options();
+        $type_days = (int) ( $o['lifetimes'][ $post->post_type ] ?? 0 );
+        $rule_days = 0;
+        if ( ! empty( $o['lifetime_rules'] ) ) {
+            foreach ( get_object_taxonomies( $post->post_type ) as $taxonomy ) {
+                $terms = get_the_terms( $post, $taxonomy );
+                if ( ! is_array( $terms ) ) {
+                    continue;
+                }
+                foreach ( $terms as $term ) {
+                    // Among term rules the longest lifetime wins: a post that is both a "preview" and an
+                    // "explainer" keeps the explainer's.
+                    $rule_days = max( $rule_days, (int) ( $o['lifetime_rules'][ $taxonomy . ':' . $term->slug ] ?? 0 ) );
+                }
+            }
+        }
+        $days = $rule_days > 0 ? $rule_days : $type_days;
+        return (int) apply_filters( 'ace_seo_retention_lifetime_days', $days, $post );
+    }
+
+    /** On first publish, a post with a lifetime gets its unavailable_after date, unless one was set by hand. */
+    public static function lifetime_on_publish( $new_status, $old_status, $post ) {
+        if ( 'publish' !== $new_status || 'publish' === $old_status || ! $post instanceof WP_Post ) {
+            return;
+        }
+        if ( '' !== (string) get_post_meta( $post->ID, self::META_UNAVAILABLE, true ) ) {
+            return;
+        }
+        $days = self::lifetime_for( $post );
+        if ( $days <= 0 ) {
+            return;
+        }
+        // The object handed to the transition hook can still carry a zeroed GMT date for a post being
+        // published for the first time; that is "now" anyway.
+        $published = get_post_time( 'U', true, $post );
+        if ( $published <= 0 || '0000-00-00 00:00:00' === $post->post_date_gmt ) {
+            $published = time();
+        }
+        $date = gmdate( 'Y-m-d', $published + $days * DAY_IN_SECONDS );
+        update_post_meta( $post->ID, self::META_UNAVAILABLE, $date );
+        self::log( $post->ID, 'unavailable-after', $date, 'publish:' . $days . 'd' );
+    }
+
+    /** The two metabox fields share these meta keys: keep what is saved by hand in the shape the front end reads. */
+    public static function tidy_saved_field( $meta_id, $post_id, $meta_key, $value ) {
+        if ( self::META_UNAVAILABLE === $meta_key ) {
+            $clean = self::normalise_date( $value );
+            if ( $clean !== (string) $value ) {
+                remove_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10 );
+                '' === $clean ? delete_post_meta( $post_id, $meta_key ) : update_post_meta( $post_id, $meta_key, $clean );
+                add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
+            }
+        } elseif ( self::META_REDIRECT === $meta_key ) {
+            $clean = self::normalise_target( $value );
+            if ( $clean !== (string) $value ) {
+                remove_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10 );
+                '' === $clean ? delete_post_meta( $post_id, $meta_key ) : update_post_meta( $post_id, $meta_key, $clean );
+                add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
+            }
+        }
+    }
+
+    /** Every post with a redirect or 410, for the map. */
+    public static function redirects( $limit = 500 ) {
+        global $wpdb;
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT p.ID, p.post_title, p.post_type, pm.meta_value FROM {$wpdb->postmeta} pm INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id WHERE pm.meta_key = %s AND pm.meta_value <> '' ORDER BY pm.meta_id DESC LIMIT %d",
+            self::META_REDIRECT,
+            (int) $limit
+        ) );
+        $out = array();
+        foreach ( $rows as $r ) {
+            $out[] = array( 'id' => (int) $r->ID, 'title' => $r->post_title, 'type' => $r->post_type, 'from' => get_permalink( $r->ID ), 'to' => $r->meta_value, 'gone' => 'gone' === $r->meta_value );
+        }
+        return $out;
+    }
+
     /** The state of every action's meta for a post, for the report's columns. */
     public static function state( $id ) {
         return array(
@@ -198,6 +316,28 @@ class AceSeoRetentionActions {
             'news_excl'   => '1' === (string) get_post_meta( $id, self::META_NEWS_EXCL, true ),
             'notice'      => (string) get_post_meta( $id, self::META_NOTICE, true ),
         );
+    }
+
+    /**
+     * A redirect target as stored: 'gone', an absolute http(s) URL, or a site-relative path made
+     * absolute. Anything else is '' — esc_url_raw() alone would turn "not a url" into http://notaurl.
+     */
+    public static function normalise_target( $value ) {
+        $raw = trim( (string) $value );
+        if ( '' === $raw ) {
+            return '';
+        }
+        if ( 'gone' === strtolower( $raw ) ) {
+            return 'gone';
+        }
+        if ( 0 === strpos( $raw, '/' ) && 0 !== strpos( $raw, '//' ) ) {
+            $raw = home_url( $raw );
+        }
+        if ( ! preg_match( '#^https?://[^\s/]+#i', $raw ) ) {
+            return '';
+        }
+        $url = esc_url_raw( $raw );
+        return filter_var( $url, FILTER_VALIDATE_URL ) ? $url : '';
     }
 
     private static function normalise_date( $value ) {
@@ -240,7 +380,19 @@ class AceSeoRetentionActions {
         }
         $id  = get_queried_object_id();
         $url = (string) get_post_meta( $id, self::META_REDIRECT, true );
-        if ( '' === $url || self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
+        if ( '' === $url ) {
+            return;
+        }
+        if ( 'gone' === $url ) {
+            // 410, not 404: "this was here and is not coming back", which search engines act on faster.
+            // The post itself is untouched, so this is one meta value away from being live again.
+            status_header( 410 );
+            nocache_headers();
+            header( 'X-Robots-Tag: noindex' );
+            $message = apply_filters( 'ace_seo_retention_gone_message', '<p>This page has been retired and is no longer available.</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></p>', $id );
+            wp_die( $message, esc_html__( 'Gone', 'ace-crawl-enhancer' ), array( 'response' => 410 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- filtered markup
+        }
+        if ( self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
             return;
         }
         $url = apply_filters( 'ace_seo_retention_redirect_url', $url, $id );
