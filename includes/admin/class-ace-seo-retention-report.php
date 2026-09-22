@@ -1,20 +1,22 @@
 <?php
 /**
- * Pruning report: what to do with old posts, decided per URL on evidence rather than by date.
+ * Retention report: what to do with old posts, decided per URL on evidence rather than by date.
  *
- * Every published post older than the cutoff is scored on four signals — search clicks and
- * impressions (Search Console, via Site Kit), inbound internal links, and optionally page views and
- * backlinks supplied by filters — and placed in one bucket:
+ * Nothing on a site should be deleted because of its age. Every published post older than the cutoff
+ * is scored on four signals — search clicks and impressions (Search Console, via Site Kit), inbound
+ * internal links, and optionally page views and backlinks supplied by filters — and placed in one
+ * bucket that says how to keep it well:
  *
  *   keep         earning search clicks, visits or links: leave it alone
  *   refresh      real search demand but weak clicks (page 1–2, poor CTR): the cheapest wins on the site
- *   consolidate  impressions but no clicks: fold into the stronger page on the same subject, 301 this one
+ *   consolidate  impressions but no clicks: a stronger page on the subject should own the queries — 301 to it
  *   noindex      no search value, but still linked or visited: keep serving it, drop it from the index
- *   remove       nothing at all: a candidate for a 410, or a 301 if it ever had a backlink
+ *   no-signal    nothing at all in the window: still served, still linked from its archives; noindex it,
+ *                fold it into a hub, or leave it — the report does not recommend deletion
  *
- * The result is written to post meta (_ace_seo_prune) so it can be listed, filtered and exported, and
- * so a later bulk action can act on it. The build runs in batches — cron ticks from the admin screen,
- * or straight through under WP-CLI — and is resumable.
+ * The result is written to post meta (_ace_seo_retention) so it can be listed, filtered and exported,
+ * and so a later bulk action can act on it. The build runs in batches — cron ticks from the admin
+ * screen, or straight through under WP-CLI — and is resumable.
  *
  * Nothing here changes a post. It is a report.
  */
@@ -23,23 +25,23 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoPruneReport {
+class AceSeoRetentionReport {
 
-    const META            = '_ace_seo_prune';
-    const PROGRESS_OPTION = 'ace_seo_prune_progress';
-    const SIGNALS_OPTION  = 'ace_seo_prune_signals';
-    const CRON_HOOK       = 'ace_seo_prune_tick';
+    const META            = '_ace_seo_retention';
+    const PROGRESS_OPTION = 'ace_seo_retention_progress';
+    const SIGNALS_OPTION  = 'ace_seo_retention_signals';
+    const CRON_HOOK       = 'ace_seo_retention_tick';
     const BATCH           = 300;
 
-    const BUCKETS = array( 'keep', 'refresh', 'consolidate', 'noindex', 'remove' );
+    const BUCKETS = array( 'keep', 'refresh', 'consolidate', 'noindex', 'no-signal' );
 
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_tick' ) );
         if ( is_admin() ) {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 20 );
-            add_action( 'admin_post_ace_seo_prune_build', array( __CLASS__, 'handle_build' ) );
-            add_action( 'admin_post_ace_seo_prune_export', array( __CLASS__, 'handle_export' ) );
-            add_action( 'admin_post_ace_seo_prune_clear', array( __CLASS__, 'handle_clear' ) );
+            add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
+            add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
+            add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
         }
     }
 
@@ -59,7 +61,7 @@ class AceSeoPruneReport {
             'refresh_max_pos'   => 20,     // and it has to be within reach: page 1 or 2
         );
         $settings = array_merge( $defaults, array_intersect_key( $overrides, $defaults ) );
-        return apply_filters( 'ace_seo_prune_settings', $settings );
+        return apply_filters( 'ace_seo_retention_settings', $settings );
     }
 
     /* ---- Build ---------------------------------------------------------------------------------- */
@@ -151,7 +153,7 @@ class AceSeoPruneReport {
                 }
             }
         } else {
-            $p['notes'][] = 'Search Console is not connected (Site Kit): scored on links and page views only, so "remove" is not trustworthy.';
+            $p['notes'][] = 'Search Console is not connected (Site Kit): scored on links and page views only, so "no signal" is not trustworthy.';
         }
 
         $signals['gsc'] = $gsc;
@@ -229,9 +231,9 @@ class AceSeoPruneReport {
          * Page views per post over the same window, from whatever analytics the site has:
          * array( post_id => views ). Nothing is assumed; without a provider the signal is absent.
          */
-        $views = apply_filters( 'ace_seo_prune_pageviews', array(), $ids, $settings );
+        $views = apply_filters( 'ace_seo_retention_pageviews', array(), $ids, $settings );
         /** External backlinks per post, array( post_id => count ), if the site has a source. */
-        $backlinks = apply_filters( 'ace_seo_prune_backlinks', array(), $ids, $settings );
+        $backlinks = apply_filters( 'ace_seo_retention_backlinks', array(), $ids, $settings );
 
         foreach ( $ids as $id ) {
             $key = self::path_key( get_permalink( $id ) );
@@ -251,7 +253,7 @@ class AceSeoPruneReport {
             $row['built']  = time();
             $row['window'] = (int) $settings['days'];
 
-            $row = apply_filters( 'ace_seo_prune_row', $row, $id, $settings );
+            $row = apply_filters( 'ace_seo_retention_row', $row, $id, $settings );
             update_post_meta( $id, self::META, $row );
             $p['counts'][ $row['bucket'] ] = ( $p['counts'][ $row['bucket'] ] ?? 0 ) + 1;
         }
@@ -267,7 +269,7 @@ class AceSeoPruneReport {
 
     /**
      * The decision. Order matters: anything with a reason to keep is kept before anything is judged
-     * worthless, and "remove" needs every signal to be absent — a page can only be removed on evidence.
+     * unused, and "no-signal" needs every signal to be absent.
      */
     public static function bucket( array $r, array $s ) {
         $ctr    = $r['impressions'] > 0 ? $r['clicks'] / $r['impressions'] : 0;
@@ -293,7 +295,7 @@ class AceSeoPruneReport {
         }
         $why = 'No clicks, no impressions, no internal links';
         $why .= null === $r['views'] ? ' (no page-view source configured)' : ', no page views';
-        return array( 'remove', $why . ' in the window: nothing on the site or in search would miss it.' );
+        return array( 'no-signal', $why . ' in the window: nothing on the site or in search is using it. Noindex it, fold it into a hub, or leave it.' );
     }
 
     /* ---- Queries -------------------------------------------------------------------------------- */
@@ -348,14 +350,14 @@ class AceSeoPruneReport {
 
     /**
      * Hosts whose links count as internal: the site's own, plus any a staging or migrated copy still
-     * links to in its content (`ace_seo_prune_internal_hosts`, e.g. the production host on a staging
+     * links to in its content (`ace_seo_retention_internal_hosts`, e.g. the production host on a staging
      * site) — otherwise every inbound link on such a copy would be attributed to nobody.
      */
     private static function internal_hosts() {
         static $hosts = null;
         if ( null === $hosts ) {
             $own   = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
-            $extra = (array) apply_filters( 'ace_seo_prune_internal_hosts', array() );
+            $extra = (array) apply_filters( 'ace_seo_retention_internal_hosts', array() );
             $hosts = array_values( array_unique( array_filter( array_map( function ( $h ) {
                 return strtolower( preg_replace( '/^www\./', '', (string) $h ) );
             }, array_merge( array( $own ), $extra ) ) ) ) );
@@ -466,11 +468,11 @@ class AceSeoPruneReport {
     /* ---- Admin ---------------------------------------------------------------------------------- */
 
     public static function add_menu() {
-        add_submenu_page( 'ace-seo', 'Pruning report', 'Pruning report', 'manage_options', 'ace-seo-prune', array( __CLASS__, 'render' ) );
+        add_submenu_page( 'ace-seo', 'Retention', 'Retention', 'manage_options', 'ace-seo-retention', array( __CLASS__, 'render' ) );
     }
 
     public static function handle_build() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_prune_build' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_build' ) ) {
             wp_die( 'Not allowed.' );
         }
         $overrides = array(
@@ -478,27 +480,27 @@ class AceSeoPruneReport {
             'days'             => isset( $_POST['days'] ) ? max( 7, (int) $_POST['days'] ) : 90,
         );
         self::start( $overrides );
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-prune' ) );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
         exit;
     }
 
     public static function handle_clear() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_prune_clear' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_clear' ) ) {
             wp_die( 'Not allowed.' );
         }
         self::clear();
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-prune' ) );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
         exit;
     }
 
     public static function handle_export() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_prune_export' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_export' ) ) {
             wp_die( 'Not allowed.' );
         }
         $bucket = isset( $_GET['bucket'] ) ? sanitize_key( $_GET['bucket'] ) : '';
         nocache_headers();
         header( 'Content-Type: text/csv; charset=utf-8' );
-        header( 'Content-Disposition: attachment; filename="pruning-report' . ( $bucket ? '-' . $bucket : '' ) . '-' . gmdate( 'Ymd' ) . '.csv"' );
+        header( 'Content-Disposition: attachment; filename="retention-report' . ( $bucket ? '-' . $bucket : '' ) . '-' . gmdate( 'Ymd' ) . '.csv"' );
         echo self::csv( $bucket ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSV
         exit;
     }
@@ -519,12 +521,12 @@ class AceSeoPruneReport {
             'refresh'     => 'Refresh',
             'consolidate' => 'Consolidate',
             'noindex'     => 'Noindex',
-            'remove'      => 'Remove',
+            'no-signal'      => 'No signal',
         );
         ?>
         <div class="wrap">
-            <h1>Pruning report</h1>
-            <p>Every published post older than the cutoff, scored on search clicks and impressions, inbound internal links and (where a source is wired in) page views and backlinks, and placed in a bucket. It is a report: nothing here changes a post.</p>
+            <h1>Retention report</h1>
+            <p>Every published post older than the cutoff, scored on search clicks and impressions, inbound internal links and (where a source is wired in) page views and backlinks, and placed in a bucket that says how to keep it well. It is a report: nothing here changes a post, and nothing in it recommends deleting one.</p>
 
             <?php if ( self::is_building() ) : ?>
                 <div class="notice notice-info"><p>
@@ -540,21 +542,21 @@ class AceSeoPruneReport {
             <?php endforeach; ?>
 
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:1em 0">
-                <?php wp_nonce_field( 'ace_seo_prune_build' ); ?>
-                <input type="hidden" name="action" value="ace_seo_prune_build">
+                <?php wp_nonce_field( 'ace_seo_retention_build' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_build">
                 <label>Posts older than <input type="number" name="older_than_years" min="1" max="20" value="<?php echo esc_attr( (int) $settings['older_than_years'] ); ?>" style="width:4em"> years</label>
                 &nbsp; <label>Search window <input type="number" name="days" min="7" max="480" value="<?php echo esc_attr( (int) $settings['days'] ); ?>" style="width:5em"> days</label>
                 &nbsp; <button class="button button-primary" <?php disabled( self::is_building() ); ?>><?php echo $built ? 'Rebuild' : 'Build the report'; ?></button>
                 <?php if ( $built ) : ?>
-                    &nbsp; <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_prune_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_prune_export' ) ); ?>">Export CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ?? $bucket ) . ')' : ''; ?></a>
+                    &nbsp; <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_retention_export' ) ); ?>">Export CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ?? $bucket ) . ')' : ''; ?></a>
                 <?php endif; ?>
             </form>
 
             <?php if ( $built ) : ?>
                 <ul class="subsubsub" style="margin-bottom:1em">
-                    <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-prune' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>
+                    <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>
                     <?php foreach ( self::BUCKETS as $i => $b ) : ?>
-                        <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-prune&bucket=' . $b ) ); ?>" <?php echo $bucket === $b ? 'class="current"' : ''; ?>><?php echo esc_html( $labels[ $b ] ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $b ] ) ); ?>)</span></a><?php echo $i < count( self::BUCKETS ) - 1 ? ' |' : ''; ?></li>
+                        <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=' . $b ) ); ?>" <?php echo $bucket === $b ? 'class="current"' : ''; ?>><?php echo esc_html( $labels[ $b ] ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $b ] ) ); ?>)</span></a><?php echo $i < count( self::BUCKETS ) - 1 ? ' |' : ''; ?></li>
                     <?php endforeach; ?>
                 </ul>
                 <div style="clear:both"></div>
@@ -595,8 +597,8 @@ class AceSeoPruneReport {
                 ?>
 
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:2em" onsubmit="return confirm('Clear the report? The posts are untouched; only the scores go.');">
-                    <?php wp_nonce_field( 'ace_seo_prune_clear' ); ?>
-                    <input type="hidden" name="action" value="ace_seo_prune_clear">
+                    <?php wp_nonce_field( 'ace_seo_retention_clear' ); ?>
+                    <input type="hidden" name="action" value="ace_seo_retention_clear">
                     <button class="button-link-delete">Clear the report</button>
                 </form>
             <?php endif; ?>
@@ -607,9 +609,9 @@ class AceSeoPruneReport {
                 <li><strong>Keep</strong> — any search clicks, backlinks or page views in the window.</li>
                 <li><strong>Consolidate</strong> — impressions but no clicks: a stronger page should own those queries; 301 this one to it.</li>
                 <li><strong>Noindex</strong> — no search value, but still linked from the site: keep serving it, drop it from the index.</li>
-                <li><strong>Remove</strong> — nothing at all. Only trustworthy with Search Console connected and a page-view source wired in (the <code>ace_seo_prune_pageviews</code> filter).</li>
+                <li><strong>No signal</strong> — nothing at all in the window. Still served and still reachable from its archives; noindex it, fold it into a hub, or leave it. Only trustworthy with Search Console connected and a page-view source wired in (the <code>ace_seo_retention_pageviews</code> filter).</li>
             </ol>
-            <p>Thresholds and the cutoff are filterable (<code>ace_seo_prune_settings</code>); each row can be adjusted before it is stored (<code>ace_seo_prune_row</code>). From the command line: <code>wp ace-crawl prune build</code> and <code>wp ace-crawl prune report</code>.</p>
+            <p>Thresholds and the cutoff are filterable (<code>ace_seo_retention_settings</code>); each row can be adjusted before it is stored (<code>ace_seo_retention_row</code>). From the command line: <code>wp ace-crawl retention build</code> and <code>wp ace-crawl retention report</code>.</p>
         </div>
         <?php
     }
@@ -617,13 +619,13 @@ class AceSeoPruneReport {
     /* ---- WP-CLI --------------------------------------------------------------------------------- */
 
     public static function register_cli() {
-        WP_CLI::add_command( 'ace-crawl prune build', array( __CLASS__, 'cli_build' ) );
-        WP_CLI::add_command( 'ace-crawl prune report', array( __CLASS__, 'cli_report' ) );
-        WP_CLI::add_command( 'ace-crawl prune clear', array( __CLASS__, 'cli_clear' ) );
+        WP_CLI::add_command( 'ace-crawl retention build', array( __CLASS__, 'cli_build' ) );
+        WP_CLI::add_command( 'ace-crawl retention report', array( __CLASS__, 'cli_report' ) );
+        WP_CLI::add_command( 'ace-crawl retention clear', array( __CLASS__, 'cli_clear' ) );
     }
 
     /**
-     * Build the pruning report.
+     * Build the retention report.
      *
      * ## OPTIONS
      *

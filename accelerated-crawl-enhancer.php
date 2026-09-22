@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.32
+ * Version: 1.0.33
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.32');
+define('ACE_SEO_VERSION', '1.0.33');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -337,9 +337,9 @@ class AceCrawlEnhancer {
         require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-orphan-report.php';
         AceSeoOrphanReport::init();
 
-        // Same reason: the pruning report builds itself on cron ticks.
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-prune-report.php';
-        AceSeoPruneReport::init();
+        // Same reason: the retention report builds itself on cron ticks.
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-retention-report.php';
+        AceSeoRetentionReport::init();
 
         if (is_admin()) {
             require_once ACE_SEO_PATH . 'includes/admin/ace-seo-robots-file.php';
@@ -380,7 +380,7 @@ class AceCrawlEnhancer {
             AceSEOSearchConsoleCli::register();
         }
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
-            AceSeoPruneReport::register_cli();
+            AceSeoRetentionReport::register_cli();
         }
     }
     

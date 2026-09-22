@@ -501,7 +501,7 @@ class AceSEOSearchConsole {
     /**
      * Clicks, impressions and position for every page with an impression in the window, keyed by
      * URL. One request per 25,000 rows (the API's page size), cached for a day: this is the bulk
-     * feed the pruning report reads rather than a call per post.
+     * feed the retention report reads rather than a call per post.
      */
     public static function pages_report( $days = 90 ) {
         $property = self::get_property();
