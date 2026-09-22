@@ -7,7 +7,7 @@
  *   wp ace-crawl gsc submit <feed-url>
  *   wp ace-crawl gsc resubmit-all
  *   wp ace-crawl gsc inspect <url>
- *   wp ace-crawl gsc queries [--url=<url>] [--days=<days>]
+ *   wp ace-crawl gsc queries [--url=<url>] [--dimension=query|page] [--rows=<n>] [--days=<days>] [--totals]
  *
  * @package AceCrawlEnhancer
  */
@@ -160,22 +160,39 @@ class AceSEOSearchConsoleCli {
     }
 
     /**
-     * Show search-performance queries for a page, or site totals.
+     * Show top queries or pages by impressions, or the queries for one page.
      *
      * ## OPTIONS
      *
      * [--url=<url>]
-     * : Show the top queries for this exact page URL. Omit for site-wide totals.
+     * : Restrict to this exact page URL (dimension defaults to query).
+     *
+     * [--dimension=<dimension>]
+     * : query or page. Default query (with --url the page is fixed, so query is the useful breakdown).
+     *
+     * [--rows=<rows>]
+     * : Number of rows (1-1000). Default 50.
      *
      * [--days=<days>]
      * : Trailing window in days (7-90). Default 28.
+     *
+     * [--totals]
+     * : Print the site totals for the window instead of a breakdown.
+     *
+     * ## EXAMPLES
+     *
+     *     wp ace-crawl gsc queries --days=28
+     *     wp ace-crawl gsc queries --dimension=page --rows=30
+     *     wp ace-crawl gsc queries --url=https://sheff.events/whats-on/ --rows=20
+     *     wp ace-crawl gsc queries --totals
      */
     public function queries( $args, $assoc_args ) {
         $this->require_ready();
         $days = isset( $assoc_args['days'] ) ? max( 7, min( 90, (int) $assoc_args['days'] ) ) : 28;
         $url  = isset( $assoc_args['url'] ) ? (string) $assoc_args['url'] : '';
+        $rows = isset( $assoc_args['rows'] ) ? max( 1, min( 1000, (int) $assoc_args['rows'] ) ) : 50;
 
-        if ( '' === $url ) {
+        if ( isset( $assoc_args['totals'] ) ) {
             $totals = $this->bail_on_error( AceSEOSearchConsole::site_totals( $days ) );
             WP_CLI\Utils\format_items(
                 'table',
@@ -191,25 +208,31 @@ class AceSEOSearchConsoleCli {
             return;
         }
 
-        $metrics = $this->bail_on_error( AceSEOSearchConsole::page_metrics( $url, $days ) );
-        if ( empty( $metrics['top_queries'] ) ) {
-            WP_CLI::success( 'No query data for this page in the last ' . $days . ' days.' );
+        $dimension = isset( $assoc_args['dimension'] ) ? (string) $assoc_args['dimension'] : 'query';
+        if ( ! in_array( $dimension, array( 'query', 'page' ), true ) ) {
+            WP_CLI::error( '--dimension must be query or page.' );
+        }
+
+        $start = gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) );
+        $end   = gmdate( 'Y-m-d', strtotime( '-1 day' ) );
+        $list  = $this->bail_on_error( AceSEOSearchConsole::top_rows( $dimension, $start, $end, $rows, $url ) );
+
+        if ( empty( $list ) ) {
+            WP_CLI::success( 'No ' . $dimension . ' data in the last ' . $days . ' days' . ( '' !== $url ? ' for ' . $url : '' ) . '.' );
             return;
         }
-        WP_CLI\Utils\format_items(
-            'table',
-            $metrics['top_queries'],
-            array( 'query', 'clicks', 'impressions', 'position' )
-        );
-        WP_CLI::log(
-            sprintf(
-                'Page totals: %d impressions, %d clicks, %s%% CTR, avg position %s. %s',
-                $metrics['impressions'],
-                $metrics['clicks'],
-                $metrics['ctr'],
-                $metrics['position'],
-                $metrics['hint']
-            )
-        );
+
+        $items = array();
+        foreach ( $list as $row ) {
+            $items[] = array(
+                $dimension => $row['key'],
+                'impressions' => $row['impressions'],
+                'clicks'      => $row['clicks'],
+                'ctr (%)'     => $row['ctr'],
+                'position'    => $row['position'],
+            );
+        }
+        WP_CLI\Utils\format_items( 'table', $items, array( $dimension, 'impressions', 'clicks', 'ctr (%)', 'position' ) );
+        WP_CLI::log( sprintf( 'Top %d %s rows by impressions, %s to %s%s.', count( $items ), $dimension, $start, $end, '' !== $url ? ', page ' . $url : '' ) );
     }
 }

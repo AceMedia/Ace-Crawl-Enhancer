@@ -494,6 +494,84 @@ class AceSEOSearchConsole {
     }
 
     /**
+     * Public entry point for other plugins: run an arbitrary Search Analytics
+     * request against the configured property and return the raw decoded report
+     * (rows carry keys[], clicks, impressions, ctr, position). Not cached; callers
+     * that poll nightly should cache their own aggregates.
+     *
+     * @param array $request Search Analytics request body (startDate, endDate, dimensions, rowLimit ...).
+     * @return array|WP_Error
+     */
+    public static function report( array $request ) {
+        if ( ! self::is_ready() ) {
+            return new WP_Error( 'gsc_not_ready', 'Search Console is not connected in Site Kit (no active plugin or no property).' );
+        }
+        $property = self::get_property();
+        if ( '' === $property ) {
+            return new WP_Error( 'gsc_no_property', 'No Search Console property is configured in Site Kit.' );
+        }
+        return self::search_analytics( $property, $request );
+    }
+
+    /**
+     * Top rows for one dimension (query or page) over a date range, sorted by
+     * impressions. Optionally filtered to one exact page URL.
+     *
+     * @param string $dimension 'query' or 'page'.
+     * @param string $start     Y-m-d (inclusive).
+     * @param string $end       Y-m-d (inclusive).
+     * @param int    $rows      Row limit (1-1000).
+     * @param string $url       Optional exact page URL filter.
+     * @return array|WP_Error List of { key, clicks, impressions, ctr, position }.
+     */
+    public static function top_rows( $dimension, $start, $end, $rows = 50, $url = '' ) {
+        $dimension = 'page' === $dimension ? 'page' : 'query';
+        $request   = array(
+            'startDate'  => $start,
+            'endDate'    => $end,
+            'dimensions' => array( $dimension ),
+            'rowLimit'   => max( 1, min( 1000, (int) $rows ) ),
+        );
+        $url = esc_url_raw( trim( (string) $url ) );
+        if ( '' !== $url ) {
+            $request['dimensionFilterGroups'] = array(
+                array(
+                    'filters' => array(
+                        array(
+                            'dimension'  => 'page',
+                            'operator'   => 'equals',
+                            'expression' => $url,
+                        ),
+                    ),
+                ),
+            );
+        }
+
+        $report = self::report( $request );
+        if ( is_wp_error( $report ) ) {
+            return $report;
+        }
+
+        $out = array();
+        foreach ( (array) ( $report['rows'] ?? array() ) as $row ) {
+            $out[] = array(
+                'key'         => (string) ( $row['keys'][0] ?? '' ),
+                'clicks'      => (int) ( $row['clicks'] ?? 0 ),
+                'impressions' => (int) ( $row['impressions'] ?? 0 ),
+                'ctr'         => round( (float) ( $row['ctr'] ?? 0 ) * 100, 1 ),
+                'position'    => round( (float) ( $row['position'] ?? 0 ), 1 ),
+            );
+        }
+        usort(
+            $out,
+            function ( $a, $b ) {
+                return $b['impressions'] <=> $a['impressions'] ?: $b['clicks'] <=> $a['clicks'];
+            }
+        );
+        return $out;
+    }
+
+    /**
      * Run a Search Analytics query against a property.
      *
      * @return array|WP_Error Raw decoded report or WP_Error.
