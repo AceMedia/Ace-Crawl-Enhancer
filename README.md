@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.35-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.36-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.36 (2026-09-22)
+
+- New: a **Retention** column on the post list (Screen Options, hidden by default like the other SEO columns): the report's verdict with its reason on hover, and whatever has been applied since — noindex, the unavailable_after date, a 301 or 410, out of the news sitemap, a forced notice. The SEO filter dropdown gains one entry per bucket and "has a redirect or 410"; these narrow on the indexed meta key first, so they are cheap even on a large table.
 
 ### 1.0.35 (2026-09-22)
 

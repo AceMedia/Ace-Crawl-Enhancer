@@ -36,6 +36,7 @@ class AceSeoPostColumns {
             'ace_seo_desc'      => __( 'Meta description', 'ace-crawl-enhancer' ),
             'ace_seo_canonical' => __( 'Canonical', 'ace-crawl-enhancer' ),
             'ace_seo_social'    => __( 'Social image', 'ace-crawl-enhancer' ),
+            'ace_seo_retention' => __( 'Retention', 'ace-crawl-enhancer' ),
         );
     }
 
@@ -214,6 +215,10 @@ class AceSeoPostColumns {
                 self::render_presence( AceCrawlEnhancer::get_meta_value( $post_id, 'title' ) );
                 break;
 
+            case 'ace_seo_retention':
+                self::render_retention_cell( $post_id );
+                break;
+
             case 'ace_seo_desc':
                 $desc = (string) AceCrawlEnhancer::get_meta_value( $post_id, 'metadesc' );
 
@@ -284,6 +289,53 @@ class AceSeoPostColumns {
      * @param int $post_id
      * @return bool
      */
+    /**
+     * The retention report's verdict for this post, and whatever has been applied since: bucket
+     * (with the reason as its title), then the live state — noindex, unavailable_after, 301 / 410,
+     * out of the news sitemap, notice forced. A post the report has not scored shows a dash.
+     *
+     * @param int $post_id
+     * @return void
+     */
+    private static function render_retention_cell( $post_id ) {
+        $row = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $post_id, AceSeoRetentionReport::META, true ) : '';
+
+        if ( is_array( $row ) && ! empty( $row['bucket'] ) ) {
+            $labels = array(
+                'keep'        => __( 'Keep', 'ace-crawl-enhancer' ),
+                'refresh'     => __( 'Refresh', 'ace-crawl-enhancer' ),
+                'consolidate' => __( 'Consolidate', 'ace-crawl-enhancer' ),
+                'noindex'     => __( 'Noindex', 'ace-crawl-enhancer' ),
+                'no-signal'   => __( 'No signal', 'ace-crawl-enhancer' ),
+            );
+            printf(
+                '<strong title="%s">%s</strong>',
+                esc_attr( (string) ( $row['reason'] ?? '' ) ),
+                esc_html( $labels[ $row['bucket'] ] ?? $row['bucket'] )
+            );
+        } else {
+            echo '<span aria-hidden="true">—</span><span class="screen-reader-text">'
+                . esc_html__( 'not scored', 'ace-crawl-enhancer' ) . '</span>';
+        }
+
+        if ( ! class_exists( 'AceSeoRetentionActions' ) ) {
+            return;
+        }
+
+        $st    = AceSeoRetentionActions::state( $post_id );
+        $flags = array_filter( array(
+            $st['noindex'] ? __( 'noindex', 'ace-crawl-enhancer' ) : '',
+            $st['unavailable'] ? sprintf( __( 'until %s', 'ace-crawl-enhancer' ), $st['unavailable'] ) : '',
+            'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ),
+            $st['news_excl'] ? __( 'no news sitemap', 'ace-crawl-enhancer' ) : '',
+            $st['notice'] ? sprintf( __( 'notice: %s', 'ace-crawl-enhancer' ), $st['notice'] ) : '',
+        ) );
+
+        if ( $flags ) {
+            echo '<br><span style="font-size:11px;color:#646970">' . esc_html( implode( ' · ', $flags ) ) . '</span>';
+        }
+    }
+
     private static function post_is_noindex( $post_id ) {
         if ( '1' === (string) AceCrawlEnhancer::get_meta_value( $post_id, 'meta-robots-noindex' ) ) {
             return true;
@@ -322,7 +374,27 @@ class AceSeoPostColumns {
      * @return array
      */
     private static function cheap_filters() {
-        return array( 'noindex' => __( 'Noindex only', 'ace-crawl-enhancer' ) );
+        $filters = array( 'noindex' => __( 'Noindex only', 'ace-crawl-enhancer' ) );
+
+        // One indexed meta key narrows these to the scored posts before the LIKE runs, so they cost
+        // a fraction of the absence filters below.
+        foreach ( self::retention_buckets() as $bucket => $label ) {
+            $filters[ 'retention_' . $bucket ] = sprintf( __( 'Retention: %s', 'ace-crawl-enhancer' ), $label );
+        }
+        $filters['retention_acted'] = __( 'Retention: has a redirect or 410', 'ace-crawl-enhancer' );
+
+        return $filters;
+    }
+
+    /** @return array bucket => label, keyed with a hyphen as the report stores it. */
+    private static function retention_buckets() {
+        return array(
+            'keep'        => __( 'keep', 'ace-crawl-enhancer' ),
+            'refresh'     => __( 'refresh', 'ace-crawl-enhancer' ),
+            'consolidate' => __( 'consolidate', 'ace-crawl-enhancer' ),
+            'noindex'     => __( 'noindex', 'ace-crawl-enhancer' ),
+            'no-signal'   => __( 'no signal', 'ace-crawl-enhancer' ),
+        );
     }
 
     /**
@@ -418,6 +490,32 @@ class AceSeoPostColumns {
         $filter = isset( $_GET['ace_seo_filter'] ) ? sanitize_key( wp_unslash( $_GET['ace_seo_filter'] ) ) : '';
 
         if ( '' === $filter ) {
+            return;
+        }
+
+        if ( 0 === strpos( $filter, 'retention_' ) && class_exists( 'AceSeoRetentionReport' ) ) {
+            $bucket = substr( $filter, strlen( 'retention_' ) );
+
+            if ( 'acted' === $bucket ) {
+                $query->set( 'meta_query', array( array( 'key' => AceSeoRetentionActions::META_REDIRECT, 'value' => '', 'compare' => '!=' ) ) );
+                return;
+            }
+
+            if ( isset( self::retention_buckets()[ $bucket ] ) ) {
+                // The verdict is one field of a serialised array; matching the serialised fragment
+                // is exact for the bucket name and cheap behind the meta_key index.
+                $query->set(
+                    'meta_query',
+                    array(
+                        array(
+                            'key'     => AceSeoRetentionReport::META,
+                            'value'   => 's:6:"bucket";s:' . strlen( $bucket ) . ':"' . $bucket . '";',
+                            'compare' => 'LIKE',
+                        ),
+                    )
+                );
+            }
+
             return;
         }
 
