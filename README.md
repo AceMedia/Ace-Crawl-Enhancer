@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.33-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.34-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,12 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.34 (2026-09-22)
+
+- New: **retention actions**, from the Retention report's rows or a whole bucket, and `wp ace-crawl retention apply <action> --bucket=|--ids= [--date=] [--to=] [--dry-run]`: noindex/index (the plugin's own Search Engine Visibility meta), an `unavailable_after` robots date, a 301 to a stronger page, keep out of / back into the news sitemap, and force or suppress the dated-content notice. Every action is reversible, written to post meta, and logged (`_ace_seo_retention_log` per post, a recent-actions table on the screen). Nothing deletes a post.
+- New: a **dated-content notice** — a line above the content of posts older than a set age ("This article was published {date}…"), so old stays honest without being unpublished. Off by default; age and text on the Retention screen; markup filterable (`ace_seo_retention_notice_html`), post types filterable.
+- The news sitemap now runs its posts query through its own filter (`ace_sitemap_powertools_news_query_args`) so a post can leave the news feed and stay in the regular sitemap.
 
 ### 1.0.33 (2026-09-22)
 

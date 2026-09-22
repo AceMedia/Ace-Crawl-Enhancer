@@ -1032,11 +1032,25 @@ function ace_sitemap_powertools_get_provider() {
             }
 
             public function get_url_list( $page_num, $object_subtype = '' ) {
-                return parent::get_url_list( $page_num, 'post' );
+                add_filter( 'wp_sitemaps_posts_query_args', array( $this, 'news_query_args' ), 20, 2 );
+                $list = parent::get_url_list( $page_num, 'post' );
+                remove_filter( 'wp_sitemaps_posts_query_args', array( $this, 'news_query_args' ), 20 );
+                return $list;
             }
 
             public function get_max_num_pages( $object_subtype = '' ) {
-                return parent::get_max_num_pages( 'post' );
+                add_filter( 'wp_sitemaps_posts_query_args', array( $this, 'news_query_args' ), 20, 2 );
+                $pages = parent::get_max_num_pages( 'post' );
+                remove_filter( 'wp_sitemaps_posts_query_args', array( $this, 'news_query_args' ), 20 );
+                return $pages;
+            }
+
+            /**
+             * The news sitemap's query, separately from the regular posts sitemap's: a post kept out
+             * of the news feed (retention) is still listed in the regular one.
+             */
+            public function news_query_args( $args, $post_type ) {
+                return 'post' === $post_type ? (array) apply_filters( 'ace_sitemap_powertools_news_query_args', $args ) : $args;
             }
         }
     }

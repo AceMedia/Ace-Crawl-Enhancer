@@ -42,6 +42,8 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
+            add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
+            add_action( 'admin_post_ace_seo_retention_options', array( __CLASS__, 'handle_options' ) );
         }
     }
 
@@ -493,6 +495,40 @@ class AceSeoRetentionReport {
         exit;
     }
 
+    /** Bulk action: the ticked rows, or every post in a bucket. */
+    public static function handle_apply() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_apply' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        $action = sanitize_key( $_POST['retention_action'] ?? '' );
+        $bucket = sanitize_key( $_POST['bucket'] ?? '' );
+        $scope  = sanitize_key( $_POST['scope'] ?? 'ticked' );
+        $args   = array(
+            'date' => sanitize_text_field( wp_unslash( $_POST['action_date'] ?? '' ) ),
+            'url'  => esc_url_raw( wp_unslash( $_POST['action_url'] ?? '' ) ),
+        );
+        if ( 'bucket' === $scope && in_array( $bucket, self::BUCKETS, true ) ) {
+            $ids = wp_list_pluck( self::rows( $bucket, 0 ), 'id' );
+        } else {
+            $ids = array_map( 'absint', (array) ( $_POST['post_ids'] ?? array() ) );
+        }
+        $result = AceSeoRetentionActions::apply( $ids, $action, $args, 'admin' );
+        $msg    = '' !== $result['error'] ? $result['error'] : sprintf( '%s: applied to %s post(s), %s skipped.', AceSeoRetentionActions::ACTIONS[ $action ] ?? $action, number_format_i18n( $result['applied'] ), number_format_i18n( $result['skipped'] ) );
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' . ( $bucket ? '&bucket=' . $bucket : '' ) ) );
+        exit;
+    }
+
+    public static function handle_options() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_options' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        AceSeoRetentionActions::save_options( wp_unslash( $_POST ) );
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Dated-content notice settings saved.', 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
+        exit;
+    }
+
     public static function handle_export() {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_export' ) ) {
             wp_die( 'Not allowed.' );
@@ -526,6 +562,7 @@ class AceSeoRetentionReport {
         ?>
         <div class="wrap">
             <h1>Retention report</h1>
+            <?php $msg = get_transient( 'ace_seo_retention_msg_' . get_current_user_id() ); if ( $msg ) { delete_transient( 'ace_seo_retention_msg_' . get_current_user_id() ); echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $msg ) . '</p></div>'; } ?>
             <p>Every published post older than the cutoff, scored on search clicks and impressions, inbound internal links and (where a source is wired in) page views and backlinks, and placed in a bucket that says how to keep it well. It is a report: nothing here changes a post, and nothing in it recommends deleting one.</p>
 
             <?php if ( self::is_building() ) : ?>
@@ -562,14 +599,35 @@ class AceSeoRetentionReport {
                 <div style="clear:both"></div>
 
                 <?php $rows = self::rows( $bucket, $per, ( $paged - 1 ) * $per ); ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="ace-seo-retention-apply" onsubmit="return this.scope.value !== 'bucket' || confirm('Apply to every post in this bucket?');">
+                <?php wp_nonce_field( 'ace_seo_retention_apply' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_apply">
+                <input type="hidden" name="bucket" value="<?php echo esc_attr( $bucket ); ?>">
+                <div class="tablenav top" style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;height:auto;padding:.5em 0">
+                    <select name="retention_action" required>
+                        <option value="">Bulk action…</option>
+                        <?php foreach ( AceSeoRetentionActions::ACTIONS as $k => $label ) : ?>
+                            <option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="date" name="action_date" title="For unavailable_after">
+                    <input type="url" name="action_url" placeholder="Redirect target URL" style="width:22em">
+                    <select name="scope">
+                        <option value="ticked">Ticked rows</option>
+                        <?php if ( '' !== $bucket ) : ?><option value="bucket">Every post in “<?php echo esc_html( $labels[ $bucket ] ); ?>” (<?php echo esc_html( number_format_i18n( $counts[ $bucket ] ) ); ?>)</option><?php endif; ?>
+                    </select>
+                    <button class="button">Apply</button>
+                    <span class="description">Everything here is reversible and logged; nothing deletes a post.</span>
+                </div>
                 <table class="widefat striped">
-                    <thead><tr><th>Post</th><th>Published</th><th>Bucket</th><th>Clicks</th><th>Impr.</th><th>Pos.</th><th>Links in</th><th>Views</th><th>Why</th></tr></thead>
+                    <thead><tr><td class="check-column"><input type="checkbox" onclick="document.querySelectorAll('#ace-seo-retention-apply input[name=\'post_ids[]\']').forEach(c=>c.checked=this.checked)"></td><th>Post</th><th>Published</th><th>Bucket</th><th>Clicks</th><th>Impr.</th><th>Pos.</th><th>Links in</th><th>Views</th><th>Why</th><th>Applied</th></tr></thead>
                     <tbody>
                     <?php if ( ! $rows ) : ?>
-                        <tr><td colspan="9">Nothing in this bucket.</td></tr>
+                        <tr><td colspan="11">Nothing in this bucket.</td></tr>
                     <?php endif; ?>
-                    <?php foreach ( $rows as $r ) : ?>
+                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '', $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
                         <tr>
+                            <th scope="row" class="check-column"><input type="checkbox" name="post_ids[]" value="<?php echo esc_attr( $r['id'] ); ?>"></th>
                             <td><a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><?php echo esc_html( $r['title'] ?: '(no title)' ); ?></a><br><a href="<?php echo esc_url( $r['url'] ); ?>" target="_blank" rel="noopener" style="font-size:11px;color:#666"><?php echo esc_html( wp_make_link_relative( $r['url'] ) ); ?></a></td>
                             <td><?php echo esc_html( $r['published'] ); ?></td>
                             <td><strong><?php echo esc_html( $labels[ $r['bucket'] ] ?? $r['bucket'] ); ?></strong></td>
@@ -579,10 +637,12 @@ class AceSeoRetentionReport {
                             <td><?php echo esc_html( number_format_i18n( $r['links_in'] ) ); ?></td>
                             <td><?php echo null === $r['views'] ? '–' : esc_html( number_format_i18n( $r['views'] ) ); ?></td>
                             <td><?php echo esc_html( $r['reason'] ); ?></td>
+                            <td style="font-size:11px"><?php echo esc_html( implode( '; ', $flags ) ); ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
                 </table>
+                </form>
                 <?php
                 $total = '' === $bucket ? array_sum( $counts ) : $counts[ $bucket ];
                 $pages = (int) ceil( $total / $per );
@@ -601,6 +661,30 @@ class AceSeoRetentionReport {
                     <input type="hidden" name="action" value="ace_seo_retention_clear">
                     <button class="button-link-delete">Clear the report</button>
                 </form>
+            <?php endif; ?>
+
+            <?php $o = AceSeoRetentionActions::options(); ?>
+            <h2 style="margin-top:2em">Dated-content notice</h2>
+            <p>A line above the content of any post older than the age below, so a reader knows when it was written. The post stays indexed; the notice can be forced on or off per post with the bulk actions above.</p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <?php wp_nonce_field( 'ace_seo_retention_options' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_options">
+                <p><label><input type="checkbox" name="notice_enabled" value="1" <?php checked( ! empty( $o['notice_enabled'] ) ); ?>> Show the notice on posts older than</label>
+                   <input type="number" name="notice_years" min="1" max="30" value="<?php echo esc_attr( (int) $o['notice_years'] ); ?>" style="width:4em"> years</p>
+                <p><input type="text" name="notice_text" value="<?php echo esc_attr( $o['notice_text'] ); ?>" class="large-text"><br><span class="description"><code>{date}</code> is the publish date, <code>{years}</code> the age in whole years. Markup is filterable (<code>ace_seo_retention_notice_html</code>).</span></p>
+                <p><button class="button">Save</button></p>
+            </form>
+
+            <?php $log = AceSeoRetentionActions::recent_log( 30 ); if ( $log ) : ?>
+                <h2 style="margin-top:2em">Recent actions</h2>
+                <table class="widefat striped" style="max-width:900px">
+                    <thead><tr><th>When</th><th>Post</th><th>Action</th><th>Value</th><th>By</th></tr></thead>
+                    <tbody>
+                    <?php foreach ( $log as $e ) : ?>
+                        <tr><td><?php echo esc_html( human_time_diff( (int) $e['time'] ) ); ?> ago</td><td><a href="<?php echo esc_url( get_edit_post_link( (int) $e['post'] ) ); ?>"><?php echo esc_html( get_the_title( (int) $e['post'] ) ?: '#' . (int) $e['post'] ); ?></a></td><td><?php echo esc_html( AceSeoRetentionActions::ACTIONS[ $e['action'] ] ?? $e['action'] ); ?></td><td><?php echo esc_html( $e['value'] ); ?></td><td><?php echo esc_html( $e['by'] ); ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
             <?php endif; ?>
 
             <h2 style="margin-top:2em">How the buckets are decided</h2>
@@ -622,6 +706,7 @@ class AceSeoRetentionReport {
         WP_CLI::add_command( 'ace-crawl retention build', array( __CLASS__, 'cli_build' ) );
         WP_CLI::add_command( 'ace-crawl retention report', array( __CLASS__, 'cli_report' ) );
         WP_CLI::add_command( 'ace-crawl retention clear', array( __CLASS__, 'cli_clear' ) );
+        WP_CLI::add_command( 'ace-crawl retention apply', array( __CLASS__, 'cli_apply' ) );
     }
 
     /**
@@ -698,6 +783,53 @@ class AceSeoRetentionReport {
         $limit = isset( $assoc['limit'] ) ? (int) $assoc['limit'] : 50;
         $rows  = self::rows( $bucket, $limit );
         WP_CLI\Utils\format_items( $format, $rows, array( 'id', 'bucket', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'title', 'reason' ) );
+    }
+
+    /**
+     * Apply a retention action to posts.
+     *
+     * ## OPTIONS
+     *
+     * <action>
+     * : noindex, index, unavailable-after, clear-unavailable, redirect, clear-redirect, news-exclude,
+     *   news-include, notice-show, notice-hide or notice-auto.
+     *
+     * [--bucket=<bucket>]
+     * : Every post in this report bucket.
+     *
+     * [--ids=<ids>]
+     * : Comma-separated post IDs instead.
+     *
+     * [--date=<date>]
+     * : For unavailable-after (YYYY-MM-DD).
+     *
+     * [--to=<url>]
+     * : For redirect. (--url is WP-CLI's own site switch, so it cannot be used here.)
+     *
+     * [--dry-run]
+     * : Count only.
+     */
+    public static function cli_apply( $args, $assoc ) {
+        $action = sanitize_key( $args[0] ?? '' );
+        if ( ! isset( AceSeoRetentionActions::ACTIONS[ $action ] ) ) {
+            WP_CLI::error( 'Unknown action. One of: ' . implode( ', ', array_keys( AceSeoRetentionActions::ACTIONS ) ) );
+        }
+        if ( ! empty( $assoc['bucket'] ) ) {
+            $ids = wp_list_pluck( self::rows( sanitize_key( $assoc['bucket'] ), 0 ), 'id' );
+        } elseif ( ! empty( $assoc['ids'] ) ) {
+            $ids = array_map( 'absint', explode( ',', $assoc['ids'] ) );
+        } else {
+            WP_CLI::error( 'Give --bucket or --ids.' );
+        }
+        if ( ! empty( $assoc['dry-run'] ) ) {
+            WP_CLI::success( sprintf( 'Would apply "%s" to %s post(s).', $action, number_format_i18n( count( $ids ) ) ) );
+            return;
+        }
+        $r = AceSeoRetentionActions::apply( $ids, $action, array( 'date' => $assoc['date'] ?? '', 'url' => $assoc['to'] ?? '' ), 'cli' );
+        if ( '' !== $r['error'] ) {
+            WP_CLI::error( $r['error'] );
+        }
+        WP_CLI::success( sprintf( '%s: applied to %s post(s), %s skipped.', $action, number_format_i18n( $r['applied'] ), number_format_i18n( $r['skipped'] ) ) );
     }
 
     public static function cli_clear() {
