@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.31-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.32-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -248,6 +248,11 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.32 (2026-09-22)
+
+- New: a **Pruning report** (Ace SEO → Pruning report; `wp ace-crawl prune build|report|clear`). Every published post older than a cutoff is scored on search clicks and impressions (Search Console via Site Kit, one bulk pull), inbound internal links, and — through the `ace_seo_prune_pageviews` and `ace_seo_prune_backlinks` filters — page views and backlinks, then put in a bucket: keep, refresh, consolidate, noindex or remove, each with the reason. The scores live in `_ace_seo_prune` post meta; the build runs in cron ticks or straight through under WP-CLI and is resumable; CSV export per bucket. It is a report: nothing changes a post. Thresholds and the cutoff are filterable (`ace_seo_prune_settings`, `ace_seo_prune_row`, `ace_seo_prune_internal_hosts`).
+- New: `AceSEOSearchConsole::pages_report()` — clicks, impressions and position for every page with an impression in a window, paginated and cached for a day.
 
 ### 1.0.31 (2026-09-21)
 

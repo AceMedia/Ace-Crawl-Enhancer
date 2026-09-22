@@ -498,6 +498,56 @@ class AceSEOSearchConsole {
      *
      * @return array|WP_Error Raw decoded report or WP_Error.
      */
+    /**
+     * Clicks, impressions and position for every page with an impression in the window, keyed by
+     * URL. One request per 25,000 rows (the API's page size), cached for a day: this is the bulk
+     * feed the pruning report reads rather than a call per post.
+     */
+    public static function pages_report( $days = 90 ) {
+        $property = self::get_property();
+        if ( '' === $property ) {
+            return new WP_Error( 'gsc_no_property', 'No Search Console property is configured in Site Kit.' );
+        }
+
+        $days      = max( 1, min( 480, (int) $days ) );
+        $cache_key = 'ace_seo_gsc_pages_' . md5( $property . '|' . $days );
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
+        $pages = array();
+        $start = 0;
+        do {
+            $response = self::search_analytics( $property, array(
+                'startDate'  => gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) ),
+                'endDate'    => gmdate( 'Y-m-d', strtotime( '-1 day' ) ),
+                'dimensions' => array( 'page' ),
+                'rowLimit'   => 25000,
+                'startRow'   => $start,
+            ) );
+            if ( is_wp_error( $response ) ) {
+                return $response;
+            }
+            $rows = isset( $response['rows'] ) && is_array( $response['rows'] ) ? $response['rows'] : array();
+            foreach ( $rows as $row ) {
+                $url = isset( $row['keys'][0] ) ? (string) $row['keys'][0] : '';
+                if ( '' === $url ) {
+                    continue;
+                }
+                $pages[ $url ] = array(
+                    'clicks'      => (int) ( $row['clicks'] ?? 0 ),
+                    'impressions' => (int) ( $row['impressions'] ?? 0 ),
+                    'position'    => round( (float) ( $row['position'] ?? 0 ), 1 ),
+                );
+            }
+            $start += 25000;
+        } while ( count( $rows ) === 25000 && $start < 250000 );
+
+        set_transient( $cache_key, $pages, DAY_IN_SECONDS );
+        return $pages;
+    }
+
     private static function search_analytics( $property, $request ) {
         $url = 'https://searchconsole.googleapis.com/webmasters/v3/sites/'
             . rawurlencode( $property ) . '/searchAnalytics/query';
