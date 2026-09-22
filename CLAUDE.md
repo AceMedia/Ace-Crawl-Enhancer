@@ -63,6 +63,11 @@ drift from each other, and that drift is the bug.
   title/meta-desc/canonical/robots pipeline, template variables, Yoast migration, background DB optimisation.
 - `includes/ace-sitemap-powertools.php` (3.4k lines, procedural `ace_sitemap_powertools_*`) — core-sitemap
   extensions, caching (Ace-Redis-Cache aware), news/authors/tags routes, exclusions, legacy redirects.
+- `includes/ace-sitemap-generations.php` — durable last-good sitemap lists (JSON files in uploads), scoped
+  dirty tracking, one flock-guarded background worker (`ace_sitemap_regenerate`), urgent withholding of
+  removed URLs, status panel + `wp ace-crawl sitemaps`. Coordination state lives in `.meta` files in the
+  store, NOT options: web requests and a WP-CLI cron worker can have different object caches. Regression
+  checks: `wp eval-file <plugin>/tests/sitemap-generations-test.php`.
 - `includes/frontend/` — `class-ace-seo-frontend.php` (head output + OG/Twitter + Jetpack override +
   JSON-LD graph), `class-ace-seo-schema.php` (Organization/Person/LocalBusiness + orphaned Product/FAQ
   builders), `class-ace-seo-breadcrumbs.php` (visual trail only), `class-ace-seo-performance.php`

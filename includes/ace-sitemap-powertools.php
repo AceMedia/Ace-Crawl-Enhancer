@@ -993,6 +993,7 @@ function ace_sitemap_powertools_render_settings_page() {
     submit_button();
     echo '</form>';
 
+    ace_sitemap_gen_render_status_panel();
     echo '</div>';
 }
 
@@ -1432,6 +1433,9 @@ function ace_sitemap_powertools_cache_enabled() {
 }
 
 function ace_sitemap_powertools_purge_cache() {
+    // Rebuilds in the background; the current sitemaps stay online meanwhile.
+    ace_sitemap_gen_mark_dirty( 'all', true );
+
     if ( ace_sitemap_powertools_redis_cache_available() ) {
         ace_sitemap_powertools_bump_cache_version();
         return;
@@ -1669,6 +1673,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
 
         if ( 'index' === $requested_sitemap ) {
             $sitemap_list = ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps );
+            if ( null === $sitemap_list ) {
+                ace_sitemap_powertools_send_unavailable();
+            }
             if ( ace_sitemap_powertools_should_render_human_view() ) {
                 ace_sitemap_powertools_render_index_html( $sitemap_list );
             } else {
@@ -1692,6 +1699,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
         }
 
         $url_list = ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page );
+        if ( null === $url_list ) {
+            ace_sitemap_powertools_send_unavailable();
+        }
         if ( empty( $url_list ) ) {
             global $wp_query;
             if ( $wp_query ) {
@@ -1718,6 +1728,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
     if ( 'sitemap.xml' === $path ) {
         $wp_sitemaps  = wp_sitemaps_get_server();
         $sitemap_list = ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps );
+        if ( null === $sitemap_list ) {
+            ace_sitemap_powertools_send_unavailable();
+        }
 
         if ( ace_sitemap_powertools_should_render_human_view() ) {
             ace_sitemap_powertools_render_index_html( $sitemap_list );
@@ -1767,6 +1780,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
     }
 
     $url_list = ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page );
+    if ( null === $url_list ) {
+        ace_sitemap_powertools_send_unavailable();
+    }
     if ( empty( $url_list ) ) {
         global $wp_query;
         if ( $wp_query ) {
@@ -1879,6 +1895,16 @@ function ace_sitemap_powertools_mark_valid_core_sitemap_success() {
 add_action( 'template_redirect', 'ace_sitemap_powertools_mark_valid_core_sitemap_success', 9 );
 
 function ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps ) {
+    if ( ace_sitemap_gen_enabled() ) {
+        return ace_sitemap_gen_get(
+            ace_sitemap_gen_index_key(),
+            array( 'provider' => 'index', 'subtype' => '', 'page' => 0 ),
+            function () use ( $wp_sitemaps ) {
+                return $wp_sitemaps->index->get_sitemap_list();
+            }
+        );
+    }
+
     $sitemap_list = null;
 
     if ( ace_sitemap_powertools_cache_enabled() ) {
@@ -1897,6 +1923,16 @@ function ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps ) {
 }
 
 function ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page ) {
+    if ( ace_sitemap_gen_enabled() ) {
+        return ace_sitemap_gen_get(
+            ace_sitemap_gen_url_key( $route['provider'], $route['subtype'], $page ),
+            array( 'provider' => sanitize_key( (string) $route['provider'] ), 'subtype' => sanitize_key( (string) $route['subtype'] ), 'page' => (int) $page ),
+            function () use ( $provider, $route, $page ) {
+                return $provider->get_url_list( $page, $route['subtype'] );
+            }
+        );
+    }
+
     $url_list = null;
 
     if ( ace_sitemap_powertools_cache_enabled() ) {
@@ -1918,6 +1954,18 @@ function ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page ) 
     }
 
     return is_array( $url_list ) ? $url_list : array();
+}
+
+/**
+ * Nothing to serve yet (first build still running elsewhere): ask the client to come back
+ * rather than answering with an empty sitemap that looks like a real one.
+ */
+function ace_sitemap_powertools_send_unavailable() {
+    status_header( 503 );
+    header( 'Retry-After: 30' );
+    header( 'Cache-Control: no-store' );
+    header( 'X-Robots-Tag: noindex, follow', true );
+    exit;
 }
 
 function ace_sitemap_powertools_is_probable_bot_request() {

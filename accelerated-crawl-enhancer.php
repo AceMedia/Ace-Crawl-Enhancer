@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.37
+ * Version: 1.0.38
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.37');
+define('ACE_SEO_VERSION', '1.0.38');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -36,6 +36,7 @@ define('ACE_SEO_BASENAME', plugin_basename(__FILE__));
 
 require_once ACE_SEO_PATH . 'includes/ace-seo-discourage.php';
 require_once ACE_SEO_PATH . 'includes/ace-sitemap-powertools.php';
+require_once ACE_SEO_PATH . 'includes/ace-sitemap-generations.php';
 
 // Plugin-specific meta keys - no longer use Yoast keys for storage
 define('ACE_SEO_META_PREFIX', '_ace_seo_');

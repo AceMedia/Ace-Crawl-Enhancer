@@ -249,6 +249,15 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.38 (2026-09-22)
+
+- Changed: **sitemaps are rebuilt in the background and the last good copy is always served.** Each list (the index and every provider/page) is kept as a small JSON file under `uploads/ace-sitemaps/<blog>/`, so a Redis flush or eviction no longer loses them. A content change marks only the affected scope dirty (`posts:<type>`, `taxonomies:<tax>`, `users`); crawlers keep getting the current file while one worker (`ace_sitemap_regenerate`, a minute after the first change) rebuilds the stale lists in bounded passes (20 s / 50 lists, then it yields). Pages are rebuilt before the index. Only a list that has never been built is built in the foreground, by one request at a time; the others wait briefly and then get a 503 with Retry-After, never an empty sitemap.
+- New: unpublished, trashed, deleted and noindexed URLs are withheld from served sitemaps at once, whatever the age of the stored list. A list that empties keeps its last contents for an hour so an index fetched a moment earlier never points at a missing page.
+- New: status panel and Pause / Resume / Queue a full rebuild / Retry on the Sitemap Powertools screen; `wp ace-crawl sitemaps status|run|mark-dirty|pause|resume|retry` for system cron. Responses carry `X-Ace-Sitemap: fresh|stale|cold|waited|unavailable|gone`.
+- New filters: `ace_sitemap_generation_dir` (return '' to keep the old object-cache behaviour, e.g. multi-webhead without shared storage), `ace_sitemap_generation_provider_scopes` (let a custom provider say what it depends on; unknown providers rebuild on any change), `ace_sitemap_generation_delay`, `_min_age` (per provider; the index defaults to 5 minutes), `_time_budget`, `_batch_size`, `_yield`, `_gone_grace`, `_shared_lock` (or the `ACE_SITEMAP_SHARED_LOCK` constant: one lock file shared by several sites on a host to run their workers one at a time). Action `ace_sitemap_generation_published` fires after each list is replaced.
+- Changed: with the store active, Ace Redis Cache no longer warms sitemap URLs over HTTP after saves (its `ace_rc_sitemap_prime_urls` filter), since that only duplicated the rebuild.
+- Rollback: older versions ignore the store and fall back to their own caching; the files can be left in place or deleted.
+
 ### 1.0.36 (2026-09-22)
 
 - New: a **Retention** column on the post list (Screen Options, hidden by default like the other SEO columns): the report's verdict with its reason on hover, and whatever has been applied since — noindex, the unavailable_after date, a 301 or 410, out of the news sitemap, a forced notice. The SEO filter dropdown gains one entry per bucket and "has a redirect or 410"; these narrow on the indexed meta key first, so they are cheap even on a large table.
