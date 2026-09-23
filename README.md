@@ -249,6 +249,12 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.44 (2026-09-23)
+
+- New: **white hat status** (Ace SEO, White hat; off by default, and nothing in it is betting specific until configured). A post is rendered as a visitor gets it now, then judged cheapest first: a link matching a bet link pattern (and not an allowed pattern, such as the operator's homepage) makes it not white hat; no sentence with a betting keyword makes it white hat; otherwise the headline and just those sentences (capped) go to the AI provider set in the settings (Anthropic or OpenAI, model and key as settings or `ACE_SEO_WHITEHAT_API_KEY`), or to the call to action patterns when no provider is set. A hash of what was judged is kept, so an unchanged post never costs a second call.
+- Runs on cron shortly after a post is published or updated, again once the latest event time in its configured bet blocks has passed (plus a grace period, so banners that dropped off are judged gone), and in an hourly sweep that rechecks posts marked not white hat or unknown once a day. `wp ace-crawl whitehat check --ids=|--unchecked [--limit=] [--force] [--dry-run]` for backfills.
+- New: sortable **White hat** column and filter on the post list (while enabled), and in the CSV export. Meta `_ace_seo_whitehat` (yes, no, unknown) and `_ace_seo_whitehat_data`. Filters `pre_ace_seo_whitehat_ai` (answer without a call, for tests or a site's own classifier), `ace_seo_whitehat_instruction`, `ace_seo_whitehat_result`, `ace_seo_whitehat_event_time`, `ace_seo_whitehat_options`, `ace_seo_whitehat_sweep_batch`.
+
 ### 1.0.43 (2026-09-23)
 
 - New: **people against bots, and referrers**, from the plugin's own tracking (Retention, Report settings, off by default). People are counted by the beacon, bots when WordPress renders the post (a cached copy is not seen, so bot counts are a lower bound; a bot that runs the beacon is not counted twice). Referrers are filed as search, social, other sites, this site or direct, per host, in `{prefix}ace_seo_post_referrers`. Filters `ace_seo_referrer_source`.

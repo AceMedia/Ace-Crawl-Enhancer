@@ -42,7 +42,11 @@ class AceSeoPostColumns {
             'ace_seo_ret_links'   => __( 'Links in', 'ace-crawl-enhancer' ),
             'ace_seo_people'      => __( 'People (30 days)', 'ace-crawl-enhancer' ),
             'ace_seo_bot_pct'     => __( 'Bots', 'ace-crawl-enhancer' ),
-        );
+        ) + ( self::whitehat_on() ? array( 'ace_seo_whitehat' => __( 'White hat', 'ace-crawl-enhancer' ) ) : array() );
+    }
+
+    private static function whitehat_on() {
+        return class_exists( 'AceSeoWhiteHat' ) && AceSeoWhiteHat::enabled();
     }
 
     /** Retention columns, shown without Screen Options on a list filtered or sorted by retention. */
@@ -63,12 +67,13 @@ class AceSeoPostColumns {
             'ace_seo_retention'   => array( '_ace_seo_ret_tier', 'CHAR' ),
             'ace_seo_people'      => array( '_ace_seo_humans', 'NUMERIC' ),
             'ace_seo_bot_pct'     => array( '_ace_seo_bot_pct', 'NUMERIC' ),
+            'ace_seo_whitehat'    => array( '_ace_seo_whitehat', 'CHAR' ),
         );
     }
 
     /** Query arguments that belong to the retention filters. */
     private static function retention_params() {
-        return array( 'ace_ret', 'ace_before', 'ace_views_min', 'ace_views_max' );
+        return array( 'ace_ret', 'ace_before', 'ace_views_min', 'ace_views_max', 'ace_wh' );
     }
 
     public static function init() {
@@ -144,7 +149,7 @@ class AceSeoPostColumns {
             _prime_post_caches( $ids, false, true );
         }
 
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'Indexable' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable' );
         $rows   = array();
         foreach ( $ids as $id ) {
             $post = get_post( $id );
@@ -167,6 +172,7 @@ class AceSeoPostColumns {
                 $row['impressions'] ?? '',
                 get_post_meta( $id, '_ace_seo_humans', true ),
                 get_post_meta( $id, '_ace_seo_bot_pct', true ),
+                get_post_meta( $id, '_ace_seo_whitehat', true ),
                 self::post_is_noindex( $id ) ? 'no' : 'yes',
             );
 
@@ -489,6 +495,22 @@ class AceSeoPostColumns {
                 echo '' === $pct ? self::dash() : esc_html( (int) $pct . '%' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                 break;
 
+            case 'ace_seo_whitehat':
+                $status = (string) get_post_meta( $post_id, '_ace_seo_whitehat', true );
+                if ( '' === $status || ! class_exists( 'AceSeoWhiteHat' ) ) {
+                    echo self::dash(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    break;
+                }
+                $data   = get_post_meta( $post_id, '_ace_seo_whitehat_data', true );
+                $colour = array( 'yes' => '#1a7f37', 'no' => '#b32d2e', 'unknown' => '#8a6d00' );
+                printf(
+                    '<span style="color:%s;font-weight:600" title="%s">%s</span>',
+                    esc_attr( $colour[ $status ] ?? '#646970' ),
+                    esc_attr( is_array( $data ) ? implode( ' ', (array) ( $data['reasons'] ?? array() ) ) . ( ! empty( $data['checked'] ) ? ' (' . wp_date( 'Y-m-d H:i', (int) $data['checked'] ) . ', ' . ( $data['method'] ?? '' ) . ')' : '' ) : '' ),
+                    esc_html( AceSeoWhiteHat::labels()[ $status ] ?? $status )
+                );
+                break;
+
             case 'ace_seo_last_viewed':
                 $last = (string) get_post_meta( $post_id, '_ace_seo_last_viewed', true );
                 echo '' === $last ? self::dash() : esc_html( mysql2date( get_option( 'date_format' ), $last ) );
@@ -764,6 +786,15 @@ class AceSeoPostColumns {
         echo '</select>';
 
         self::render_retention_filters( $post_type );
+
+        if ( self::whitehat_on() && in_array( $post_type, (array) AceSeoWhiteHat::options()['post_types'], true ) ) {
+            $wh = isset( $_GET['ace_wh'] ) ? sanitize_key( wp_unslash( $_GET['ace_wh'] ) ) : '';
+            echo '<select name="ace_wh" aria-label="' . esc_attr__( 'White hat status', 'ace-crawl-enhancer' ) . '"><option value="">' . esc_html__( 'Any white hat status', 'ace-crawl-enhancer' ) . '</option>';
+            foreach ( AceSeoWhiteHat::labels() as $value => $label ) {
+                printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $wh, $value, false ), esc_html( $label ) );
+            }
+            echo '</select>';
+        }
     }
 
     /** Is the retention report about this post type? */
@@ -882,6 +913,11 @@ class AceSeoPostColumns {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'compare' => 'EXISTS' );
         } elseif ( in_array( $tier, AceSeoRetentionReport::TIERS, true ) ) {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'value' => $tier );
+        }
+
+        $wh = isset( $params['ace_wh'] ) ? sanitize_key( wp_unslash( $params['ace_wh'] ) ) : '';
+        if ( in_array( $wh, array( 'yes', 'no', 'unknown' ), true ) ) {
+            $clauses[] = array( 'key' => '_ace_seo_whitehat', 'value' => $wh );
         }
 
         foreach ( array( 'ace_views_min' => '>=', 'ace_views_max' => '<=' ) as $param => $compare ) {

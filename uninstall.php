@@ -59,6 +59,7 @@ class AceSEOUninstaller {
             'ace_seo_performance_monitoring',
             'ace_sitemap_powertools_options',
             'ace_seo_hits_db_version',
+            'ace_seo_whitehat_options',
             'ace_sitemap_powertools_purge_notice',
             'ace_sitemap_powertools_large_site_notice',
             'ace_sitemap_powertools_legacy_cache_purged',
