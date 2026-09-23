@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.39 (2026-09-23)
+
+- Fixed: PHP 8.4+ deprecation notice on every sitemap request (`ace_sitemap_gen_required_seq()` now declares its optional `$seqs` as `?array`).
+
 ### 1.0.38 (2026-09-22)
 
 - Changed: **sitemaps are rebuilt in the background and the last good copy is always served.** Each list (the index and every provider/page) is kept as a small JSON file under `uploads/ace-sitemaps/<blog>/`, so a Redis flush or eviction no longer loses them. A content change marks only the affected scope dirty (`posts:<type>`, `taxonomies:<tax>`, `users`); crawlers keep getting the current file while one worker (`ace_sitemap_regenerate`, a minute after the first change) rebuilds the stale lists in bounded passes (20 s / 50 lists, then it yields). Pages are rebuilt before the index. Only a list that has never been built is built in the foreground, by one request at a time; the others wait briefly and then get a 503 with Retry-After, never an empty sitemap.

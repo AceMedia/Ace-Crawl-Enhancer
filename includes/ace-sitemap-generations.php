@@ -335,7 +335,7 @@ function ace_sitemap_gen_scopes_for( $provider, $subtype ) {
 }
 
 /** The sequence an artifact must have reached to be current. */
-function ace_sitemap_gen_required_seq( array $scopes, array $seqs = null ) {
+function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null ) {
     $seqs = $seqs ? $seqs : ace_sitemap_gen_seqs();
     if ( in_array( '*', $scopes, true ) ) {
         return $seqs['seq'];
