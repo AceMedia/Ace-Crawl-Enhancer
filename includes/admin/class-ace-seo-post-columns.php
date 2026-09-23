@@ -37,7 +37,34 @@ class AceSeoPostColumns {
             'ace_seo_canonical' => __( 'Canonical', 'ace-crawl-enhancer' ),
             'ace_seo_social'    => __( 'Social image', 'ace-crawl-enhancer' ),
             'ace_seo_retention' => __( 'Retention', 'ace-crawl-enhancer' ),
+            'ace_seo_ret_views'   => __( 'Views', 'ace-crawl-enhancer' ),
+            'ace_seo_last_viewed' => __( 'Last viewed', 'ace-crawl-enhancer' ),
+            'ace_seo_ret_links'   => __( 'Links in', 'ace-crawl-enhancer' ),
         );
+    }
+
+    /** Retention columns, shown without Screen Options on a list filtered or sorted by retention. */
+    private static function retention_columns() {
+        return array( 'ace_seo_retention', 'ace_seo_ret_views', 'ace_seo_last_viewed', 'ace_seo_ret_links' );
+    }
+
+    /**
+     * Sortable retention columns => meta key and type. These sort on flat meta written only for
+     * posts the report scored, so a sort lists the scored posts: a bounded set joined on an indexed
+     * key, not a filesort over the whole post type.
+     */
+    private static function retention_sorts() {
+        return array(
+            'ace_seo_ret_views'   => array( '_ace_seo_ret_views', 'NUMERIC' ),
+            'ace_seo_last_viewed' => array( '_ace_seo_last_viewed', 'CHAR' ),
+            'ace_seo_ret_links'   => array( '_ace_seo_ret_links', 'NUMERIC' ),
+            'ace_seo_retention'   => array( '_ace_seo_ret_tier', 'CHAR' ),
+        );
+    }
+
+    /** Query arguments that belong to the retention filters. */
+    private static function retention_params() {
+        return array( 'ace_ret', 'ace_before', 'ace_views_min', 'ace_views_max' );
     }
 
     public static function init() {
@@ -46,6 +73,185 @@ class AceSeoPostColumns {
         // types register at, so iterating post types here would silently miss any
         // CPT whose plugin or theme happened to load later.
         add_action( 'current_screen', array( __CLASS__, 'register_for_screen' ) );
+        add_action( 'wp_ajax_ace_seo_list_export', array( __CLASS__, 'ajax_export' ) );
+    }
+
+    /** Rows per export request: small enough to finish well inside a request's time limit. */
+    const EXPORT_BATCH = 500;
+
+    /**
+     * One batch of the CSV export: the list's own query (its filters, search, sort) rebuilt from the
+     * query string the screen was loaded with, a page at a time. The browser stitches the batches
+     * together, so a 30,000-post export is sixty short requests rather than one that times out.
+     *
+     * @return void
+     */
+    public static function ajax_export() {
+        check_ajax_referer( 'ace_seo_list_export' );
+
+        $params = array();
+        wp_parse_str( (string) wp_unslash( $_POST['q'] ?? '' ), $params );
+        $post_type = sanitize_key( $params['post_type'] ?? 'post' );
+        $type_obj  = get_post_type_object( $post_type );
+
+        if ( ! $type_obj || ! in_array( $post_type, self::post_types(), true ) || ! current_user_can( $type_obj->cap->edit_posts ) ) {
+            wp_send_json_error( __( 'Not allowed.', 'ace-crawl-enhancer' ), 403 );
+        }
+
+        $batch  = max( 1, absint( $_POST['batch'] ?? 1 ) );
+        $status = sanitize_key( $params['post_status'] ?? '' );
+        $args   = array(
+            'post_type'           => $post_type,
+            'post_status'         => ( '' !== $status && get_post_status_object( $status ) ) ? $status : array_values( get_post_stati( array( 'show_in_admin_all_list' => true ) ) ),
+            'posts_per_page'      => self::EXPORT_BATCH,
+            'paged'               => $batch,
+            'fields'              => 'ids',
+            'orderby'             => sanitize_key( $params['orderby'] ?? 'date' ) ?: 'date',
+            'order'               => 'asc' === strtolower( (string) ( $params['order'] ?? '' ) ) ? 'ASC' : 'DESC',
+            'ignore_sticky_posts' => true,
+            'suppress_filters'    => false,
+            'ace_seo_export'      => true,
+        );
+        // The list screen's own filters, passed straight through: WP_Query reads them the same way.
+        foreach ( array( 'm', 'cat', 'category_name', 'tag', 's', 'author' ) as $var ) {
+            if ( isset( $params[ $var ] ) && '' !== $params[ $var ] ) {
+                $args[ $var ] = sanitize_text_field( $params[ $var ] );
+            }
+        }
+        if ( ! current_user_can( $type_obj->cap->edit_others_posts ) ) {
+            $args['author'] = get_current_user_id();
+        }
+
+        $apply = function ( $query ) use ( $params, $post_type ) {
+            if ( ! $query->get( 'ace_seo_export' ) ) {
+                return;
+            }
+            self::apply_filter( $query, $params );
+            self::apply_retention_filters( $query, $params );
+            self::apply_sort( $query, $post_type );
+            self::apply_retention_sort( $query );
+        };
+        add_action( 'pre_get_posts', $apply );
+        $query = new WP_Query( $args );
+        remove_action( 'pre_get_posts', $apply );
+
+        $ids = array_map( 'intval', $query->posts );
+        if ( $ids ) {
+            _prime_post_caches( $ids, false, true );
+        }
+
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'Indexable' );
+        $rows   = array();
+        foreach ( $ids as $id ) {
+            $post = get_post( $id );
+            $row  = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $id, AceSeoRetentionReport::META, true ) : '';
+            $row  = is_array( $row ) ? $row : array();
+            $line = array(
+                $id,
+                html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
+                get_permalink( $post ),
+                $post->post_status,
+                get_post_time( 'Y-m-d', false, $post ),
+                get_post_modified_time( 'Y-m-d', false, $post ),
+                $row['tier'] ?? '',
+                $row['bucket'] ?? '',
+                get_post_meta( $id, '_ace_seo_ret_views', true ),
+                get_post_meta( $id, '_ace_seo_last_viewed', true ),
+                get_post_meta( $id, '_ace_seo_ret_links', true ),
+                get_post_meta( $id, '_ace_seo_ret_words', true ),
+                $row['clicks'] ?? '',
+                $row['impressions'] ?? '',
+                self::post_is_noindex( $id ) ? 'no' : 'yes',
+            );
+
+            /**
+             * Filter one exported row; add a value and a matching header with ace_seo_list_export_header.
+             *
+             * @param array $line
+             * @param int   $id
+             */
+            $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
+        }
+
+        wp_send_json_success( array(
+            'header' => array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) ),
+            'rows'   => $rows,
+            'total'  => (int) $query->found_posts,
+            'pages'  => (int) $query->max_num_pages,
+            'batch'  => $batch,
+        ) );
+    }
+
+    /**
+     * The export button's script: fetch the batches, build the CSV in the browser, save it.
+     *
+     * @return void
+     */
+    public static function print_export_script() {
+        $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+        if ( ! $screen instanceof WP_Screen || 'edit' !== $screen->base || ! in_array( $screen->post_type, self::post_types(), true ) ) {
+            return;
+        }
+        $label = __( 'Export CSV', 'ace-crawl-enhancer' );
+        ?>
+        <script>
+        (function () {
+            var bar = document.querySelector('.tablenav.top .actions:not(.bulkactions)');
+            if (!bar || !window.fetch || !window.Blob) { return; }
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'button';
+            b.id = 'ace-seo-export';
+            b.title = <?php echo wp_json_encode( __( 'Everything this list shows with its current filters, search and sort, not just this page', 'ace-crawl-enhancer' ) ); ?>;
+            b.textContent = <?php echo wp_json_encode( $label ); ?>;
+            bar.appendChild(b);
+            var cell = function (v) {
+                v = v === null || v === undefined ? '' : String(v);
+                if (/^[=+\-@]/.test(v)) { v = "'" + v; }
+                return /[",
+]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+            };
+            b.addEventListener('click', function () {
+                var q = window.location.search.replace(/^\?/, '').split('&').filter(function (p) { return p && p.indexOf('paged=') !== 0; }).join('&');
+                var rows = [], header = null, page = 1, pages = 1;
+                b.disabled = true;
+                var next = function () {
+                    var fd = new FormData();
+                    fd.append('action', 'ace_seo_list_export');
+                    fd.append('_ajax_nonce', <?php echo wp_json_encode( wp_create_nonce( 'ace_seo_list_export' ) ); ?>);
+                    fd.append('q', q);
+                    fd.append('batch', String(page));
+                    return fetch(window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            if (!j || !j.success) { throw new Error((j && j.data) || 'Export failed'); }
+                            header = j.data.header;
+                            pages = Math.max(1, j.data.pages);
+                            rows = rows.concat(j.data.rows);
+                            b.textContent = 'Exporting ' + Math.min(page, pages) + ' of ' + pages + '…';
+                            page++;
+                            return page <= pages ? next() : null;
+                        });
+                };
+                next().then(function () {
+                    var csv = [header].concat(rows).map(function (r) { return r.map(cell).join(','); }).join('
+');
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+                    a.download = <?php echo wp_json_encode( $screen->post_type . '-' ); ?> + new Date().toISOString().slice(0, 10) + '.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }).catch(function (e) {
+                    window.alert(e.message);
+                }).then(function () {
+                    b.disabled = false;
+                    b.textContent = <?php echo wp_json_encode( $label ); ?>;
+                });
+            });
+        })();
+        </script>
+        <?php
     }
 
     /**
@@ -75,6 +281,33 @@ class AceSeoPostColumns {
 
         add_action( 'restrict_manage_posts', array( __CLASS__, 'render_filter' ) );
         add_action( 'pre_get_posts', array( __CLASS__, 'apply_query' ) );
+        add_filter( 'hidden_columns', array( __CLASS__, 'show_retention_columns' ), 10, 2 );
+        add_action( 'admin_footer', array( __CLASS__, 'print_export_script' ) );
+    }
+
+    /**
+     * On a list filtered or sorted by retention the columns that explain it are shown, whatever
+     * Screen Options says, so a shared link opens on the numbers it is about.
+     *
+     * @param string[]  $hidden
+     * @param WP_Screen $screen
+     * @return string[]
+     */
+    public static function show_retention_columns( $hidden, $screen ) {
+        if ( ! $screen instanceof WP_Screen || 'edit' !== $screen->base ) {
+            return $hidden;
+        }
+        $active = false;
+        foreach ( self::retention_params() as $param ) {
+            if ( isset( $_GET[ $param ] ) && '' !== $_GET[ $param ] ) {
+                $active = true;
+            }
+        }
+        $orderby = isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : '';
+        if ( isset( self::retention_sorts()[ $orderby ] ) ) {
+            $active = true;
+        }
+        return $active ? array_values( array_diff( (array) $hidden, self::retention_columns() ) ) : $hidden;
     }
 
     /**
@@ -147,12 +380,28 @@ class AceSeoPostColumns {
      * @return array
      */
     public static function sortable_columns( $columns ) {
+        $columns = self::retention_sortable_columns( $columns );
+
         if ( ! self::sorting_allowed( self::current_post_type() ) ) {
             return $columns;
         }
 
         $columns['ace_seo_index'] = 'ace_seo_index';
         $columns['ace_seo_desc']  = 'ace_seo_desc';
+
+        return $columns;
+    }
+
+    /**
+     * Retention sorts are offered whatever the size of the post type (see retention_sorts()).
+     *
+     * @param array $columns
+     * @return array
+     */
+    public static function retention_sortable_columns( $columns ) {
+        foreach ( array_keys( self::retention_sorts() ) as $key ) {
+            $columns[ $key ] = array( $key, 'ace_seo_ret_views' === $key );
+        }
 
         return $columns;
     }
@@ -217,6 +466,31 @@ class AceSeoPostColumns {
 
             case 'ace_seo_retention':
                 self::render_retention_cell( $post_id );
+                break;
+
+            case 'ace_seo_ret_views':
+                $views = get_post_meta( $post_id, '_ace_seo_ret_views', true );
+                echo '' === $views ? self::dash() : esc_html( number_format_i18n( (int) $views ) );
+                break;
+
+            case 'ace_seo_last_viewed':
+                $last = (string) get_post_meta( $post_id, '_ace_seo_last_viewed', true );
+                echo '' === $last ? self::dash() : esc_html( mysql2date( get_option( 'date_format' ), $last ) );
+                break;
+
+            case 'ace_seo_ret_links':
+                $links = get_post_meta( $post_id, '_ace_seo_ret_links', true );
+                if ( '' === $links ) {
+                    echo self::dash(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                } elseif ( 0 === (int) $links ) {
+                    printf(
+                        '<span style="color:#b32d2e" title="%s">0 %s</span>',
+                        esc_attr__( 'No post on the site links here.', 'ace-crawl-enhancer' ),
+                        esc_html__( '(orphaned)', 'ace-crawl-enhancer' )
+                    );
+                } else {
+                    echo esc_html( number_format_i18n( (int) $links ) );
+                }
                 break;
 
             case 'ace_seo_desc':
@@ -297,8 +571,21 @@ class AceSeoPostColumns {
      * @param int $post_id
      * @return void
      */
+    private static function dash() {
+        return '<span aria-hidden="true">-</span><span class="screen-reader-text">' . esc_html__( 'no data', 'ace-crawl-enhancer' ) . '</span>';
+    }
+
     private static function render_retention_cell( $post_id ) {
         $row = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $post_id, AceSeoRetentionReport::META, true ) : '';
+
+        if ( is_array( $row ) && ! empty( $row['tier'] ) ) {
+            $tiers = array(
+                'retained'  => __( 'Retained', 'ace-crawl-enhancer' ),
+                'candidate' => __( 'Deletion candidate', 'ace-crawl-enhancer' ),
+                'dormant'   => __( 'Dormant', 'ace-crawl-enhancer' ),
+            );
+            echo '<span style="display:block">' . esc_html( $tiers[ $row['tier'] ] ?? $row['tier'] ) . '</span>';
+        }
 
         if ( is_array( $row ) && ! empty( $row['bucket'] ) ) {
             $labels = array(
@@ -459,6 +746,58 @@ class AceSeoPostColumns {
         }
 
         echo '</select>';
+
+        self::render_retention_filters( $post_type );
+    }
+
+    /** Is the retention report about this post type? */
+    private static function is_report_type( $post_type ) {
+        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+            return false;
+        }
+        return in_array( $post_type, (array) AceSeoRetentionReport::settings()['post_types'], true );
+    }
+
+    /**
+     * Retention tier, published before, and view thresholds: combined with each other and with the
+     * list's own filters. Plus the export of whatever the list is showing.
+     *
+     * @param string $post_type
+     * @return void
+     */
+    private static function render_retention_filters( $post_type ) {
+        if ( ! self::is_report_type( $post_type ) ) {
+            return;
+        }
+        $get = function ( $key ) {
+            return isset( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+        };
+        $current = sanitize_key( $get( 'ace_ret' ) );
+
+        echo '<select name="ace_ret" aria-label="' . esc_attr__( 'Retention tier', 'ace-crawl-enhancer' ) . '"><option value="">'
+            . esc_html__( 'All retention tiers', 'ace-crawl-enhancer' ) . '</option>';
+        foreach ( AceSeoRetentionReport::tier_labels() + array( 'scored' => __( 'Any old post (scored)', 'ace-crawl-enhancer' ) ) as $value => $label ) {
+            printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $current, $value, false ), esc_html( $label ) );
+        }
+        echo '</select>';
+
+        printf(
+            '<label class="screen-reader-text" for="ace-before">%1$s</label><input type="date" id="ace-before" name="ace_before" value="%2$s" title="%1$s" style="float:left;margin-right:6px">',
+            esc_attr__( 'Published before', 'ace-crawl-enhancer' ),
+            esc_attr( $get( 'ace_before' ) )
+        );
+        printf(
+            '<input type="number" min="0" name="ace_views_min" value="%s" placeholder="%s" title="%s" style="float:left;width:7em;margin-right:6px">',
+            esc_attr( $get( 'ace_views_min' ) ),
+            esc_attr__( 'Views from', 'ace-crawl-enhancer' ),
+            esc_attr__( 'At least this many views in the report window', 'ace-crawl-enhancer' )
+        );
+        printf(
+            '<input type="number" min="0" name="ace_views_max" value="%s" placeholder="%s" title="%s" style="float:left;width:7em;margin-right:6px">',
+            esc_attr( $get( 'ace_views_max' ) ),
+            esc_attr__( 'Views to', 'ace-crawl-enhancer' ),
+            esc_attr__( 'At most this many views in the report window', 'ace-crawl-enhancer' )
+        );
     }
 
     /**
@@ -479,15 +818,99 @@ class AceSeoPostColumns {
         }
 
         self::apply_filter( $query );
+        self::apply_retention_filters( $query, $_GET );
         self::apply_sort( $query, $screen->post_type );
+        self::apply_retention_sort( $query );
+    }
+
+    /**
+     * AND a set of meta clauses onto whatever meta_query the query already has.
+     *
+     * @param WP_Query $query
+     * @param array    $clauses
+     * @return void
+     */
+    private static function add_meta_clauses( $query, array $clauses ) {
+        if ( ! $clauses ) {
+            return;
+        }
+        $existing = $query->get( 'meta_query' );
+        $merged   = array( 'relation' => 'AND' );
+        if ( ! empty( $existing ) ) {
+            $merged[] = $existing;
+        }
+        foreach ( $clauses as $key => $clause ) {
+            if ( is_string( $key ) ) {
+                $merged[ $key ] = $clause;
+            } else {
+                $merged[] = $clause;
+            }
+        }
+        $query->set( 'meta_query', $merged );
+    }
+
+    /**
+     * Retention tier, published before and view thresholds.
+     *
+     * @param WP_Query $query
+     * @param array    $params Request arguments (the list's $_GET, or an export's copy of it).
+     * @return void
+     */
+    public static function apply_retention_filters( $query, array $params ) {
+        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+            return;
+        }
+        $clauses = array();
+        $tier    = isset( $params['ace_ret'] ) ? sanitize_key( wp_unslash( $params['ace_ret'] ) ) : '';
+        if ( 'scored' === $tier ) {
+            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'compare' => 'EXISTS' );
+        } elseif ( in_array( $tier, AceSeoRetentionReport::TIERS, true ) ) {
+            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'value' => $tier );
+        }
+
+        foreach ( array( 'ace_views_min' => '>=', 'ace_views_max' => '<=' ) as $param => $compare ) {
+            if ( isset( $params[ $param ] ) && '' !== $params[ $param ] && is_numeric( $params[ $param ] ) ) {
+                $clauses[] = array(
+                    'key'     => AceSeoRetentionReport::META_VIEWS,
+                    'value'   => max( 0, (int) $params[ $param ] ),
+                    'compare' => $compare,
+                    'type'    => 'NUMERIC',
+                );
+            }
+        }
+        self::add_meta_clauses( $query, $clauses );
+
+        $before = isset( $params['ace_before'] ) ? sanitize_text_field( wp_unslash( $params['ace_before'] ) ) : '';
+        if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $before ) ) {
+            $date_query   = (array) $query->get( 'date_query' );
+            $date_query[] = array( 'before' => $before, 'inclusive' => false, 'column' => 'post_date' );
+            $query->set( 'date_query', $date_query );
+        }
     }
 
     /**
      * @param WP_Query $query
      * @return void
      */
-    private static function apply_filter( $query ) {
-        $filter = isset( $_GET['ace_seo_filter'] ) ? sanitize_key( wp_unslash( $_GET['ace_seo_filter'] ) ) : '';
+    private static function apply_retention_sort( $query ) {
+        $orderby = $query->get( 'orderby' );
+        $sorts   = self::retention_sorts();
+        if ( ! is_string( $orderby ) || ! isset( $sorts[ $orderby ] ) ) {
+            return;
+        }
+        list( $key, $type ) = $sorts[ $orderby ];
+        self::add_meta_clauses( $query, array( 'ace_sort' => array( 'key' => $key, 'compare' => 'EXISTS', 'type' => $type ) ) );
+        $order = 'ASC' === strtoupper( (string) $query->get( 'order' ) ) ? 'ASC' : 'DESC';
+        $query->set( 'orderby', array( 'ace_sort' => $order, 'date' => 'DESC' ) );
+    }
+
+    /**
+     * @param WP_Query $query
+     * @return void
+     */
+    private static function apply_filter( $query, $params = null ) {
+        $params = null === $params ? $_GET : $params;
+        $filter = isset( $params['ace_seo_filter'] ) ? sanitize_key( wp_unslash( $params['ace_seo_filter'] ) ) : '';
 
         if ( '' === $filter ) {
             return;

@@ -58,6 +58,7 @@ class AceSEOUninstaller {
             'ace_seo_optimization_progress',
             'ace_seo_performance_monitoring',
             'ace_sitemap_powertools_options',
+            'ace_seo_hits_db_version',
             'ace_sitemap_powertools_purge_notice',
             'ace_sitemap_powertools_large_site_notice',
             'ace_sitemap_powertools_legacy_cache_purged',
@@ -97,7 +98,8 @@ class AceSEOUninstaller {
         $tables_to_remove = array(
             $wpdb->prefix . 'ace_seo_analytics',
             $wpdb->prefix . 'ace_seo_redirects',
-            $wpdb->prefix . 'ace_seo_crawl_errors'
+            $wpdb->prefix . 'ace_seo_crawl_errors',
+            $wpdb->prefix . 'ace_seo_post_hits'
         );
         
         foreach ( $tables_to_remove as $table ) {

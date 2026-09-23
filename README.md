@@ -249,6 +249,15 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.41 (2026-09-23)
+
+- New: **retention tiers** alongside the report's buckets. Retained (old, still read), deletion candidate (old, unread, fewer words than the thin threshold) and dormant (old, unread, substantial). Views come from Google Analytics through Site Kit's connection (no key), else the plugin's own tracking, else search clicks stand in. The report also measures the last seven days' share of page views going to old posts (with Analytics).
+- New: **report settings** on the Retention screen: the age cutoff, window, retained views and thin word count are saved and used by the build form, `wp ace-crawl retention build` and an optional weekly rebuild (off by default). Nothing a visitor sees changes; the report only writes post meta.
+- New: **post list filters and columns**: a retention tier dropdown, published before a date, and views from/to, all combinable with each other and the list's own filters. Views, Last viewed and Links in (orphaned when 0) columns; those and Retention are sortable, on flat meta keys (`_ace_seo_ret_tier`, `_ace_seo_ret_views`, `_ace_seo_ret_links`, `_ace_seo_ret_words`, `_ace_seo_last_viewed`) so a sort joins only the scored posts. A list filtered or sorted by retention shows these columns without Screen Options, so the pre-filtered links on the Retention screen open on the numbers.
+- New: **Export CSV** on the post list: everything the list shows with its current filters, search and sort, fetched 500 rows per request and assembled in the browser, so a 30,000 post export does not time out. Filters `ace_seo_list_export_header`, `ace_seo_list_export_row`.
+- New: **own view tracking** (off by default): a beacon on posts older than the cutoff, one row per post per day in `{prefix}ace_seo_post_hits` (created only when switched on), a daily rollup for "last viewed". Filters `ace_seo_track_post`, `ace_seo_is_bot_user_agent`, `ace_seo_track_keep_days`.
+- Changed: a rebuild drops rows the previous build wrote for posts it no longer scores. Existing reports need one rebuild to fill the tiers and columns.
+
 ### 1.0.40 (2026-09-23)
 
 - New: **taxonomy sitemap settings** (Settings, Sitemaps, Taxonomy sitemaps). Every public taxonomy, categories and tags included, can be kept in or left out of the XML sitemaps, with an optional minimum number of published posts before a term is listed. A "Use recommended" preset ticks categories in, tags and plugin or theme taxonomies out; nothing changes on a site until its settings are saved. Leaving a taxonomy out only drops it from the sitemap index and its clean route; the archives stay public. Filters: `ace_sitemap_powertools_taxonomy_min_posts`, `ace_sitemap_powertools_recommended_excluded_taxonomies`.

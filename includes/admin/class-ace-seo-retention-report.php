@@ -35,8 +35,28 @@ class AceSeoRetentionReport {
 
     const BUCKETS = array( 'keep', 'refresh', 'consolidate', 'noindex', 'no-signal' );
 
+    /**
+     * Tiers: a plainer reading of the same evidence, for the post list and for people outside SEO.
+     *
+     *   retained   old, and still getting views (or search clicks, where no views source exists)
+     *   candidate  old, no views, and thin: the posts a clean-up would look at first
+     *   dormant    old and unvisited, but with enough content that it is not an obvious candidate
+     */
+    const TIERS = array( 'retained', 'candidate', 'dormant' );
+
+    /** Flat copies of the row, one meta key each, so the post list can filter and sort on them. */
+    const META_TIER  = '_ace_seo_ret_tier';
+    const META_VIEWS = '_ace_seo_ret_views';
+    const META_WORDS = '_ace_seo_ret_words';
+    const META_LINKS = '_ace_seo_ret_links';
+    const META_BUILT = '_ace_seo_ret_built';
+
+    const WEEKLY_HOOK = 'ace_seo_retention_weekly';
+
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_tick' ) );
+        add_action( self::WEEKLY_HOOK, array( __CLASS__, 'run_weekly' ) );
+        add_action( 'admin_init', array( __CLASS__, 'sync_weekly_schedule' ) );
         if ( is_admin() ) {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 20 );
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
@@ -45,6 +65,7 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
             add_action( 'admin_post_ace_seo_retention_options', array( __CLASS__, 'handle_options' ) );
             add_action( 'admin_post_ace_seo_retention_redirect', array( __CLASS__, 'handle_redirect' ) );
+            add_action( 'admin_post_ace_seo_retention_report_settings', array( __CLASS__, 'handle_report_settings' ) );
         }
     }
 
@@ -55,13 +76,17 @@ class AceSeoRetentionReport {
      * can shorten the cutoff, one with a long tail can raise the "demand" bar.
      */
     public static function settings( array $overrides = array() ) {
+        // The cutoffs saved on the Retention screen, so a scheduled rebuild and the build form agree.
+        $saved    = class_exists( 'AceSeoRetentionActions' ) ? AceSeoRetentionActions::options() : array();
         $defaults = array(
-            'older_than_years'  => 3,      // posts published before this many years ago are candidates
-            'days'              => 90,     // Search Console window
+            'older_than_years'  => (int) ( $saved['report_years'] ?? 3 ),  // posts published before this many years ago are candidates
+            'days'              => (int) ( $saved['report_days'] ?? 90 ),  // Search Console and Analytics window
             'post_types'        => array( 'post' ),
             'demand_impressions'=> 100,    // impressions in the window that count as "there is demand"
             'refresh_max_ctr'   => 0.02,   // below this CTR, with demand, the page needs a refresh
             'refresh_max_pos'   => 20,     // and it has to be within reach: page 1 or 2
+            'thin_words'        => (int) ( $saved['thin_words'] ?? 300 ),  // fewer words than this counts as thin
+            'retained_views'    => (int) ( $saved['retained_views'] ?? 1 ), // views in the window that count as retained
         );
         $settings = array_merge( $defaults, array_intersect_key( $overrides, $defaults ) );
         return apply_filters( 'ace_seo_retention_settings', $settings );
@@ -89,6 +114,7 @@ class AceSeoRetentionReport {
             'total'    => 0,
             'started'  => time(),
             'counts'   => array_fill_keys( self::BUCKETS, 0 ),
+            'tiers'    => array_fill_keys( self::TIERS, 0 ),
             'notes'    => array(),
         ), false );
         update_option( self::SIGNALS_OPTION, array( 'gsc' => array(), 'links' => array() ), false );
@@ -122,6 +148,9 @@ class AceSeoRetentionReport {
             case 'gsc':
                 self::phase_gsc( $p );
                 break;
+            case 'ga4':
+                self::phase_ga4( $p );
+                break;
             case 'links':
                 self::phase_links( $p );
                 break;
@@ -144,6 +173,11 @@ class AceSeoRetentionReport {
         $signals = get_option( self::SIGNALS_OPTION, array() );
         $gsc     = array();
 
+        // A WP-Cron tick is neither admin, REST nor CLI, so the Search Console class may not be loaded.
+        if ( ! class_exists( 'AceSEOSearchConsole' ) && class_exists( 'AceSEOSiteKit' ) && defined( 'ACE_SEO_PATH' ) ) {
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
+        }
+
         if ( class_exists( 'AceSEOSearchConsole' ) && AceSEOSearchConsole::is_ready() ) {
             $report = AceSEOSearchConsole::pages_report( (int) $p['settings']['days'] );
             if ( is_wp_error( $report ) ) {
@@ -162,10 +196,124 @@ class AceSeoRetentionReport {
         $signals['gsc'] = $gsc;
         update_option( self::SIGNALS_OPTION, $signals, false );
 
+        $p['phase'] = 'ga4';
+        self::save_progress( $p );
+    }
+
+    /**
+     * Phase 1b: page views per path from Google Analytics (Site Kit's connection), for the window,
+     * plus the last seven days' share of views going to old posts. Without Analytics the report
+     * falls back to the plugin's own view tracking, if that is on.
+     */
+    private static function phase_ga4( array $p ) {
+        $signals        = get_option( self::SIGNALS_OPTION, array() );
+        $signals['ga4'] = null;
+
+        $views = self::ga4_page_views( (int) $p['settings']['days'] );
+        if ( is_wp_error( $views ) ) {
+            $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
+        } else {
+            $signals['ga4'] = $views;
+
+            $week = self::ga4_page_views( 7 );
+            if ( ! is_wp_error( $week ) ) {
+                $lookup = self::candidate_lookup( $p['settings'] );
+                $old    = 0;
+                $total  = 0;
+                foreach ( $week as $path => $n ) {
+                    $total += $n;
+                    if ( isset( $lookup[ $path ] ) ) {
+                        $old += $n;
+                    }
+                }
+                $p['share'] = array(
+                    'days'   => 7,
+                    'old'    => $old,
+                    'total'  => $total,
+                    'source' => 'Google Analytics',
+                    'at'     => time(),
+                );
+            }
+        }
+        update_option( self::SIGNALS_OPTION, $signals, false );
+
         $p['phase']  = 'links';
         $p['offset'] = 0;
         $p['total']  = self::count_all_posts( $p['settings']['post_types'] );
         self::save_progress( $p );
+    }
+
+    /**
+     * Page views per path over the last $days days, from the GA4 property Site Kit is connected to.
+     * One request per 100,000 rows, cached for twelve hours.
+     *
+     * @return array|WP_Error path => views
+     */
+    public static function ga4_page_views( $days ) {
+        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+            return new WP_Error( 'ga4_no_sitekit', 'Site Kit is not active.' );
+        }
+        $property = AceSEOSiteKit::get_analytics_property_id();
+        if ( '' === $property ) {
+            return new WP_Error( 'ga4_no_property', 'Site Kit has no Analytics property connected.' );
+        }
+
+        $days      = max( 1, min( 480, (int) $days ) );
+        $cache_key = 'ace_seo_ga4_paths_' . md5( $property . '|' . $days );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        if ( is_wp_error( $token ) ) {
+            return $token;
+        }
+        if ( empty( $token ) ) {
+            return new WP_Error( 'ga4_no_token', 'No Site Kit token for Analytics.' );
+        }
+
+        $views  = array();
+        $offset = 0;
+        $limit  = 100000;
+        do {
+            $response = wp_remote_post(
+                'https://analyticsdata.googleapis.com/v1beta/properties/' . rawurlencode( $property ) . ':runReport',
+                array(
+                    'timeout' => 30,
+                    'headers' => array(
+                        'Authorization' => 'Bearer ' . $token,
+                        'Content-Type'  => 'application/json',
+                    ),
+                    'body'    => wp_json_encode( array(
+                        'dateRanges' => array( array( 'startDate' => $days . 'daysAgo', 'endDate' => 'yesterday' ) ),
+                        'dimensions' => array( array( 'name' => 'pagePath' ) ),
+                        'metrics'    => array( array( 'name' => 'screenPageViews' ) ),
+                        'limit'      => $limit,
+                        'offset'     => $offset,
+                    ) ),
+                )
+            );
+            if ( is_wp_error( $response ) ) {
+                return $response;
+            }
+            $code = (int) wp_remote_retrieve_response_code( $response );
+            $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+            if ( $code < 200 || $code >= 300 ) {
+                return new WP_Error( 'ga4_http', $body['error']['message'] ?? 'Analytics request failed with HTTP ' . $code . '.' );
+            }
+            $rows = isset( $body['rows'] ) && is_array( $body['rows'] ) ? $body['rows'] : array();
+            foreach ( $rows as $row ) {
+                $key = self::path_key( (string) ( $row['dimensionValues'][0]['value'] ?? '' ) );
+                if ( '' !== $key ) {
+                    $views[ $key ] = ( $views[ $key ] ?? 0 ) + (int) ( $row['metricValues'][0]['value'] ?? 0 );
+                }
+            }
+            $offset += $limit;
+        } while ( count( $rows ) === $limit && $offset < 500000 );
+
+        set_transient( $cache_key, $views, 12 * HOUR_IN_SECONDS );
+        return $views;
     }
 
     /**
@@ -229,10 +377,20 @@ class AceSeoRetentionReport {
         $links    = $signals['links'] ?? array();
 
         $ids = self::candidate_ids( $settings, self::BATCH, (int) $p['offset'] );
+        $ga4 = isset( $signals['ga4'] ) && is_array( $signals['ga4'] ) ? $signals['ga4'] : null;
+
+        // The plugin's own tracking, where Analytics is not connected: human views in the window.
+        $tracked = null;
+        if ( null === $ga4 && class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ) {
+            $tracked = AceSeoViewTracker::views_for( $ids, (int) $settings['days'] );
+        }
+
+        $words = self::word_counts( $ids );
 
         /**
          * Page views per post over the same window, from whatever analytics the site has:
-         * array( post_id => views ). Nothing is assumed; without a provider the signal is absent.
+         * array( post_id => views ). Takes precedence over Analytics (Site Kit) and the plugin's own
+         * tracking; without any of them the signal is absent.
          */
         $views = apply_filters( 'ace_seo_retention_pageviews', array(), $ids, $settings );
         /** External backlinks per post, array( post_id => count ), if the site has a source. */
@@ -242,23 +400,39 @@ class AceSeoRetentionReport {
             $key = self::path_key( get_permalink( $id ) );
             $g   = $gsc[ $key ] ?? array( 'clicks' => 0, 'impressions' => 0, 'position' => 0 );
 
+            if ( isset( $views[ $id ] ) ) {
+                $view_count = (int) $views[ $id ];
+            } elseif ( null !== $ga4 ) {
+                $view_count = (int) ( $ga4[ $key ] ?? 0 ); // Analytics lists every page with a view
+            } elseif ( null !== $tracked ) {
+                $view_count = (int) ( $tracked[ $id ] ?? 0 );
+            } else {
+                $view_count = null;
+            }
+
             $row = array(
                 'clicks'      => (int) $g['clicks'],
                 'impressions' => (int) $g['impressions'],
                 'position'    => (float) $g['position'],
                 'links_in'    => (int) ( $links[ $id ] ?? 0 ),
-                'views'       => isset( $views[ $id ] ) ? (int) $views[ $id ] : null,
+                'views'       => $view_count,
                 'backlinks'   => isset( $backlinks[ $id ] ) ? (int) $backlinks[ $id ] : null,
+                'words'       => (int) ( $words[ $id ] ?? 0 ),
             );
             list( $bucket, $reason ) = self::bucket( $row, $settings );
             $row['bucket'] = $bucket;
             $row['reason'] = $reason;
+            $row['tier']   = self::tier( $row, $settings );
             $row['built']  = time();
             $row['window'] = (int) $settings['days'];
 
             $row = apply_filters( 'ace_seo_retention_row', $row, $id, $settings );
             update_post_meta( $id, self::META, $row );
+            self::write_flat_meta( $id, $row, (int) $p['started'] );
             $p['counts'][ $row['bucket'] ] = ( $p['counts'][ $row['bucket'] ] ?? 0 ) + 1;
+            if ( isset( $row['tier'] ) && in_array( $row['tier'], self::TIERS, true ) ) {
+                $p['tiers'][ $row['tier'] ] = ( $p['tiers'][ $row['tier'] ] ?? 0 ) + 1;
+            }
         }
 
         $p['offset'] += self::BATCH;
@@ -266,8 +440,130 @@ class AceSeoRetentionReport {
             $p['phase']    = 'done';
             $p['finished'] = time();
             delete_option( self::SIGNALS_OPTION );
+            self::forget_stale( (int) $p['started'] );
         }
         self::save_progress( $p );
+    }
+
+    /**
+     * The tier: retained if it is still being read, a candidate if nobody reads it and there is
+     * little to it, dormant otherwise. Where no views source exists, search clicks stand in.
+     */
+    public static function tier( array $r, array $s ) {
+        $views  = isset( $r['views'] ) ? $r['views'] : null;
+        $clicks = (int) ( $r['clicks'] ?? 0 );
+
+        if ( ( null !== $views && (int) $views >= max( 1, (int) $s['retained_views'] ) ) || $clicks > 0 ) {
+            return 'retained';
+        }
+        $unread = null !== $views ? 0 === (int) $views : true;
+        if ( $unread && (int) ( $r['words'] ?? 0 ) < (int) $s['thin_words'] ) {
+            return 'candidate';
+        }
+        return 'dormant';
+    }
+
+    /** Word counts for a batch of posts in one query, markup and shortcodes stripped. */
+    private static function word_counts( array $ids ) {
+        global $wpdb;
+        if ( ! $ids ) {
+            return array();
+        }
+        $out  = array();
+        $rows = $wpdb->get_results( 'SELECT ID, post_content FROM ' . $wpdb->posts . ' WHERE ID IN (' . implode( ',', array_map( 'intval', $ids ) ) . ')' );
+        foreach ( $rows as $row ) {
+            $text = wp_strip_all_tags( strip_shortcodes( (string) $row->post_content ) );
+            $out[ (int) $row->ID ] = $text === '' ? 0 : count( preg_split( '/\s+/u', trim( $text ), -1, PREG_SPLIT_NO_EMPTY ) );
+        }
+        return $out;
+    }
+
+    /** One meta key per signal, so the post list can filter and sort without unpacking the row. */
+    public static function write_flat_meta( $id, array $row, $build ) {
+        update_post_meta( $id, self::META_TIER, (string) ( $row['tier'] ?? '' ) );
+        update_post_meta( $id, self::META_WORDS, (int) ( $row['words'] ?? 0 ) );
+        update_post_meta( $id, self::META_LINKS, (int) ( $row['links_in'] ?? 0 ) );
+        if ( isset( $row['views'] ) && null !== $row['views'] ) {
+            update_post_meta( $id, self::META_VIEWS, (int) $row['views'] );
+        } else {
+            delete_post_meta( $id, self::META_VIEWS );
+        }
+        update_post_meta( $id, self::META_BUILT, (int) $build );
+    }
+
+    /** Meta keys the report owns, for clearing. */
+    public static function meta_keys() {
+        return array( self::META, self::META_TIER, self::META_VIEWS, self::META_WORDS, self::META_LINKS, self::META_BUILT );
+    }
+
+    /**
+     * After a rebuild, drop what the previous build wrote for posts this one no longer scored (the
+     * cutoff moved, or the post was unpublished), so the list and its filters only show this build.
+     */
+    private static function forget_stale( $build ) {
+        global $wpdb;
+        if ( $build <= 0 ) {
+            return;
+        }
+        $stale = $wpdb->get_col( $wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND CAST(meta_value AS UNSIGNED) < %d",
+            self::META_BUILT,
+            $build
+        ) );
+        // Rows from before 1.0.41 carry no build stamp; they were scored by an older build too.
+        $unstamped = $wpdb->get_col( $wpdb->prepare(
+            "SELECT pm.post_id FROM {$wpdb->postmeta} pm LEFT JOIN {$wpdb->postmeta} b ON b.post_id = pm.post_id AND b.meta_key = %s WHERE pm.meta_key = %s AND b.meta_id IS NULL",
+            self::META_BUILT,
+            self::META
+        ) );
+        foreach ( array_unique( array_merge( $stale, $unstamped ) ) as $post_id ) {
+            foreach ( self::meta_keys() as $key ) {
+                delete_post_meta( (int) $post_id, $key );
+            }
+        }
+    }
+
+    /** Counts per tier, from the flat meta. */
+    public static function tier_counts() {
+        global $wpdb;
+        $counts = array_fill_keys( self::TIERS, 0 );
+        $rows   = $wpdb->get_results( $wpdb->prepare(
+            "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value",
+            self::META_TIER
+        ) );
+        foreach ( $rows as $row ) {
+            if ( isset( $counts[ $row->meta_value ] ) ) {
+                $counts[ $row->meta_value ] = (int) $row->n;
+            }
+        }
+        return $counts;
+    }
+
+    public static function tier_labels() {
+        return array(
+            'retained'  => __( 'Retained (old, still read)', 'ace-crawl-enhancer' ),
+            'candidate' => __( 'Deletion candidate (old, unread, thin)', 'ace-crawl-enhancer' ),
+            'dormant'   => __( 'Dormant (old, unread, substantial)', 'ace-crawl-enhancer' ),
+        );
+    }
+
+    /* ---- Schedule ------------------------------------------------------------------------------- */
+
+    /** A weekly rebuild with the saved cutoffs, when switched on. Off by default. */
+    public static function sync_weekly_schedule() {
+        $on   = class_exists( 'AceSeoRetentionActions' ) && ! empty( AceSeoRetentionActions::options()['auto_build'] );
+        $next = wp_next_scheduled( self::WEEKLY_HOOK );
+        if ( $on && ! $next ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'weekly', self::WEEKLY_HOOK );
+        } elseif ( ! $on && $next ) {
+            wp_clear_scheduled_hook( self::WEEKLY_HOOK );
+        }
+    }
+
+    public static function run_weekly() {
+        if ( ! self::is_building() ) {
+            self::start();
+        }
     }
 
     /**
@@ -445,14 +741,19 @@ class AceSeoRetentionReport {
 
     public static function clear() {
         global $wpdb;
-        $wpdb->delete( $wpdb->postmeta, array( 'meta_key' => self::META ) );
+        foreach ( self::meta_keys() as $key ) {
+            $wpdb->delete( $wpdb->postmeta, array( 'meta_key' => $key ) );
+        }
+        if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_group' ) ) {
+            wp_cache_flush_group( 'post_meta' );
+        }
         delete_option( self::PROGRESS_OPTION );
         delete_option( self::SIGNALS_OPTION );
         wp_clear_scheduled_hook( self::CRON_HOOK );
     }
 
     public static function csv( $bucket = '' ) {
-        $cols = array( 'id', 'bucket', 'title', 'url', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'backlinks', 'reason' );
+        $cols = array( 'id', 'tier', 'bucket', 'title', 'url', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'words', 'backlinks', 'reason' );
         $fh   = fopen( 'php://temp', 'w+' );
         fputcsv( $fh, $cols );
         foreach ( self::rows( $bucket, 0 ) as $row ) {
@@ -485,6 +786,36 @@ class AceSeoRetentionReport {
         self::start( $overrides );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
         exit;
+    }
+
+    public static function handle_report_settings() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_report_settings' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        AceSeoRetentionActions::save_report_settings( wp_unslash( $_POST ) );
+        self::sync_weekly_schedule();
+        if ( class_exists( 'AceSeoViewTracker' ) ) {
+            AceSeoViewTracker::maybe_install();
+        }
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Report settings saved.', 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
+        exit;
+    }
+
+    /**
+     * Pre-filtered post list links, to send to someone who wants the list rather than a spreadsheet.
+     * They need an account that can see the post list; the retention columns are shown on these links.
+     */
+    public static function shareable_links() {
+        $base = admin_url( 'edit.php' );
+        $o    = class_exists( 'AceSeoRetentionActions' ) ? AceSeoRetentionActions::options() : array();
+        $year = (int) gmdate( 'Y' ) - 2;
+        $links = array(
+            'retained'  => array( __( 'Retained: old posts still being read, most read first', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'retained', 'orderby' => 'ace_seo_ret_views', 'order' => 'desc' ), $base ) ),
+            'candidate' => array( __( 'Deletion candidates: old, unread and thin', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'candidate' ), $base ) ),
+            'before'    => array( sprintf( __( 'Everything published before %d', 'ace-crawl-enhancer' ), $year ), add_query_arg( array( 'post_type' => 'post', 'post_status' => 'publish', 'ace_before' => $year . '-01-01' ), $base ) ),
+        );
+        return apply_filters( 'ace_seo_retention_shareable_links', $links, $o );
     }
 
     public static function handle_clear() {
@@ -611,6 +942,48 @@ class AceSeoRetentionReport {
                     &nbsp; <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_retention_export' ) ); ?>">Export CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ?? $bucket ) . ')' : ''; ?></a>
                 <?php endif; ?>
             </form>
+
+            <?php
+            $share = $p['share'] ?? null;
+            if ( is_array( $share ) && ! empty( $share['total'] ) ) :
+                ?>
+                <p style="font-size:1.1em"><strong><?php echo esc_html( round( 100 * $share['old'] / $share['total'], 1 ) ); ?>%</strong> of page views in the last <?php echo esc_html( (int) $share['days'] ); ?> days went to posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years (<?php echo esc_html( number_format_i18n( (int) $share['old'] ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $share['total'] ) ); ?>, <?php echo esc_html( $share['source'] ); ?>, measured <?php echo esc_html( human_time_diff( (int) $share['at'] ) ); ?> ago).</p>
+            <?php endif; ?>
+
+            <?php $tier_counts = self::tier_counts(); if ( array_sum( $tier_counts ) > 0 ) : ?>
+                <h2>Tiers</h2>
+                <p>The same evidence read plainly, as filters on the post list (with before-date and view thresholds, sortable columns and a CSV export of whatever the list shows). These links open the list already filtered, with the retention columns showing:</p>
+                <ul style="list-style:disc;margin-left:2em">
+                    <?php foreach ( self::tier_labels() as $t => $label ) : ?>
+                        <li><?php echo esc_html( $label ); ?>: <strong><?php echo esc_html( number_format_i18n( $tier_counts[ $t ] ) ); ?></strong></li>
+                    <?php endforeach; ?>
+                </ul>
+                <ul style="list-style:disc;margin-left:2em">
+                    <?php foreach ( self::shareable_links() as $link ) : ?>
+                        <li><a href="<?php echo esc_url( $link[1] ); ?>"><?php echo esc_html( $link[0] ); ?></a><br><code style="font-size:11px;user-select:all"><?php echo esc_html( $link[1] ); ?></code></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+
+            <?php $o = AceSeoRetentionActions::options(); ?>
+            <details style="margin:1em 0" <?php echo $built ? '' : 'open'; ?>>
+                <summary style="cursor:pointer;font-weight:600">Report settings</summary>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <?php wp_nonce_field( 'ace_seo_retention_report_settings' ); ?>
+                    <input type="hidden" name="action" value="ace_seo_retention_report_settings">
+                    <table class="form-table" style="max-width:800px"><tbody>
+                        <tr><th scope="row">Old means</th><td>published more than <input type="number" name="report_years" min="1" max="20" value="<?php echo esc_attr( (int) $o['report_years'] ); ?>" style="width:4em"> years ago</td></tr>
+                        <tr><th scope="row">Window</th><td><input type="number" name="report_days" min="7" max="480" value="<?php echo esc_attr( (int) $o['report_days'] ); ?>" style="width:5em"> days of search and view data</td></tr>
+                        <tr><th scope="row">Retained</th><td>at least <input type="number" name="retained_views" min="1" value="<?php echo esc_attr( (int) $o['retained_views'] ); ?>" style="width:5em"> views in the window (or any search click)</td></tr>
+                        <tr><th scope="row">Thin</th><td>fewer than <input type="number" name="thin_words" min="0" value="<?php echo esc_attr( (int) $o['thin_words'] ); ?>" style="width:6em"> words</td></tr>
+                        <tr><th scope="row">Schedule</th><td><label><input type="checkbox" name="auto_build" value="1" <?php checked( ! empty( $o['auto_build'] ) ); ?>> Rebuild the report every week with these settings</label></td></tr>
+                        <tr><th scope="row">Own view tracking</th><td><label><input type="checkbox" name="track_views" value="1" <?php checked( ! empty( $o['track_views'] ) ); ?>> Count views of old posts with a small beacon on the page</label>
+                            <p class="description">For sites without Google Analytics in Site Kit, and for "last viewed". Only posts older than the cutoff are counted, one row per post per day in a table of its own. Nothing visible changes on the page.</p></td></tr>
+                    </tbody></table>
+                    <p class="description">Views come from Google Analytics through Site Kit when it is connected (no key needed), otherwise from the plugin's own tracking. Nothing here changes what visitors see: the report only writes post meta.</p>
+                    <p><button class="button">Save report settings</button></p>
+                </form>
+            </details>
 
             <?php if ( $built ) : ?>
                 <ul class="subsubsub" style="margin-bottom:1em">
@@ -846,7 +1219,7 @@ class AceSeoRetentionReport {
         }
         $limit = isset( $assoc['limit'] ) ? (int) $assoc['limit'] : 50;
         $rows  = self::rows( $bucket, $limit );
-        WP_CLI\Utils\format_items( $format, $rows, array( 'id', 'bucket', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'title', 'reason' ) );
+        WP_CLI\Utils\format_items( $format, $rows, array( 'id', 'tier', 'bucket', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'words', 'title', 'reason' ) );
     }
 
     /**

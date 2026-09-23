@@ -69,6 +69,14 @@ class AceSeoRetentionActions {
             // an evergreen guide has no lifetime at all.
             'lifetimes'      => array(),
             'lifetime_rules' => array(),
+            // The report's own settings (Ace SEO, Retention, Report settings). Only post meta and a
+            // stats table depend on them; nothing a visitor sees.
+            'report_years'   => 3,
+            'report_days'    => 90,
+            'retained_views' => 1,
+            'thin_words'     => 300,
+            'auto_build'     => 0,
+            'track_views'    => 0,
         );
         $saved = get_option( self::OPTION, array() );
         return apply_filters( 'ace_seo_retention_options', array_merge( $defaults, is_array( $saved ) ? array_intersect_key( $saved, $defaults ) : array() ) );
@@ -103,6 +111,22 @@ class AceSeoRetentionActions {
                 }
             }
         }
+        update_option( self::OPTION, $clean, false );
+        return self::options();
+    }
+
+    /** The Report settings form: cutoffs, thresholds, the weekly rebuild and own tracking. */
+    public static function save_report_settings( array $input ) {
+        $current = get_option( self::OPTION, array() );
+        $current = is_array( $current ) ? $current : array();
+        $clean   = array_merge( $current, array(
+            'report_years'   => max( 1, min( 20, (int) ( $input['report_years'] ?? 3 ) ) ),
+            'report_days'    => max( 7, min( 480, (int) ( $input['report_days'] ?? 90 ) ) ),
+            'retained_views' => max( 1, (int) ( $input['retained_views'] ?? 1 ) ),
+            'thin_words'     => max( 0, (int) ( $input['thin_words'] ?? 300 ) ),
+            'auto_build'     => ! empty( $input['auto_build'] ) ? 1 : 0,
+            'track_views'    => ! empty( $input['track_views'] ) ? 1 : 0,
+        ) );
         update_option( self::OPTION, $clean, false );
         return self::options();
     }
