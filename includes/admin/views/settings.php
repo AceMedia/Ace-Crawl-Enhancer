@@ -608,7 +608,9 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             <legend><span class="dashicons dashicons-search" aria-hidden="true"></span>Detected Plugin Sitemaps</legend>
                             <?php
                             $detected_provider_choices = function_exists('ace_sitemap_powertools_detected_custom_providers') ? ace_sitemap_powertools_detected_custom_providers() : [];
-                            $detected_taxonomy_choices = function_exists('ace_sitemap_powertools_detected_custom_taxonomies') ? ace_sitemap_powertools_detected_custom_taxonomies() : [];
+                            $detected_taxonomy_choices = function_exists('ace_sitemap_powertools_detected_sitemap_taxonomies') ? ace_sitemap_powertools_detected_sitemap_taxonomies() : [];
+                            $recommended_excluded_taxonomies = function_exists('ace_sitemap_powertools_recommended_excluded_taxonomies') ? ace_sitemap_powertools_recommended_excluded_taxonomies() : [];
+                            $taxonomy_min_posts = isset($sitemap_options['sitemap_taxonomy_min_posts']) && is_array($sitemap_options['sitemap_taxonomy_min_posts']) ? $sitemap_options['sitemap_taxonomy_min_posts'] : [];
                             $detected_post_type_choices = function_exists('ace_sitemap_powertools_detected_custom_post_types') ? ace_sitemap_powertools_detected_custom_post_types() : [];
                             $excluded_providers = isset($sitemap_options['excluded_sitemap_providers']) && is_array($sitemap_options['excluded_sitemap_providers']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_providers']) : [];
                             $excluded_taxonomies = isset($sitemap_options['excluded_sitemap_taxonomies']) && is_array($sitemap_options['excluded_sitemap_taxonomies']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_taxonomies']) : [];
@@ -635,21 +637,33 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             </div>
 
                             <div class="setting-row">
-                                <div class="setting-label"><label>Custom taxonomy sitemaps</label></div>
-                                <div class="setting-field">
+                                <div class="setting-label"><label>Taxonomy sitemaps</label></div>
+                                <div class="setting-field" id="ace-sitemap-taxonomies">
                                     <?php if (empty($detected_taxonomy_choices)) : ?>
-                                        <p class="description">No custom public taxonomies detected.</p>
+                                        <p class="description">No public taxonomies detected.</p>
                                     <?php else : ?>
-                                        <?php foreach ($detected_taxonomy_choices as $value => $choice) : ?>
-                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" />
-                                            <label style="display:block;margin-bottom:8px;">
-                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_taxonomies, true)); ?> />
-                                                <?php echo esc_html($choice['label']); ?>
-                                                <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
-                                            </label>
-                                        <?php endforeach; ?>
+                                        <table class="widefat striped" style="max-width:640px">
+                                            <thead><tr><th>In the sitemap</th><th>Minimum posts per term</th></tr></thead>
+                                            <tbody>
+                                            <?php foreach ($detected_taxonomy_choices as $value => $choice) : ?>
+                                                <tr>
+                                                    <td>
+                                                        <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" />
+                                                        <label>
+                                                            <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" data-recommended="<?php echo in_array($value, $recommended_excluded_taxonomies, true) ? '0' : '1'; ?>" <?php checked(!in_array(sanitize_key($value), $excluded_taxonomies, true)); ?> />
+                                                            <?php echo esc_html($choice['label']); ?>
+                                                        </label>
+                                                        <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
+                                                    </td>
+                                                    <td><input type="number" min="0" step="1" class="small-text" name="ace_sitemap_powertools_options[sitemap_taxonomy_min_posts][<?php echo esc_attr($value); ?>]" value="<?php echo esc_attr((int) ($taxonomy_min_posts[$value] ?? 0) ?: ''); ?>" placeholder="1" aria-label="<?php echo esc_attr(sprintf('Minimum posts per term for %s', $choice['label'])); ?>" /></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        <p><button type="button" class="button" onclick="document.querySelectorAll('#ace-sitemap-taxonomies input[data-recommended]').forEach(function(c){c.checked=c.getAttribute('data-recommended')==='1';});">Use recommended</button>
+                                        <span class="description">Categories in, tags out, taxonomies added by plugins or themes out. Save to apply.</span></p>
                                     <?php endif; ?>
-                                    <p class="description">Unchecked taxonomy sitemaps are excluded from both the sitemap index and clean routes.</p>
+                                    <p class="description">Unchecked taxonomies are left out of the sitemap index and their clean routes. The archives themselves are untouched: they stay public and indexable. A minimum post count keeps a term out of the sitemap until it has that many published posts (blank means any term with a post, as WordPress does).</p>
                                 </div>
                             </div>
 

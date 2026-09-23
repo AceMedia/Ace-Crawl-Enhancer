@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.40 (2026-09-23)
+
+- New: **taxonomy sitemap settings** (Settings, Sitemaps, Taxonomy sitemaps). Every public taxonomy, categories and tags included, can be kept in or left out of the XML sitemaps, with an optional minimum number of published posts before a term is listed. A "Use recommended" preset ticks categories in, tags and plugin or theme taxonomies out; nothing changes on a site until its settings are saved. Leaving a taxonomy out only drops it from the sitemap index and its clean route; the archives stay public. Filters: `ace_sitemap_powertools_taxonomy_min_posts`, `ace_sitemap_powertools_recommended_excluded_taxonomies`.
+
 ### 1.0.39 (2026-09-23)
 
 - Fixed: PHP 8.4+ deprecation notice on every sitemap request (`ace_sitemap_gen_required_seq()` now declares its optional `$seqs` as `?array`).

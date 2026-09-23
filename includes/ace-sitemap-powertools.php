@@ -31,6 +31,7 @@ function ace_sitemap_powertools_default_options() {
         'excluded_sitemap_providers'   => array(),
         'excluded_sitemap_post_types'  => array(),
         'excluded_sitemap_taxonomies'  => array( 'ace_event' ),
+        'sitemap_taxonomy_min_posts'   => array(),
         'enable_root_tag_archive_fallback' => 1,
         'enable_root_tag_links'           => 1,
         'enable_tag_base_redirect'        => 0,
@@ -114,6 +115,133 @@ function ace_sitemap_powertools_excluded_sitemap_taxonomies() {
         array_values( array_unique( array_merge( array( 'post_format' ), array_map( 'sanitize_key', $saved ) ) ) )
     );
 }
+
+/**
+ * Every taxonomy that can have a sitemap on this site: public, viewable, and not
+ * post_format (which is always left out). Core taxonomies are included, so a site
+ * can drop tags as easily as a plugin's taxonomy.
+ *
+ * @return array taxonomy => array( label, description, builtin )
+ */
+function ace_sitemap_powertools_detected_sitemap_taxonomies() {
+    $taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
+    if ( ! is_array( $taxonomies ) ) {
+        return array();
+    }
+
+    $items = array();
+    foreach ( $taxonomies as $name => $object ) {
+        if ( 'post_format' === $name || ! is_taxonomy_viewable( $object ) ) {
+            continue;
+        }
+
+        $slug = $name;
+        if ( isset( $object->rewrite['slug'] ) && is_string( $object->rewrite['slug'] ) ) {
+            $slug = trim( $object->rewrite['slug'], '/' );
+        }
+
+        $items[ $name ] = array(
+            'label'       => isset( $object->labels->name ) ? $object->labels->name : $name,
+            'description' => 'Taxonomy slug: ' . $slug . ( $object->_builtin ? '' : ', added by a plugin or theme' ),
+            'builtin'     => (bool) $object->_builtin,
+        );
+    }
+
+    // Core taxonomies first, then the rest alphabetically.
+    uksort( $items, function ( $a, $b ) use ( $items ) {
+        if ( $items[ $a ]['builtin'] !== $items[ $b ]['builtin'] ) {
+            return $items[ $a ]['builtin'] ? -1 : 1;
+        }
+        return strcmp( $a, $b );
+    } );
+
+    return $items;
+}
+
+/**
+ * The taxonomies a news or content site usually wants out of its sitemaps: tags
+ * (thin, numerous, overlapping) and anything a plugin or theme registered.
+ * Categories stay in. Offered as a one-click preset in the settings; it is not
+ * applied to a site on its own, so an existing site's sitemaps never change
+ * until someone chooses to.
+ *
+ * @return string[]
+ */
+function ace_sitemap_powertools_recommended_excluded_taxonomies() {
+    $excluded = array( 'post_tag' );
+    foreach ( ace_sitemap_powertools_detected_sitemap_taxonomies() as $name => $item ) {
+        if ( empty( $item['builtin'] ) ) {
+            $excluded[] = $name;
+        }
+    }
+
+    return (array) apply_filters( 'ace_sitemap_powertools_recommended_excluded_taxonomies', array_values( array_unique( $excluded ) ) );
+}
+
+/**
+ * The fewest published posts a term needs before it is listed in its taxonomy's
+ * sitemap. 0 keeps core's behaviour (any term with at least one post).
+ *
+ * @param string $taxonomy Taxonomy name.
+ * @return int
+ */
+function ace_sitemap_powertools_taxonomy_min_posts( $taxonomy ) {
+    $saved = ace_sitemap_powertools_get_option( 'sitemap_taxonomy_min_posts' );
+    $min   = is_array( $saved ) && isset( $saved[ $taxonomy ] ) ? (int) $saved[ $taxonomy ] : 0;
+
+    return max( 0, (int) apply_filters( 'ace_sitemap_powertools_taxonomy_min_posts', $min, $taxonomy ) );
+}
+
+/**
+ * Carry the minimum post count into the term query core runs for a taxonomy
+ * sitemap (and for its page count, which uses the same arguments).
+ *
+ * @param array  $args     WP_Term_Query arguments.
+ * @param string $taxonomy Taxonomy name.
+ * @return array
+ */
+function ace_sitemap_powertools_taxonomy_query_args( $args, $taxonomy ) {
+    $min = ace_sitemap_powertools_taxonomy_min_posts( $taxonomy );
+    if ( $min > 1 ) {
+        $args['ace_sitemap_min_posts'] = $min;
+    }
+
+    return $args;
+}
+add_filter( 'wp_sitemaps_taxonomies_query_args', 'ace_sitemap_powertools_taxonomy_query_args', 10, 2 );
+
+/**
+ * WP_Term_Query has no minimum count argument, so apply it as a WHERE on the
+ * term_taxonomy count column, only for queries that carry our marker.
+ *
+ * @param array $pieces     Query clauses.
+ * @param array $taxonomies Taxonomies.
+ * @param array $args       Query arguments.
+ * @return array
+ */
+function ace_sitemap_powertools_taxonomy_min_posts_clause( $pieces, $taxonomies, $args ) {
+    if ( ! empty( $args['ace_sitemap_min_posts'] ) ) {
+        $pieces['where'] .= ' AND tt.count >= ' . absint( $args['ace_sitemap_min_posts'] );
+    }
+
+    return $pieces;
+}
+add_filter( 'terms_clauses', 'ace_sitemap_powertools_taxonomy_min_posts_clause', 10, 3 );
+
+/**
+ * With a minimum in place a term enters or leaves the sitemap when its post
+ * count crosses it, which is a count update rather than a term edit. Mark the
+ * taxonomy's stored sitemap stale when that happens.
+ *
+ * @param int    $tt_id    Term taxonomy ID.
+ * @param string $taxonomy Taxonomy name.
+ */
+function ace_sitemap_powertools_taxonomy_count_changed( $tt_id, $taxonomy ) {
+    if ( is_string( $taxonomy ) && function_exists( 'ace_sitemap_gen_mark_dirty' ) && ace_sitemap_powertools_taxonomy_min_posts( $taxonomy ) > 1 ) {
+        ace_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
+    }
+}
+add_action( 'edited_term_taxonomy', 'ace_sitemap_powertools_taxonomy_count_changed', 10, 2 );
 
 function ace_sitemap_powertools_excluded_sitemap_providers() {
     $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_providers' );
@@ -724,6 +852,17 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
         $output[ $key ] = array_values( array_unique( array_map( 'sanitize_key', $values ) ) );
     }
 
+    $output['sitemap_taxonomy_min_posts'] = array();
+    if ( isset( $input['sitemap_taxonomy_min_posts'] ) && is_array( $input['sitemap_taxonomy_min_posts'] ) ) {
+        foreach ( $input['sitemap_taxonomy_min_posts'] as $taxonomy => $min ) {
+            $taxonomy = sanitize_key( $taxonomy );
+            $min      = absint( $min );
+            if ( '' !== $taxonomy && $min > 1 ) {
+                $output['sitemap_taxonomy_min_posts'][ $taxonomy ] = min( $min, 100000 );
+            }
+        }
+    }
+
     $detected_toggle_map = array(
         'excluded_sitemap_providers'  => 'providers',
         'excluded_sitemap_post_types' => 'post_types',
@@ -1104,11 +1243,12 @@ function ace_sitemap_powertools_custom_routes() {
         $routes['authors'] = array( 'provider' => 'authors', 'subtype' => '' );
     }
 
-    if ( ace_sitemap_powertools_is_enabled( 'enable_categories_route' ) ) {
+    // An excluded taxonomy gets no clean route either: it would only answer an empty sitemap.
+    if ( ace_sitemap_powertools_is_enabled( 'enable_categories_route' ) && ! in_array( 'category', $excluded_taxonomies, true ) ) {
         $routes['categories'] = array( 'provider' => 'taxonomies', 'subtype' => 'category' );
     }
 
-    if ( ace_sitemap_powertools_is_enabled( 'enable_tags_route' ) ) {
+    if ( ace_sitemap_powertools_is_enabled( 'enable_tags_route' ) && ! in_array( 'post_tag', $excluded_taxonomies, true ) ) {
         $routes['tags'] = array( 'provider' => 'taxonomies', 'subtype' => 'post_tag' );
     }
 
