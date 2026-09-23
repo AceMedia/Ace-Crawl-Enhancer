@@ -75,7 +75,7 @@ drift from each other, and that drift is the bug.
 - `includes/admin/` — settings/metabox/dashboard views (PHP + vanilla JS in `assets/js/`),
   `class-ace-seo-api-helper.php` (OpenAI + PageSpeed), `class-ace-seo-ai-assistant.php` (AJAX AI endpoints),
   Site Kit readers (`class-ace-seo-sitekit.php`, `class-ace-seo-google-data.php`).
-- DB tables: `{prefix}ace_seo_analytics`, plus `{prefix}ace_seo_post_hits` (own view tracking, created only when
+- DB tables: `{prefix}ace_seo_analytics`, plus `{prefix}ace_seo_post_hits` and `{prefix}ace_seo_post_referrers` (own view tracking, created only when
   switched on in Retention report settings; `includes/class-ace-seo-view-tracker.php`). Crons: `ace_seo_optimize_database` (once),
   `ace_seo_daily_performance_check`.
 

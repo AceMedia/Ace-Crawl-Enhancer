@@ -249,6 +249,12 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.43 (2026-09-23)
+
+- New: **people against bots, and referrers**, from the plugin's own tracking (Retention, Report settings, off by default). People are counted by the beacon, bots when WordPress renders the post (a cached copy is not seen, so bot counts are a lower bound; a bot that runs the beacon is not counted twice). Referrers are filed as search, social, other sites, this site or direct, per host, in `{prefix}ace_seo_post_referrers`. Filters `ace_seo_referrer_source`.
+- New: **People (30 days)** and **Bots** columns on the post list, sortable, from a daily rollup (`_ace_seo_humans`, `_ace_seo_bot_pct`), and in the CSV export.
+- New: **Readers panel** in the block editor's document sidebar for posts the retention report scored, loaded on request: people and bots per day as a small line chart, referrers by source and host, the posts on the site that link here, and Google Analytics sources and mediums through Site Kit where connected. REST: `GET ace-seo/v1/retention/audience?post=ID` (anyone who can edit the post).
+
 ### 1.0.42 (2026-09-23)
 
 - New: **retained posts on the front end** (Ace SEO, Retention; every part off by default). An older content notice on posts in the retained tier (own text, same markup as the dated-content notice). A lighter page: blocks with the listed class names or template part slugs (`sidebar` by default) are skipped before they render, classic widget areas are emptied, and Ace Redis Cache keeps the page longer (`ace_rc_page_ttl`). A keep reading card at the end links to the latest post in the same category, and scrolling on past it goes there with a full page load, so the reader is back in the normal layout. Logged-in users, pages, and cart, checkout and account pages are never affected.

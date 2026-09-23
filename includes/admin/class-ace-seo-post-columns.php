@@ -40,12 +40,14 @@ class AceSeoPostColumns {
             'ace_seo_ret_views'   => __( 'Views', 'ace-crawl-enhancer' ),
             'ace_seo_last_viewed' => __( 'Last viewed', 'ace-crawl-enhancer' ),
             'ace_seo_ret_links'   => __( 'Links in', 'ace-crawl-enhancer' ),
+            'ace_seo_people'      => __( 'People (30 days)', 'ace-crawl-enhancer' ),
+            'ace_seo_bot_pct'     => __( 'Bots', 'ace-crawl-enhancer' ),
         );
     }
 
     /** Retention columns, shown without Screen Options on a list filtered or sorted by retention. */
     private static function retention_columns() {
-        return array( 'ace_seo_retention', 'ace_seo_ret_views', 'ace_seo_last_viewed', 'ace_seo_ret_links' );
+        return array( 'ace_seo_retention', 'ace_seo_ret_views', 'ace_seo_last_viewed', 'ace_seo_ret_links', 'ace_seo_people', 'ace_seo_bot_pct' );
     }
 
     /**
@@ -59,6 +61,8 @@ class AceSeoPostColumns {
             'ace_seo_last_viewed' => array( '_ace_seo_last_viewed', 'CHAR' ),
             'ace_seo_ret_links'   => array( '_ace_seo_ret_links', 'NUMERIC' ),
             'ace_seo_retention'   => array( '_ace_seo_ret_tier', 'CHAR' ),
+            'ace_seo_people'      => array( '_ace_seo_humans', 'NUMERIC' ),
+            'ace_seo_bot_pct'     => array( '_ace_seo_bot_pct', 'NUMERIC' ),
         );
     }
 
@@ -140,7 +144,7 @@ class AceSeoPostColumns {
             _prime_post_caches( $ids, false, true );
         }
 
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'Indexable' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'Indexable' );
         $rows   = array();
         foreach ( $ids as $id ) {
             $post = get_post( $id );
@@ -161,6 +165,8 @@ class AceSeoPostColumns {
                 get_post_meta( $id, '_ace_seo_ret_words', true ),
                 $row['clicks'] ?? '',
                 $row['impressions'] ?? '',
+                get_post_meta( $id, '_ace_seo_humans', true ),
+                get_post_meta( $id, '_ace_seo_bot_pct', true ),
                 self::post_is_noindex( $id ) ? 'no' : 'yes',
             );
 
@@ -400,7 +406,7 @@ class AceSeoPostColumns {
      */
     public static function retention_sortable_columns( $columns ) {
         foreach ( array_keys( self::retention_sorts() ) as $key ) {
-            $columns[ $key ] = array( $key, 'ace_seo_ret_views' === $key );
+            $columns[ $key ] = array( $key, in_array( $key, array( 'ace_seo_ret_views', 'ace_seo_people', 'ace_seo_bot_pct' ), true ) );
         }
 
         return $columns;
@@ -471,6 +477,16 @@ class AceSeoPostColumns {
             case 'ace_seo_ret_views':
                 $views = get_post_meta( $post_id, '_ace_seo_ret_views', true );
                 echo '' === $views ? self::dash() : esc_html( number_format_i18n( (int) $views ) );
+                break;
+
+            case 'ace_seo_people':
+                $people = get_post_meta( $post_id, '_ace_seo_humans', true );
+                echo '' === $people ? self::dash() : esc_html( number_format_i18n( (int) $people ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                break;
+
+            case 'ace_seo_bot_pct':
+                $pct = get_post_meta( $post_id, '_ace_seo_bot_pct', true );
+                echo '' === $pct ? self::dash() : esc_html( (int) $pct . '%' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                 break;
 
             case 'ace_seo_last_viewed':

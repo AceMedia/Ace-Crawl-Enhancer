@@ -99,7 +99,8 @@ class AceSEOUninstaller {
             $wpdb->prefix . 'ace_seo_analytics',
             $wpdb->prefix . 'ace_seo_redirects',
             $wpdb->prefix . 'ace_seo_crawl_errors',
-            $wpdb->prefix . 'ace_seo_post_hits'
+            $wpdb->prefix . 'ace_seo_post_hits',
+            $wpdb->prefix . 'ace_seo_post_referrers'
         );
         
         foreach ( $tables_to_remove as $table ) {
