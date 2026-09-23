@@ -249,6 +249,11 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.42 (2026-09-23)
+
+- New: **retained posts on the front end** (Ace SEO, Retention; every part off by default). An older content notice on posts in the retained tier (own text, same markup as the dated-content notice). A lighter page: blocks with the listed class names or template part slugs (`sidebar` by default) are skipped before they render, classic widget areas are emptied, and Ace Redis Cache keeps the page longer (`ace_rc_page_ttl`). A keep reading card at the end links to the latest post in the same category, and scrolling on past it goes there with a full page load, so the reader is back in the normal layout. Logged-in users, pages, and cart, checkout and account pages are never affected.
+- New: `GET /wp-json/ace-seo/v1/retention/next?post=ID` (while the lighter page is on) for a theme's own load more. Filters `ace_seo_retention_light_applies`, `ace_seo_retention_next_post_id`, `ace_seo_retention_continue_html`, `ace_seo_retention_is_retained`; action `ace_seo_retention_light_request`.
+
 ### 1.0.41 (2026-09-23)
 
 - New: **retention tiers** alongside the report's buckets. Retained (old, still read), deletion candidate (old, unread, fewer words than the thin threshold) and dormant (old, unread, substantial). Views come from Google Analytics through Site Kit's connection (no key), else the plugin's own tracking, else search clicks stand in. The report also measures the last seven days' share of page views going to old posts (with Analytics).

@@ -77,6 +77,13 @@ class AceSeoRetentionActions {
             'thin_words'     => 300,
             'auto_build'     => 0,
             'track_views'    => 0,
+            // Retained posts on the front end (AceSeoRetentionFront). All off until switched on.
+            'retained_notice'      => 0,
+            'retained_notice_text' => 'This is an older article, published {date}, and it has not been updated in a while.',
+            'light_enabled'        => 0,
+            'light_drop'           => 'sidebar',
+            'light_cache_hours'    => 24,
+            'light_continue'       => 'card',
         );
         $saved = get_option( self::OPTION, array() );
         return apply_filters( 'ace_seo_retention_options', array_merge( $defaults, is_array( $saved ) ? array_intersect_key( $saved, $defaults ) : array() ) );
@@ -129,6 +136,32 @@ class AceSeoRetentionActions {
         ) );
         update_option( self::OPTION, $clean, false );
         return self::options();
+    }
+
+    /** The front-end form for retained posts: notice, lighter render, continue reading. */
+    public static function save_front_settings( array $input ) {
+        $current = get_option( self::OPTION, array() );
+        $current = is_array( $current ) ? $current : array();
+        $drop    = implode( ', ', array_filter( array_map( 'sanitize_html_class', preg_split( '/[\s,]+/', (string) ( $input['light_drop'] ?? '' ) ) ) ) );
+        $clean   = array_merge( $current, array(
+            'retained_notice'      => ! empty( $input['retained_notice'] ) ? 1 : 0,
+            'retained_notice_text' => sanitize_text_field( (string) ( $input['retained_notice_text'] ?? '' ) ),
+            'light_enabled'        => ! empty( $input['light_enabled'] ) ? 1 : 0,
+            'light_drop'           => $drop,
+            'light_cache_hours'    => max( 0, min( 720, (int) ( $input['light_cache_hours'] ?? 24 ) ) ),
+            'light_continue'       => in_array( $input['light_continue'] ?? '', array( 'card', 'none' ), true ) ? $input['light_continue'] : 'card',
+        ) );
+        if ( '' === $clean['retained_notice_text'] ) {
+            unset( $clean['retained_notice_text'] );
+        }
+        update_option( self::OPTION, $clean, false );
+        return self::options();
+    }
+
+    /** Is this post in the retained tier of the last report? */
+    public static function is_retained( $post_id ) {
+        $retained = 'retained' === (string) get_post_meta( (int) $post_id, '_ace_seo_ret_tier', true );
+        return (bool) apply_filters( 'ace_seo_retention_is_retained', $retained, (int) $post_id );
     }
 
     /* ---- Applying actions ------------------------------------------------------------------------ */
@@ -451,12 +484,15 @@ class AceSeoRetentionActions {
         if ( 'show' === $forced ) {
             return true;
         }
-        $o = self::options();
-        if ( empty( $o['notice_enabled'] ) ) {
-            return false;
-        }
+        $o     = self::options();
         $types = apply_filters( 'ace_seo_retention_notice_post_types', array( 'post' ) );
         if ( ! in_array( $post->post_type, (array) $types, true ) ) {
+            return false;
+        }
+        if ( ! empty( $o['retained_notice'] ) && self::is_retained( $post->ID ) ) {
+            return true;
+        }
+        if ( empty( $o['notice_enabled'] ) ) {
             return false;
         }
         return get_post_time( 'U', true, $post ) < strtotime( '-' . (int) $o['notice_years'] . ' years' );
@@ -466,7 +502,8 @@ class AceSeoRetentionActions {
         $post  = get_post( $post );
         $o     = self::options();
         $years = max( 1, (int) floor( ( time() - get_post_time( 'U', true, $post ) ) / YEAR_IN_SECONDS ) );
-        $text  = strtr( $o['notice_text'], array(
+        $tpl   = ! empty( $o['retained_notice'] ) && self::is_retained( $post->ID ) ? $o['retained_notice_text'] : $o['notice_text'];
+        $text  = strtr( $tpl, array(
             '{years}' => number_format_i18n( $years ),
             '{date}'  => get_the_date( '', $post ),
         ) );

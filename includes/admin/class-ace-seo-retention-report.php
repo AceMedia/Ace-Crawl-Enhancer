@@ -66,6 +66,7 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_options', array( __CLASS__, 'handle_options' ) );
             add_action( 'admin_post_ace_seo_retention_redirect', array( __CLASS__, 'handle_redirect' ) );
             add_action( 'admin_post_ace_seo_retention_report_settings', array( __CLASS__, 'handle_report_settings' ) );
+            add_action( 'admin_post_ace_seo_retention_front', array( __CLASS__, 'handle_front_settings' ) );
         }
     }
 
@@ -802,6 +803,16 @@ class AceSeoRetentionReport {
         exit;
     }
 
+    public static function handle_front_settings() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_front' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        AceSeoRetentionActions::save_front_settings( wp_unslash( $_POST ) );
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Front-end settings for retained posts saved. Cached pages pick them up as they expire or are purged.', 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention#front' ) );
+        exit;
+    }
+
     /**
      * Pre-filtered post list links, to send to someone who wants the list rather than a spreadsheet.
      * They need an account that can see the post list; the retention columns are shown on these links.
@@ -1068,6 +1079,34 @@ class AceSeoRetentionReport {
                 <p><label><input type="checkbox" name="notice_enabled" value="1" <?php checked( ! empty( $o['notice_enabled'] ) ); ?>> Show the notice on posts older than</label>
                    <input type="number" name="notice_years" min="1" max="30" value="<?php echo esc_attr( (int) $o['notice_years'] ); ?>" style="width:4em"> years</p>
                 <p><input type="text" name="notice_text" value="<?php echo esc_attr( $o['notice_text'] ); ?>" class="large-text"><br><span class="description"><code>{date}</code> is the publish date, <code>{years}</code> the age in whole years. Markup is filterable (<code>ace_seo_retention_notice_html</code>).</span></p>
+                <p><button class="button">Save</button></p>
+            </form>
+
+            <h2 id="front" style="margin-top:2em">Retained posts on the front end</h2>
+            <p>For old posts still being read (the retained tier): tell the reader it is older content, serve the page lighter, and hand them on to current posts. All off until ticked; nothing changes for logged-in users, pages, or the cart, checkout and account pages.</p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <?php wp_nonce_field( 'ace_seo_retention_front' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_front">
+                <table class="form-table" style="max-width:900px"><tbody>
+                    <tr><th scope="row">Older content notice</th><td>
+                        <label><input type="checkbox" name="retained_notice" value="1" <?php checked( ! empty( $o['retained_notice'] ) ); ?>> Show a notice above the content of retained posts</label>
+                        <p><input type="text" name="retained_notice_text" value="<?php echo esc_attr( $o['retained_notice_text'] ); ?>" class="large-text"></p>
+                        <p class="description"><code>{date}</code> is the publish date, <code>{years}</code> the age in whole years. Same markup as the dated-content notice below.</p>
+                    </td></tr>
+                    <tr><th scope="row">Lighter page</th><td>
+                        <label><input type="checkbox" name="light_enabled" value="1" <?php checked( ! empty( $o['light_enabled'] ) ); ?>> Serve retained posts light</label>
+                        <p><label>Leave out blocks with these class names or template part slugs <input type="text" name="light_drop" value="<?php echo esc_attr( $o['light_drop'] ); ?>" class="regular-text"></label></p>
+                        <p class="description">Comma separated. Matching blocks are never rendered (their queries do not run), classic widget areas are emptied.</p>
+                        <p><label>Keep the page in the Ace Redis Cache page cache for <input type="number" name="light_cache_hours" min="0" max="720" value="<?php echo esc_attr( (int) $o['light_cache_hours'] ); ?>" style="width:5em"> hours</label> <span class="description">(0 leaves the site's own lifetime)</span></p>
+                    </td></tr>
+                    <tr><th scope="row">Keep reading</th><td>
+                        <select name="light_continue">
+                            <option value="card" <?php selected( $o['light_continue'], 'card' ); ?>>A card at the end linking to the latest post in the same category; scrolling on past it goes there</option>
+                            <option value="none" <?php selected( $o['light_continue'], 'none' ); ?>>Nothing: leave it to the theme's own load more</option>
+                        </select>
+                        <p class="description">Going there is a full page load, so the reader is back in the normal layout. A theme's load more can ask <code>/wp-json/ace-seo/v1/retention/next?post=ID</code> for the same post.</p>
+                    </td></tr>
+                </tbody></table>
                 <p><button class="button">Save</button></p>
             </form>
 
