@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.50 (2026-10-01)
+
+- Fix: **the retention build's links phase crawled.** Every tick rebuilt the URL-to-post lookup for every candidate, one permalink at a time (30,000 on a large site: 100 seconds and 580 MB per 300-post batch, about four hours for the phase). The lookup is now built once per build with post and term caches primed, and kept in a transient for the rest of it.
+
 ### 1.0.49 (2026-10-01)
 
 - Fix: **a retention build on a large site scored every post with no search or view data.** The Search Console pages and Analytics paths for the whole property were saved as one option, which on a 41,000-post news site with a year's window passed MySQL's `max_allowed_packet` (16 MB); the save failed quietly. Only candidate posts are scored, so only their rows are kept now.

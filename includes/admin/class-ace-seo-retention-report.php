@@ -646,15 +646,29 @@ class AceSeoRetentionReport {
         if ( null !== $lookup ) {
             return $lookup;
         }
+        // Built once per run and kept for the rest of it: 30,000 permalinks cost a cron tick over a
+        // minute and a half each time, and the links phase asks on every tick.
+        $p        = self::progress();
+        $key      = 'ace_seo_retention_lookup_' . md5( (string) ( $p['started'] ?? '' ) . wp_json_encode( $settings ) );
+        $lookup   = get_transient( $key );
+        if ( is_array( $lookup ) ) {
+            return $lookup;
+        }
         $lookup = array();
         $offset = 0;
         do {
             $ids = self::candidate_ids( $settings, 2000, $offset );
+            // Permalinks with %category% need each post's terms: load the batch's in a few queries.
+            _prime_post_caches( $ids, true, false );
             foreach ( $ids as $id ) {
                 $lookup[ self::path_key( get_permalink( $id ) ) ] = $id;
             }
             $offset += 2000;
+            if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime' ) ) {
+                wp_cache_flush_runtime();
+            }
         } while ( count( $ids ) === 2000 );
+        set_transient( $key, $lookup, DAY_IN_SECONDS );
         return $lookup;
     }
 
