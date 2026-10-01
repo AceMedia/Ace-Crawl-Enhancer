@@ -249,6 +249,12 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.51 (2026-10-01)
+
+- New: **Week by week** on the Retention report. Every finished build is kept (the last 26): bucket and tier counts with the change on the build before, old posts' share of views, and the biggest moves between buckets ("Refresh → Keep: 154"). Each post's previous bucket and tier are read before it is rescored, so the moves are real per-post changes, not just differences in totals.
+- Change: a cron tick now takes batches for up to 40 seconds instead of one, so a build driven by a once-a-minute system cron finishes in well under an hour rather than two or three.
+- Change: the "demand" bar for Refresh scales with the window (100 impressions per 90 days, so about 400 over a year). Fixed at 100, a year's window flagged pages Google barely shows.
+
 ### 1.0.50 (2026-10-01)
 
 - Fix: **the retention build's links phase crawled.** Every tick rebuilt the URL-to-post lookup for every candidate, one permalink at a time (30,000 on a large site: 100 seconds and 580 MB per 300-post batch, about four hours for the phase). The lookup is now built once per build with post and term caches primed, and kept in a transient for the rest of it.

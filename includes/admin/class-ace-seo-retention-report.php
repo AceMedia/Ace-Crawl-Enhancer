@@ -29,6 +29,10 @@ class AceSeoRetentionReport {
 
     const META            = '_ace_seo_retention';
     const PROGRESS_OPTION = 'ace_seo_retention_progress';
+    const HISTORY_OPTION  = 'ace_seo_retention_history';
+    const HISTORY_KEEP    = 26;
+    /** Seconds a cron tick keeps taking batches: a site's cron fires once a minute, a batch at a time is two hours. */
+    const TICK_BUDGET     = 40;
     const SIGNALS_OPTION  = 'ace_seo_retention_signals';
     const CRON_HOOK       = 'ace_seo_retention_tick';
     const BATCH           = 300;
@@ -83,13 +87,18 @@ class AceSeoRetentionReport {
             'older_than_years'  => (int) ( $saved['report_years'] ?? 3 ),  // posts published before this many years ago are candidates
             'days'              => (int) ( $saved['report_days'] ?? 90 ),  // Search Console and Analytics window
             'post_types'        => array( 'post' ),
-            'demand_impressions'=> 100,    // impressions in the window that count as "there is demand"
+            // impressions that count as "there is demand": 100 per 90 days, scaled to the window, so a
+            // year's window does not flag pages Google barely shows
+            'demand_impressions'=> (int) round( 100 * max( 7, (int) ( $saved['report_days'] ?? 90 ) ) / 90 ),
             'refresh_max_ctr'   => 0.02,   // below this CTR, with demand, the page needs a refresh
             'refresh_max_pos'   => 20,     // and it has to be within reach: page 1 or 2
             'thin_words'        => (int) ( $saved['thin_words'] ?? 300 ),  // fewer words than this counts as thin
             'retained_views'    => (int) ( $saved['retained_views'] ?? 1 ), // views in the window that count as retained
         );
         $settings = array_merge( $defaults, array_intersect_key( $overrides, $defaults ) );
+        if ( ! isset( $overrides['demand_impressions'] ) ) {
+            $settings['demand_impressions'] = (int) round( 100 * max( 7, (int) $settings['days'] ) / 90 );
+        }
         return apply_filters( 'ace_seo_retention_settings', $settings );
     }
 
@@ -145,6 +154,19 @@ class AceSeoRetentionReport {
     }
 
     public static function run_tick() {
+        $until = microtime( true ) + ( self::$running_all ? 0 : self::TICK_BUDGET );
+        do {
+            self::run_step();
+        } while ( ! self::$running_all && self::is_building() && microtime( true ) < $until );
+
+        // Not "unless WP-CLI": a site that runs WP-Cron from a system crontab runs every tick under
+        // WP-CLI, and the build stalled after its first step.
+        if ( self::is_building() && ! self::$running_all ) {
+            self::schedule_tick();
+        }
+    }
+
+    private static function run_step() {
         $p = self::progress();
         if ( empty( $p['phase'] ) || in_array( $p['phase'], array( 'done', 'error' ), true ) ) {
             return;
@@ -163,12 +185,6 @@ class AceSeoRetentionReport {
             case 'score':
                 self::phase_score( $p );
                 break;
-        }
-
-        // Not "unless WP-CLI": a site that runs WP-Cron from a system crontab runs every tick under
-        // WP-CLI, and the build stalled after its first step.
-        if ( self::is_building() && ! self::$running_all ) {
-            self::schedule_tick();
         }
     }
 
@@ -430,6 +446,8 @@ class AceSeoRetentionReport {
                 'backlinks'   => isset( $backlinks[ $id ] ) ? (int) $backlinks[ $id ] : null,
                 'words'       => (int) ( $words[ $id ] ?? 0 ),
             );
+            $prev = get_post_meta( $id, self::META, true );
+            $prev = is_array( $prev ) ? $prev : array();
             list( $bucket, $reason ) = self::bucket( $row, $settings );
             $row['bucket'] = $bucket;
             $row['reason'] = $reason;
@@ -441,6 +459,17 @@ class AceSeoRetentionReport {
             update_post_meta( $id, self::META, $row );
             self::write_flat_meta( $id, $row, (int) $p['started'] );
             $p['counts'][ $row['bucket'] ] = ( $p['counts'][ $row['bucket'] ] ?? 0 ) + 1;
+            // Movement since the last build, for the week-by-week history: "keep>refresh", "new>keep".
+            $from = (string) ( $prev['bucket'] ?? 'new' );
+            if ( $from !== $row['bucket'] ) {
+                $move = $from . '>' . $row['bucket'];
+                $p['moves'][ $move ] = ( $p['moves'][ $move ] ?? 0 ) + 1;
+            }
+            $tfrom = (string) ( $prev['tier'] ?? 'new' );
+            if ( isset( $row['tier'] ) && $tfrom !== $row['tier'] ) {
+                $move = $tfrom . '>' . $row['tier'];
+                $p['tier_moves'][ $move ] = ( $p['tier_moves'][ $move ] ?? 0 ) + 1;
+            }
             if ( isset( $row['tier'] ) && in_array( $row['tier'], self::TIERS, true ) ) {
                 $p['tiers'][ $row['tier'] ] = ( $p['tiers'][ $row['tier'] ] ?? 0 ) + 1;
             }
@@ -452,8 +481,80 @@ class AceSeoRetentionReport {
             $p['finished'] = time();
             delete_option( self::SIGNALS_OPTION );
             self::forget_stale( (int) $p['started'] );
+            self::record_history( $p );
         }
         self::save_progress( $p );
+    }
+
+    /** One line per finished build, newest last, so the screen can show how the archive moves week to week. */
+    private static function record_history( array $p ) {
+        $h   = self::history();
+        $h[] = array(
+            'finished'   => (int) $p['finished'],
+            'started'    => (int) $p['started'],
+            'years'      => (int) $p['settings']['older_than_years'],
+            'days'       => (int) $p['settings']['days'],
+            'counts'     => (array) $p['counts'],
+            'tiers'      => (array) ( $p['tiers'] ?? array() ),
+            'moves'      => (array) ( $p['moves'] ?? array() ),
+            'tier_moves' => (array) ( $p['tier_moves'] ?? array() ),
+            'share'      => $p['share'] ?? null,
+        );
+        update_option( self::HISTORY_OPTION, array_slice( $h, -self::HISTORY_KEEP ), false );
+    }
+
+    public static function history() {
+        $h = get_option( self::HISTORY_OPTION, array() );
+        return is_array( $h ) ? array_values( $h ) : array();
+    }
+
+    /** Week by week: each build's buckets and tiers with the change on the one before, and what moved. */
+    private static function render_history( array $labels ) {
+        $h = self::history();
+        if ( ! $h ) {
+            return;
+        }
+        $delta       = static function ( $now, $before ) {
+            if ( null === $before ) {
+                return '';
+            }
+            $d = (int) $now - (int) $before;
+            return $d ? ' <span style="color:' . ( $d > 0 ? '#1a7f37' : '#b32d2e' ) . ';font-size:11px">' . ( $d > 0 ? '+' : '' ) . esc_html( number_format_i18n( $d ) ) . '</span>' : '';
+        };
+        ?>
+        <h2>Week by week</h2>
+        <p>Every finished build, with the change on the build before. Settings changes between builds move posts too, so compare like with like (the window and cutoff are in the first column).</p>
+        <table class="widefat striped" style="max-width:1100px"><thead><tr>
+            <th>Built</th>
+            <?php foreach ( self::BUCKETS as $b ) : ?><th><?php echo esc_html( $labels[ $b ] ?? $b ); ?></th><?php endforeach; ?>
+            <?php foreach ( self::TIERS as $t ) : ?><th><?php echo esc_html( ucfirst( $t ) ); ?></th><?php endforeach; ?>
+            <th>Old posts' share of views</th><th>Biggest moves</th>
+        </tr></thead><tbody>
+        <?php
+        foreach ( array_reverse( $h, true ) as $i => $row ) :
+            $prev  = $h[ $i - 1 ] ?? null;
+            $moves = array_filter( (array) $row['moves'], static function ( $n, $k ) {
+                return 0 !== strpos( $k, 'new>' );
+            }, ARRAY_FILTER_USE_BOTH );
+            arsort( $moves );
+            ?>
+            <tr>
+                <td><?php echo esc_html( wp_date( 'j M Y', (int) $row['finished'] ) ); ?><br><span style="font-size:11px;color:#666"><?php echo esc_html( (int) $row['years'] . 'y+, ' . (int) $row['days'] . '-day window' ); ?></span></td>
+                <?php foreach ( self::BUCKETS as $b ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['counts'][ $b ] ?? 0 ) ) ) . $delta( $row['counts'][ $b ] ?? 0, $prev ? ( $prev['counts'][ $b ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
+                <?php foreach ( self::TIERS as $t ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['tiers'][ $t ] ?? 0 ) ) ) . $delta( $row['tiers'][ $t ] ?? 0, $prev ? ( $prev['tiers'][ $t ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
+                <td><?php echo ! empty( $row['share']['total'] ) ? esc_html( round( 100 * $row['share']['old'] / $row['share']['total'], 1 ) . '%' ) : '–'; ?></td>
+                <td style="font-size:11px"><?php
+                    $out = array();
+                    foreach ( array_slice( $moves, 0, 4, true ) as $k => $n ) {
+                        list( $a, $b ) = explode( '>', $k );
+                        $out[] = esc_html( ( $labels[ $a ] ?? $a ) . ' → ' . ( $labels[ $b ] ?? $b ) . ': ' . number_format_i18n( $n ) );
+                    }
+                    echo $out ? implode( '<br>', $out ) : ( $prev ? 'No moves' : 'First build' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody></table>
+        <?php
     }
 
     /**
@@ -999,6 +1100,8 @@ class AceSeoRetentionReport {
                     <?php endforeach; ?>
                 </ul>
             <?php endif; ?>
+
+            <?php self::render_history( $labels ); ?>
 
             <?php $o = AceSeoRetentionActions::options(); ?>
             <details style="margin:1em 0" <?php echo $built ? '' : 'open'; ?>>
