@@ -67,7 +67,8 @@ drift from each other, and that drift is the bug.
   dirty tracking, one flock-guarded background worker (`ace_sitemap_regenerate`), urgent withholding of
   removed URLs, status panel + `wp ace-crawl sitemaps`. Coordination state lives in `.meta` files in the
   store, NOT options: web requests and a WP-CLI cron worker can have different object caches. Regression
-  checks: `wp eval-file <plugin>/tests/sitemap-generations-test.php`.
+  checks: `wp eval-file <plugin>/tests/sitemap-generations-test.php`. ID-ordered post types use stable pages
+  (fixed ID range per page, page map in the store, one edit = one page rebuilt); `post` keeps offset paging.
 - `includes/frontend/` — `class-ace-seo-frontend.php` (head output + OG/Twitter + Jetpack override +
   JSON-LD graph), `class-ace-seo-schema.php` (Organization/Person/LocalBusiness + orphaned Product/FAQ
   builders), `class-ace-seo-breadcrumbs.php` (visual trail only), `class-ace-seo-performance.php`

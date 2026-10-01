@@ -249,6 +249,15 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.45 (2026-10-01)
+
+- Fix: **background sitemap rebuilds keep up on busy sites.** Every post save marked every page of its post type stale, and the worker rebuilt stale pages in key order, so on a site publishing all day the same early pages were rebuilt every pass while later pages never came round (TalkFuse: 280 of 288 story pages permanently stale).
+- New: **stable pages** for ID-ordered post types under background generation. Each page owns a fixed ID range, kept in a small page map in the generation store, so an edit, publish, removal or noindex rebuilds just the page holding that post, and a page is one range query however deep it sits (page 27 of a story sitemap: 236 queries before, 3 after). New posts fill the open-ended last page until it splits; a page that thins below a fill floor triggers one rebalance. Filters `ace_sitemap_powertools_stable_pages` (per post type, on by default where supported), `ace_sitemap_powertools_stable_pages_min_fill` (0.25), `ace_sitemap_powertools_stable_pages_check_interval` (60s). Types ordered by modification date (`post`) keep offset paging.
+- New: index `lastmod` per page for stable-page types (the newest change in that page's range, not the type-wide date), so crawlers re-read only the pages that moved.
+- New: **keyed dirtiness** in the generation engine. `ace_sitemap_gen_mark_dirty( $scope, $flush, $key )` can confine a mark to one artifact; providers opt in with `ace_sitemap_generation_keyed_scopes` and report a post's key through `ace_sitemap_generation_post_key`. Other dependants of the scope still see it move.
+- Fix: the worker now rebuilds the **oldest artifacts first**, and an artifact older than `ace_sitemap_generation_max_age` (default a day, 0 disables) counts as stale, which catches changes no hook reports (a site's exclusion filter starting to drop an item).
+- Fix: a generation build no longer reads the powertools object cache, which could hand it the list it was replacing and store that under a current sequence.
+
 ### 1.0.44 (2026-09-23)
 
 - New: **white hat status** (Ace SEO, White hat; off by default, and nothing in it is betting specific until configured). A post is rendered as a visitor gets it now, then judged cheapest first: a link matching a bet link pattern (and not an allowed pattern, such as the operator's homepage) makes it not white hat; no sentence with a betting keyword makes it white hat; otherwise the headline and just those sentences (capped) go to the AI provider set in the settings (Anthropic or OpenAI, model and key as settings or `ACE_SEO_WHITEHAT_API_KEY`), or to the call to action patterns when no provider is set. A hash of what was judged is kept, so an unchanged post never costs a second call.

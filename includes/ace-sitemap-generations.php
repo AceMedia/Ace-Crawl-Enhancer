@@ -16,6 +16,14 @@
  *   the kernel if that process dies, so there is no expiry to tune and no foreign unlock.
  * - Urgent removals (unpublish, trash, delete, noindex) are withheld from served lists at
  *   once, whatever the age of the artifact.
+ * - Keyed dirtiness: a provider whose pages have stable membership (a post always lives on
+ *   the same page) can track a scope per page through `ace_sitemap_generation_keyed_scopes`
+ *   and `ace_sitemap_generation_post_key`, so one edit rebuilds one page rather than every
+ *   page of the type. Without that, a site that publishes all day keeps every page stale
+ *   and the worker never catches up.
+ * - Fairness and a safety net: the worker rebuilds the oldest artifacts first, so no page
+ *   starves, and anything older than `ace_sitemap_generation_max_age` counts as stale, which
+ *   catches changes that fire no hook (exclusion filters fed by a site's own rules).
  *
  * Nothing here knows about any particular site. Providers declare what they depend on with
  * the `ace_sitemap_generation_provider_scopes` filter; unknown providers rebuild on any change.
@@ -256,15 +264,27 @@ function ace_sitemap_gen_seqs() {
     $seqs = ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_SEQ_OPTION );
     $seqs['seq']    = (int) ( $seqs['seq'] ?? 0 );
     $seqs['scopes'] = isset( $seqs['scopes'] ) && is_array( $seqs['scopes'] ) ? $seqs['scopes'] : array();
+    // Scope-wide marks only (a mark that named a key is partial), and per-key marks.
+    $seqs['full']      = isset( $seqs['full'] ) && is_array( $seqs['full'] ) ? $seqs['full'] : array();
+    $seqs['keys']      = isset( $seqs['keys'] ) && is_array( $seqs['keys'] ) ? $seqs['keys'] : array();
+    $seqs['key_floor'] = (int) ( $seqs['key_floor'] ?? 0 );
     return $seqs;
 }
 
 /**
  * Mark scopes dirty. Collected per request and written once at shutdown, so an import that
  * saves a thousand posts costs one option write and one scheduled job.
+ *
+ * With $key, the mark is partial: the scope still moves (anything depending on the whole
+ * scope goes stale), but a provider that tracks the scope per key only rebuilds that key.
+ *
+ * @param string|null $scope     Scope name, or null to flush only.
+ * @param bool        $flush_now Write now instead of at shutdown.
+ * @param string|null $key       Artifact key the change is confined to.
  */
-function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false ) {
-    static $pending = array();
+function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = null ) {
+    static $pending = array(); // scope => true for a scope-wide mark, false for partial.
+    static $keys    = array();
     static $hooked  = false;
 
     if ( ! ace_sitemap_gen_enabled() ) {
@@ -272,7 +292,13 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false ) {
     }
 
     if ( null !== $scope ) {
-        $pending[ (string) $scope ] = true;
+        $scope = (string) $scope;
+        if ( null === $key || '' === (string) $key ) {
+            $pending[ $scope ] = true;
+        } else {
+            $pending[ $scope ]       = ! empty( $pending[ $scope ] );
+            $keys[ (string) $key ] = true;
+        }
     }
 
     if ( ! $flush_now ) {
@@ -289,21 +315,40 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false ) {
         return;
     }
 
-    $names   = array_keys( $pending );
-    $pending = array();
+    $names     = $pending;
+    $key_names = array_keys( $keys );
+    $pending   = array();
+    $keys      = array();
 
-    ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_SEQ_OPTION, function () use ( $names ) {
+    ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_SEQ_OPTION, function () use ( $names, $key_names ) {
         $seqs = ace_sitemap_gen_seqs();
         // Millisecond clock as a floor keeps the sequence moving forward even if this record
         // is lost while older artifacts survive, so they can never look current by accident.
         $seqs['seq'] = max( $seqs['seq'] + 1, (int) floor( microtime( true ) * 1000 ) );
-        foreach ( $names as $name ) {
+        foreach ( $names as $name => $full ) {
             $seqs['scopes'][ $name ] = $seqs['seq'];
+            if ( $full ) {
+                $seqs['full'][ $name ] = $seqs['seq'];
+            }
+        }
+        foreach ( $key_names as $name ) {
+            $seqs['keys'][ $name ] = $seqs['seq'];
         }
         // Scopes accumulate slowly (one per post type/taxonomy); keep the record small.
         if ( count( $seqs['scopes'] ) > 200 ) {
             arsort( $seqs['scopes'] );
             $seqs['scopes'] = array_slice( $seqs['scopes'], 0, 200, true );
+            $seqs['full']   = array_intersect_key( $seqs['full'], $seqs['scopes'] );
+        }
+        // Keys are bounded by the number of pages, but cap them anyway. Dropping a key mark
+        // must never let its artifact look current, so the newest dropped mark becomes a
+        // floor every keyed artifact has to reach.
+        $max_keys = (int) apply_filters( 'ace_sitemap_generation_max_keys', 5000 );
+        if ( count( $seqs['keys'] ) > $max_keys ) {
+            arsort( $seqs['keys'] );
+            $dropped           = array_slice( $seqs['keys'], $max_keys, null, true );
+            $seqs['keys']      = array_slice( $seqs['keys'], 0, $max_keys, true );
+            $seqs['key_floor'] = max( $seqs['key_floor'], (int) max( $dropped ) );
         }
         return $seqs;
     } );
@@ -334,8 +379,25 @@ function ace_sitemap_gen_scopes_for( $provider, $subtype ) {
     return array_values( array_unique( $scopes ) );
 }
 
-/** The sequence an artifact must have reached to be current. */
-function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null ) {
+/**
+ * Scopes this provider tracks per key rather than as a whole. A provider opts in when each
+ * of its items always lands on the same key (stable page membership), and then reports the
+ * key an item lives on through `ace_sitemap_generation_post_key`.
+ */
+function ace_sitemap_gen_keyed_scopes( $provider, $subtype ) {
+    return array_values( (array) apply_filters( 'ace_sitemap_generation_keyed_scopes', array(), (string) $provider, (string) $subtype ) );
+}
+
+/**
+ * The sequence an artifact must have reached to be current.
+ *
+ * @param array      $scopes Scopes the artifact depends on.
+ * @param array|null $seqs   Sequence record (read when omitted).
+ * @param string     $key    The artifact's own key, for keyed scopes.
+ * @param array      $keyed  Scopes tracked per key: only scope-wide marks and this key's
+ *                           own marks count for them.
+ */
+function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null, $key = '', array $keyed = array() ) {
     $seqs = $seqs ? $seqs : ace_sitemap_gen_seqs();
     if ( in_array( '*', $scopes, true ) ) {
         return $seqs['seq'];
@@ -343,9 +405,53 @@ function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null ) {
 
     $required = 0;
     foreach ( $scopes as $scope ) {
+        if ( in_array( $scope, $keyed, true ) ) {
+            $required = max( $required, (int) ( $seqs['full'][ $scope ] ?? 0 ), (int) ( $seqs['keys'][ $key ] ?? 0 ), (int) ( $seqs['key_floor'] ?? 0 ) );
+            continue;
+        }
         $required = max( $required, (int) ( $seqs['scopes'][ $scope ] ?? 0 ) );
     }
     return $required;
+}
+
+/** The sequence a stored artifact must have reached, from its key and meta. */
+function ace_sitemap_gen_artifact_required_seq( $key, array $meta, ?array $seqs = null ) {
+    return ace_sitemap_gen_required_seq(
+        ace_sitemap_gen_scopes_for( $meta['provider'], $meta['subtype'] ),
+        $seqs,
+        (string) $key,
+        ace_sitemap_gen_keyed_scopes( $meta['provider'], $meta['subtype'] )
+    );
+}
+
+/**
+ * Is this artifact due a rebuild? Behind its scopes, or simply older than the maximum age.
+ * The age rule catches changes that fire no hook at all, such as a site's own exclusion
+ * filter starting to drop an item, and the worker's oldest-first order spreads it out.
+ */
+function ace_sitemap_gen_is_stale( array $artifact, ?array $seqs = null ) {
+    if ( (int) $artifact['seq'] < ace_sitemap_gen_artifact_required_seq( $artifact['key'], $artifact['meta'], $seqs ) ) {
+        return true;
+    }
+    $max_age = (int) apply_filters( 'ace_sitemap_generation_max_age', DAY_IN_SECONDS, $artifact['meta']['provider'], $artifact['meta']['subtype'] );
+    return $max_age > 0 && (int) ( $artifact['built'] ?? 0 ) < time() - $max_age;
+}
+
+/** True while a generation build runs, so lower cache layers can step aside. */
+function ace_sitemap_gen_is_building() {
+    return ! empty( $GLOBALS['ace_sitemap_gen_building'] );
+}
+
+/**
+ * Mark a post's sitemap dirty: just the page it lives on when its provider tracks pages,
+ * otherwise the whole post type.
+ */
+function ace_sitemap_gen_mark_post_dirty( $post ) {
+    if ( ! ( $post instanceof WP_Post ) ) {
+        return;
+    }
+    $key = apply_filters( 'ace_sitemap_generation_post_key', null, $post );
+    ace_sitemap_gen_mark_dirty( 'posts:' . $post->post_type, false, is_string( $key ) && '' !== $key ? $key : null );
 }
 
 /* --------------------------------------------------------- Urgent removals */
@@ -418,7 +524,7 @@ function ace_sitemap_gen_on_before_delete( $post_id ) {
     $post = get_post( $post_id );
     if ( $post && 'publish' === $post->post_status && ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
         ace_sitemap_gen_withhold( get_permalink( $post ) );
-        ace_sitemap_gen_mark_dirty( 'posts:' . $post->post_type );
+        ace_sitemap_gen_mark_post_dirty( $post );
     }
 }
 add_action( 'before_delete_post', 'ace_sitemap_gen_on_before_delete', 5 );
@@ -440,7 +546,7 @@ function ace_sitemap_gen_on_noindex_meta( $meta_id, $post_id, $meta_key, $meta_v
     } else {
         ace_sitemap_gen_release( get_permalink( $post ) );
     }
-    ace_sitemap_gen_mark_dirty( 'posts:' . $post->post_type );
+    ace_sitemap_gen_mark_post_dirty( $post );
 }
 add_action( 'added_post_meta', 'ace_sitemap_gen_on_noindex_meta', 10, 4 );
 add_action( 'updated_post_meta', 'ace_sitemap_gen_on_noindex_meta', 10, 4 );
@@ -466,7 +572,7 @@ function ace_sitemap_gen_on_post_change( $post_id, $post = null ) {
     if ( ! $post || wp_is_post_revision( $post ) || wp_is_post_autosave( $post ) || ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
         return;
     }
-    ace_sitemap_gen_mark_dirty( 'posts:' . $post->post_type );
+    ace_sitemap_gen_mark_post_dirty( $post );
 }
 
 function ace_sitemap_gen_on_post_transition( $new_status, $old_status, $post ) {
@@ -519,8 +625,7 @@ function ace_sitemap_gen_get( $key, array $meta, callable $builder ) {
             return array();
         }
 
-        $scopes = ace_sitemap_gen_scopes_for( $meta['provider'], $meta['subtype'] );
-        if ( (int) $artifact['seq'] < ace_sitemap_gen_required_seq( $scopes ) ) {
+        if ( ace_sitemap_gen_is_stale( $artifact ) ) {
             ace_sitemap_gen_note( 'stale' );
             $worker_home = ace_sitemap_gen_state()['worker_home'] ?? home_url( '/' );
             if ( $worker_home === home_url( '/' ) ) {
@@ -584,11 +689,17 @@ function ace_sitemap_gen_build( $key, array $meta, callable $builder ) {
     $started  = microtime( true );
     $queries  = function_exists( 'get_num_queries' ) ? get_num_queries() : 0;
 
+    // Lower cache layers (the powertools object cache) must not hand a rebuild the list it
+    // is replacing: that stored a stale list under a current sequence.
+    $was_building                       = ace_sitemap_gen_is_building();
+    $GLOBALS['ace_sitemap_gen_building'] = true;
     try {
         $data = call_user_func( $builder );
     } catch ( Throwable $e ) {
         ace_sitemap_gen_record_failure( $key, 'exception', get_class( $e ) );
         return $previous;
+    } finally {
+        $GLOBALS['ace_sitemap_gen_building'] = $was_building;
     }
 
     if ( ! ace_sitemap_gen_is_valid_list( $data, $meta ) ) {
@@ -761,8 +872,7 @@ function ace_sitemap_gen_scan() {
         $total++;
         $min_seq  = min( $min_seq, (int) $artifact['seq'] );
         $meta     = $artifact['meta'];
-        $required = ace_sitemap_gen_required_seq( ace_sitemap_gen_scopes_for( $meta['provider'], $meta['subtype'] ), $seqs );
-        if ( (int) $artifact['seq'] >= $required ) {
+        if ( ! ace_sitemap_gen_is_stale( $artifact, $seqs ) ) {
             continue;
         }
 
@@ -786,12 +896,15 @@ function ace_sitemap_gen_scan() {
             'waiting'    => $not_before > time(),
             'not_before' => $not_before,
             'order'      => 'index' === $meta['provider'] ? 1 : 0,
+            'seq'        => (int) $artifact['seq'],
         );
     }
 
-    // Pages first, the index last, so a new index only ever points at rebuilt pages.
+    // Pages first, the index last, so a new index only ever points at rebuilt pages. Within
+    // that, oldest first: sorting by key rebuilt the same alphabetically early pages on every
+    // pass of a busy site while the rest never came round.
     usort( $dirty, function ( $a, $b ) {
-        return $a['order'] <=> $b['order'] ?: strcmp( $a['key'], $b['key'] );
+        return $a['order'] <=> $b['order'] ?: ( $a['seq'] <=> $b['seq'] ?: strcmp( $a['key'], $b['key'] ) );
     } );
 
     return array( 'dirty' => $dirty, 'total' => $total, 'min_seq' => PHP_INT_MAX === $min_seq ? 0 : $min_seq );
@@ -844,6 +957,11 @@ function ace_sitemap_gen_run( $args = array() ) {
     $started      = microtime( true );
 
     try {
+        // Providers keep their own bookkeeping current first (stable page maps split or
+        // rebalance here), so the scan sees the marks that produces.
+        do_action( 'ace_sitemap_generation_before_pass' );
+        ace_sitemap_gen_mark_dirty( null, true );
+
         $scan = ace_sitemap_gen_scan();
         foreach ( $scan['dirty'] as $item ) {
             if ( $item['waiting'] && empty( $args['force'] ) ) {
@@ -874,7 +992,8 @@ function ace_sitemap_gen_run( $args = array() ) {
             try {
                 $before = ace_sitemap_gen_read( $item['key'] );
                 $after  = ace_sitemap_gen_build( $item['key'], $item['meta'], $builder );
-                if ( $after && ( ! $before || (int) $after['seq'] > (int) $before['seq'] ) ) {
+                // A max-age rebuild with no new marks keeps its sequence, so a newer build time counts too.
+                if ( $after && ( ! $before || (int) $after['seq'] > (int) $before['seq'] || (int) ( $after['built'] ?? 0 ) > (int) ( $before['built'] ?? 0 ) ) ) {
                     $summary['built']++;
                 } else {
                     $summary['failed']++;

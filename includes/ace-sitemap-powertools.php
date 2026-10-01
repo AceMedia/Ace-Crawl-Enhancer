@@ -1529,6 +1529,12 @@ function ace_sitemap_powertools_cache_release_lock( $key ) {
 }
 
 function ace_sitemap_powertools_cache_remember( $key, $callback, $fallback = null ) {
+    // A background generation build is itself the cache; reading this layer there would
+    // hand it the very list it is replacing.
+    if ( function_exists( 'ace_sitemap_gen_is_building' ) && ace_sitemap_gen_is_building() ) {
+        return is_callable( $callback ) ? call_user_func( $callback ) : $fallback;
+    }
+
     $cached = ace_sitemap_powertools_cache_get( $key );
     if ( null !== $cached ) {
         return $cached;
@@ -1569,6 +1575,9 @@ function ace_sitemap_powertools_get_cache_ttl() {
 }
 
 function ace_sitemap_powertools_cache_enabled() {
+    if ( function_exists( 'ace_sitemap_gen_is_building' ) && ace_sitemap_gen_is_building() ) {
+        return false;
+    }
     return ace_sitemap_powertools_is_enabled( 'enable_sitemap_cache' ) && ace_sitemap_powertools_redis_cache_available();
 }
 
@@ -2846,6 +2855,14 @@ function ace_sitemap_powertools_get_noindex_meta_map( $post_ids ) {
 function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page ) {
     global $wpdb;
 
+    if ( ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
+        $map = ace_sitemap_powertools_page_map( $post_type );
+        if ( $map ) {
+            $range = ace_sitemap_powertools_page_range( $map, (int) $page_num );
+            return $range ? ace_sitemap_powertools_visible_ids_in_range( $post_type, $range[0], $range[1] ) : array();
+        }
+    }
+
     $page_num = max( 1, (int) $page_num );
     $per_page = max( 1, (int) $per_page );
     $offset   = ( $page_num - 1 ) * $per_page;
@@ -2970,6 +2987,234 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
     return max( 0, $published_count - $excluded_count - $extra );
 }
 
+/* ------------------------------------------------------------ Stable pages */
+
+/**
+ * Stable page membership for ID-ordered post types under background generation.
+ *
+ * Offset paging puts post N on page ceil(N / per page), so one post published, removed or
+ * noindexed moves every later post along a slot and every later page changes. On a site that
+ * publishes all day that left every page permanently stale and the worker never caught up.
+ * Instead each page owns a fixed ID range, recorded once in a small page map: an edit changes
+ * exactly one page, a page is a single range query however deep it sits, and new posts fill
+ * the open-ended last page until it splits. Pages that thin out below a fill floor (or empty)
+ * trigger one full rebalance. Ordering is unchanged (ID ascending), so a page holds the same
+ * posts it would have held, give or take what has since been removed.
+ */
+function ace_sitemap_powertools_stable_pages_supported( $post_type ) {
+    global $wpdb;
+    $on = function_exists( 'ace_sitemap_gen_enabled' ) && ace_sitemap_gen_enabled()
+        && "{$wpdb->posts}.ID ASC" === ace_sitemap_powertools_posts_order_sql( $post_type );
+    return (bool) apply_filters( 'ace_sitemap_powertools_stable_pages', $on, $post_type );
+}
+
+/** Published, not noindexed, not excluded by filter: IDs after $after up to $upto (null = open). */
+function ace_sitemap_powertools_visible_ids_in_range( $post_type, $after = 0, $upto = null ) {
+    global $wpdb;
+
+    $upper = null === $upto ? '' : $wpdb->prepare( ' AND p.ID <= %d', (int) $upto );
+    $ids   = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare(
+        "SELECT p.ID
+        FROM {$wpdb->posts} p
+        WHERE p.post_type = %s
+            AND p.post_status = 'publish'
+            AND p.ID > %d{$upper}
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm
+                WHERE pm.post_id = p.ID
+                    AND pm.meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')
+                    AND pm.meta_value = '1'
+            )
+        ORDER BY p.ID ASC",
+        $post_type,
+        (int) $after
+    ) ) );
+
+    $filtered = (array) apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+    if ( $filtered && $ids ) {
+        $ids = array_values( array_diff( $ids, array_map( 'intval', $filtered ) ) );
+    }
+    return $ids;
+}
+
+/** Stored page maps, keyed by post type. Lives in the generation store beside the sequences. */
+function ace_sitemap_powertools_page_maps() {
+    return function_exists( 'ace_sitemap_gen_meta_get' ) ? (array) ace_sitemap_gen_meta_get( 'pagemap' ) : array();
+}
+
+/** The stored map for a type when it is usable at the current page size, else null. Never builds. */
+function ace_sitemap_powertools_stored_page_map( $post_type ) {
+    $map = ace_sitemap_powertools_page_maps()[ $post_type ] ?? null;
+    return is_array( $map ) && (int) ( $map['per'] ?? 0 ) === ace_sitemap_powertools_effective_post_max_urls() ? $map : null;
+}
+
+/** The map for a type, built on first use (or when the page size changed). */
+function ace_sitemap_powertools_page_map( $post_type ) {
+    if ( ! ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
+        return null;
+    }
+    $map = ace_sitemap_powertools_stored_page_map( $post_type );
+    return $map ? $map : ace_sitemap_powertools_rebuild_page_map( $post_type );
+}
+
+/** Lay pages out afresh from the current visible IDs. Every page of the type changes. */
+function ace_sitemap_powertools_rebuild_page_map( $post_type ) {
+    $per    = ace_sitemap_powertools_effective_post_max_urls();
+    $chunks = array_chunk( ace_sitemap_powertools_visible_ids_in_range( $post_type ), $per );
+    $bounds = array();
+    foreach ( array_slice( $chunks, 0, -1 ) as $chunk ) {
+        $bounds[] = (int) end( $chunk );
+    }
+    $map = array( 'per' => $per, 'b' => $bounds, 'n' => count( $chunks ), 'built' => time(), 'checked' => time() );
+
+    ace_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
+        $maps[ $post_type ] = $map;
+        return $maps;
+    } );
+    // A scope-wide mark, written now, so pages built from here on are current.
+    ace_sitemap_gen_mark_dirty( 'posts:' . $post_type, true );
+    return $map;
+}
+
+/** [after, upto] for a page (upto null on the open-ended last page), or null when out of range. */
+function ace_sitemap_powertools_page_range( array $map, $page ) {
+    $page = (int) $page;
+    if ( $page < 1 || $page > (int) $map['n'] ) {
+        return null;
+    }
+    $after = 1 === $page ? 0 : (int) $map['b'][ $page - 2 ];
+    $upto  = $page === (int) $map['n'] ? null : (int) $map['b'][ $page - 1 ];
+    return array( $after, $upto );
+}
+
+/** The page an ID belongs to under a map: the first page whose bound reaches it. */
+function ace_sitemap_powertools_page_for_id( array $map, $id ) {
+    if ( (int) $map['n'] < 1 ) {
+        return 0;
+    }
+    $bounds = $map['b'];
+    $lo     = 0;
+    $hi     = count( $bounds );
+    while ( $lo < $hi ) {
+        $mid = intdiv( $lo + $hi, 2 );
+        if ( (int) $bounds[ $mid ] >= (int) $id ) {
+            $hi = $mid;
+        } else {
+            $lo = $mid + 1;
+        }
+    }
+    return $lo + 1;
+}
+
+/** Visible posts per page in one grouped query (index = page - 1). */
+function ace_sitemap_powertools_page_counts( $post_type, array $map ) {
+    global $wpdb;
+    $n = (int) $map['n'];
+    if ( $n < 1 ) {
+        return array();
+    }
+    // INTERVAL(ID, b1+1, b2+1, ...) is the zero-based page of each ID.
+    $bucket = $map['b'] ? 'INTERVAL(p.ID, ' . implode( ', ', array_map( function ( $b ) { return (int) $b + 1; }, $map['b'] ) ) . ')' : '0';
+    $rows   = $wpdb->get_results( $wpdb->prepare(
+        "SELECT {$bucket} AS k, COUNT(*) AS c, MAX(p.post_modified_gmt) AS m
+        FROM {$wpdb->posts} p
+        WHERE p.post_type = %s
+            AND p.post_status = 'publish'
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm
+                WHERE pm.post_id = p.ID
+                    AND pm.meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')
+                    AND pm.meta_value = '1'
+            )
+        GROUP BY k",
+        $post_type
+    ) );
+    $out = array_fill( 0, $n, array( 'c' => 0, 'm' => '' ) );
+    foreach ( (array) $rows as $row ) {
+        $out[ min( $n - 1, (int) $row->k ) ] = array( 'c' => (int) $row->c, 'm' => (string) $row->m );
+    }
+    return $out;
+}
+
+/**
+ * Keep a map in shape, at most once a minute: split an overgrown last page (only the last
+ * page and the new ones change) and rebalance when any earlier page has thinned below the
+ * fill floor (every page changes, so this is meant to be rare).
+ */
+function ace_sitemap_powertools_maintain_page_map( $post_type ) {
+    $map = ace_sitemap_powertools_page_map( $post_type );
+    if ( ! $map || time() - (int) ( $map['checked'] ?? 0 ) < (int) apply_filters( 'ace_sitemap_powertools_stable_pages_check_interval', MINUTE_IN_SECONDS ) ) {
+        return $map;
+    }
+
+    $per    = (int) $map['per'];
+    $n      = (int) $map['n'];
+    $counts = ace_sitemap_powertools_page_counts( $post_type, $map );
+    $floor  = (float) apply_filters( 'ace_sitemap_powertools_stable_pages_min_fill', 0.25, $post_type );
+
+    for ( $i = 0; $i < $n - 1; $i++ ) {
+        if ( $counts[ $i ]['c'] < max( 1, (int) floor( $per * $floor ) ) ) {
+            return ace_sitemap_powertools_rebuild_page_map( $post_type );
+        }
+    }
+
+    if ( $n < 1 ) {
+        // Nothing was visible when the map was laid out; lay it out again once something is.
+        $any = ace_sitemap_powertools_visible_ids_in_range( $post_type );
+        return $any ? ace_sitemap_powertools_rebuild_page_map( $post_type ) : $map;
+    }
+
+    $map['checked'] = time();
+    if ( $counts[ $n - 1 ]['c'] > $per ) {
+        $last   = ace_sitemap_powertools_page_range( $map, $n );
+        $chunks = array_chunk( ace_sitemap_powertools_visible_ids_in_range( $post_type, $last[0] ), $per );
+        foreach ( array_slice( $chunks, 0, -1 ) as $chunk ) {
+            $map['b'][] = (int) end( $chunk );
+        }
+        $map['n'] = count( $map['b'] ) + 1;
+        for ( $page = $n; $page <= $map['n']; $page++ ) {
+            ace_sitemap_gen_mark_dirty( 'posts:' . $post_type, false, ace_sitemap_gen_url_key( 'posts', $post_type, $page ) );
+        }
+    }
+
+    ace_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
+        $maps[ $post_type ] = $map;
+        return $maps;
+    } );
+    ace_sitemap_gen_mark_dirty( null, true );
+    return $map;
+}
+
+/** Before each worker pass: lay out or tidy the map of every type that can use one. */
+function ace_sitemap_powertools_page_maps_before_pass() {
+    foreach ( get_post_types( array( 'public' => true ) ) as $post_type ) {
+        if ( ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) && ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
+            ace_sitemap_powertools_maintain_page_map( $post_type );
+        }
+    }
+}
+add_action( 'ace_sitemap_generation_before_pass', 'ace_sitemap_powertools_page_maps_before_pass' );
+
+/** A mapped type's pages are tracked per page, so one edit rebuilds one page. */
+function ace_sitemap_powertools_page_map_keyed_scopes( $scopes, $provider, $subtype ) {
+    if ( 'posts' === $provider && $subtype && ace_sitemap_powertools_stable_pages_supported( $subtype ) && ace_sitemap_powertools_stored_page_map( $subtype ) ) {
+        $scopes[] = 'posts:' . $subtype;
+    }
+    return $scopes;
+}
+add_filter( 'ace_sitemap_generation_keyed_scopes', 'ace_sitemap_powertools_page_map_keyed_scopes', 10, 3 );
+
+/** The page a post lives on, as a generation key; null (whole type) when there is no map. */
+function ace_sitemap_powertools_page_map_post_key( $key, $post ) {
+    if ( null !== $key || ! ( $post instanceof WP_Post ) || ! ace_sitemap_powertools_stable_pages_supported( $post->post_type ) ) {
+        return $key;
+    }
+    $map  = ace_sitemap_powertools_stored_page_map( $post->post_type );
+    $page = $map ? ace_sitemap_powertools_page_for_id( $map, $post->ID ) : 0;
+    return $page > 0 ? ace_sitemap_gen_url_key( 'posts', $post->post_type, $page ) : null;
+}
+add_filter( 'ace_sitemap_generation_post_key', 'ace_sitemap_powertools_page_map_post_key', 10, 2 );
+
 function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num ) {
     $per_page = ace_sitemap_powertools_effective_post_max_urls();
     $post_ids = ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page );
@@ -3056,6 +3301,14 @@ add_filter( 'wp_sitemaps_posts_pre_url_list', 'ace_sitemap_powertools_posts_pre_
 function ace_sitemap_powertools_posts_pre_max_num_pages( $max_num_pages, $post_type ) {
     if ( null !== $max_num_pages || ! ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) ) {
         return $max_num_pages;
+    }
+
+    if ( ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
+        $map = ace_sitemap_powertools_maintain_page_map( $post_type );
+        if ( $map ) {
+            $min_num_pages = ( 'page' === $post_type && 'posts' === get_option( 'show_on_front' ) ) ? 1 : 0;
+            return max( $min_num_pages, (int) $map['n'] );
+        }
     }
 
     $cache_key = sprintf(
@@ -3419,6 +3672,23 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
         $post_type = 'post';
     } elseif ( 'posts' === $provider || 'post' === $provider ) { // core announces the singular
         $post_type = $subtype ? $subtype : 'post';
+    }
+
+    // With stable pages each page knows its own newest change, so a crawler re-reads only the
+    // pages that moved instead of every page carrying the type-wide date.
+    if ( $post_type && in_array( $provider, array( 'posts', 'post' ), true ) ) {
+        $map = $post_type && ace_sitemap_powertools_stable_pages_supported( $post_type ) ? ace_sitemap_powertools_stored_page_map( $post_type ) : null;
+        if ( $map ) {
+            static $page_lastmods = array();
+            if ( ! isset( $page_lastmods[ $post_type ] ) ) {
+                $page_lastmods[ $post_type ] = wp_list_pluck( ace_sitemap_powertools_page_counts( $post_type, $map ), 'm' );
+            }
+            $m = $page_lastmods[ $post_type ][ $page - 1 ] ?? '';
+            if ( $m && '0000-00-00 00:00:00' !== $m ) {
+                $cache[ $key ] = mysql2date( 'c', $m );
+                return $cache[ $key ];
+            }
+        }
     }
 
     if ( $post_type ) {
