@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.49 (2026-10-01)
+
+- Fix: **a retention build on a large site scored every post with no search or view data.** The Search Console pages and Analytics paths for the whole property were saved as one option, which on a 41,000-post news site with a year's window passed MySQL's `max_allowed_packet` (16 MB); the save failed quietly. Only candidate posts are scored, so only their rows are kept now.
+
 ### 1.0.48 (2026-10-01)
 
 - Fix: **the retention build stalled after its first step on sites that run WP-Cron from a system crontab.** A tick only queued the next one when it was not running under WP-CLI, to stay out of the way of `wp ace-crawl retention build`; but a crontab running `wp cron event run --due-now` runs every tick under WP-CLI too. The check is now whether the CLI command is driving the build itself.

@@ -201,7 +201,10 @@ class AceSeoRetentionReport {
             $p['notes'][] = 'Search Console is not connected (Site Kit): scored on links and page views only, so "no signal" is not trustworthy.';
         }
 
-        $signals['gsc'] = $gsc;
+        // Only candidates are ever scored, so only their rows are kept. The whole property's pages (51,000
+        // on a large news site) plus Analytics' paths overran MySQL's max_allowed_packet as one option, the
+        // save failed quietly, and every post was scored with no search or view data at all.
+        $signals['gsc'] = array_intersect_key( $gsc, self::candidate_lookup( $p['settings'] ) );
         update_option( self::SIGNALS_OPTION, $signals, false );
 
         $p['phase'] = 'ga4';
@@ -221,7 +224,7 @@ class AceSeoRetentionReport {
         if ( is_wp_error( $views ) ) {
             $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
         } else {
-            $signals['ga4'] = $views;
+            $signals['ga4'] = array_intersect_key( $views, self::candidate_lookup( $p['settings'] ) );
 
             $week = self::ga4_page_views( 7 );
             if ( ! is_wp_error( $week ) ) {
