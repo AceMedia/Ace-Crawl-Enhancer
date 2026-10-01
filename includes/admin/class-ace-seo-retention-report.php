@@ -996,6 +996,8 @@ class AceSeoRetentionReport {
                 </form>
             </details>
 
+            <?php if ( class_exists( 'AceSeoSheets' ) ) { AceSeoSheets::render_settings(); } ?>
+
             <?php if ( $built ) : ?>
                 <ul class="subsubsub" style="margin-bottom:1em">
                     <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>

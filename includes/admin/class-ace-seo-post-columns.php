@@ -185,8 +185,38 @@ class AceSeoPostColumns {
             $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
         }
 
+        $header = array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
+
+        // To Google Sheets: the first batch opens a new tab and writes the header, every batch appends
+        // its own rows server-side, and the browser only carries the tab name between requests.
+        if ( 'sheets' === ( $_POST['dest'] ?? '' ) ) {
+            if ( ! class_exists( 'AceSeoSheets' ) || ! AceSeoSheets::configured() ) {
+                wp_send_json_error( __( 'Google Sheets is not set up (Ace SEO, Retention report).', 'ace-crawl-enhancer' ), 400 );
+            }
+            $tab = sanitize_text_field( wp_unslash( $_POST['tab'] ?? '' ) );
+            if ( 1 === $batch || '' === $tab ) {
+                $tab = AceSeoSheets::add_tab( $type_obj->labels->name . ' ' . wp_date( 'Y-m-d H:i:s' ) );
+                if ( is_wp_error( $tab ) ) {
+                    wp_send_json_error( $tab->get_error_message(), 502 );
+                }
+                array_unshift( $rows, $header );
+            }
+            $done = AceSeoSheets::append( $tab, $rows );
+            if ( is_wp_error( $done ) ) {
+                wp_send_json_error( $done->get_error_message(), 502 );
+            }
+            wp_send_json_success( array(
+                'tab'   => $tab,
+                'url'   => AceSeoSheets::sheet_url(),
+                'count' => count( $ids ),
+                'total' => (int) $query->found_posts,
+                'pages' => (int) $query->max_num_pages,
+                'batch' => $batch,
+            ) );
+        }
+
         wp_send_json_success( array(
-            'header' => array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) ),
+            'header' => $header,
             'rows'   => $rows,
             'total'  => (int) $query->found_posts,
             'pages'  => (int) $query->max_num_pages,
@@ -204,63 +234,112 @@ class AceSeoPostColumns {
         if ( ! $screen instanceof WP_Screen || 'edit' !== $screen->base || ! in_array( $screen->post_type, self::post_types(), true ) ) {
             return;
         }
-        $label = __( 'Export CSV', 'ace-crawl-enhancer' );
+        $sheets = class_exists( 'AceSeoSheets' ) && AceSeoSheets::configured();
         ?>
+        <style>
+            #ace-seo-export-progress{display:none;align-items:center;gap:.6em;margin:.4em 0 .6em;padding:.5em .75em;background:#fff;border:1px solid #c3c4c7;border-left:4px solid #2271b1;max-width:640px}
+            #ace-seo-export-progress.is-on{display:flex}
+            #ace-seo-export-progress progress{flex:1;height:14px}
+            #ace-seo-export-progress .ace-msg{white-space:nowrap;font-variant-numeric:tabular-nums}
+        </style>
         <script>
         (function () {
             var bar = document.querySelector('.tablenav.top .actions:not(.bulkactions)');
             if (!bar || !window.fetch || !window.Blob) { return; }
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'button';
-            b.id = 'ace-seo-export';
-            b.title = <?php echo wp_json_encode( __( 'Everything this list shows with its current filters, search and sort, not just this page', 'ace-crawl-enhancer' ) ); ?>;
-            b.textContent = <?php echo wp_json_encode( $label ); ?>;
-            bar.appendChild(b);
+            var nonce = <?php echo wp_json_encode( wp_create_nonce( 'ace_seo_list_export' ) ); ?>;
+            var mk = function (id, label, title) {
+                var b = document.createElement('button');
+                b.type = 'button'; b.className = 'button'; b.id = id; b.textContent = label; b.title = title;
+                bar.appendChild(b);
+                return b;
+            };
+            var title = <?php echo wp_json_encode( __( 'Everything this list shows with its current filters, search and sort, not just this page', 'ace-crawl-enhancer' ) ); ?>;
+            var csvBtn = mk('ace-seo-export', <?php echo wp_json_encode( __( 'Export CSV', 'ace-crawl-enhancer' ) ); ?>, title);
+            var gsBtn = <?php echo $sheets ? 'mk(\'ace-seo-export-sheets\', ' . wp_json_encode( __( 'Export to Google Sheets', 'ace-crawl-enhancer' ) ) . ', title)' : 'null'; ?>;
+
+            var box = document.createElement('div');
+            box.id = 'ace-seo-export-progress';
+            box.setAttribute('role', 'status');
+            box.innerHTML = '<progress max="100" value="0"></progress><span class="ace-msg"></span><button type="button" class="button-link">Cancel</button>';
+            var tablenav = document.querySelector('.tablenav.top');
+            tablenav.parentNode.insertBefore(box, tablenav.nextSibling);
+            var meter = box.querySelector('progress'), msg = box.querySelector('.ace-msg'), cancel = box.querySelector('button');
+            var stopped = false;
+            cancel.addEventListener('click', function () { stopped = true; });
+
             var cell = function (v) {
                 v = v === null || v === undefined ? '' : String(v);
                 if (/^[=+\-@]/.test(v)) { v = "'" + v; }
-                return /[",
-]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+                return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
             };
-            b.addEventListener('click', function () {
+            var fmt = function (n) { return Number(n).toLocaleString(); };
+
+            var run = function (dest) {
                 var q = window.location.search.replace(/^\?/, '').split('&').filter(function (p) { return p && p.indexOf('paged=') !== 0; }).join('&');
-                var rows = [], header = null, page = 1, pages = 1;
-                b.disabled = true;
+                var rows = [], header = null, page = 1, pages = 1, total = 0, done = 0, tab = '', sheetUrl = '';
+                stopped = false;
+                csvBtn.disabled = true; if (gsBtn) { gsBtn.disabled = true; }
+                meter.removeAttribute('value');
+                msg.textContent = 'Counting posts…';
+                box.classList.add('is-on');
+                cancel.hidden = false;
                 var next = function () {
+                    if (stopped) { throw new Error('cancelled'); }
                     var fd = new FormData();
                     fd.append('action', 'ace_seo_list_export');
-                    fd.append('_ajax_nonce', <?php echo wp_json_encode( wp_create_nonce( 'ace_seo_list_export' ) ); ?>);
+                    fd.append('_ajax_nonce', nonce);
                     fd.append('q', q);
                     fd.append('batch', String(page));
+                    fd.append('dest', dest);
+                    fd.append('tab', tab);
                     return fetch(window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd })
-                        .then(function (r) { return r.json(); })
+                        .then(function (r) { return r.json().catch(function () { throw new Error('The server returned ' + r.status + ' on batch ' + page + '.'); }); })
                         .then(function (j) {
                             if (!j || !j.success) { throw new Error((j && j.data) || 'Export failed'); }
-                            header = j.data.header;
                             pages = Math.max(1, j.data.pages);
-                            rows = rows.concat(j.data.rows);
-                            b.textContent = 'Exporting ' + Math.min(page, pages) + ' of ' + pages + '…';
+                            total = j.data.total;
+                            if (dest === 'sheets') {
+                                tab = j.data.tab; sheetUrl = j.data.url; done += j.data.count;
+                            } else {
+                                header = j.data.header; rows = rows.concat(j.data.rows); done = rows.length;
+                            }
+                            meter.max = total || 1;
+                            meter.value = done;
+                            msg.textContent = fmt(done) + ' of ' + fmt(total) + ' posts · batch ' + Math.min(page, pages) + ' of ' + pages;
                             page++;
                             return page <= pages ? next() : null;
                         });
                 };
                 next().then(function () {
-                    var csv = [header].concat(rows).map(function (r) { return r.map(cell).join(','); }).join('
-');
+                    cancel.hidden = true;
+                    if (dest === 'sheets') {
+                        msg.innerHTML = '';
+                        msg.append(fmt(done) + ' posts sent to tab “' + tab + '”. ');
+                        var l = document.createElement('a');
+                        l.href = sheetUrl; l.target = '_blank'; l.rel = 'noopener'; l.textContent = 'Open the spreadsheet';
+                        msg.append(l);
+                        return;
+                    }
+                    var csv = [header].concat(rows).map(function (r) { return r.map(cell).join(','); }).join('\r\n');
                     var a = document.createElement('a');
                     a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
                     a.download = <?php echo wp_json_encode( $screen->post_type . '-' ); ?> + new Date().toISOString().slice(0, 10) + '.csv';
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
+                    msg.textContent = fmt(done) + ' posts exported.';
+                    setTimeout(function () { box.classList.remove('is-on'); }, 4000);
                 }).catch(function (e) {
-                    window.alert(e.message);
+                    cancel.hidden = true;
+                    msg.textContent = e.message === 'cancelled'
+                        ? 'Cancelled.' + (dest === 'sheets' && tab ? ' The partial tab “' + tab + '” is left in the spreadsheet.' : '')
+                        : 'Export stopped: ' + e.message;
                 }).then(function () {
-                    b.disabled = false;
-                    b.textContent = <?php echo wp_json_encode( $label ); ?>;
+                    csvBtn.disabled = false; if (gsBtn) { gsBtn.disabled = false; }
                 });
-            });
+            };
+            csvBtn.addEventListener('click', function () { run('csv'); });
+            if (gsBtn) { gsBtn.addEventListener('click', function () { run('sheets'); }); }
         })();
         </script>
         <?php

@@ -249,6 +249,11 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.46 (2026-10-01)
+
+- New: the post list's **CSV export shows a progress bar** under the toolbar, with posts done of the total, the batch it is on, and a Cancel. Errors say which batch failed rather than leaving the button stuck.
+- New: **Export to Google Sheets** beside Export CSV. Same filters, search and sort, same batches; each batch is appended server-side to a new tab in one spreadsheet. Set up under Retention report, Google Sheets export: a service account JSON key (or `ACE_SEO_SHEETS_KEY_FILE` pointing at one outside the web root) and a spreadsheet shared with that account as an Editor. Saving tests the connection. Values are written RAW, so nothing in a title is evaluated as a formula. No Google client library; a signed JWT buys the token.
+
 ### 1.0.45 (2026-10-01)
 
 - Fix: **background sitemap rebuilds keep up on busy sites.** Every post save marked every page of its post type stale, and the worker rebuilt stale pages in key order, so on a site publishing all day the same early pages were rebuilt every pass while later pages never came round (TalkFuse: 280 of 288 story pages permanently stale).
