@@ -122,14 +122,19 @@ class AceSeoRetentionReport {
         self::schedule_tick();
     }
 
+    /** True while run_all() is driving the build itself, so ticks do not also queue cron events. */
+    private static $running_all = false;
+
     public static function run_all( $callback = null ) {
-        $guard = 0;
+        $guard             = 0;
+        self::$running_all = true;
         while ( self::is_building() && $guard++ < 100000 ) {
             self::run_tick();
             if ( $callback ) {
                 call_user_func( $callback, self::progress() );
             }
         }
+        self::$running_all = false;
         return self::progress();
     }
 
@@ -160,7 +165,9 @@ class AceSeoRetentionReport {
                 break;
         }
 
-        if ( self::is_building() && ! ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+        // Not "unless WP-CLI": a site that runs WP-Cron from a system crontab runs every tick under
+        // WP-CLI, and the build stalled after its first step.
+        if ( self::is_building() && ! self::$running_all ) {
             self::schedule_tick();
         }
     }

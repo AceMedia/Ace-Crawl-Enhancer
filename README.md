@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.48 (2026-10-01)
+
+- Fix: **the retention build stalled after its first step on sites that run WP-Cron from a system crontab.** A tick only queued the next one when it was not running under WP-CLI, to stay out of the way of `wp ace-crawl retention build`; but a crontab running `wp cron event run --due-now` runs every tick under WP-CLI too. The check is now whether the CLI command is driving the build itself.
+
 ### 1.0.47 (2026-10-01)
 
 - Change: **lifetimes are worked out on the fly** instead of being stamped on a post when it is first published. A post's `unavailable_after` is its lifetime counted from whichever is later, the publish date or the last edit, so a new rule reaches the whole archive the moment it is saved and updating a post gives it a fresh lifetime. A date set by hand still always wins. Nothing is written to post meta any more.
