@@ -249,6 +249,10 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.53 (2026-10-01)
+
+- Fix: a rebuilt sitemap no longer sits behind a stale page-cache copy. When a rebuild changes what a sitemap serves, every public URL for it (the clean route such as `/pages.xml`, its legacy `wp-sitemap-*.xml` name, and `/wp-sitemap.xml` plus `/sitemap.xml` for the index) is purged through Ace Redis Cache's `ace_redis_cache_purge_url` action, which also bans them in Varnish when one sits in front of the site. Rebuilds that change nothing purge nothing. Other cache layers can hook `ace_sitemap_generation_artifact_changed`, and `ace_sitemap_generation_public_urls` adjusts the URL list.
+
 ### 1.0.52 (2026-10-01)
 
 - New: **periods and trends.** Each build also pulls page views for the last 7, 14, 30 and 90 days, and search clicks and impressions for 30 and 90 (Search Console runs a few days behind, so not 7 or 14), and keeps them on each post. A post's **momentum** is its last 30 days' daily rate against the window's: rising (1.5× or more), steady, falling (half or less), gone quiet (read in the window, nothing in 90 days), or too quiet to tell.

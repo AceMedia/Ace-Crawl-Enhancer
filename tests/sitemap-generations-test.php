@@ -258,6 +258,42 @@ try {
     // 11. Ace Redis Cache no longer warms sitemap URLs over HTTP.
     $urls = ace_sitemap_gen_filter_redis_prime_urls( array( home_url( '/sitemap.xml' ), home_url( '/wp-sitemap-posts-post-1.xml' ), home_url( '/about/' ) ) );
     $check( 'redis primer keeps only non-sitemap URLs', array( home_url( '/about/' ) ) === $urls );
+
+    // 12. A rebuild that changes what is served purges downstream page caches; one that does not, does not.
+    $index_urls = ace_sitemap_gen_public_urls( 'index', array( 'provider' => 'index', 'subtype' => '', 'page' => 0 ) );
+    $check( 'index purge covers both index URLs', in_array( home_url( '/wp-sitemap.xml' ), $index_urls, true ) && in_array( home_url( '/sitemap.xml' ), $index_urls, true ) );
+
+    foreach ( ace_sitemap_powertools_custom_routes() as $slug => $route ) {
+        $route_urls = ace_sitemap_gen_public_urls( 'route', array( 'provider' => $route['provider'], 'subtype' => $route['subtype'], 'page' => 1 ) );
+        $has_core   = (bool) preg_grep( '~/wp-sitemap-~', $route_urls );
+        $has_clean  = (bool) preg_grep( '~/' . preg_quote( $slug, '~' ) . '(-1)?\.xml$~', $route_urls );
+        $check( "route {$slug} purge covers its core and clean URLs", $has_core && $has_clean );
+        break;
+    }
+
+    $purge_key  = 'url|purgeprov|x|1';
+    $purge_meta = array( 'provider' => 'purgeprov', 'subtype' => 'x', 'page' => 1 );
+    $purge_url  = home_url( '/ace-sitemap-purge-test.xml' );
+    $purged     = array();
+    $add_url    = function ( $urls, $key ) use ( $purge_key, $purge_url ) {
+        return $key === $purge_key ? array_merge( $urls, array( $purge_url ) ) : $urls;
+    };
+    $listen     = function ( $key, $meta, $urls ) use ( &$purged, $purge_key ) {
+        if ( $key === $purge_key ) {
+            $purged[] = $urls;
+        }
+    };
+    add_filter( 'ace_sitemap_generation_public_urls', $add_url, 10, 2 );
+    add_action( 'ace_sitemap_generation_artifact_changed', $listen, 10, 3 );
+    $v2 = array( array( 'loc' => 'https://example.test/c/' ) );
+    ace_sitemap_gen_build( $purge_key, $purge_meta, function () use ( $v1 ) { return $v1; } );
+    $check( 'first build purges its URLs', 1 === count( $purged ) && array( $purge_url ) === $purged[0] );
+    ace_sitemap_gen_build( $purge_key, $purge_meta, function () use ( $v1 ) { return $v1; } );
+    $check( 'identical rebuild does not purge', 1 === count( $purged ) );
+    ace_sitemap_gen_build( $purge_key, $purge_meta, function () use ( $v2 ) { return $v2; } );
+    $check( 'changed rebuild purges again', 2 === count( $purged ) );
+    remove_filter( 'ace_sitemap_generation_public_urls', $add_url, 10 );
+    remove_action( 'ace_sitemap_generation_artifact_changed', $listen, 10 );
 } finally {
     wp_clear_scheduled_hook( ACE_SITEMAP_GEN_HOOK );
     if ( $saved_cron ) {

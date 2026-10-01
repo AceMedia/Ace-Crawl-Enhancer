@@ -740,6 +740,13 @@ function ace_sitemap_gen_build( $key, array $meta, callable $builder ) {
     }
 
     ace_sitemap_gen_clear_failure( $key );
+
+    // Page caches in front of the site keep the XML they served from the old list until
+    // told otherwise. Only a change in what is served needs them dropped.
+    if ( ! $previous || ( $previous['data'] ?? null ) !== $artifact['data'] ) {
+        ace_sitemap_gen_purge_downstream( $key, $meta );
+    }
+
     return $artifact;
 }
 
@@ -783,6 +790,51 @@ function ace_sitemap_gen_builder_for( array $meta ) {
     return function () use ( $provider, $meta ) {
         return $provider->get_url_list( (int) $meta['page'], (string) $meta['subtype'] );
     };
+}
+
+/* --------------------------------------------------------- Downstream caches */
+
+/**
+ * Every public URL that serves an artifact. Page caches key on the URL, so the legacy core
+ * name and the clean Powertools route are separate copies and both have to go.
+ */
+function ace_sitemap_gen_public_urls( $key, array $meta ) {
+    $urls = array();
+
+    if ( 'index' === $meta['provider'] ) {
+        $urls[] = home_url( '/wp-sitemap.xml' );
+        $urls[] = home_url( '/sitemap.xml' );
+    } elseif ( function_exists( 'wp_sitemaps_get_server' ) ) {
+        $provider = wp_sitemaps_get_server()->registry->get_provider( $meta['provider'] );
+        if ( $provider ) {
+            $page   = max( 1, (int) $meta['page'] );
+            $core   = $provider->get_sitemap_url( (string) $meta['subtype'], $page );
+            $urls[] = $core;
+            if ( function_exists( 'ace_sitemap_powertools_custom_loc_for_entry' ) ) {
+                $entry  = ace_sitemap_powertools_custom_loc_for_entry( array( 'loc' => $core ), $meta['provider'], $meta['subtype'], $page );
+                $urls[] = is_array( $entry ) ? ( $entry['loc'] ?? '' ) : '';
+            }
+        }
+    }
+
+    $urls = (array) apply_filters( 'ace_sitemap_generation_public_urls', $urls, $key, $meta );
+
+    return array_values( array_unique( array_filter( $urls, function ( $url ) {
+        return is_string( $url ) && '' !== $url;
+    } ) ) );
+}
+
+/**
+ * Drop downstream copies of an artifact that changed. Ace Redis Cache purges its page cache
+ * through its public action and mirrors that to Varnish when one sits in front of the site;
+ * any other cache layer can listen for ace_sitemap_generation_artifact_changed.
+ */
+function ace_sitemap_gen_purge_downstream( $key, array $meta ) {
+    $urls = ace_sitemap_gen_public_urls( $key, $meta );
+    foreach ( $urls as $url ) {
+        do_action( 'ace_redis_cache_purge_url', $url );
+    }
+    do_action( 'ace_sitemap_generation_artifact_changed', $key, $meta, $urls );
 }
 
 /* ------------------------------------------------------------------- Worker */

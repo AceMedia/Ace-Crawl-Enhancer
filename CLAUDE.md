@@ -69,6 +69,8 @@ drift from each other, and that drift is the bug.
   store, NOT options: web requests and a WP-CLI cron worker can have different object caches. Regression
   checks: `wp eval-file <plugin>/tests/sitemap-generations-test.php`. ID-ordered post types use stable pages
   (fixed ID range per page, page map in the store, one edit = one page rebuilt); `post` keeps offset paging.
+  A rebuild that changes what is served purges its public URLs downstream (`ace_redis_cache_purge_url`, which
+  Ace Redis Cache mirrors to Varnish) and fires `ace_sitemap_generation_artifact_changed`.
 - `includes/frontend/` — `class-ace-seo-frontend.php` (head output + OG/Twitter + Jetpack override +
   JSON-LD graph), `class-ace-seo-schema.php` (Organization/Person/LocalBusiness + orphaned Product/FAQ
   builders), `class-ace-seo-breadcrumbs.php` (visual trail only), `class-ace-seo-performance.php`
