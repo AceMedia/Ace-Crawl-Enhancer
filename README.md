@@ -249,6 +249,12 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.52 (2026-10-01)
+
+- New: **periods and trends.** Each build also pulls page views for the last 7, 14, 30 and 90 days, and search clicks and impressions for 30 and 90 (Search Console runs a few days behind, so not 7 or 14), and keeps them on each post. A post's **momentum** is its last 30 days' daily rate against the window's: rising (1.5× or more), steady, falling (half or less), gone quiet (read in the window, nothing in 90 days), or too quiet to tell.
+- New: **By section** on the Retention report: old posts per top-level category with retained share, views over the window and the last 30 days, momentum with an arrow against the build before, and rising, falling and gone-quiet counts. Kept per build in the history, so sections can be compared week to week.
+- New: trend counts and trend moves in Week by week; a trend filter and momentum (sortable) on the post list; trend, momentum and the period figures in the list export.
+
 ### 1.0.51 (2026-10-01)
 
 - New: **Week by week** on the Retention report. Every finished build is kept (the last 26): bucket and tier counts with the change on the build before, old posts' share of views, and the biggest moves between buckets ("Refresh → Keep: 154"). Each post's previous bucket and tier are read before it is rescored, so the moves are real per-post changes, not just differences in totals.

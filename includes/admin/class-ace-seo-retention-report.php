@@ -34,6 +34,12 @@ class AceSeoRetentionReport {
     /** Seconds a cron tick keeps taking batches: a site's cron fires once a minute, a batch at a time is two hours. */
     const TICK_BUDGET     = 40;
     const SIGNALS_OPTION  = 'ace_seo_retention_signals';
+    /** Shorter windows read against the main one, for trends. Each is its own option: post ID => numbers. */
+    const PERIODS         = array( 7, 14, 30, 90 );
+    const PERIOD_OPTION   = 'ace_seo_retention_period_';
+    const META_TREND      = '_ace_seo_ret_trend';
+    const META_MOMENTUM   = '_ace_seo_ret_momentum';
+    const TRENDS          = array( 'rising', 'steady', 'falling', 'gone', 'quiet' );
     const CRON_HOOK       = 'ace_seo_retention_tick';
     const BATCH           = 300;
 
@@ -221,6 +227,9 @@ class AceSeoRetentionReport {
         // on a large news site) plus Analytics' paths overran MySQL's max_allowed_packet as one option, the
         // save failed quietly, and every post was scored with no search or view data at all.
         $signals['gsc'] = array_intersect_key( $gsc, self::candidate_lookup( $p['settings'] ) );
+        if ( ! empty( $gsc ) ) {
+            self::store_periods( 'gsc', $p['settings'] );
+        }
         update_option( self::SIGNALS_OPTION, $signals, false );
 
         $p['phase'] = 'ga4';
@@ -241,6 +250,7 @@ class AceSeoRetentionReport {
             $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
         } else {
             $signals['ga4'] = array_intersect_key( $views, self::candidate_lookup( $p['settings'] ) );
+            self::store_periods( 'ga4', $p['settings'] );
 
             $week = self::ga4_page_views( 7 );
             if ( ! is_wp_error( $week ) ) {
@@ -446,6 +456,20 @@ class AceSeoRetentionReport {
                 'backlinks'   => isset( $backlinks[ $id ] ) ? (int) $backlinks[ $id ] : null,
                 'words'       => (int) ( $words[ $id ] ?? 0 ),
             );
+            $row['periods'] = array();
+            foreach ( self::PERIODS as $days ) {
+                $v = self::period( 'ga4', $days );
+                if ( $v ) {
+                    $row['periods'][ 'views_' . $days ] = (int) ( $v[ $id ] ?? 0 );
+                }
+                $g = self::period( 'gsc', $days );
+                if ( $g ) {
+                    $row['periods'][ 'clicks_' . $days ]      = (int) ( $g[ $id ][0] ?? 0 );
+                    $row['periods'][ 'impressions_' . $days ] = (int) ( $g[ $id ][1] ?? 0 );
+                }
+            }
+            list( $row['trend'], $row['momentum'] ) = self::trend( $row, $settings );
+
             $prev = get_post_meta( $id, self::META, true );
             $prev = is_array( $prev ) ? $prev : array();
             list( $bucket, $reason ) = self::bucket( $row, $settings );
@@ -465,6 +489,33 @@ class AceSeoRetentionReport {
                 $move = $from . '>' . $row['bucket'];
                 $p['moves'][ $move ] = ( $p['moves'][ $move ] ?? 0 ) + 1;
             }
+            $trfrom = (string) ( $prev['trend'] ?? 'new' );
+            if ( $trfrom !== $row['trend'] ) {
+                $move = $trfrom . '>' . $row['trend'];
+                $p['trend_moves'][ $move ] = ( $p['trend_moves'][ $move ] ?? 0 ) + 1;
+            }
+            $p['trends'][ $row['trend'] ] = ( $p['trends'][ $row['trend'] ] ?? 0 ) + 1;
+
+            // Per top-level category, so sections can be compared with each other and week to week.
+            $cats = get_the_category( $id );
+            if ( $cats ) {
+                $top = $cats[0];
+                while ( $top->parent && ( $parent = get_category( $top->parent ) ) && ! is_wp_error( $parent ) ) {
+                    $top = $parent;
+                }
+                $c = $p['cats'][ $top->term_id ] ?? array( 'posts' => 0, 'views' => 0, 'views_30' => 0, 'views_90' => 0, 'clicks' => 0, 'retained' => 0, 'rising' => 0, 'falling' => 0, 'gone' => 0 );
+                $c['posts']++;
+                $c['views']    += (int) $row['views'];
+                $c['views_30'] += (int) ( $row['periods']['views_30'] ?? 0 );
+                $c['views_90'] += (int) ( $row['periods']['views_90'] ?? 0 );
+                $c['clicks']   += (int) $row['clicks'];
+                foreach ( array( 'rising', 'falling', 'gone' ) as $t ) {
+                    $c[ $t ] += $t === $row['trend'] ? 1 : 0;
+                }
+                $c['retained'] += 'retained' === $row['tier'] ? 1 : 0;
+                $p['cats'][ $top->term_id ] = $c;
+            }
+
             $tfrom = (string) ( $prev['tier'] ?? 'new' );
             if ( isset( $row['tier'] ) && $tfrom !== $row['tier'] ) {
                 $move = $tfrom . '>' . $row['tier'];
@@ -480,6 +531,7 @@ class AceSeoRetentionReport {
             $p['phase']    = 'done';
             $p['finished'] = time();
             delete_option( self::SIGNALS_OPTION );
+            self::forget_periods();
             self::forget_stale( (int) $p['started'] );
             self::record_history( $p );
         }
@@ -498,6 +550,9 @@ class AceSeoRetentionReport {
             'tiers'      => (array) ( $p['tiers'] ?? array() ),
             'moves'      => (array) ( $p['moves'] ?? array() ),
             'tier_moves' => (array) ( $p['tier_moves'] ?? array() ),
+            'trends'     => (array) ( $p['trends'] ?? array() ),
+            'trend_moves'=> (array) ( $p['trend_moves'] ?? array() ),
+            'cats'       => (array) ( $p['cats'] ?? array() ),
             'share'      => $p['share'] ?? null,
         );
         update_option( self::HISTORY_OPTION, array_slice( $h, -self::HISTORY_KEEP ), false );
@@ -528,6 +583,7 @@ class AceSeoRetentionReport {
             <th>Built</th>
             <?php foreach ( self::BUCKETS as $b ) : ?><th><?php echo esc_html( $labels[ $b ] ?? $b ); ?></th><?php endforeach; ?>
             <?php foreach ( self::TIERS as $t ) : ?><th><?php echo esc_html( ucfirst( $t ) ); ?></th><?php endforeach; ?>
+            <th>Rising</th><th>Falling</th><th>Gone quiet</th>
             <th>Old posts' share of views</th><th>Biggest moves</th>
         </tr></thead><tbody>
         <?php
@@ -542,6 +598,7 @@ class AceSeoRetentionReport {
                 <td><?php echo esc_html( wp_date( 'j M Y', (int) $row['finished'] ) ); ?><br><span style="font-size:11px;color:#666"><?php echo esc_html( (int) $row['years'] . 'y+, ' . (int) $row['days'] . '-day window' ); ?></span></td>
                 <?php foreach ( self::BUCKETS as $b ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['counts'][ $b ] ?? 0 ) ) ) . $delta( $row['counts'][ $b ] ?? 0, $prev ? ( $prev['counts'][ $b ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
                 <?php foreach ( self::TIERS as $t ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['tiers'][ $t ] ?? 0 ) ) ) . $delta( $row['tiers'][ $t ] ?? 0, $prev ? ( $prev['tiers'][ $t ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
+                <?php foreach ( array( 'rising', 'falling', 'gone' ) as $t ) : ?><td><?php echo isset( $row['trends'] ) ? esc_html( number_format_i18n( (int) ( $row['trends'][ $t ] ?? 0 ) ) ) . $delta( $row['trends'][ $t ] ?? 0, $prev && isset( $prev['trends'] ) ? ( $prev['trends'][ $t ] ?? 0 ) : null ) : '–'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
                 <td><?php echo ! empty( $row['share']['total'] ) ? esc_html( round( 100 * $row['share']['old'] / $row['share']['total'], 1 ) . '%' ) : '–'; ?></td>
                 <td style="font-size:11px"><?php
                     $out = array();
@@ -551,6 +608,54 @@ class AceSeoRetentionReport {
                     }
                     echo $out ? implode( '<br>', $out ) : ( $prev ? 'No moves' : 'First build' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                 ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody></table>
+        <?php
+        self::render_categories( $h );
+    }
+
+    /**
+     * Sections side by side from the latest build: how much each is still read, how its last month
+     * compares with its year, and how that has moved since the build before.
+     */
+    private static function render_categories( array $h ) {
+        $last = end( $h );
+        if ( empty( $last['cats'] ) ) {
+            return;
+        }
+        $before = count( $h ) > 1 ? $h[ count( $h ) - 2 ]['cats'] ?? array() : array();
+        $cats   = $last['cats'];
+        uasort( $cats, static function ( $a, $b ) {
+            return $b['views'] <=> $a['views'];
+        } );
+        $days = max( 1, (int) $last['days'] );
+        $mom  = static function ( $c ) use ( $days ) {
+            return $c['views'] > 0 ? ( $c['views_30'] / 30 ) / ( $c['views'] / $days ) : null;
+        };
+        ?>
+        <h2>By section</h2>
+        <p>Old posts grouped by top-level category. <strong>Momentum</strong> is the last 30 days' daily views against the <?php echo esc_html( $days ); ?>-day average: above 1 the section's old posts are being read more than usual lately, below 1 less. The arrow compares it with the build before.</p>
+        <table class="widefat striped" style="max-width:1100px"><thead><tr>
+            <th>Section</th><th>Old posts</th><th>Retained</th><th>Views (window)</th><th>Views (30 days)</th><th>Momentum</th><th>Rising</th><th>Falling</th><th>Gone quiet</th><th>Search clicks</th>
+        </tr></thead><tbody>
+        <?php foreach ( array_slice( $cats, 0, 40, true ) as $term_id => $c ) :
+            $term = get_term( (int) $term_id, 'category' );
+            $m    = $mom( $c );
+            $pm   = isset( $before[ $term_id ] ) ? $mom( $before[ $term_id ] ) : null;
+            $link = admin_url( 'edit.php?post_type=post&cat=' . (int) $term_id );
+            ?>
+            <tr>
+                <td><a href="<?php echo esc_url( $link ); ?>"><?php echo esc_html( $term && ! is_wp_error( $term ) ? $term->name : '#' . $term_id ); ?></a></td>
+                <td><?php echo esc_html( number_format_i18n( $c['posts'] ) ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['retained'] ) . ' (' . round( 100 * $c['retained'] / max( 1, $c['posts'] ) ) . '%)' ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['views'] ) ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['views_30'] ) ); ?></td>
+                <td><?php echo null === $m ? '–' : esc_html( number_format_i18n( $m, 2 ) ) . ( null !== $pm && abs( $m - $pm ) >= 0.05 ? ( $m > $pm ? ' <span style="color:#1a7f37">▲</span>' : ' <span style="color:#b32d2e">▼</span>' ) : '' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['rising'] ) ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['falling'] ) ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['gone'] ) ); ?></td>
+                <td><?php echo esc_html( number_format_i18n( $c['clicks'] ) ); ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody></table>
@@ -601,11 +706,105 @@ class AceSeoRetentionReport {
             delete_post_meta( $id, self::META_VIEWS );
         }
         update_post_meta( $id, self::META_BUILT, (int) $build );
+        update_post_meta( $id, self::META_TREND, (string) ( $row['trend'] ?? '' ) );
+        if ( isset( $row['momentum'] ) && null !== $row['momentum'] ) {
+            update_post_meta( $id, self::META_MOMENTUM, (float) $row['momentum'] );
+        } else {
+            delete_post_meta( $id, self::META_MOMENTUM );
+        }
     }
 
     /** Meta keys the report owns, for clearing. */
     public static function meta_keys() {
-        return array( self::META, self::META_TIER, self::META_VIEWS, self::META_WORDS, self::META_LINKS, self::META_BUILT );
+        return array( self::META, self::META_TIER, self::META_VIEWS, self::META_WORDS, self::META_LINKS, self::META_BUILT, self::META_TREND, self::META_MOMENTUM );
+    }
+
+    /* ---- Periods and trends --------------------------------------------------------------------- */
+
+    /**
+     * Views (Analytics) or clicks and impressions (Search Console) for each shorter period, keyed by
+     * post ID. Search Console runs two to three days behind, so its 7- and 14-day figures are skipped.
+     */
+    private static function store_periods( $source, array $settings ) {
+        $lookup = self::candidate_lookup( $settings );
+        foreach ( self::PERIODS as $days ) {
+            if ( $days >= (int) $settings['days'] || ( 'gsc' === $source && $days < 30 ) ) {
+                continue;
+            }
+            $data = 'ga4' === $source ? self::ga4_page_views( $days ) : ( class_exists( 'AceSEOSearchConsole' ) ? AceSEOSearchConsole::pages_report( $days ) : null );
+            if ( ! is_array( $data ) ) {
+                continue;
+            }
+            $by_id = array();
+            foreach ( $data as $path => $value ) {
+                $key = 'gsc' === $source ? self::path_key( $path ) : $path;
+                if ( isset( $lookup[ $key ] ) ) {
+                    $by_id[ $lookup[ $key ] ] = 'gsc' === $source ? array( (int) $value['clicks'], (int) $value['impressions'] ) : (int) $value;
+                }
+            }
+            update_option( self::PERIOD_OPTION . $source . '_' . $days, $by_id, false );
+        }
+    }
+
+    /** @return array post ID => views (ga4) or [clicks, impressions] (gsc); empty when absent. */
+    private static function period( $source, $days ) {
+        static $cache = array();
+        $key = $source . '_' . $days;
+        if ( ! isset( $cache[ $key ] ) ) {
+            $v             = get_option( self::PERIOD_OPTION . $key, array() );
+            $cache[ $key ] = is_array( $v ) ? $v : array();
+        }
+        return $cache[ $key ];
+    }
+
+    private static function forget_periods() {
+        foreach ( array( 'ga4', 'gsc' ) as $source ) {
+            foreach ( self::PERIODS as $days ) {
+                delete_option( self::PERIOD_OPTION . $source . '_' . $days );
+            }
+        }
+    }
+
+    /**
+     * Momentum: the last 30 days' daily rate against the whole window's (views where Analytics is wired
+     * in, search clicks otherwise). 1 is steady, 2 is twice as busy as usual lately, 0.5 half. Too few
+     * views over the window to read a trend from is "quiet", and a page that was read in the window but
+     * not in the last 90 days is "gone".
+     *
+     * @return array{0: string, 1: float|null}
+     */
+    public static function trend( array $row, array $settings ) {
+        $window = max( 1, (int) $settings['days'] );
+        $total  = null !== $row['views'] ? (int) $row['views'] : (int) $row['clicks'];
+        $recent = null !== $row['views'] ? ( $row['periods']['views_30'] ?? null ) : ( $row['periods']['clicks_30'] ?? null );
+        $ninety = null !== $row['views'] ? ( $row['periods']['views_90'] ?? null ) : ( $row['periods']['clicks_90'] ?? null );
+        if ( null === $recent || $window <= 30 ) {
+            return array( 'quiet', null );
+        }
+        if ( $total >= 3 && null !== $ninety && 0 === (int) $ninety && $window > 90 ) {
+            return array( 'gone', 0.0 );
+        }
+        if ( $total < max( 6, (int) $settings['retained_views'] ) ) {
+            return array( 'quiet', null );
+        }
+        $momentum = round( ( (int) $recent / 30 ) / ( $total / $window ), 2 );
+        if ( $momentum >= 1.5 ) {
+            return array( 'rising', $momentum );
+        }
+        if ( $momentum <= 0.5 ) {
+            return array( 'falling', $momentum );
+        }
+        return array( 'steady', $momentum );
+    }
+
+    public static function trend_labels() {
+        return array(
+            'rising'  => __( 'Rising', 'ace-crawl-enhancer' ),
+            'steady'  => __( 'Steady', 'ace-crawl-enhancer' ),
+            'falling' => __( 'Falling', 'ace-crawl-enhancer' ),
+            'gone'    => __( 'Gone quiet', 'ace-crawl-enhancer' ),
+            'quiet'   => __( 'Too quiet to tell', 'ace-crawl-enhancer' ),
+        );
     }
 
     /**

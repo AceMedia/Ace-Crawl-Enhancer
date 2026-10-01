@@ -68,12 +68,13 @@ class AceSeoPostColumns {
             'ace_seo_people'      => array( '_ace_seo_humans', 'NUMERIC' ),
             'ace_seo_bot_pct'     => array( '_ace_seo_bot_pct', 'NUMERIC' ),
             'ace_seo_whitehat'    => array( '_ace_seo_whitehat', 'CHAR' ),
+            'ace_seo_momentum'    => array( '_ace_seo_ret_momentum', 'DECIMAL(10,2)' ),
         );
     }
 
     /** Query arguments that belong to the retention filters. */
     private static function retention_params() {
-        return array( 'ace_ret', 'ace_before', 'ace_views_min', 'ace_views_max', 'ace_wh' );
+        return array( 'ace_ret', 'ace_trend', 'ace_before', 'ace_views_min', 'ace_views_max', 'ace_wh' );
     }
 
     public static function init() {
@@ -149,7 +150,7 @@ class AceSeoPostColumns {
             _prime_post_caches( $ids, false, true );
         }
 
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)' );
         $rows   = array();
         foreach ( $ids as $id ) {
             $post = get_post( $id );
@@ -174,6 +175,12 @@ class AceSeoPostColumns {
                 get_post_meta( $id, '_ace_seo_bot_pct', true ),
                 get_post_meta( $id, '_ace_seo_whitehat', true ),
                 self::post_is_noindex( $id ) ? 'no' : 'yes',
+                $row['trend'] ?? '',
+                $row['momentum'] ?? '',
+                $row['periods']['views_7'] ?? '',
+                $row['periods']['views_30'] ?? '',
+                $row['periods']['views_90'] ?? '',
+                $row['periods']['clicks_30'] ?? '',
             );
 
             /**
@@ -704,6 +711,12 @@ class AceSeoPostColumns {
             echo '<span style="display:block">' . esc_html( $tiers[ $row['tier'] ] ?? $row['tier'] ) . '</span>';
         }
 
+        if ( is_array( $row ) && ! empty( $row['trend'] ) && 'quiet' !== $row['trend'] ) {
+            $trends = AceSeoRetentionReport::trend_labels();
+            echo '<span style="display:block;font-size:11px;color:#50575e">' . esc_html( $trends[ $row['trend'] ] ?? $row['trend'] )
+                . ( isset( $row['momentum'] ) && null !== $row['momentum'] ? ' (' . esc_html( number_format_i18n( (float) $row['momentum'], 2 ) ) . '×)' : '' ) . '</span>';
+        }
+
         if ( is_array( $row ) && ! empty( $row['bucket'] ) ) {
             $labels = array(
                 'keep'        => __( 'Keep', 'ace-crawl-enhancer' ),
@@ -907,6 +920,14 @@ class AceSeoPostColumns {
         }
         echo '</select>';
 
+        $trend = sanitize_key( $get( 'ace_trend' ) );
+        echo '<select name="ace_trend" aria-label="' . esc_attr__( 'Trend', 'ace-crawl-enhancer' ) . '"><option value="">'
+            . esc_html__( 'Any trend', 'ace-crawl-enhancer' ) . '</option>';
+        foreach ( AceSeoRetentionReport::trend_labels() as $value => $label ) {
+            printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $trend, $value, false ), esc_html( $label ) );
+        }
+        echo '</select>';
+
         printf(
             '<label class="screen-reader-text" for="ace-before">%1$s</label><input type="date" id="ace-before" name="ace_before" value="%2$s" title="%1$s" style="float:left;margin-right:6px">',
             esc_attr__( 'Published before', 'ace-crawl-enhancer' ),
@@ -992,6 +1013,11 @@ class AceSeoPostColumns {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'compare' => 'EXISTS' );
         } elseif ( in_array( $tier, AceSeoRetentionReport::TIERS, true ) ) {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'value' => $tier );
+        }
+
+        $trend = isset( $params['ace_trend'] ) ? sanitize_key( wp_unslash( $params['ace_trend'] ) ) : '';
+        if ( in_array( $trend, AceSeoRetentionReport::TRENDS, true ) ) {
+            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TREND, 'value' => $trend );
         }
 
         $wh = isset( $params['ace_wh'] ) ? sanitize_key( wp_unslash( $params['ace_wh'] ) ) : '';
