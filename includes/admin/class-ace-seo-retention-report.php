@@ -1112,8 +1112,16 @@ class AceSeoRetentionReport {
                 <p><button class="button">Save</button></p>
             </form>
 
-            <h2 style="margin-top:2em">Lifetimes: unavailable_after at publish</h2>
-            <p>Time-boxed content — a match preview, a weekend tips piece — gets its <code>unavailable_after</code> date the moment it is published, so it leaves search results on schedule without anyone coming back to it. Days from publish, per post type; a term rule overrides the type's. Blank means no lifetime. A date set by hand on the post is never overwritten.</p>
+            <h2 style="margin-top:2em">Lifetimes: unavailable_after</h2>
+            <p>Time-boxed content — a match preview, a weekend tips piece — carries an <code>unavailable_after</code> date so it leaves search results on schedule without anyone coming back to it. The date is worked out on every page view from whichever is later, the publish date or the last edit, plus the lifetime: a rule applies to the whole archive the moment it is saved, and updating a post gives it a fresh lifetime. Per post type; a term rule overrides the type's. Blank means no lifetime. A date set by hand on the post always wins. Nothing is deleted or redirected; the page stays up and only leaves search results.</p>
+            <?php $lc = AceSeoRetentionActions::lifetime_counts(); if ( $lc ) : ?>
+                <table class="widefat striped" style="max-width:600px;margin-bottom:1em"><thead><tr><th>Lifetime</th><th>Days</th><th>Posts</th><th>Already past it</th></tr></thead><tbody>
+                <?php foreach ( $lc as $c ) : ?>
+                    <tr><td><code><?php echo esc_html( $c['label'] ); ?></code></td><td><?php echo esc_html( number_format_i18n( $c['days'] ) ); ?></td><td><?php echo esc_html( number_format_i18n( $c['total'] ) ); ?></td><td><?php echo esc_html( number_format_i18n( $c['expired'] ) ); ?></td></tr>
+                <?php endforeach; ?>
+                </tbody></table>
+                <p class="description">“Already past it” is what search engines are told to drop as they next crawl each page.</p>
+            <?php endif; ?>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                 <?php wp_nonce_field( 'ace_seo_retention_options' ); ?>
                 <input type="hidden" name="action" value="ace_seo_retention_options">

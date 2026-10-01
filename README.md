@@ -249,6 +249,11 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.47 (2026-10-01)
+
+- Change: **lifetimes are worked out on the fly** instead of being stamped on a post when it is first published. A post's `unavailable_after` is its lifetime counted from whichever is later, the publish date or the last edit, so a new rule reaches the whole archive the moment it is saved and updating a post gives it a fresh lifetime. A date set by hand still always wins. Nothing is written to post meta any more.
+- New: the Lifetimes section shows, per rule, how many published posts it covers and how many are already past it, and flags a rule whose term does not exist.
+
 ### 1.0.46 (2026-10-01)
 
 - New: the post list's **CSV export shows a progress bar** under the toolbar, with posts done of the total, the batch it is on, and a Cancel. Errors say which batch failed rather than leaving the button stuck.

@@ -51,7 +51,6 @@ class AceSeoRetentionActions {
         add_action( 'template_redirect', array( __CLASS__, 'maybe_redirect' ), 2 );
         add_filter( 'the_content', array( __CLASS__, 'dated_content_notice' ), 5 );
         add_filter( 'ace_sitemap_powertools_news_query_args', array( __CLASS__, 'news_sitemap_exclusions' ) );
-        add_action( 'transition_post_status', array( __CLASS__, 'lifetime_on_publish' ), 10, 3 );
         add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
         add_action( 'added_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
     }
@@ -64,9 +63,9 @@ class AceSeoRetentionActions {
             'notice_years'   => 3,
             /* translators: {years} the post's age in whole years, {date} its publish date. */
             'notice_text'    => 'This article was published {date}. Details, prices and dates may have changed since.',
-            // Lifetimes: days from publish to unavailable_after, per post type; term rules ("taxonomy:slug"
-            // => days) override the type's, longest match wins. A time-boxed match preview lives a week;
-            // an evergreen guide has no lifetime at all.
+            // Lifetimes: days from the last publish or edit to unavailable_after, per post type; term rules
+            // ("taxonomy:slug" => days) override the type's, longest match wins. Worked out on every render,
+            // not stored, so a rule reaches the whole archive at once and an edit extends a post's life.
             'lifetimes'      => array(),
             'lifetime_rules' => array(),
             // The report's own settings (Ace SEO, Retention, Report settings). Only post meta and a
@@ -279,7 +278,7 @@ class AceSeoRetentionActions {
         return is_array( $log ) ? array_reverse( array_slice( $log, -$limit ) ) : array();
     }
 
-    /* ---- Lifetimes: unavailable_after set at publish ------------------------------------------ */
+    /* ---- Lifetimes: unavailable_after worked out on the fly --------------------------------------- */
 
     /** Days a post of this type, with these terms, should live in search results; 0 for no lifetime. */
     public static function lifetime_for( $post ) {
@@ -307,27 +306,63 @@ class AceSeoRetentionActions {
         return (int) apply_filters( 'ace_seo_retention_lifetime_days', $days, $post );
     }
 
-    /** On first publish, a post with a lifetime gets its unavailable_after date, unless one was set by hand. */
-    public static function lifetime_on_publish( $new_status, $old_status, $post ) {
-        if ( 'publish' !== $new_status || 'publish' === $old_status || ! $post instanceof WP_Post ) {
-            return;
+    /**
+     * The unavailable_after date a post carries and where it came from: a date set by hand (bulk action,
+     * the post's Advanced tab) always wins; otherwise its lifetime counted from whichever is later, the
+     * publish date or the last edit. Nothing is stored, so changing a rule moves every matching post the
+     * moment it is saved, and refreshing a post buys it another lifetime.
+     *
+     * @return array{date: string, source: string, days: int}
+     */
+    public static function unavailable_for( $post ) {
+        $post = get_post( $post );
+        if ( ! $post ) {
+            return array( 'date' => '', 'source' => '', 'days' => 0 );
         }
-        if ( '' !== (string) get_post_meta( $post->ID, self::META_UNAVAILABLE, true ) ) {
-            return;
+        $manual = (string) get_post_meta( $post->ID, self::META_UNAVAILABLE, true );
+        if ( '' !== $manual ) {
+            return array( 'date' => $manual, 'source' => 'manual', 'days' => 0 );
         }
         $days = self::lifetime_for( $post );
         if ( $days <= 0 ) {
-            return;
+            return array( 'date' => '', 'source' => '', 'days' => 0 );
         }
-        // The object handed to the transition hook can still carry a zeroed GMT date for a post being
-        // published for the first time; that is "now" anyway.
-        $published = get_post_time( 'U', true, $post );
-        if ( $published <= 0 || '0000-00-00 00:00:00' === $post->post_date_gmt ) {
-            $published = time();
+        $from = max( (int) get_post_time( 'U', true, $post ), (int) get_post_modified_time( 'U', true, $post ) );
+        return array( 'date' => gmdate( 'Y-m-d', ( $from ?: time() ) + $days * DAY_IN_SECONDS ), 'source' => 'lifetime', 'days' => $days );
+    }
+
+    /**
+     * How many published posts each lifetime currently covers, and how many are already past it, for the
+     * settings screen. Counts on the dates alone; a hand-set date on a post is not taken into account.
+     *
+     * @return array<string, array{label: string, days: int, total: int, expired: int}>
+     */
+    public static function lifetime_counts() {
+        global $wpdb;
+        $o   = self::options();
+        $out = array();
+        $now = current_time( 'mysql', true );
+        foreach ( (array) $o['lifetimes'] as $type => $days ) {
+            $row = $wpdb->get_row( $wpdb->prepare(
+                "SELECT COUNT(*) total, SUM( GREATEST( post_date_gmt, post_modified_gmt ) < DATE_SUB( %s, INTERVAL %d DAY ) ) expired FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish'",
+                $now, (int) $days, $type
+            ) );
+            $out[ 'type:' . $type ] = array( 'label' => $type, 'days' => (int) $days, 'total' => (int) $row->total, 'expired' => (int) $row->expired );
         }
-        $date = gmdate( 'Y-m-d', $published + $days * DAY_IN_SECONDS );
-        update_post_meta( $post->ID, self::META_UNAVAILABLE, $date );
-        self::log( $post->ID, 'unavailable-after', $date, 'publish:' . $days . 'd' );
+        foreach ( (array) $o['lifetime_rules'] as $key => $days ) {
+            list( $taxonomy, $slug ) = array_pad( explode( ':', $key, 2 ), 2, '' );
+            $term = get_term_by( 'slug', $slug, $taxonomy );
+            if ( ! $term ) {
+                $out[ $key ] = array( 'label' => $key . ' (no such term)', 'days' => (int) $days, 'total' => 0, 'expired' => 0 );
+                continue;
+            }
+            $row = $wpdb->get_row( $wpdb->prepare(
+                "SELECT COUNT(*) total, SUM( GREATEST( p.post_date_gmt, p.post_modified_gmt ) < DATE_SUB( %s, INTERVAL %d DAY ) ) expired FROM {$wpdb->posts} p INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = p.ID WHERE tr.term_taxonomy_id = %d AND p.post_status = 'publish'",
+                $now, (int) $days, (int) $term->term_taxonomy_id
+            ) );
+            $out[ $key ] = array( 'label' => $key, 'days' => (int) $days, 'total' => (int) $row->total, 'expired' => (int) $row->expired );
+        }
+        return $out;
     }
 
     /** The two metabox fields share these meta keys: keep what is saved by hand in the shape the front end reads. */
@@ -368,7 +403,7 @@ class AceSeoRetentionActions {
     public static function state( $id ) {
         return array(
             'noindex'     => '1' === (string) get_post_meta( $id, self::META_NOINDEX, true ),
-            'unavailable' => (string) get_post_meta( $id, self::META_UNAVAILABLE, true ),
+            'unavailable' => self::unavailable_for( $id )['date'],
             'redirect'    => (string) get_post_meta( $id, self::META_REDIRECT, true ),
             'news_excl'   => '1' === (string) get_post_meta( $id, self::META_NEWS_EXCL, true ),
             'notice'      => (string) get_post_meta( $id, self::META_NOTICE, true ),
@@ -417,7 +452,7 @@ class AceSeoRetentionActions {
         if ( ! is_singular() ) {
             return $robots;
         }
-        $date = (string) get_post_meta( get_queried_object_id(), self::META_UNAVAILABLE, true );
+        $date = self::unavailable_for( get_queried_object_id() )['date'];
         if ( '' === $date ) {
             return $robots;
         }
