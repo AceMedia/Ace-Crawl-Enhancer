@@ -705,7 +705,7 @@ class AceSeoPostColumns {
         if ( is_array( $row ) && ! empty( $row['tier'] ) ) {
             $tiers = array(
                 'retained'  => __( 'Retained', 'ace-crawl-enhancer' ),
-                'candidate' => __( 'Deletion candidate', 'ace-crawl-enhancer' ),
+                'candidate' => __( 'Candidate for review', 'ace-crawl-enhancer' ),
                 'dormant'   => __( 'Dormant', 'ace-crawl-enhancer' ),
             );
             echo '<span style="display:block">' . esc_html( $tiers[ $row['tier'] ] ?? $row['tier'] ) . '</span>';
@@ -718,13 +718,7 @@ class AceSeoPostColumns {
         }
 
         if ( is_array( $row ) && ! empty( $row['bucket'] ) ) {
-            $labels = array(
-                'keep'        => __( 'Keep', 'ace-crawl-enhancer' ),
-                'refresh'     => __( 'Refresh', 'ace-crawl-enhancer' ),
-                'consolidate' => __( 'Consolidate', 'ace-crawl-enhancer' ),
-                'noindex'     => __( 'Noindex', 'ace-crawl-enhancer' ),
-                'no-signal'   => __( 'No signal', 'ace-crawl-enhancer' ),
-            );
+            $labels = AceSeoRetentionReport::recommendation_labels();
             printf(
                 '<strong title="%s">%s</strong>',
                 esc_attr( (string) ( $row['reason'] ?? '' ) ),
@@ -791,27 +785,21 @@ class AceSeoPostColumns {
      * @return array
      */
     private static function cheap_filters() {
-        $filters = array( 'noindex' => __( 'Noindex only', 'ace-crawl-enhancer' ) );
+        $filters = array( 'noindex' => __( 'Already set to noindex', 'ace-crawl-enhancer' ) );
 
         // One indexed meta key narrows these to the scored posts before the LIKE runs, so they cost
         // a fraction of the absence filters below.
         foreach ( self::retention_buckets() as $bucket => $label ) {
-            $filters[ 'retention_' . $bucket ] = sprintf( __( 'Retention: %s', 'ace-crawl-enhancer' ), $label );
+            $filters[ 'retention_' . $bucket ] = sprintf( __( 'Recommendation: %s', 'ace-crawl-enhancer' ), $label );
         }
-        $filters['retention_acted'] = __( 'Retention: has a redirect or 410', 'ace-crawl-enhancer' );
+        $filters['retention_acted'] = __( 'Already has a redirect or 410', 'ace-crawl-enhancer' );
 
         return $filters;
     }
 
     /** @return array bucket => label, keyed with a hyphen as the report stores it. */
     private static function retention_buckets() {
-        return array(
-            'keep'        => __( 'keep', 'ace-crawl-enhancer' ),
-            'refresh'     => __( 'refresh', 'ace-crawl-enhancer' ),
-            'consolidate' => __( 'consolidate', 'ace-crawl-enhancer' ),
-            'noindex'     => __( 'noindex', 'ace-crawl-enhancer' ),
-            'no-signal'   => __( 'no signal', 'ace-crawl-enhancer' ),
-        );
+        return class_exists( 'AceSeoRetentionReport' ) ? AceSeoRetentionReport::recommendation_labels() : array();
     }
 
     /**
@@ -863,16 +851,24 @@ class AceSeoPostColumns {
 
         $options = self::filter_options( $post_type );
 
-        echo '<select name="ace_seo_filter"><option value="">'
-            . esc_html__( 'All SEO states', 'ace-crawl-enhancer' ) . '</option>';
+        echo '<select name="ace_seo_filter" aria-label="' . esc_attr__( 'SEO status or recommendation', 'ace-crawl-enhancer' ) . '"><option value="">'
+            . esc_html__( 'Any SEO status or recommendation', 'ace-crawl-enhancer' ) . '</option>';
 
-        foreach ( $options as $value => $label ) {
-            printf(
-                '<option value="%s"%s>%s</option>',
-                esc_attr( $value ),
-                selected( $current, $value, false ),
-                esc_html( $label )
-            );
+        foreach ( array( false => __( 'Current SEO status', 'ace-crawl-enhancer' ), true => __( 'Retention recommendations', 'ace-crawl-enhancer' ) ) as $recommendations => $group_label ) {
+            echo '<optgroup label="' . esc_attr( $group_label ) . '">';
+            foreach ( $options as $value => $label ) {
+                $is_recommendation = 0 === strpos( $value, 'retention_' ) && 'retention_acted' !== $value;
+                if ( (bool) $recommendations !== $is_recommendation ) {
+                    continue;
+                }
+                printf(
+                    '<option value="%s"%s>%s</option>',
+                    esc_attr( $value ),
+                    selected( $current, $value, false ),
+                    esc_html( $label )
+                );
+            }
+            echo '</optgroup>';
         }
 
         echo '</select>';
@@ -913,9 +909,9 @@ class AceSeoPostColumns {
         };
         $current = sanitize_key( $get( 'ace_ret' ) );
 
-        echo '<select name="ace_ret" aria-label="' . esc_attr__( 'Retention tier', 'ace-crawl-enhancer' ) . '"><option value="">'
-            . esc_html__( 'All retention tiers', 'ace-crawl-enhancer' ) . '</option>';
-        foreach ( AceSeoRetentionReport::tier_labels() + array( 'scored' => __( 'Any old post (scored)', 'ace-crawl-enhancer' ) ) as $value => $label ) {
+        echo '<select name="ace_ret" aria-label="' . esc_attr__( 'Retention group', 'ace-crawl-enhancer' ) . '"><option value="">'
+            . esc_html__( 'Any retention group', 'ace-crawl-enhancer' ) . '</option>';
+        foreach ( AceSeoRetentionReport::tier_labels() + array( 'scored' => __( 'Any reviewed older post', 'ace-crawl-enhancer' ) ) as $value => $label ) {
             printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $current, $value, false ), esc_html( $label ) );
         }
         echo '</select>';
@@ -945,6 +941,14 @@ class AceSeoPostColumns {
             esc_attr__( 'Views to', 'ace-crawl-enhancer' ),
             esc_attr__( 'At most this many views in the report window', 'ace-crawl-enhancer' )
         );
+        echo '<details style="clear:both;max-width:70em;padding:8px 0;white-space:normal"><summary style="cursor:pointer">'
+            . esc_html__( 'How to use these retention filters', 'ace-crawl-enhancer' ) . '</summary>';
+        echo '<p>' . esc_html__( 'Combine a recommendation, a retention group, a publication date and a view range, then press Filter. Views belong to the latest report window. A dash in a data column means no data is available, rather than zero visits. Exports use the same filters and sorting as this list.', 'ace-crawl-enhancer' ) . '</p>';
+        AceSeoRetentionReport::render_help();
+        if ( current_user_can( 'manage_options' ) ) {
+            echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ) . '">' . esc_html__( 'Retention settings', 'ace-crawl-enhancer' ) . '</a> · <a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-retention#retention-help' ) ) . '">' . esc_html__( 'Retention dashboard and status explanations', 'ace-crawl-enhancer' ) . '</a></p>';
+        }
+        echo '</details>';
     }
 
     /**

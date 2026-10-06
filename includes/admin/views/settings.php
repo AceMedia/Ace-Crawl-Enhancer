@@ -100,6 +100,14 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                     <a href="#sitemaps-display" class="ace-subtab-link" data-target-tab="sitemaps" data-target-group="sitemaps-display"><span class="dashicons dashicons-visibility" aria-hidden="true"></span>Display</a>
                     <a href="#sitemaps-cache" class="ace-subtab-link" data-target-tab="sitemaps" data-target-group="sitemaps-cache"><span class="dashicons dashicons-database" aria-hidden="true"></span>Caching</a>
                 </div>
+                <a href="#retention" class="nav-tab"><span class="dashicons dashicons-backup" aria-hidden="true"></span>Retention</a>
+                <div class="ace-tab-subnav" data-tab="retention">
+                    <a href="#retention-report" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-report">Report settings</a>
+                    <a href="#retention-notice" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-notice">Older articles</a>
+                    <a href="#retention-readers" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-readers">Retained pages</a>
+                    <a href="#retention-sheets" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-sheets">Google Sheets</a>
+                    <a href="#retention-help" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-help">What the labels mean</a>
+                </div>
                 <a href="#advanced" class="nav-tab"><span class="dashicons dashicons-admin-tools" aria-hidden="true"></span>Advanced</a>
                 <div class="ace-tab-subnav" data-tab="advanced">
                     <a href="#advanced-core" class="ace-subtab-link" data-target-tab="advanced" data-target-group="advanced-core"><span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>Core Features</a>
@@ -1182,6 +1190,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                 <?php endif; ?>
 
             </form>
+            <?php include ACE_SEO_PATH . 'includes/admin/views/retention-settings.php'; ?>
         </div> <!-- .ace-seo-content -->
     </div> <!-- .ace-seo-container -->
 </div>

@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.6  
+**Stable tag:** 1.0.54
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,13 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.54 (2026-10-06)
+
+- Move the existing retention, older-article, lighter-page and Google Sheets controls into **Ace SEO → Settings → Retention**, with independent saves and the same option names and defaults. Preserve rules for inactive or unlisted content types when saving the notice.
+- Explain retention groups and recommendations in plain English across the dashboard and Posts filters. Keep developer controls in keyboard-accessible disclosures, distinguish article age, traffic windows and collected history, and make clear that recommendations do not apply actions.
+- Check that Google confirms a new export tab and every row written before reporting success. Keep a saved service-account key when its replacement field is blank, explain spreadsheet read versus write access, and report missing OpenSSL clearly.
+- Fix settings overflow on small screens. Validation includes isolated save/export regression checks, PHP 8.1 compatibility and authenticated WordPress admin browser checks.
 
 ### 1.0.53 (2026-10-01)
 

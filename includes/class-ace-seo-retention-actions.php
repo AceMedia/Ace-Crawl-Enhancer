@@ -91,6 +91,9 @@ class AceSeoRetentionActions {
     public static function save_options( array $input ) {
         $current = get_option( self::OPTION, array() );
         $current = is_array( $current ) ? $current : array();
+        // The combined Settings form only displays public post types. A notice save must not
+        // silently remove rules for an inactive plugin or an unlisted/private content type.
+        $preserve_unlisted = 'notice-lifetimes' === ( $input['settings_section'] ?? '' );
         $clean   = array_merge( $current, array(
             'notice_enabled' => ! empty( $input['notice_enabled'] ) ? 1 : 0,
             'notice_years'   => max( 1, min( 30, (int) ( $input['notice_years'] ?? 3 ) ) ),
@@ -100,10 +103,11 @@ class AceSeoRetentionActions {
             unset( $clean['notice_text'] );
         }
         if ( isset( $input['lifetimes'] ) && is_array( $input['lifetimes'] ) ) {
-            $clean['lifetimes'] = array();
+            $clean['lifetimes'] = $preserve_unlisted && is_array( $current['lifetimes'] ?? null ) ? $current['lifetimes'] : array();
             foreach ( $input['lifetimes'] as $type => $days ) {
                 $type = sanitize_key( $type );
                 $days = max( 0, (int) $days );
+                unset( $clean['lifetimes'][ $type ] );
                 if ( $type && $days > 0 && post_type_exists( $type ) ) {
                     $clean['lifetimes'][ $type ] = $days;
                 }
@@ -112,8 +116,12 @@ class AceSeoRetentionActions {
         if ( isset( $input['lifetime_rules'] ) ) {
             $clean['lifetime_rules'] = array();
             foreach ( preg_split( '/[\r\n,]+/', (string) $input['lifetime_rules'] ) as $line ) {
-                if ( preg_match( '/^\s*([a-z0-9_-]+)\s*:\s*([^=\s]+)\s*=\s*(\d+)\s*$/i', $line, $m ) && taxonomy_exists( sanitize_key( $m[1] ) ) && (int) $m[3] > 0 ) {
-                    $clean['lifetime_rules'][ sanitize_key( $m[1] ) . ':' . sanitize_title( $m[2] ) ] = (int) $m[3];
+                if ( preg_match( '/^\s*([a-z0-9_-]+)\s*:\s*([^=\s]+)\s*=\s*(\d+)\s*$/i', $line, $m ) && (int) $m[3] > 0 ) {
+                    $key = sanitize_key( $m[1] ) . ':' . sanitize_title( $m[2] );
+                    // Existing rules stay editable/removable even while their taxonomy is inactive.
+                    if ( taxonomy_exists( sanitize_key( $m[1] ) ) || ( $preserve_unlisted && isset( $current['lifetime_rules'][ $key ] ) ) ) {
+                        $clean['lifetime_rules'][ $key ] = (int) $m[3];
+                    }
                 }
             }
         }

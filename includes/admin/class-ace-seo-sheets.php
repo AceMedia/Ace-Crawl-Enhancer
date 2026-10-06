@@ -102,22 +102,25 @@ class AceSeoSheets {
                 : 'Connected to “' . ( $check['properties']['title'] ?? 'the spreadsheet' ) . '”.';
         }
         set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
         exit;
     }
 
-    /** The settings block on the Retention report page. */
+    /** The administrator-only connection form in Settings → Retention. */
     public static function render_settings() {
-        $s      = self::settings();
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
         $email  = self::account_email();
         $locked = defined( 'ACE_SEO_SHEETS_KEY_FILE' );
         ?>
-        <details style="margin:1em 0">
-            <summary style="cursor:pointer;font-weight:600">Google Sheets export <?php echo self::configured() ? '(connected)' : '(not set up)'; ?></summary>
+        <details id="retention-sheets" style="margin:1em 0">
+            <summary style="cursor:pointer;font-weight:600">Google Sheets snapshots <?php echo self::configured() ? '(details saved)' : '(not set up)'; ?></summary>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                 <?php wp_nonce_field( 'ace_seo_sheets_settings' ); ?>
                 <input type="hidden" name="action" value="ace_seo_sheets_settings">
-                <p>Adds <strong>Export to Google Sheets</strong> beside Export CSV on the post list. Each export becomes a new tab in one spreadsheet. To set it up:</p>
+                <p>Adds <strong>Export to Google Sheets</strong> beside Export CSV on the post list. Each export copies the currently filtered posts into a new tab in your spreadsheet. It is a snapshot: later changes in WordPress or the spreadsheet do not update each other.</p>
+                <p>To set it up:</p>
                 <ol style="margin-left:2em">
                     <li>In Google Cloud, enable the <em>Google Sheets API</em> on a project, create a service account and download a JSON key for it.</li>
                     <li>Paste the key below (or put the file outside the web root and define <code>ACE_SEO_SHEETS_KEY_FILE</code> as its path).</li>
@@ -125,18 +128,19 @@ class AceSeoSheets {
                     <li>Paste the spreadsheet's URL below and save; it checks the connection there and then.</li>
                 </ol>
                 <table class="form-table" style="max-width:800px"><tbody>
-                    <tr><th scope="row">Spreadsheet</th><td><input type="url" name="sheet" class="large-text" placeholder="https://docs.google.com/spreadsheets/d/…" value="<?php echo esc_attr( self::sheet_url() ); ?>"></td></tr>
-                    <tr><th scope="row">Service account key</th><td>
+                    <tr><th scope="row"><label for="ace-seo-sheet">Spreadsheet link or ID</label></th><td><input type="text" id="ace-seo-sheet" name="sheet" class="large-text" placeholder="https://docs.google.com/spreadsheets/d/…" value="<?php echo esc_attr( self::sheet_url() ); ?>"></td></tr>
+                    <tr><th scope="row"><?php if ( $locked ) : ?>Google service account key<?php else : ?><label for="ace-seo-sheets-key">Google service account key</label><?php endif; ?></th><td>
                         <?php if ( $locked ) : ?>
                             Read from <code>ACE_SEO_SHEETS_KEY_FILE</code><?php echo $email ? '' : ' (file missing or unreadable)'; ?>.
                         <?php else : ?>
-                            <textarea name="key" rows="4" class="large-text code" placeholder="<?php echo $email ? esc_attr( 'Stored for ' . $email . '. Paste a new key to replace it.' ) : '{ &quot;type&quot;: &quot;service_account&quot;, … }'; ?>"></textarea>
+                            <textarea id="ace-seo-sheets-key" name="key" autocomplete="off" spellcheck="false" rows="4" class="large-text code" placeholder="<?php echo $email ? esc_attr( 'Stored for ' . $email . '. Paste a new key to replace it.' ) : '{ &quot;type&quot;: &quot;service_account&quot;, … }'; ?>"></textarea>
                             <?php if ( $email ) : ?><label><input type="checkbox" name="forget_key" value="1"> Forget the stored key</label><?php endif; ?>
-                            <p class="description">Only the email and private key are kept, in an option that does not autoload. It is never shown again.</p>
+                            <p class="description">Leave this blank to keep the saved key. The service account email, private key and token address are stored in an option that does not autoload. The private key is never shown again.</p>
                         <?php endif; ?>
                     </td></tr>
                 </tbody></table>
-                <p><button class="button">Save and test</button></p>
+                <p><button class="button">Save and check access</button></p>
+                <p class="description">This checks that Google lets us read the spreadsheet. Creating an export also needs Editor access. Saving here does not export any posts.</p>
             </form>
         </details>
         <?php
@@ -153,6 +157,9 @@ class AceSeoSheets {
         $key = self::settings()['key'];
         if ( empty( $key['client_email'] ) || empty( $key['private_key'] ) ) {
             return new WP_Error( 'ace_sheets_key', 'No service account key is set.' );
+        }
+        if ( ! function_exists( 'openssl_sign' ) ) {
+            return new WP_Error( 'ace_sheets_openssl', 'Google Sheets needs the PHP OpenSSL extension. Ask your host to enable it.' );
         }
         $aud  = $key['token_uri'] ?? 'https://oauth2.googleapis.com/token';
         $now  = time();
@@ -212,7 +219,10 @@ class AceSeoSheets {
             }
             return new WP_Error( 'ace_sheets_api', $msg );
         }
-        return is_array( $data ) ? $data : array();
+        if ( $code < 200 || ! is_array( $data ) ) {
+            return new WP_Error( 'ace_sheets_response', 'Google returned an unreadable response. The export could not be confirmed.' );
+        }
+        return $data;
     }
 
     /**
@@ -228,7 +238,14 @@ class AceSeoSheets {
                 'gridProperties' => array( 'frozenRowCount' => 1 ),
             ) ) ) ),
         ) );
-        return is_wp_error( $res ) ? $res : (string) ( $res['replies'][0]['addSheet']['properties']['title'] ?? $title );
+        if ( is_wp_error( $res ) ) {
+            return $res;
+        }
+        $created = $res['replies'][0]['addSheet']['properties']['title'] ?? null;
+        if ( ! is_string( $created ) || '' === $created ) {
+            return new WP_Error( 'ace_sheets_response', 'Google did not confirm the new export tab. Check the spreadsheet before trying again.' );
+        }
+        return $created;
     }
 
     /**
@@ -248,6 +265,12 @@ class AceSeoSheets {
                 }, array_values( $r ) );
             }, $rows ),
         ) );
-        return is_wp_error( $res ) ? $res : true;
+        if ( is_wp_error( $res ) ) {
+            return $res;
+        }
+        if ( ! isset( $res['updates']['updatedRows'] ) || (int) $res['updates']['updatedRows'] !== count( $rows ) ) {
+            return new WP_Error( 'ace_sheets_incomplete', 'Google did not confirm all rows in this batch. The export tab may be incomplete; check it before starting a new export.' );
+        }
+        return true;
     }
 }

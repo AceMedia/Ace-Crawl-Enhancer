@@ -1,3 +1,63 @@
+/* Retention uses native disclosures and independent Settings forms. */
+.ace-retention-settings .ace-retention-section {
+  padding: 0 0 24px;
+  margin: 0 0 24px;
+  border-bottom: 1px solid #dcdcde;
+  scroll-margin-top: 48px;
+}
+.ace-retention-detail {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  background: #fff;
+}
+.ace-retention-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ace-retention-detail summary:focus-visible {
+  outline: 2px solid #2271b1;
+  outline-offset: 4px;
+}
+.ace-retention-settings input,
+.ace-retention-settings select,
+.ace-retention-settings textarea,
+.ace-retention-dashboard input,
+.ace-retention-dashboard select {
+  max-width: 100%;
+}
+.ace-retention-settings select {
+  white-space: normal;
+  height: auto;
+}
+.ace-retention-settings p,
+.ace-retention-settings li,
+.ace-retention-dashboard p {
+  max-width: 80ch;
+  overflow-wrap: anywhere;
+}
+.ace-retention-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+body:has(#retention.active) .ace-redis-save-bar {
+  display: none;
+}
+@media (max-width: 782px) {
+  .ace-retention-settings .form-table th,
+  .ace-retention-settings .form-table td {
+    display: block;
+    width: auto;
+    padding: 8px 0;
+  }
+  .ace-retention-settings input.large-text,
+  .ace-retention-settings textarea.large-text {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
 .metabox-location-side {
   .ace-seo-tabs {
     border-radius: 8px;
