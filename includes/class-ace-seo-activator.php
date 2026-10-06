@@ -291,6 +291,8 @@ class AceSEODeactivator {
      */
     private static function clear_scheduled_events() {
         wp_clear_scheduled_hook( 'ace_seo_optimize_database' );
+        wp_clear_scheduled_hook( 'ace_seo_sheets_schedule_start' );
+        wp_clear_scheduled_hook( 'ace_seo_sheets_schedule_tick' );
         
         // Clear optimization flags
         delete_option( 'ace_seo_db_optimization_pending' );

@@ -144,6 +144,9 @@ class AceSeoSheets {
             </form>
         </details>
         <?php
+        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
+            AceSeoSheetsSchedule::render_settings();
+        }
     }
 
     /* ---- API ------------------------------------------------------------------------------------ */
@@ -270,6 +273,165 @@ class AceSeoSheets {
         }
         if ( ! isset( $res['updates']['updatedRows'] ) || (int) $res['updates']['updatedRows'] !== count( $rows ) ) {
             return new WP_Error( 'ace_sheets_incomplete', 'Google did not confirm all rows in this batch. The export tab may be incomplete; check it before starting a new export.' );
+        }
+        return true;
+    }
+
+    /**
+     * Find or create the one tab owned by a scheduled job. A lost creation response
+     * is safe to retry: both the title and numeric sheet ID were saved before the request.
+     *
+     * @return true|WP_Error
+     */
+    public static function ensure_snapshot_tab( $spreadsheet, $title, $tab_id, $rows, $columns, $allow_create = true, $may_write = null ) {
+        $existing = self::request( 'GET', rawurlencode( $spreadsheet ) . '?fields=sheets.properties(sheetId,title)' );
+        if ( is_wp_error( $existing ) ) {
+            return $existing;
+        }
+        if ( ! isset( $existing['sheets'] ) || ! is_array( $existing['sheets'] ) ) {
+            return new WP_Error( 'ace_sheets_response', 'Google did not return the tab list. No new tab was created.' );
+        }
+        foreach ( $existing['sheets'] as $sheet ) {
+            $properties = $sheet['properties'] ?? array();
+            if ( (int) ( $properties['sheetId'] ?? -1 ) === (int) $tab_id || ( $properties['title'] ?? '' ) === $title ) {
+                return (int) ( $properties['sheetId'] ?? -1 ) === (int) $tab_id && ( $properties['title'] ?? '' ) === $title
+                    ? true
+                    : new WP_Error( 'ace_sheets_tab_conflict', 'The snapshot tab name or ID belongs to another tab. No existing tab was overwritten.' );
+            }
+        }
+        if ( ! $allow_create ) {
+            return new WP_Error( 'ace_sheets_tab_missing', 'The unfinished report tab was removed. The current report has not changed.' );
+        }
+        if ( is_callable( $may_write ) && ! $may_write() ) { return new WP_Error( 'ace_sheets_stopped', 'The refresh was stopped before creating its working copy.' ); }
+        $created = self::request( 'POST', rawurlencode( $spreadsheet ) . ':batchUpdate', array(
+            'requests' => array( array( 'addSheet' => array( 'properties' => array(
+                'sheetId' => (int) $tab_id,
+                'title' => $title,
+                'hidden' => true,
+                'gridProperties' => array( 'rowCount' => max( 1, (int) $rows ), 'columnCount' => max( 1, (int) $columns ), 'frozenRowCount' => 1 ),
+            ) ) ) ),
+        ) );
+        if ( is_wp_error( $created ) ) {
+            return $created;
+        }
+        $properties = $created['replies'][0]['addSheet']['properties'] ?? array();
+        if ( (int) ( $properties['sheetId'] ?? -1 ) !== (int) $tab_id || ( $properties['title'] ?? '' ) !== $title ) {
+            return new WP_Error( 'ace_sheets_response', 'Google did not confirm the snapshot tab. The next attempt will check for it before creating anything.' );
+        }
+        return true;
+    }
+
+    /** Idempotent numeric-grid write: a renamed/replaced title cannot redirect a retry. */
+    public static function write_snapshot_rows( $spreadsheet, $tab_id, $first_row, array $rows ) {
+        if ( ! $rows ) { return true; }
+        $result = self::request( 'POST', rawurlencode( $spreadsheet ) . '/values:batchUpdateByDataFilter', array(
+            'valueInputOption' => 'RAW',
+            'data' => array( array(
+                'dataFilter' => array( 'gridRange' => array( 'sheetId' => (int) $tab_id, 'startRowIndex' => max( 0, (int) $first_row - 1 ), 'startColumnIndex' => 0 ) ),
+                'majorDimension' => 'ROWS',
+                'values' => array_map( static function ( $row ) {
+                    return array_map( static function ( $value ) { return null === $value ? '' : $value; }, array_values( $row ) );
+                }, $rows ),
+            ) ),
+        ) );
+        if ( is_wp_error( $result ) ) { return $result; }
+        if ( ! isset( $result['totalUpdatedRows'] ) || (int) $result['totalUpdatedRows'] !== count( $rows ) ) {
+            return new WP_Error( 'ace_sheets_incomplete', 'Google did not confirm every row. The same report range can be retried without adding duplicates.' );
+        }
+        return true;
+    }
+
+    /** Remove only the verified hidden working tab from a cancelled job. */
+    public static function discard_snapshot_tab( $spreadsheet, $tab_id, $title ) {
+        $metadata = self::request( 'GET', rawurlencode( $spreadsheet ) . '?fields=sheets.properties(sheetId,title,hidden)' );
+        if ( is_wp_error( $metadata ) ) { return $metadata; }
+        if ( ! isset( $metadata['sheets'] ) || ! is_array( $metadata['sheets'] ) ) { return new WP_Error( 'ace_sheets_response', 'Google did not confirm the unfinished tab list.' ); }
+        foreach ( $metadata['sheets'] as $sheet ) {
+            $properties = $sheet['properties'] ?? array();
+            if ( (int) ( $properties['sheetId'] ?? -1 ) !== (int) $tab_id ) { continue; }
+            if ( ( $properties['title'] ?? '' ) !== $title || empty( $properties['hidden'] ) ) {
+                return new WP_Error( 'ace_sheets_stage_changed', 'The unfinished tab has been changed outside Ace SEO. It was not removed.' );
+            }
+            $result = self::request( 'POST', rawurlencode( $spreadsheet ) . ':batchUpdate', array( 'requests' => array( array( 'deleteSheet' => array( 'sheetId' => (int) $tab_id ) ) ) ) );
+            if ( is_wp_error( $result ) ) { return $result; }
+            return isset( $result['replies'] ) && count( $result['replies'] ) === 1 ? true : new WP_Error( 'ace_sheets_response', 'The unfinished tab removal was not confirmed; it can be checked again safely.' );
+        }
+        return true;
+    }
+
+    /**
+     * Atomically replace only the managed report after staging has finished.
+     * The run marker and deletion of our staging tab commit in the same batch.
+     * A timeout is resolved by reading that marker, never by clearing the report again blindly.
+     */
+    public static function publish_snapshot( $spreadsheet, $stage_id, $stage_title, $report_id, $run_id, $rows, $columns, $allow_create_report, $previous_rows = 0, $previous_columns = 0, $may_publish = null ) {
+        $metadata = self::request( 'GET', rawurlencode( $spreadsheet ) . '?fields=sheets(properties(sheetId,title,gridProperties),developerMetadata(metadataId,metadataKey,metadataValue),basicFilter)' );
+        if ( is_wp_error( $metadata ) ) { return $metadata; }
+        if ( ! isset( $metadata['sheets'] ) || ! is_array( $metadata['sheets'] ) ) {
+            return new WP_Error( 'ace_sheets_response', 'Google did not return the report tab details. The current report has not changed.' );
+        }
+        $stage = null; $report = null; $title_conflict = false;
+        foreach ( $metadata['sheets'] as $sheet ) {
+            $properties = $sheet['properties'] ?? array();
+            $id = (int) ( $properties['sheetId'] ?? -1 );
+            if ( $id === (int) $stage_id && ( $properties['title'] ?? '' ) === $stage_title ) { $stage = $sheet; }
+            if ( $id === (int) $report_id ) { $report = $sheet; }
+            if ( 'Ace SEO report' === ( $properties['title'] ?? '' ) && $id !== (int) $report_id ) { $title_conflict = true; }
+        }
+        foreach ( (array) ( $report['developerMetadata'] ?? array() ) as $marker ) {
+            if ( 'ace_seo_report_run' === ( $marker['metadataKey'] ?? '' ) && $run_id === ( $marker['metadataValue'] ?? '' ) ) { return true; }
+        }
+        if ( ! $stage || $title_conflict || ( $allow_create_report && $report ) || ( ! $report && ! $allow_create_report ) || (int) $stage_id === (int) $report_id ) {
+            return new WP_Error( 'ace_sheets_report_conflict', 'The managed report or its unfinished copy no longer matches. No existing report was replaced; check the tab setup.' );
+        }
+        $grid = array( 'rowCount' => max( 1, (int) $rows ), 'columnCount' => max( 1, (int) $columns ), 'frozenRowCount' => 1 );
+        $requests = array();
+        $managed_columns = (int) $columns;
+        $managed_rows = (int) $rows;
+        $known_rows = $previous_rows > 0;
+        $known_columns = $previous_columns > 0;
+        if ( $report ) {
+            $managed_rows = max( $managed_rows, min( (int) $previous_rows, (int) ( $report['properties']['gridProperties']['rowCount'] ?? $rows ) ) );
+            $managed_columns = max( $managed_columns, min( (int) $previous_columns, (int) ( $report['properties']['gridProperties']['columnCount'] ?? $columns ) ) );
+            foreach ( (array) ( $report['developerMetadata'] ?? array() ) as $marker ) {
+                if ( 'ace_seo_report_rows' === ( $marker['metadataKey'] ?? '' ) ) { $managed_rows = max( $managed_rows, min( (int) $marker['metadataValue'], (int) ( $report['properties']['gridProperties']['rowCount'] ?? $rows ) ) ); $known_rows = (int) $marker['metadataValue'] > 0; }
+                if ( 'ace_seo_report_columns' === ( $marker['metadataKey'] ?? '' ) ) { $managed_columns = max( $managed_columns, min( (int) $marker['metadataValue'], (int) ( $report['properties']['gridProperties']['columnCount'] ?? $columns ) ) ); $known_columns = (int) $marker['metadataValue'] > 0; }
+            }
+            if ( ! $known_rows || ! $known_columns ) { return new WP_Error( 'ace_sheets_report_extent', 'The managed report size has not been recorded. Its existing cells were left unchanged.' ); }
+            $grid['rowCount'] = max( $grid['rowCount'], (int) ( $report['properties']['gridProperties']['rowCount'] ?? 1 ) );
+            $grid['columnCount'] = max( $grid['columnCount'], (int) ( $report['properties']['gridProperties']['columnCount'] ?? 1 ) );
+            // Keep unrelated columns/formatting; clear stale values only within the managed report width.
+            $requests[] = array( 'clearBasicFilter' => array( 'sheetId' => (int) $report_id ) );
+            $requests[] = array( 'updateSheetProperties' => array( 'properties' => array( 'sheetId' => (int) $report_id, 'title' => 'Ace SEO report', 'index' => 0, 'hidden' => false, 'gridProperties' => $grid ), 'fields' => 'title,index,hidden,gridProperties.rowCount,gridProperties.columnCount,gridProperties.frozenRowCount' ) );
+            $requests[] = array( 'updateCells' => array( 'range' => array( 'sheetId' => (int) $report_id, 'startRowIndex' => 0, 'endRowIndex' => $managed_rows, 'startColumnIndex' => 0, 'endColumnIndex' => $managed_columns ), 'fields' => 'userEnteredValue' ) );
+            foreach ( (array) ( $report['developerMetadata'] ?? array() ) as $marker ) {
+                if ( in_array( $marker['metadataKey'] ?? '', array( 'ace_seo_report_run', 'ace_seo_report_columns', 'ace_seo_report_rows' ), true ) && isset( $marker['metadataId'] ) ) {
+                    $requests[] = array( 'deleteDeveloperMetadata' => array( 'dataFilter' => array( 'developerMetadataLookup' => array( 'metadataId' => (int) $marker['metadataId'] ) ) ) );
+                }
+            }
+        } else {
+            $requests[] = array( 'addSheet' => array( 'properties' => array( 'sheetId' => (int) $report_id, 'title' => 'Ace SEO report', 'index' => 0, 'gridProperties' => $grid ) ) );
+        }
+        $source = array( 'sheetId' => (int) $stage_id, 'startRowIndex' => 0, 'endRowIndex' => (int) $rows, 'startColumnIndex' => 0, 'endColumnIndex' => (int) $columns );
+        $destination = array_merge( $source, array( 'sheetId' => (int) $report_id ) );
+        $requests[] = array( 'copyPaste' => array( 'source' => $source, 'destination' => $destination, 'pasteType' => 'PASTE_VALUES', 'pasteOrientation' => 'NORMAL' ) );
+        $filter = $report['basicFilter'] ?? array();
+        $filter['range'] = $destination;
+        foreach ( array_keys( $filter['criteria'] ?? array() ) as $column ) { if ( (int) $column >= $columns ) { unset( $filter['criteria'][ $column ] ); } }
+        if ( isset( $filter['criteria'] ) ) { if ( ! $filter['criteria'] ) { unset( $filter['criteria'] ); } else { $filter['criteria'] = (object) $filter['criteria']; } }
+        if ( isset( $filter['sortSpecs'] ) ) { $filter['sortSpecs'] = array_values( array_filter( $filter['sortSpecs'], static function ( $sort ) use ( $columns ) { return (int) ( $sort['dimensionIndex'] ?? 0 ) < $columns; } ) ); }
+        $requests[] = array( 'setBasicFilter' => array( 'filter' => $filter ) );
+        $requests[] = array( 'deleteSheet' => array( 'sheetId' => (int) $stage_id ) );
+        $requests[] = array( 'createDeveloperMetadata' => array( 'developerMetadata' => array( 'metadataKey' => 'ace_seo_report_rows', 'metadataValue' => (string) $rows, 'location' => array( 'sheetId' => (int) $report_id ), 'visibility' => 'DOCUMENT' ) ) );
+        $requests[] = array( 'createDeveloperMetadata' => array( 'developerMetadata' => array( 'metadataKey' => 'ace_seo_report_columns', 'metadataValue' => (string) $columns, 'location' => array( 'sheetId' => (int) $report_id ), 'visibility' => 'DOCUMENT' ) ) );
+        $requests[] = array( 'createDeveloperMetadata' => array( 'developerMetadata' => array( 'metadataKey' => 'ace_seo_report_run', 'metadataValue' => $run_id, 'location' => array( 'sheetId' => (int) $report_id ), 'visibility' => 'DOCUMENT' ) ) );
+        if ( is_callable( $may_publish ) && ! $may_publish() ) { return new WP_Error( 'ace_sheets_stopped', 'The refresh was stopped before replacing the main report.' ); }
+        $result = self::request( 'POST', rawurlencode( $spreadsheet ) . ':batchUpdate', array( 'requests' => $requests ) );
+        if ( is_wp_error( $result ) ) { return $result; }
+        $last = count( $requests ) - 1;
+        $confirmed = $result['replies'][ $last ]['createDeveloperMetadata']['developerMetadata'] ?? array();
+        if ( count( $result['replies'] ?? array() ) !== count( $requests ) || ( $confirmed['metadataValue'] ?? '' ) !== $run_id || (int) ( $confirmed['location']['sheetId'] ?? -1 ) !== (int) $report_id ) {
+            return new WP_Error( 'ace_sheets_publish_unconfirmed', 'The report update could not be confirmed. The next attempt will check its run marker before writing.' );
         }
         return true;
     }

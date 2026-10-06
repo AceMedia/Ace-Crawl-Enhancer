@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.54
+**Stable tag:** 1.0.55
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,13 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.55
+- Optional daily, weekly or four-weekly refresh of a managed first Google Sheets report tab; off by default. A one-off refresh uses the same background worker without enabling a schedule.
+- Explicit public content-type and published/all-editorial scope, separate save/stop/retry controls, and visible progress/failure/completion status. Saved retention data is exported without rebuilding the report or changing articles.
+- Freeze destination, item IDs and per-batch payloads; process at most 500 rows per tick, prime post/meta/term caches, and use database-owned leases and fixed RAW ranges so retries cannot append duplicates.
+- Prepare a hidden copy, then atomically publish to a stable managed report tab. Preserve other tabs and cells outside the managed report area; recognise completed runs after an uncertain response. Working copies are bounded, not a growing weekly archive.
+- Share CSV/Sheets headers and row formatting; honour global search visibility in the Indexable column and retain explicit ID ordering.
 
 ### 1.0.54 (2026-10-06)
 

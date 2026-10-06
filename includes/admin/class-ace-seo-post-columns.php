@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-ace-seo-export.php';
+
 class AceSeoPostColumns {
 
     /**
@@ -116,7 +118,7 @@ class AceSeoPostColumns {
             'posts_per_page'      => self::EXPORT_BATCH,
             'paged'               => $batch,
             'fields'              => 'ids',
-            'orderby'             => sanitize_key( $params['orderby'] ?? 'date' ) ?: 'date',
+            'orderby'             => 'id' === strtolower( (string) ( $params['orderby'] ?? '' ) ) ? 'ID' : ( sanitize_key( $params['orderby'] ?? 'date' ) ?: 'date' ),
             'order'               => 'asc' === strtolower( (string) ( $params['order'] ?? '' ) ) ? 'ASC' : 'DESC',
             'ignore_sticky_posts' => true,
             'suppress_filters'    => false,
@@ -146,53 +148,8 @@ class AceSeoPostColumns {
         remove_action( 'pre_get_posts', $apply );
 
         $ids = array_map( 'intval', $query->posts );
-        if ( $ids ) {
-            _prime_post_caches( $ids, false, true );
-        }
-
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)' );
-        $rows   = array();
-        foreach ( $ids as $id ) {
-            $post = get_post( $id );
-            $row  = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $id, AceSeoRetentionReport::META, true ) : '';
-            $row  = is_array( $row ) ? $row : array();
-            $line = array(
-                $id,
-                html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ),
-                get_permalink( $post ),
-                $post->post_status,
-                get_post_time( 'Y-m-d', false, $post ),
-                get_post_modified_time( 'Y-m-d', false, $post ),
-                $row['tier'] ?? '',
-                $row['bucket'] ?? '',
-                get_post_meta( $id, '_ace_seo_ret_views', true ),
-                get_post_meta( $id, '_ace_seo_last_viewed', true ),
-                get_post_meta( $id, '_ace_seo_ret_links', true ),
-                get_post_meta( $id, '_ace_seo_ret_words', true ),
-                $row['clicks'] ?? '',
-                $row['impressions'] ?? '',
-                get_post_meta( $id, '_ace_seo_humans', true ),
-                get_post_meta( $id, '_ace_seo_bot_pct', true ),
-                get_post_meta( $id, '_ace_seo_whitehat', true ),
-                self::post_is_noindex( $id ) ? 'no' : 'yes',
-                $row['trend'] ?? '',
-                $row['momentum'] ?? '',
-                $row['periods']['views_7'] ?? '',
-                $row['periods']['views_30'] ?? '',
-                $row['periods']['views_90'] ?? '',
-                $row['periods']['clicks_30'] ?? '',
-            );
-
-            /**
-             * Filter one exported row; add a value and a matching header with ace_seo_list_export_header.
-             *
-             * @param array $line
-             * @param int   $id
-             */
-            $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
-        }
-
-        $header = array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
+        $header = AceSeoExport::header();
+        $rows   = AceSeoExport::rows( $ids );
 
         // To Google Sheets: the first batch opens a new tab and writes the header, every batch appends
         // its own rows server-side, and the browser only carries the tab name between requests.
@@ -412,22 +369,7 @@ class AceSeoPostColumns {
      * @return string[]
      */
     private static function post_types() {
-        $types = array();
-
-        foreach ( get_post_types( array( 'show_ui' => true ), 'objects' ) as $type ) {
-            if ( 'attachment' === $type->name || ! is_post_type_viewable( $type ) ) {
-                continue;
-            }
-
-            $types[] = $type->name;
-        }
-
-        /**
-         * Filter the post types that get SEO list columns.
-         *
-         * @param string[] $types
-         */
-        return (array) apply_filters( 'ace_seo_admin_column_post_types', $types );
+        return AceSeoExport::post_types();
     }
 
     /**
@@ -748,13 +690,7 @@ class AceSeoPostColumns {
     }
 
     private static function post_is_noindex( $post_id ) {
-        if ( '1' === (string) AceCrawlEnhancer::get_meta_value( $post_id, 'meta-robots-noindex' ) ) {
-            return true;
-        }
-
-        $advanced = (string) AceCrawlEnhancer::get_meta_value( $post_id, 'meta-robots-adv' );
-
-        return false !== stripos( $advanced, 'noindex' );
+        return AceSeoExport::post_is_noindex( $post_id );
     }
 
     /**
