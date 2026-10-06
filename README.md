@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.55
+**Stable tag:** 1.0.56
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.56 (2026-10-06)
+- Add a plain-English recommended next step, saved assessment reason, assessment time and applied retention settings to CSV and Google Sheets exports. Keep recommendations separate from changes already applied and make missing assessments explicit.
 
 ### 1.0.55
 - Optional daily, weekly or four-weekly refresh of a managed first Google Sheets report tab; off by default. A one-off refresh uses the same background worker without enabling a schedule.

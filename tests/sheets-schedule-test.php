@@ -35,6 +35,7 @@ function wp_get_scheduled_event($h){return isset($GLOBALS['cron'][$h])?(object)$
 function wp_get_schedules(){return ['daily'=>['interval'=>86400],'weekly'=>['interval'=>604800],'ace_seo_four_weeks'=>['interval'=>2419200]];}
 function wp_clear_scheduled_hook($h){unset($GLOBALS['cron'][$h]);}
 function sanitize_key($x){return strtolower(preg_replace('/[^a-zA-Z0-9_-]/','',$x));}
+function wp_strip_all_tags($x){return strip_tags($x);}
 function sanitize_text_field($x){return strip_tags($x);}function wp_unslash($x){return $x;}
 function current_user_can($x){return $GLOBALS['cap'];}function check_admin_referer($x){return $GLOBALS['nonce'];}
 function wp_die($m){throw new FixtureStop('die:'.$m);}function wp_safe_redirect($u){throw new FixtureStop('redirect');}

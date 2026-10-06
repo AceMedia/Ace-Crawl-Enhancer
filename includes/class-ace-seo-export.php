@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AceSeoExport {
     public static function header() {
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings' );
         return array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
     }
 
@@ -49,10 +49,56 @@ class AceSeoExport {
              * @param array $line
              * @param int   $id
              */
+            $line = array_merge( $line, self::retention_context( $id, $row ) );
             $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
         }
 
         return $rows;
+    }
+
+    /** Explain the saved recommendation; do not rescore or apply it during an export. */
+    public static function retention_context( $id, array $row ) {
+        $next_steps = array(
+            'keep' => 'Keep this article available.',
+            'refresh' => 'Review and update the article, title and search description.',
+            'consolidate' => 'Check whether a newer article covers this subject. Choose a destination before setting a redirect.',
+            'noindex' => 'Review whether this should stay available but out of search results.',
+            'no-signal' => 'Check data coverage and seasonal interest before deciding what to do.',
+        );
+        $bucket = (string) ( $row['bucket'] ?? '' );
+        $next = $next_steps[ $bucket ] ?? ( '' === $bucket ? 'Not assessed yet.' : 'Review the saved assessment in WordPress.' );
+        $why = trim( wp_strip_all_tags( (string) ( $row['reason'] ?? '' ) ) );
+        if ( '' === $why ) {
+            $why = '' === $bucket
+                ? 'No saved retention assessment. Check the report status and which content it covers.'
+                : 'The saved recommendation has no recorded explanation. Review it before acting.';
+        } else {
+            $period = ! empty( $row['window'] ) ? 'over the assessed ' . (int) $row['window'] . '-day period' : 'over the assessed period';
+            $why = strtr( $why, array(
+                'impressions' => 'appearances in search results',
+                'CTR' => 'click-through rate',
+                'external backlink(s)' => 'link(s) from other websites',
+                'internal link(s)' => 'link(s) from other pages on this site',
+                'in the window' => $period,
+            ) );
+        }
+        $assessed = ! empty( $row['built'] ) && is_numeric( $row['built'] ) && (int) $row['built'] > 0
+            ? wp_date( 'Y-m-d H:i:s T', (int) $row['built'] ) : '';
+        $applied = array();
+        if ( class_exists( 'AceSeoRetentionActions' ) ) {
+            $state = AceSeoRetentionActions::state( $id );
+            if ( ! empty( $state['noindex'] ) ) { $applied[] = 'Search exclusion set (noindex)'; }
+            if ( ! empty( $state['unavailable'] ) ) { $applied[] = 'Search expiry date: ' . $state['unavailable']; }
+            if ( 'gone' === ( $state['redirect'] ?? '' ) ) { $applied[] = '410 response set; kept in WordPress'; }
+            elseif ( ! empty( $state['redirect'] ) ) { $applied[] = 'Redirect set to ' . $state['redirect']; }
+            if ( ! empty( $state['news_excl'] ) ) { $applied[] = 'Excluded from the news sitemap'; }
+            if ( 'show' === ( $state['notice'] ?? '' ) ) { $applied[] = 'Older-article notice forced on'; }
+            elseif ( 'hide' === ( $state['notice'] ?? '' ) ) { $applied[] = 'Older-article notice forced off'; }
+            $applied = $applied ? implode( '; ', $applied ) : 'No per-post retention changes recorded';
+        } else {
+            $applied = 'Applied retention settings unavailable';
+        }
+        return array( $next, $why, $assessed, $applied );
     }
 
     public static function post_types() {
