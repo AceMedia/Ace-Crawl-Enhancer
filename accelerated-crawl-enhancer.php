@@ -1918,7 +1918,7 @@ class AceCrawlEnhancer {
      * Does this title already carry the site name at the end?
      *
      * Only the tail counts. A title may legitimately mention the brand in
-     * passing ("Paddy Power's guide to...") and still want the usual suffix;
+     * passing ("Acme's guide to...") and still want the usual suffix;
      * one that ends with the site name does not.
      *
      * @param string $title Title to inspect.
