@@ -77,6 +77,34 @@ final class Ace_SEO_Retention_Evidence {
         return array( 'source' => 'Relevant dates not established', 'verified' => false );
     }
 
+    /**
+     * Why a period cannot judge an article yet, or '' when it can. Used by the saved report as well as the
+     * preview: an article is only judged on a period that contained the dates it is about. An anniversary
+     * estimate recurs yearly, so any year's season inside the period counts; editorial dates and verified
+     * event occurrences are one-off. Positive evidence (readers, clicks) is never held back by this.
+     */
+    public static function timing_hold( array $relevance, array $period ) {
+        if ( ! self::interval( $period ) ) {
+            return 'The assessed period is unknown.';
+        }
+        if ( ! empty( $relevance['ambiguous'] ) ) {
+            return 'Several linked events could be the one this article covers; confirm which before judging it.';
+        }
+        if ( ! empty( $relevance['evergreen'] ) || ! isset( $relevance['start'], $relevance['end'] ) || ! self::interval( $relevance ) ) {
+            return '';
+        }
+        $recurring = empty( $relevance['verified'] ) && false !== stripos( (string) ( $relevance['source'] ?? '' ), 'anniversary' );
+        foreach ( $recurring ? range( -6, 1 ) : array( 0 ) as $years ) {
+            $start = $years ? ( new DateTimeImmutable( $relevance['start'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $relevance['start'];
+            $end   = $years ? ( new DateTimeImmutable( $relevance['end'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $relevance['end'];
+            if ( $period['start'] <= $end && $period['end'] >= $start ) {
+                return '';
+            }
+        }
+        $when = $relevance['start'] > $period['end'] ? 'Judge it after that period has passed and been recorded.' : 'Judge it on a period that includes those dates.';
+        return sprintf( 'The assessed period (%s to %s) did not include the dates this article is about (%s to %s, %s). %s', $period['start'], $period['end'], $relevance['start'], $relevance['end'], strtolower( (string) ( $relevance['source'] ?? 'relevant dates' ) ), $when );
+    }
+
     /** A source must explicitly attest full coverage of this exact interval; absent rows are not zeros. */
     public static function covered( array $coverage, array $period ) {
         return self::interval( $period ) && self::interval( $coverage )

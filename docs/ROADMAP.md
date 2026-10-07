@@ -184,6 +184,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
 
+## Timing holds in the saved report — 7 October 2026 (#32)
+
+1.0.62: `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period )` is pure and shared by the preview and the scorer. `phase_score()` works out the build's period (started minus `days`), reads `base_context()` for each post (editor fields, linked events, anniversary; no API calls) and, unless the post is retained, sets tier `unknown` / bucket `no-signal` with `reason` "Not ready to judge. …" and `hold` when the period did not contain the relevant dates. `phase_ga4()` records `ga4_capped`; a capped Analytics list makes absent pages `null` views. `do_action( 'ace_seo_retention_built', $p )` fires once a build completes; `AceSeoSheetsSchedule::after_build()` (setting `after_build`) starts a manual-type refresh so the sheet follows the report. The first live run of 1.0.59 showed a 365-day window judging posts whose relevant dates were simply unknown — those are not held (the period stands on its own); only known dates outside the period hold.
+
 ## Timing columns in exports — 7 October 2026 (#25, #32)
 
 1.0.61: `AceSeoExport::timing_context()` → `Ace_SEO_Retention_Evidence_View::timing_columns()` appends *When it matters*, *Relevant window*, *Timing basis*, *Linked events*, *Assessed in season?* to every CSV/Sheets row. It reads `base_context()` (editor fields, linked `ace_event` terms, anniversary estimate) and never runs the evidence-context filter, so an export of 40k rows makes no Analytics or Search Console calls. Verdicts stay out of the sheet: the client decides. Checks in `tests/retention-event-provider-test.php`.

@@ -28,6 +28,15 @@ class AceSeoSheetsSchedule {
         if ( wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
             add_action( 'wp_loaded', array( __CLASS__, 'sync_schedule' ) );
         }
+        add_action( 'ace_seo_retention_built', array( __CLASS__, 'after_build' ) );
+    }
+
+    /** Opt-in: a completed retention build refreshes the main report, so the sheet never lags the assessment. */
+    public static function after_build() {
+        if ( empty( self::settings()['after_build'] ) ) {
+            return;
+        }
+        self::start( true );
     }
 
     public static function intervals( $schedules ) {
@@ -49,7 +58,7 @@ class AceSeoSheetsSchedule {
     public static function settings() {
         $saved = self::record( self::OPTION );
         $saved = is_array( $saved ) ? $saved : array();
-        return array_merge( array( 'frequency' => 'off', 'post_types' => array( 'post' ), 'include_unpublished' => 0, 'stop_generation' => 0, 'auto_stop_generation' => 0 ), $saved );
+        return array_merge( array( 'frequency' => 'off', 'post_types' => array( 'post' ), 'include_unpublished' => 0, 'after_build' => 0, 'stop_generation' => 0, 'auto_stop_generation' => 0 ), $saved );
     }
 
     private static function dependencies() {
@@ -157,7 +166,11 @@ class AceSeoSheetsSchedule {
         if ( 'off' !== $frequency && ( ! $types || ! AceSeoSheets::configured() ) ) {
             wp_die( 'Choose at least one content type and save a Google Sheets connection before switching snapshots on.' );
         }
-        $new = array_merge( $old, array( 'frequency' => $frequency, 'post_types' => $types ?: array( 'post' ), 'include_unpublished' => empty( $_POST['include_unpublished'] ) ? 0 : 1, 'stop_generation' => (int) $old['stop_generation'], 'auto_stop_generation' => (int) $old['auto_stop_generation'] + ( 'off' === $frequency && 'off' !== $old['frequency'] ? 1 : 0 ) ) );
+        $after_build = empty( $_POST['after_build'] ) ? 0 : 1;
+        if ( $after_build && ( ! $types || ! AceSeoSheets::configured() ) ) {
+            wp_die( 'Choose at least one content type and save a Google Sheets connection before refreshing after each build.' );
+        }
+        $new = array_merge( $old, array( 'frequency' => $frequency, 'post_types' => $types ?: array( 'post' ), 'include_unpublished' => empty( $_POST['include_unpublished'] ) ? 0 : 1, 'after_build' => $after_build, 'stop_generation' => (int) $old['stop_generation'], 'auto_stop_generation' => (int) $old['auto_stop_generation'] + ( 'off' === $frequency && 'off' !== $old['frequency'] ? 1 : 0 ) ) );
         wp_cache_delete( self::OPTION, 'options' );
         wp_cache_delete( 'alloptions', 'options' );
         wp_cache_delete( 'notoptions', 'options' );
@@ -352,7 +365,8 @@ class AceSeoSheetsSchedule {
             }
             self::store( self::JOB, $job, $lease );
             $batches++;
-            } while ( $batches < 2 && microtime( true ) < $deadline && 'publish' !== $job['phase'] && self::active( $job ) );
+            // As many batches as fit the deadline (a 42,000-row site took 85 minutes at two a tick).
+            } while ( $batches < 12 && microtime( true ) < $deadline && 'publish' !== $job['phase'] && self::active( $job ) );
             if ( self::active( $job ) ) { self::queue_tick(); }
         } catch ( Throwable $error ) {
             if ( $job && self::owns( $lease ) ) {
@@ -440,6 +454,7 @@ class AceSeoSheetsSchedule {
                     <?php endforeach; ?>
                 </fieldset>
                 <p><label><input type="checkbox" name="include_unpublished" value="1" <?php checked( ! empty( $settings['include_unpublished'] ) ); ?>> Also include drafts, pending, private and scheduled content</label></p>
+                <p><label><input type="checkbox" name="after_build" value="1" <?php checked( ! empty( $settings['after_build'] ) ); ?>> Also refresh the report each time a retention build finishes</label><br><span class="description">The weekly build (when switched on), a manual rebuild or a resumed one: the sheet then always shows the latest saved assessment.</span></p>
                 <p class="description">Otherwise, only published content is copied. The snapshot includes every item in the selected types and statuses, with the same columns as the post-list export. Trash, revisions and automatic drafts are excluded.</p>
                 <p><button class="button button-primary">Save report schedule</button></p>
             </form>

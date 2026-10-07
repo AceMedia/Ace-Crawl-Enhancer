@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.61-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.62-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.61
+**Stable tag:** 1.0.62
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.62 (2026-10-07)
+- The saved report now holds its judgement when the period it measured did not contain the dates an article is about: editor-set dates, a verified event occurrence, or (recurring, so any year counts) the publication anniversary. Such posts are "Not ready to judge" with the reason spelt out; readers and clicks still count, so a retained article is never held. Analytics reports that hit their row ceiling leave unlisted pages as unknown rather than zero.
+- Google Sheets: an option to refresh the main report each time a retention build finishes, so the sheet never lags the assessment. A refresh now writes as many batches as fit its 20-second tick instead of two, so a 42,000-row report takes minutes rather than an hour and a half.
 
 ### 1.0.61 (2026-10-07)
 - Five timing columns in the CSV and Google Sheets exports: *When it matters* (the editor's choice or the automatic anniversary estimate), *Relevant window*, *Timing basis* (editorial, verified event, or an estimate marked unverified), *Linked events* with their dates, and *Assessed in season?*, which says whether the saved assessment's traffic window overlapped the dates the article is about. Facts for the person deciding; the export still draws no verdict and calls no analytics API.

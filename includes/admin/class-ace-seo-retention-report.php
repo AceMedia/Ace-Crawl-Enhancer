@@ -462,10 +462,18 @@ class AceSeoRetentionReport {
         $signals        = get_option( self::SIGNALS_OPTION, array() );
         $signals['ga4'] = null;
 
-        $views = self::ga4_page_views( (int) $p['settings']['days'] );
+        $days   = max( 1, min( 480, (int) $p['settings']['days'] ) );
+        $report = self::ga4_report( gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) ), gmdate( 'Y-m-d', strtotime( '-1 day' ) ) );
+        $views  = is_wp_error( $report ) ? $report : $report['rows'];
         if ( is_wp_error( $views ) ) {
             $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
         } else {
+            // Analytics listed every page with a view only if it did not hit its row ceiling. When it did,
+            // a page absent from the rows is unknown, not zero, and the scorer treats it that way.
+            $signals['ga4_capped'] = ! empty( $report['capped'] );
+            if ( $signals['ga4_capped'] ) {
+                $p['notes'][] = 'Google Analytics returned its maximum number of rows, so pages it did not list have unknown views rather than none.';
+            }
             $signals['ga4'] = array_intersect_key( $views, self::candidate_lookup( $p['settings'] ) );
             self::store_periods( 'ga4', $p['settings'] );
 
@@ -652,6 +660,11 @@ class AceSeoRetentionReport {
         }
 
         $words = self::word_counts( $ids );
+        // The dates this build's traffic covers, for the timing rule.
+        $period = array( 'start' => gmdate( 'Y-m-d', (int) $p['started'] - (int) $settings['days'] * DAY_IN_SECONDS ), 'end' => gmdate( 'Y-m-d', (int) $p['started'] - DAY_IN_SECONDS ) );
+        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) && defined( 'ACE_SEO_PATH' ) ) {
+            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-retention-evidence-view.php';
+        }
 
         /**
          * Page views per post over the same window, from whatever analytics the site has:
@@ -669,7 +682,8 @@ class AceSeoRetentionReport {
             if ( isset( $views[ $id ] ) ) {
                 $view_count = (int) $views[ $id ];
             } elseif ( null !== $ga4 ) {
-                $view_count = (int) ( $ga4[ $key ] ?? 0 ); // Analytics lists every page with a view
+                // Analytics lists every page with a view, unless its row ceiling cut the list short.
+                $view_count = isset( $ga4[ $key ] ) ? (int) $ga4[ $key ] : ( empty( $signals['ga4_capped'] ) ? 0 : null );
             } elseif ( null !== $tracked ) {
                 $view_count = (int) ( $tracked[ $id ] ?? 0 );
             } else {
@@ -707,6 +721,19 @@ class AceSeoRetentionReport {
             $row['tier']   = self::tier( $row, $settings );
             $row['built']  = time();
             $row['window'] = (int) $settings['days'];
+
+            // Timing: an article is only judged on a period that contained the dates it is about.
+            // Editor-set dates, a verified event occurrence or (recurring) the publication anniversary.
+            // Readers and clicks still count: a retained article is never held.
+            if ( 'retained' !== $row['tier'] && class_exists( 'Ace_SEO_Retention_Evidence' ) ) {
+                $hold = self::timing_hold_for( $id, $period );
+                if ( '' !== $hold ) {
+                    $row['tier']   = 'unknown';
+                    $row['bucket'] = 'no-signal';
+                    $row['reason'] = 'Not ready to judge. ' . $hold;
+                    $row['hold']   = $hold;
+                }
+            }
 
             $row = apply_filters( 'ace_seo_retention_row', $row, $id, $settings );
             update_post_meta( $id, self::META, $row );
@@ -763,8 +790,23 @@ class AceSeoRetentionReport {
             self::forget_periods();
             self::forget_stale( (int) $p['started'] );
             self::record_history( $p );
+            /** A build has finished and every row is saved; exports that follow the report hook here. */
+            do_action( 'ace_seo_retention_built', $p );
         }
         self::save_progress( $p );
+    }
+
+    /** Why this build's period cannot judge the post yet ('' when it can). Site knowledge only; no API calls. */
+    public static function timing_hold_for( $id, array $period ) {
+        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) ) {
+            return '';
+        }
+        try {
+            $context = Ace_SEO_Retention_Evidence_View::base_context( (int) $id, array( 'published' => get_post_time( 'Y-m-d', true, $id ) ), $period, gmdate( 'Y-m-d' ) );
+            return Ace_SEO_Retention_Evidence::timing_hold( Ace_SEO_Retention_Evidence::relevance( $context ), $period );
+        } catch ( Throwable $e ) {
+            return '';
+        }
     }
 
     /** One line per finished build, newest last, so the screen can show how the archive moves week to week. */

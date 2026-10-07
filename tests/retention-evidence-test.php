@@ -55,4 +55,14 @@ evidence_check( 'retained' === AceSeoRetentionReport::tier( array( 'views' => nu
 $legacy_settings = array_merge( $s, array( 'demand_impressions' => 100, 'refresh_max_ctr' => .02, 'refresh_max_pos' => 20 ) );
 $missing = array_merge( $row, array( 'views' => null, 'position' => 0 ) );
 evidence_check( 'no-signal' === AceSeoRetentionReport::bucket( $missing, $legacy_settings )[0], 'Legacy scorer must not suggest noindex from absent visitor evidence.' );
+$assessed = array( 'start' => '2025-10-01', 'end' => '2026-09-30' );
+$hold = 'Ace_SEO_Retention_Evidence::timing_hold';
+evidence_check( '' === $hold( array( 'source' => 'Publication anniversary estimate', 'verified' => false, 'start' => '2027-01-10', 'end' => '2027-05-10' ), $assessed ), 'A year-long period always contains one season of a recurring anniversary estimate.' );
+evidence_check( '' !== $hold( array( 'source' => 'Publication anniversary estimate', 'verified' => false, 'start' => '2027-01-10', 'end' => '2027-05-10' ), array( 'start' => '2026-07-01', 'end' => '2026-09-30' ) ), 'A summer-only period misses a spring season in every year.' );
+evidence_check( false !== strpos( $hold( array( 'source' => 'Editorial override', 'verified' => true, 'start' => '2027-03-10', 'end' => '2027-03-13' ), $assessed ), 'after that period has passed' ), 'Editor dates in the future hold the judgement until afterwards.' );
+evidence_check( false !== strpos( $hold( array( 'source' => 'Verified event occurrence', 'verified' => true, 'start' => '2024-03-10', 'end' => '2024-03-13' ), $assessed ), 'period that includes those dates' ), 'A one-off event before the period is not judged by that period.' );
+evidence_check( '' === $hold( array( 'source' => 'Verified event occurrence', 'verified' => true, 'start' => '2026-03-10', 'end' => '2026-03-13' ), $assessed ), 'A verified event inside the period can be judged.' );
+evidence_check( '' === $hold( array( 'source' => 'Evergreen: chosen observation period', 'verified' => true, 'evergreen' => true ), $assessed ), 'Evergreen articles are never held for timing.' );
+evidence_check( '' === $hold( array( 'source' => 'Relevant dates not established', 'verified' => false ), $assessed ), 'Unknown relevance does not hold: the period stands on its own.' );
+evidence_check( false !== strpos( $hold( array( 'source' => 'Several event occurrences: choose the relevant one', 'verified' => false, 'ambiguous' => true ), $assessed ), 'confirm which' ), 'Ambiguous linked events hold until an editor confirms the edition.' );
 echo "$n retention evidence checks passed.\n";
