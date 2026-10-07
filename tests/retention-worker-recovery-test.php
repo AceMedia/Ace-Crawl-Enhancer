@@ -105,7 +105,10 @@ $p = $progress(); $p['phase'] = 'score'; $p['total'] = 33673; $p['offset'] = 231
 WorkerStub::run_tick();
 $check( 'a normal tick queues its successor before releasing the lease', false !== wp_next_scheduled( WorkerStub::CRON_HOOK ) && null === WorkerStub::$lock );
 unset( $GLOBALS['cron'][ WorkerStub::CRON_HOOK ] ); // the lost continuation seen on a live site
-$check( 'no tick and no lease reads as interrupted', 'interrupted' === WorkerStub::worker_state() );
+$check( 'no tick and no lease straight after a step reads as queued (handing over), not interrupted', 'queued' === WorkerStub::worker_state() );
+$check( 'recover() leaves a hand-over alone', false === WorkerStub::recover() );
+$p = $progress(); $p['tick_at'] = time() - WorkerStub::LEASE_SECONDS - 1; $p['started'] = $p['tick_at'] - 60; update_option( WorkerStub::PROGRESS_OPTION, $p );
+$check( 'no tick, no lease and no step for a lease period reads as interrupted', 'interrupted' === WorkerStub::worker_state() );
 $check( 'recover() queues the build again', true === WorkerStub::recover() && false !== wp_next_scheduled( WorkerStub::CRON_HOOK ) );
 $p = $progress();
 $check( 'resume keeps the offset and the start time', 23400 === $p['offset'] && 'score' === $p['phase'] );
@@ -117,6 +120,7 @@ $check( 'state back to queued', 'queued' === WorkerStub::worker_state() );
 $reset();
 WorkerStub::start();
 unset( $GLOBALS['cron'][ WorkerStub::CRON_HOOK ] );
+$p = $progress(); $p['started'] = time() - 3600; update_option( WorkerStub::PROGRESS_OPTION, $p );
 WorkerStub::$lock = 'other-host:999:abc|' . ( time() + 200 );
 WorkerStub::$script = array( 'ok' );
 WorkerStub::run_tick();
@@ -162,9 +166,9 @@ $check( 'the stopped build keeps the rows scored so far', 300 === $p['offset'] )
 /* 7. The weekly job resumes an interrupted build rather than skipping it, and starts afresh after a stop. */
 $reset();
 WorkerStub::start();
-$started = $progress()['started'];
+$started = time() - 86400;
 unset( $GLOBALS['cron'][ WorkerStub::CRON_HOOK ] ); unset( $GLOBALS['cron'][ WorkerStub::WATCH_HOOK ] );
-$p = $progress(); $p['phase'] = 'links'; $p['offset'] = 9000; update_option( WorkerStub::PROGRESS_OPTION, $p );
+$p = $progress(); $p['phase'] = 'links'; $p['offset'] = 9000; $p['started'] = $started; $p['tick_at'] = $started; update_option( WorkerStub::PROGRESS_OPTION, $p );
 WorkerStub::run_weekly();
 $p = $progress();
 $check( 'weekly resumes the interrupted build in place', 'links' === $p['phase'] && 9000 === $p['offset'] && $started === $p['started'] && false !== wp_next_scheduled( WorkerStub::CRON_HOOK ) );
@@ -198,6 +202,7 @@ $check( 'a fatal outside a tick is ignored', 1 === $progress()['failures'] );
 /* 9. The admin resume action and clear(). */
 $reset();
 WorkerStub::start(); unset( $GLOBALS['cron'][ WorkerStub::CRON_HOOK ] );
+$p = $progress(); $p['started'] = time() - 3600; update_option( WorkerStub::PROGRESS_OPTION, $p );
 try { WorkerStub::handle_resume(); $check( 'resume handler redirects', false ); } catch ( WorkerRedirect $r ) { $check( 'resume handler queues the tick and redirects to the dashboard', false !== wp_next_scheduled( WorkerStub::CRON_HOOK ) && false !== strpos( $r->url, 'ace-seo-retention' ) ); }
 $check( 'resume handler leaves a message', false !== strpos( (string) get_transient( 'ace_seo_retention_msg_1' ), 'continue from where it stopped' ) );
 $GLOBALS['nonce_ok'] = false;

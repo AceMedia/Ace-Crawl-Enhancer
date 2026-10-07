@@ -352,7 +352,10 @@ class AceSeoRetentionReport {
         if ( wp_next_scheduled( self::CRON_HOOK ) ) {
             return 'queued';
         }
-        return 'interrupted';
+        // Between a cron runner taking the tick off the queue and the worker taking the lease there is
+        // a moment with neither; a build whose last step was recent is handing over, not interrupted.
+        $last = max( (int) ( $p['tick_at'] ?? 0 ), (int) ( $p['started'] ?? 0 ) );
+        return $last > time() - self::LEASE_SECONDS ? 'queued' : 'interrupted';
     }
 
     /** Queue the next tick for a build that is waiting on nothing. Returns true if it did. */
@@ -374,6 +377,9 @@ class AceSeoRetentionReport {
 
     /** The watchdog: runs hourly while a build is on, and on every admin page load. Cheap when there is nothing to do. */
     public static function recover() {
+        if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+            return false; // Front-end admin-ajax traffic is not an admin looking at the dashboard.
+        }
         if ( ! self::is_building() ) {
             if ( wp_next_scheduled( self::WATCH_HOOK ) ) {
                 wp_clear_scheduled_hook( self::WATCH_HOOK );
