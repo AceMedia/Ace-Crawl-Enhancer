@@ -17,6 +17,25 @@ the compatibility contract in [CLAUDE.md](../CLAUDE.md) (6 live consumer sites; 
 **GitHub issues:** Phase 0 = #10, Phase 1 = #11, Phase 2 = #12, Phase 3 = #13, Phase 4 = #14,
 Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
+## October 2026 call follow-ups
+
+- Seasonal retention: [#32](https://github.com/AceMedia/Ace-Crawl-Enhancer/issues/32).
+  A read-only calendar preview is available through
+  `wp eval-file <plugin>/bin/seasonal-retention-preview.php YYYY-MM-DD > preview.csv`.
+  It scans published posts in batches of 500, using the site's calendar/timezone and
+  two months either side of the publication anniversary. Boundary days are included;
+  month ends are clamped and 29 February uses 28 February in non-leap years.
+  This is a full published-post inventory, not the older-post candidate cohort or a
+  traffic assessment. It makes no report, spreadsheet, publication-date or indexing
+  changes. In-season rows still need verified traffic coverage before any recommendation.
+  Live integration, explicit overrides, scoped history and UI remain open; worker
+  recovery in #30 is a prerequisite for trusting a replacement report.
+  Run `php tests/seasonal-window-test.php` for the calendar boundary checks.
+- Optional ChatGPT sign-in and eligible plan usage:
+  [#33](https://github.com/AceMedia/Ace-Crawl-Enhancer/issues/33), alongside provider
+  work in #14. Confirm the supported deployment/registration route and explicit
+  inference consent before implementing the connection; identity alone is insufficient.
+
 ## Phase 0 — Hygiene & safety (small, independent tasks) — issue #10
 
 - [x] Remove `test-background-optimization.php`, `test-homepage-sync.php`, `fix-slashes.php` from the
@@ -164,3 +183,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
    consumer mirror before declaring done.
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
+
+## Retention evidence preview — 7 October 2026
+
+Local implementation for #32 adds a counts-free bucket/suggestion reference table, explicit event-edition/coverage guards, separate expandable evidence timelines and a private resumable baseline/preview CSV runner. Read [RETENTION-EVIDENCE-PREVIEW.md](RETENTION-EVIDENCE-PREVIEW.md) for the provider contract and precise remaining work. The old report worker is not yet generation-safe (#30), and real dated traffic collection/occurrence controls remain prerequisites for live seasonal assessment. Curated automatic management (#34) is shown as planned, not implemented or enabled. No live assessments or Sheets were rewritten.

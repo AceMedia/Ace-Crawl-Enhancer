@@ -52,7 +52,7 @@ class AceSeoRetentionReport {
      *   candidate  old, no views, and thin: the posts a clean-up would look at first
      *   dormant    old and unvisited, but with enough content that it is not an obvious candidate
      */
-    const TIERS = array( 'retained', 'candidate', 'dormant' );
+    const TIERS = array( 'retained', 'candidate', 'dormant', 'unknown' );
 
     /** Flat copies of the row, one meta key each, so the post list can filter and sort on them. */
     const META_TIER  = '_ace_seo_ret_tier';
@@ -673,7 +673,11 @@ class AceSeoRetentionReport {
         if ( ( null !== $views && (int) $views >= max( 1, (int) $s['retained_views'] ) ) || $clicks > 0 ) {
             return 'retained';
         }
-        $unread = null !== $views ? 0 === (int) $views : true;
+        // Absence of a source cannot establish that nobody reads a post.
+        if ( null === $views ) {
+            return 'unknown';
+        }
+        $unread = 0 === (int) $views;
         if ( $unread && (int) ( $r['words'] ?? 0 ) < (int) $s['thin_words'] ) {
             return 'candidate';
         }
@@ -855,6 +859,7 @@ class AceSeoRetentionReport {
             'retained'  => __( 'Retained', 'ace-crawl-enhancer' ),
             'candidate' => __( 'Candidates for review', 'ace-crawl-enhancer' ),
             'dormant'   => __( 'Dormant', 'ace-crawl-enhancer' ),
+            'unknown'   => __( 'Not ready to judge', 'ace-crawl-enhancer' ),
         );
     }
 
@@ -885,6 +890,7 @@ class AceSeoRetentionReport {
             <li><strong>Retained</strong> — an older post with enough recorded views, or any search click, in the report window.</li>
             <li><strong>Candidates for review</strong> — older posts with no recorded visits and less text than the saved word limit. This is a review queue, not a decision to delete.</li>
             <li><strong>Dormant</strong> — other older posts below the Retained threshold, usually with more text or a small amount of traffic. A quiet period may be seasonal; missing evidence is not proof that a post is unused.</li>
+            <li><strong>Not ready to judge</strong> — visitor counts are missing and there are no positive search clicks to establish readership. Unknown does not mean unused.</li>
         </ul>
         <h3>Recommendations suggest what to look at next</h3>
         <ul>
@@ -936,6 +942,9 @@ class AceSeoRetentionReport {
         }
         if ( ! empty( $r['views'] ) ) {
             return array( 'keep', sprintf( 'Still visited (%s page views in the window) even without search clicks.', number_format_i18n( $r['views'] ) ) );
+        }
+        if ( ! isset( $r['views'] ) ) {
+            return array( 'no-signal', 'Visitor counts are unknown, not zero. Check traffic coverage before suggesting a negative change.' );
         }
         if ( $r['impressions'] > 0 ) {
             return array( 'consolidate', sprintf( 'Shown %s times but never clicked: review whether another article covers the same subject. No redirect target has been selected.', number_format_i18n( $r['impressions'] ) ) );
@@ -1277,6 +1286,13 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
+        if ( ! empty( $_GET['evidence_preview'] ) ) {
+            require_once __DIR__ . '/class-ace-seo-retention-evidence-view.php';
+            echo '<div class="wrap"><h1>Retention evidence preview</h1><p><a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ) . '">Back to the saved report</a></p>';
+            Ace_SEO_Retention_Evidence_View::render();
+            echo '</div>';
+            return;
+        }
         $p        = self::progress();
         $settings = ! empty( $p['settings'] ) ? $p['settings'] : self::settings();
         $bucket   = isset( $_GET['bucket'] ) ? sanitize_key( $_GET['bucket'] ) : '';
@@ -1293,6 +1309,7 @@ class AceSeoRetentionReport {
             <h1>Retention dashboard</h1>
             <?php self::render_message(); ?>
             <p>See which older posts still help readers and which need a closer look. Groups describe the evidence; recommendations suggest a next step. Building this report does not delete, redirect or hide any post.</p>
+            <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a> — read-only; the saved report remains unchanged.</p>
             <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Retention settings</a> <a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&ace_ret=scored' ) ); ?>">Review posts and export</a> <a href="#retention-help">What the labels mean</a></p>
 
             <?php if ( self::is_building() ) : ?>
