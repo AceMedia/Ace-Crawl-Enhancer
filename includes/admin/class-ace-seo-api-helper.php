@@ -163,15 +163,23 @@ class AceSEOApiHelper {
     /**
      * Get OpenAI API key from settings
      */
-    public static function get_openai_key() {
+    public static function get_openai_key( $feature = 'text' ) {
         $options = get_option( 'ace_seo_options', array() );
-        return $options['ai']['openai_api_key'] ?? '';
+        $legacy = $options['ai']['openai_api_key'] ?? '';
+        $service = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        $key = $service ? $service->api_key( $feature, $legacy ) : $legacy;
+        return is_wp_error( $key ) ? '' : $key;
     }
     
     /**
      * Test basic OpenAI connection with a simple prompt
      */
     public static function test_basic_openai_connection() {
+        $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        if ( $shared && $shared->subscription_selected() ) {
+            $result = self::make_openai_request( "Say 'Hello, this is a test' in exactly those words." );
+            return is_wp_error( $result ) ? $result : 'ChatGPT connection successful. Response: ' . substr( $result, 0, 100 );
+        }
         $api_key = self::get_openai_key();
         
         if ( empty( $api_key ) ) {
@@ -205,10 +213,10 @@ class AceSEOApiHelper {
         $options = get_option( 'ace_seo_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
-        return ! empty( $ai_settings['openai_api_key'] ) && 
-               ( $ai_settings['ai_content_analysis'] || 
-                 $ai_settings['ai_keyword_suggestions'] || 
-                 $ai_settings['ai_content_optimization'] );
+        return ( ! empty( self::get_openai_key() ) || ( function_exists( 'ace_ai_connection_service' ) && ace_ai_connection_service() && ace_ai_connection_service()->subscription_selected() ) ) &&
+               ( ! empty( $ai_settings['ai_content_analysis'] ) ||
+                 ! empty( $ai_settings['ai_keyword_suggestions'] ) ||
+                 ! empty( $ai_settings['ai_content_optimization'] ) );
     }
     
     /**
@@ -218,7 +226,7 @@ class AceSEOApiHelper {
         $options = get_option( 'ace_seo_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
-        return ! empty( $ai_settings['openai_api_key'] ) && 
+        return ! empty( self::get_openai_key() ) &&
                ( $ai_settings['ai_web_search'] ?? 0 );
     }
     
@@ -229,7 +237,7 @@ class AceSEOApiHelper {
         $options = get_option( 'ace_seo_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
-        return ! empty( $ai_settings['openai_api_key'] ) && 
+        return ! empty( self::get_openai_key( 'images' ) ) &&
                ( $ai_settings['ai_image_generation'] ?? 0 );
     }
     
@@ -285,6 +293,12 @@ class AceSEOApiHelper {
      * Make OpenAI API request with model fallback
      */
     public static function make_openai_request( $prompt, $model = 'gpt-3.5-turbo', $enable_web_search = false ) {
+        $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        if ( $shared && $shared->subscription_selected() ) {
+            if ( $enable_web_search ) { return new WP_Error( 'ace_ai_subscription_web_search', 'Web search is not enabled for this subscription text connection.' ); }
+            $result = $shared->subscription_text( array( array( 'role' => 'user', 'content' => $prompt ) ), $model );
+            return is_wp_error( $result ) ? $result : $result['message'];
+        }
         $api_key = self::get_openai_key();
         
         if ( empty( $api_key ) ) {
@@ -405,7 +419,7 @@ class AceSEOApiHelper {
         if ( ! self::is_ai_image_generation_enabled() ) {
             return new WP_Error( 'ai_image_disabled', 'AI image generation is not enabled' );
         }
-        $api_key = self::get_openai_key();
+        $api_key = self::get_openai_key( 'images' );
         
         if ( empty( $api_key ) ) {
             return new WP_Error( 'no_api_key', 'OpenAI API key not configured' );
