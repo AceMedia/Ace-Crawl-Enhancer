@@ -27,7 +27,7 @@ class AceSeoIntegrations {
     }
 
     /**
-     * Ace-Community-Events (SheffEvents): events / businesses / job_listings /
+     * Ace-Community-Events: events / businesses / job_listings /
      * locations CPTs.
      *
      * Its own ACE_SEO class already emits Event JSON-LD on single events —
