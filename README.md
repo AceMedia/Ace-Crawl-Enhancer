@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.57-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.58-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.57
+**Stable tag:** 1.0.58
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.58 (2026-10-07)
+- Sign in with ChatGPT from Ace AI connection settings through a second, isolated Codex instance on the server (device-code login, no helper download or credential file).
+- Subscription text requests can run through the Codex bridge; shared bundle 1.2.0.
 
 ### 1.0.57 (2026-10-07)
 - Add a shared Ace AI connection for single sites and multisite networks, with site overrides, a clear off switch and no silent billing fallback.
