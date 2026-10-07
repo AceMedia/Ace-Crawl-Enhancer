@@ -7,10 +7,42 @@ require_once dirname( __DIR__ ) . '/class-ace-seo-retention-actions.php';
 
 final class Ace_SEO_Retention_Evidence_View {
     const LIMIT = 100;
+    /** Per-post editorial timing (Advanced tab): auto, evergreen, or explicit dates. */
+    const META_TIMING = '_ace_seo_retention_timing';
+    const META_FROM   = '_ace_seo_relevant_from';
+    const META_TO     = '_ace_seo_relevant_to';
+
+    /**
+     * The row the rules should judge: the saved row, with its traffic replaced by the exact-period
+     * figures a provider supplied in the context (never the other way round).
+     */
+    public static function prepare( array $row, array $context ) {
+        if ( isset( $context['metrics'] ) && is_array( $context['metrics'] ) ) {
+            foreach ( array( 'views', 'clicks', 'impressions', 'position' ) as $k ) {
+                if ( array_key_exists( $k, $context['metrics'] ) ) {
+                    $row[ $k ] = $context['metrics'][ $k ];
+                }
+            }
+        }
+        return $row;
+    }
 
     /** Generic provider contract; third-party adapters can supply edition-bound occurrences. */
     public static function context( $id, array $row, array $period, $as_of ) {
         $context = array( 'period' => $period, 'as_of' => $as_of, 'events' => array(), 'coverage' => array(), 'metric_period' => (array) ( $row['metric_period'] ?? array() ) );
+        // Editorial timing, set per post on the Advanced tab: it takes precedence over any estimate.
+        $timing = (string) get_post_meta( $id, self::META_TIMING, true );
+        if ( 'evergreen' === $timing ) {
+            $context['content_type'] = 'evergreen';
+        } elseif ( 'dates' === $timing ) {
+            $from = (string) get_post_meta( $id, self::META_FROM, true );
+            $to   = (string) get_post_meta( $id, self::META_TO, true );
+            if ( Ace_SEO_Retention_Evidence::date( $from ) && Ace_SEO_Retention_Evidence::date( $to ) && $from <= $to ) {
+                $context['override'] = array( 'start' => $from, 'end' => $to );
+            } else {
+                $context['timing_note'] = 'Editorial dates are set but incomplete or invalid, so they are ignored.';
+            }
+        }
         try {
             $anniversary = Ace_SEO_Seasonal_Window::preview( $row['published'], $as_of, wp_timezone() );
             $context['anniversary'] = array( 'start' => $anniversary['season_start'], 'end' => $anniversary['season_end'] );
@@ -55,7 +87,7 @@ final class Ace_SEO_Retention_Evidence_View {
         $records = array();
         foreach ( $rows as $row ) {
             $context = self::context( $row['id'], $row, array( 'start' => $start, 'end' => $end ), $as_of );
-            $records[] = array( 'id' => $row['id'], 'row' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( $row, $context, AceSeoRetentionReport::settings() ) );
+            $records[] = array( 'id' => $row['id'], 'row' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( self::prepare( $row, $context ), $context, AceSeoRetentionReport::settings() ) );
         }
         $labels = Ace_SEO_Retention_Evidence::recommendations();
         $tiers = array_merge( AceSeoRetentionReport::tier_labels(), array( 'unknown' => 'Not ready to judge' ) );
@@ -110,7 +142,15 @@ final class Ace_SEO_Retention_Evidence_View {
             <label>From <input type="date" name="evidence_start" value="<?php echo esc_attr( $start ); ?>" required></label>
             <label>to <input type="date" name="evidence_end" value="<?php echo esc_attr( $end ); ?>" max="<?php echo esc_attr( current_datetime()->modify( '-1 day' )->format( 'Y-m-d' ) ); ?>" required></label>
             <button class="button">Preview these dates</button>
+            <?php $prev = array( 'evidence_start' => gmdate( 'Y-m-d', strtotime( $start . ' -1 year' ) ), 'evidence_end' => gmdate( 'Y-m-d', strtotime( $end . ' -1 year' ) ) ); ?>
+            <a href="<?php echo esc_url( add_query_arg( $prev ) ); ?>">Same dates a year earlier</a>
         </form>
+        <?php $first = $records ? $records[0]['context'] : array(); ?>
+        <?php if ( ! empty( $first['sources'] ) ) : ?>
+            <p>Traffic for these exact dates comes from <?php echo esc_html( implode( ' and ', $first['sources'] ) ); ?> — <?php echo esc_html( ! empty( $first['coverage']['complete'] ) ? 'complete coverage of the period' : 'coverage is incomplete, so no negative conclusions are drawn' ); ?>.<?php foreach ( (array) ( $first['coverage']['notes'] ?? array() ) as $note ) : ?> <?php echo esc_html( $note ); ?><?php endforeach; ?></p>
+        <?php elseif ( $records ) : ?>
+            <p>No traffic source can report these exact dates (Site Kit Analytics, Search Console or own tracking), so visitor counts stay unknown and the rules hold.</p>
+        <?php endif; ?>
         <p><?php echo esc_html( sprintf( 'Showing %d saved articles on page %d. This sample is separate from the reference guide above.', count( $records ), $page ) ); ?></p>
         <h3>Why each suggestion fits</h3>
         <?php foreach ( $records as $record ) : $row = $record['row']; $assessment = $record['assessment']; ?>
@@ -119,6 +159,8 @@ final class Ace_SEO_Retention_Evidence_View {
                 <p>Saved assessment: <?php echo esc_html( ( AceSeoRetentionReport::tier_labels()[$row['tier'] ?? ''] ?? 'Unknown group' ) . ' / ' . ( AceSeoRetentionReport::recommendation_labels()[$row['bucket'] ?? ''] ?? 'Unknown recommendation' ) ); ?>. Preview: <?php echo esc_html( $tiers[$assessment['tier']] ); ?>.</p>
                 <p>Suggestions: <?php echo esc_html( implode( '; ', array_map( static function ( $key ) use ( $labels ) { return $labels[$key]; }, $assessment['suggestions'] ) ) ); ?>.</p>
                 <p><span class="ace-evidence-status ace-evidence-<?php echo esc_attr( $assessment['attention'] ); ?>"><?php echo esc_html( Ace_SEO_Retention_Evidence::attention_labels()[$assessment['attention']] ); ?></span> <strong>Evidence:</strong> <?php echo esc_html( $assessment['confidence'] ); ?>. <?php echo esc_html( $assessment['activity'] ); ?>.</p>
+                <?php if ( ! empty( $record['context']['metrics'] ) ) : $m = $record['context']['metrics']; ?><p>For these dates: <?php echo esc_html( null === $m['views'] ? 'views unknown' : number_format_i18n( (int) $m['views'] ) . ' views' ); ?>, <?php echo esc_html( number_format_i18n( (int) $m['clicks'] ) ); ?> search clicks, <?php echo esc_html( number_format_i18n( (int) $m['impressions'] ) ); ?> impressions.</p><?php endif; ?>
+                <?php if ( ! empty( $record['context']['timing_note'] ) ) : ?><p><?php echo esc_html( $record['context']['timing_note'] ); ?></p><?php endif; ?>
                 <?php foreach ( $assessment['reasons'] as $reason ) : ?><p><?php echo esc_html( $reason ); ?></p><?php endforeach; ?>
                 <?php self::timeline( $record ); ?>
                 <p><a href="<?php echo esc_url( get_edit_post_link( $record['id'] ) ); ?>">Review this article</a></p>

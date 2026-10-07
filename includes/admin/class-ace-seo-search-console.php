@@ -581,6 +581,52 @@ class AceSEOSearchConsole {
      * URL. One request per 25,000 rows (the API's page size), cached for a day: this is the bulk
      * feed the retention report reads rather than a call per post.
      */
+    /**
+     * The same bulk feed for exact dates (inclusive). Returns array( 'rows' => url => {clicks,
+     * impressions, position}, 'capped' => bool ); capped means the row ceiling was hit and pages are
+     * missing, so an absent URL is not a measured zero. Cached for a day.
+     */
+    public static function pages_between( $start, $end ) {
+        $property = self::get_property();
+        if ( '' === $property ) {
+            return new WP_Error( 'gsc_no_property', 'No Search Console property is configured in Site Kit.' );
+        }
+        $cache_key = 'ace_seo_gsc_pages_' . md5( $property . '|' . $start . '|' . $end );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && isset( $cached['rows'] ) ) {
+            return $cached;
+        }
+        $pages = array();
+        $from  = 0;
+        do {
+            $response = self::search_analytics( $property, array(
+                'startDate'  => $start,
+                'endDate'    => $end,
+                'dimensions' => array( 'page' ),
+                'rowLimit'   => 25000,
+                'startRow'   => $from,
+            ) );
+            if ( is_wp_error( $response ) ) {
+                return $response;
+            }
+            $rows = isset( $response['rows'] ) && is_array( $response['rows'] ) ? $response['rows'] : array();
+            foreach ( $rows as $row ) {
+                $url = isset( $row['keys'][0] ) ? (string) $row['keys'][0] : '';
+                if ( '' !== $url ) {
+                    $pages[ $url ] = array(
+                        'clicks'      => (int) ( $row['clicks'] ?? 0 ),
+                        'impressions' => (int) ( $row['impressions'] ?? 0 ),
+                        'position'    => round( (float) ( $row['position'] ?? 0 ), 1 ),
+                    );
+                }
+            }
+            $from += 25000;
+        } while ( count( $rows ) === 25000 && $from < 250000 );
+        $report = array( 'rows' => $pages, 'capped' => count( $rows ) === 25000 && $from >= 250000 );
+        set_transient( $cache_key, $report, DAY_IN_SECONDS );
+        return $report;
+    }
+
     public static function pages_report( $days = 90 ) {
         $property = self::get_property();
         if ( '' === $property ) {

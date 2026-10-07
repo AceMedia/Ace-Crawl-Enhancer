@@ -3,7 +3,8 @@
  * Read-only, resumable review snapshot with an unchanged baseline for every scoped post.
  * wp eval-file <plugin>/bin/retention-evidence-snapshot.php /private/new-run 2026-01-01 2026-04-30 2026-10-07
  * Resume: repeat with the SAME arguments. Restart/compare: choose a NEW directory.
- * Does not replace the report, apply actions, fetch analytics, or update Google Sheets.
+ * Does not replace the report, apply actions or update Google Sheets. Dated traffic is read
+ * through the evidence-context providers (cached per period); the baseline row is kept unchanged.
  */
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) { exit; }
 require_once dirname( __DIR__ ) . '/includes/admin/class-ace-seo-retention-report.php';
@@ -65,7 +66,7 @@ try {
             if ( ! isset( $by_id[$id] ) ) { throw new RuntimeException( 'A scoped assessment disappeared or became invalid. Preserve this run and start a new snapshot after reviewing the source change.' ); }
             $row = $by_id[$id];
             $context = Ace_SEO_Retention_Evidence_View::context( $id, $row, $period, $as_of );
-            $records[] = array( 'id' => $id, 'captured_at' => gmdate( 'c' ), 'baseline' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( $row, $context, $state['provenance']['settings'] ) );
+            $records[] = array( 'id' => $id, 'captured_at' => gmdate( 'c' ), 'baseline' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( Ace_SEO_Retention_Evidence_View::prepare( $row, $context ), $context, $state['provenance']['settings'] ) );
         }
         $store->append( $records );
         WP_CLI::log( 'Saved ' . $store->state()['offset'] . ' of ' . count( $state['ids'] ) . ' scoped posts.' );

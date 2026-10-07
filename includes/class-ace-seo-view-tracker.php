@@ -325,6 +325,39 @@ class AceSeoViewTracker {
         return $out;
     }
 
+    /**
+     * Human views per post between two dates (inclusive), every post with a row. Only meaningful
+     * with coverage_start(): a post with no row is a measured zero only for days tracking recorded.
+     *
+     * @return array post_id => views
+     */
+    public static function views_between( $start, $end ) {
+        global $wpdb;
+        if ( ! self::enabled() ) {
+            return array();
+        }
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            'SELECT post_id, SUM(humans) AS n FROM ' . self::table() . ' WHERE day >= %s AND day <= %s GROUP BY post_id',
+            $start,
+            $end
+        ) );
+        $out = array();
+        foreach ( (array) $rows as $row ) {
+            $out[ (int) $row->post_id ] = (int) $row->n;
+        }
+        return $out;
+    }
+
+    /** The first day tracking has rows for ('' when none): coverage cannot start earlier. */
+    public static function coverage_start() {
+        global $wpdb;
+        if ( ! self::enabled() ) {
+            return '';
+        }
+        $day = $wpdb->get_var( 'SELECT MIN(day) FROM ' . self::table() );
+        return is_string( $day ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $day ) ? $day : '';
+    }
+
     /** Daily: last viewed day into post meta for posts read since the last run; prune old rows. */
     public static function rollup() {
         global $wpdb;

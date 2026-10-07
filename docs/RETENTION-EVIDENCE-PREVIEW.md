@@ -53,11 +53,17 @@ wp eval-file assets/plugins/Ace-Crawl-Enhancer/bin/retention-evidence-snapshot.p
 - A failed run never replaces a complete snapshot or the live report. The runner does not modify the current main Sheets tab or remove out-of-scope report metadata.
 - This captures source rows batch by batch and records their capture times. It is **not** a transaction-wide database backup. Take the consistent live backup separately before any future report rewrite; that backup was captured for PP News on 7 October.
 
+## Done since (1.0.59–1.0.60)
+
+- **Worker recovery (#30):** a lease, heartbeat, failure count, fatal-error guard and `resume()` with three recovery layers. A durable staged generation with an atomic last-complete result is still to do; a resumed build writes rows in place as before.
+- **Traffic by explicit dates:** the built-in dated-traffic provider fills `metrics`, `metric_period` and `coverage` for a finished period from Analytics, Search Console or own tracking, each attesting its own coverage and capping. Saved rows are never reused for other dates. `prepare()` is what the rules judge.
+- **Editorial timing:** Advanced-tab fields for evergreen / set dates / automatic, and a "same dates a year earlier" link for comparable seasons.
+
 ## Still required before live seasonal assessment
 
-1. Repair the legacy report worker (#30) with a database lease, durable generation staging, recovery and an atomic last-complete result. The new snapshot runner does not retrofit those semantics into the legacy worker.
-2. Retrieve traffic by explicit dates with honest per-source coverage/capping metadata. Existing saved report rows do not establish that provenance and therefore wait for review in this preview.
-3. Add editorial controls for evergreen/seasonal/event classification and verified occurrence overrides, plus comparable-season selection. Current generic provider support is not an editor-facing occurrence picker.
+1. A durable staged generation for the legacy worker with an atomic last-complete result (the rest of #30 is done).
+2. A verified event-occurrence picker: today an editor enters the dates for the edition an article covers; binding it to an Ace Teams & Events edition with a stable occurrence identifier is still open.
+3. Comparable-season selection beyond the one-year-earlier link.
 4. Review the reference wording and wire the remaining proposed suggestions (post-event reassessment, historical usefulness and internal-link improvement) to actual evidence.
 5. Implement optional curated management separately (#34): review only, approve once, or automatic action under explicitly configured action/scope rules. Require exclusions/manual keep, complete relevant snapshots, a verified relevant indexable canonical 200 replacement, no self redirects/chains/cycles, a dry run, capped batches, ledger/reason/rollback and stops on errors. A 301 is a persistent decision, never a seasonal on/off switch. No automatic management is enabled here.
 

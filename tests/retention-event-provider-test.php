@@ -5,6 +5,7 @@ function wp_timezone() { return new DateTimeZone( 'Europe/London' ); }
 function taxonomy_exists( $name ) { return 'ace_event' === $name && ! empty( $GLOBALS['events_enabled'] ); }
 function get_the_terms( $id, $taxonomy ) { return array( (object) array( 'term_id' => 7, 'name' => 'Example event' ) ); }
 function get_term_meta( $id, $key, $single ) { return $GLOBALS['event_meta'][$key] ?? ''; }
+function get_post_meta( $id, $key, $single ) { return $GLOBALS['post_meta'][$key] ?? ''; }
 function wp_date( $format, $timestamp, $timezone ) { return ( new DateTimeImmutable( '@' . $timestamp ) )->setTimezone( $timezone )->format( $format ); }
 function apply_filters( $name, $value, ...$unused ) { return $value; }
 require_once dirname( __DIR__ ) . '/includes/admin/class-ace-seo-retention-evidence-view.php';
@@ -27,4 +28,7 @@ provider_check( '' === $context['events'][0]['start'], 'Invalid legacy dates rem
 $GLOBALS['events_enabled'] = false;
 $context = Ace_SEO_Retention_Evidence_View::context( 9, $row, $period, '2026-10-07' );
 provider_check( array() === $context['events'], 'Generic sites do not require the events taxonomy or plugin.' );
+$GLOBALS['post_meta'] = array( '_ace_seo_retention_timing' => 'dates', '_ace_seo_relevant_from' => '2026-07-01', '_ace_seo_relevant_to' => '2026-07-03' );
+$context = Ace_SEO_Retention_Evidence_View::context( 9, $row, $period, '2026-10-07' );
+provider_check( 'Editorial override' === Ace_SEO_Retention_Evidence::relevance( $context )['source'], 'An editor\'s dates on the post outrank every estimate.' );
 echo "$checks event provider checks passed.\n";

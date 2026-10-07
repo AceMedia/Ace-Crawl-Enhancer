@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.58-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.60-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.58
+**Stable tag:** 1.0.60
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -249,6 +249,13 @@ Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page 
 
 ## 📝 Changelog
 
+### 1.0.60 (2026-10-07)
+- The retention evidence preview now reads traffic for the exact dates chosen, not the saved "last N days" totals: Google Analytics page views and Search Console clicks, impressions and position via Site Kit, or the plugin's own view tracking where Analytics is absent. Each source states whether it covers the whole period (Search Console's 16-month limit, Analytics row caps and the day tracking began are all reported), and a page no complete source lists is a measured zero rather than an unknown. Incomplete coverage still holds back every negative conclusion.
+- Editors can set when an article matters on the Advanced tab: evergreen, explicit relevant dates (the event or season it covers), or automatic. Set dates outrank every estimate; the preview says when dates are incomplete and ignores them.
+- "Same dates a year earlier" link on the preview for comparable seasons. Snapshot exports judge the same prepared row.
+
+### 1.0.59 (2026-10-07)
+- Retention builds recover on their own. Each step records a heartbeat, a database lease stops two workers racing, a fatal mid-step queues the next tick instead of leaving the build half-done, and a step that fails three times in a row stops the build with the reason shown. The dashboard tells queued, running and interrupted apart and offers a Resume button; the hourly watchdog, any admin page load and the weekly job resume an interrupted build rather than skipping it. `wp ace-crawl retention status|resume`.
 ### 1.0.58 (2026-10-07)
 - Sign in with ChatGPT from Ace AI connection settings through a second, isolated Codex instance on the server (device-code login, no helper download or credential file).
 - Subscription text requests can run through the Codex bridge; shared bundle 1.2.0.

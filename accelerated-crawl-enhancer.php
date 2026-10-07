@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://acemedia.com/ace-crawl-enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.58
+ * Version: 1.0.60
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('ACE_SEO_VERSION', '1.0.58');
+define('ACE_SEO_VERSION', '1.0.60');
 define('ACE_SEO_FILE', __FILE__);
 define('ACE_SEO_PATH', plugin_dir_path(__FILE__));
 define('ACE_SEO_URL', plugin_dir_url(__FILE__));
@@ -105,6 +105,29 @@ class AceCrawlEnhancer {
                 'type' => 'text',
                 'title' => 'Redirect to',
                 'description' => 'A URL to send this post to with a 301 — a stronger page on the same subject — or the word "gone" to answer 410. Leave blank for neither.',
+                'default_value' => '',
+            ],
+            'retention_timing' => [
+                'type' => 'select',
+                'title' => 'When this article matters',
+                'description' => 'Tells the retention report which dates to judge it on. Evergreen: any period. Set dates: the event or season it covers (below). Automatic: a window around its publication anniversary, treated as an estimate.',
+                'default_value' => '',
+                'options' => [
+                    '' => 'Automatic (anniversary estimate)',
+                    'evergreen' => 'Evergreen — relevant all year',
+                    'dates' => 'Set dates — the event or season below',
+                ],
+            ],
+            'relevant_from' => [
+                'type' => 'text',
+                'title' => 'Relevant from',
+                'description' => 'YYYY-MM-DD. First day of the event or season this article covers; used with "Set dates".',
+                'default_value' => '',
+            ],
+            'relevant_to' => [
+                'type' => 'text',
+                'title' => 'Relevant to',
+                'description' => 'YYYY-MM-DD. Last day of that event or season. Its traffic is only judged once the whole period has passed and been recorded.',
                 'default_value' => '',
             ],
             'meta-robots-noindex' => [
@@ -358,6 +381,10 @@ class AceCrawlEnhancer {
         AceSeoSheetsSchedule::init();
         require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-actions.php';
         AceSeoRetentionActions::init();
+        // Traffic for exact dates (Analytics, Search Console, own tracking) for the evidence preview.
+        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-evidence.php';
+        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-dated-traffic.php';
+        Ace_SEO_Retention_Dated_Traffic::init();
         // Own view tracking for old posts (off by default): the beacon, its REST route and the rollup.
         require_once ACE_SEO_PATH . 'includes/class-ace-seo-view-tracker.php';
         AceSeoViewTracker::init();

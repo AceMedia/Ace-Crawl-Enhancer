@@ -42,6 +42,14 @@ class AceSeoRetentionReport {
     const TRENDS          = array( 'rising', 'steady', 'falling', 'gone', 'quiet' );
     const CRON_HOOK       = 'ace_seo_retention_tick';
     const BATCH           = 300;
+    /** Hourly check that a build still has a worker, in case the tick that should follow it was lost. */
+    const WATCH_HOOK      = 'ace_seo_retention_watch';
+    /** The lease row: whichever worker holds it is the one allowed to run steps. */
+    const LOCK_OPTION     = 'ace_seo_retention_lock';
+    /** Seconds a lease lasts without renewal; a batch of 300 takes well under a minute, a tick under 80 s. */
+    const LEASE_SECONDS   = 300;
+    /** Consecutive failed steps before a build gives up rather than looping on a broken batch. */
+    const MAX_FAILURES    = 3;
 
     const BUCKETS = array( 'keep', 'refresh', 'consolidate', 'noindex', 'no-signal' );
 
@@ -66,10 +74,13 @@ class AceSeoRetentionReport {
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_tick' ) );
         add_action( self::WEEKLY_HOOK, array( __CLASS__, 'run_weekly' ) );
+        add_action( self::WATCH_HOOK, array( __CLASS__, 'recover' ) );
         add_action( 'admin_init', array( __CLASS__, 'sync_weekly_schedule' ) );
+        add_action( 'admin_init', array( __CLASS__, 'recover' ) );
         if ( is_admin() ) {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 20 );
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
+            add_action( 'admin_post_ace_seo_retention_resume', array( __CLASS__, 'handle_resume' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
@@ -132,9 +143,15 @@ class AceSeoRetentionReport {
             'counts'   => array_fill_keys( self::BUCKETS, 0 ),
             'tiers'    => array_fill_keys( self::TIERS, 0 ),
             'notes'    => array(),
+            'tick_at'  => 0,
+            'failures' => 0,
         ), false );
         update_option( self::SIGNALS_OPTION, array( 'gsc' => array(), 'links' => array() ), false );
+        static::lock_delete( '' );
         self::schedule_tick();
+        if ( ! wp_next_scheduled( self::WATCH_HOOK ) ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::WATCH_HOOK );
+        }
     }
 
     /** True while run_all() is driving the build itself, so ticks do not also queue cron events. */
@@ -159,20 +176,214 @@ class AceSeoRetentionReport {
         }
     }
 
+    /** Set while a tick is running, so the shutdown handler can tell a fatal mid-step from a normal exit. */
+    protected static $in_tick  = false;
+    protected static $worker   = '';
+    private static $shutdown   = false;
+
     public static function run_tick() {
-        $until = microtime( true ) + ( self::$running_all ? 0 : self::TICK_BUDGET );
+        if ( ! self::is_building() ) {
+            return;
+        }
+        $owner = self::$worker ? self::$worker : self::worker_id();
+        if ( ! self::take_lease( $owner ) ) {
+            // Another worker holds a live lease: it will queue the next tick itself when it finishes.
+            return;
+        }
+        self::$in_tick = true;
+        self::$worker  = $owner;
+        if ( ! self::$shutdown ) {
+            self::$shutdown = true;
+            register_shutdown_function( array( __CLASS__, 'on_shutdown' ) );
+        }
+
+        $until = microtime( true ) + ( self::$running_all ? 0 : static::tick_budget() );
         do {
-            self::run_step();
+            $p = self::progress();
+            try {
+                static::run_step();
+                $p             = self::progress();
+                $p['tick_at']  = time();
+                $p['failures'] = 0;
+                $p['worker']   = $owner;
+                self::save_progress( $p );
+            } catch ( \Throwable $e ) {
+                self::record_failure( $p, $e->getMessage() );
+                break;
+            }
+            static::lock_renew( $owner, time() + self::LEASE_SECONDS );
         } while ( ! self::$running_all && self::is_building() && microtime( true ) < $until );
 
         // Not "unless WP-CLI": a site that runs WP-Cron from a system crontab runs every tick under
-        // WP-CLI, and the build stalled after its first step.
+        // WP-CLI, and the build stalled after its first step. The next tick is queued before the
+        // lease is released, so "no tick and no lease" always means the worker was interrupted.
         if ( self::is_building() && ! self::$running_all ) {
             self::schedule_tick();
+        } elseif ( ! self::is_building() ) {
+            wp_clear_scheduled_hook( self::CRON_HOOK );
+            wp_clear_scheduled_hook( self::WATCH_HOOK );
+        }
+        self::$in_tick = false;
+        static::lock_delete( $owner );
+    }
+
+    /**
+     * A fatal error (memory, timeout, a killed process) ends the request without run_tick() finishing,
+     * which is how a build was left half-done with nothing queued. Count it like an exception and queue
+     * the next tick so the build carries on from the saved offset.
+     */
+    public static function on_shutdown() {
+        if ( ! self::$in_tick ) {
+            return;
+        }
+        $err = static::last_error();
+        if ( ! $err || ! in_array( (int) $err['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_RECOVERABLE_ERROR ), true ) ) {
+            return;
+        }
+        self::$in_tick = false;
+        self::record_failure( self::progress(), sprintf( '%s (%s:%d)', $err['message'], basename( (string) $err['file'] ), (int) $err['line'] ) );
+        static::lock_delete( self::$worker );
+    }
+
+    protected static function last_error() {
+        return error_get_last();
+    }
+
+    /** Seconds a cron tick keeps taking batches (overridable so checks can run one step per tick). */
+    protected static function tick_budget() {
+        return self::TICK_BUDGET;
+    }
+
+    /** One failed step: note it and carry on; the same step failing MAX_FAILURES times in a row stops the build. */
+    private static function record_failure( array $p, $message ) {
+        $p['failures']   = (int) ( $p['failures'] ?? 0 ) + 1;
+        $p['last_error'] = sprintf( '%s at %s %s/%s: %s', gmdate( 'Y-m-d H:i', time() ), (string) ( $p['phase'] ?? '' ), (int) ( $p['offset'] ?? 0 ), (int) ( $p['total'] ?? 0 ), (string) $message );
+        $p['tick_at']    = time();
+        if ( $p['failures'] >= self::MAX_FAILURES ) {
+            $p['phase']   = 'error';
+            $p['notes'][] = sprintf( 'The build stopped after %d failed attempts at the same step. Last error: %s. Start it again when the cause is fixed; the previous report rows are still in place.', self::MAX_FAILURES, $p['last_error'] );
+            wp_clear_scheduled_hook( self::CRON_HOOK );
+            wp_clear_scheduled_hook( self::WATCH_HOOK );
+        } else {
+            self::schedule_tick();
+        }
+        self::save_progress( $p );
+    }
+
+    /* ---- Worker lease and recovery ---------------------------------------------------------------- */
+
+    private static function worker_id() {
+        return substr( (string) gethostname(), 0, 40 ) . ':' . getmypid() . ':' . substr( uniqid( '', true ), -6 );
+    }
+
+    /** Take the lease if nobody holds a live one. Expired leases are taken over with a compare-and-swap. */
+    private static function take_lease( $owner ) {
+        $now   = time();
+        $until = $now + self::LEASE_SECONDS;
+        if ( static::lock_insert( $owner, $until ) ) {
+            return true;
+        }
+        $row = static::lock_get();
+        if ( ! $row ) {
+            return static::lock_insert( $owner, $until );
+        }
+        if ( $row['owner'] === $owner || (int) $row['until'] < $now ) {
+            return static::lock_replace( $row['raw'], $owner . '|' . $until );
+        }
+        return false;
+    }
+
+    public static function lease_active() {
+        $row = static::lock_get();
+        return $row && (int) $row['until'] >= time() ? $row : false;
+    }
+
+    /** The lease row, read past the object cache: another process may have written it a moment ago. */
+    protected static function lock_get() {
+        global $wpdb;
+        $raw = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", self::LOCK_OPTION ) );
+        if ( ! is_string( $raw ) || false === strpos( $raw, '|' ) ) {
+            return null;
+        }
+        list( $owner, $until ) = explode( '|', $raw, 2 );
+        return array( 'owner' => $owner, 'until' => (int) $until, 'raw' => $raw );
+    }
+
+    protected static function lock_insert( $owner, $until ) {
+        global $wpdb;
+        return 1 === $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::LOCK_OPTION, $owner . '|' . $until ) );
+    }
+
+    protected static function lock_replace( $expected, $value ) {
+        global $wpdb;
+        return 1 === $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $value, self::LOCK_OPTION, $expected ) );
+    }
+
+    protected static function lock_renew( $owner, $until ) {
+        global $wpdb;
+        $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value LIKE %s", $owner . '|' . $until, self::LOCK_OPTION, $wpdb->esc_like( $owner ) . '|%' ) );
+    }
+
+    /** Release a lease ('' releases whoever holds it, for a fresh start or a clear). */
+    protected static function lock_delete( $owner ) {
+        global $wpdb;
+        if ( '' === $owner ) {
+            $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s", self::LOCK_OPTION ) );
+        } else {
+            $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value LIKE %s", self::LOCK_OPTION, $wpdb->esc_like( $owner ) . '|%' ) );
         }
     }
 
-    private static function run_step() {
+    /**
+     * What the background worker is doing right now: idle, queued (a tick is due), running (a worker
+     * holds a live lease), interrupted (building, but nothing queued and nobody working), error, done.
+     */
+    public static function worker_state() {
+        $p = self::progress();
+        if ( empty( $p['phase'] ) ) {
+            return 'idle';
+        }
+        if ( in_array( $p['phase'], array( 'done', 'error' ), true ) ) {
+            return $p['phase'];
+        }
+        if ( self::lease_active() ) {
+            return 'running';
+        }
+        if ( wp_next_scheduled( self::CRON_HOOK ) ) {
+            return 'queued';
+        }
+        return 'interrupted';
+    }
+
+    /** Queue the next tick for a build that is waiting on nothing. Returns true if it did. */
+    public static function resume() {
+        if ( 'interrupted' !== self::worker_state() ) {
+            return false;
+        }
+        $p             = self::progress();
+        $p['notes']    = array_slice( (array) ( $p['notes'] ?? array() ), -19 );
+        $p['notes'][]  = sprintf( 'Resumed on %s: the worker had stopped at %s %s/%s with no next step queued. Nothing already scored was lost.', gmdate( 'Y-m-d H:i' ), (string) $p['phase'], number_format_i18n( (int) $p['offset'] ), number_format_i18n( (int) $p['total'] ) );
+        $p['failures'] = 0;
+        self::save_progress( $p );
+        wp_schedule_single_event( time(), self::CRON_HOOK );
+        if ( ! wp_next_scheduled( self::WATCH_HOOK ) ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::WATCH_HOOK );
+        }
+        return true;
+    }
+
+    /** The watchdog: runs hourly while a build is on, and on every admin page load. Cheap when there is nothing to do. */
+    public static function recover() {
+        if ( ! self::is_building() ) {
+            if ( wp_next_scheduled( self::WATCH_HOOK ) ) {
+                wp_clear_scheduled_hook( self::WATCH_HOOK );
+            }
+            return false;
+        }
+        return self::resume();
+    }
+
+    protected static function run_step() {
         $p = self::progress();
         if ( empty( $p['phase'] ) || in_array( $p['phase'], array( 'done', 'error' ), true ) ) {
             return;
@@ -287,6 +498,17 @@ class AceSeoRetentionReport {
      * @return array|WP_Error path => views
      */
     public static function ga4_page_views( $days ) {
+        $days   = max( 1, min( 480, (int) $days ) );
+        $report = self::ga4_report( gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) ), gmdate( 'Y-m-d', strtotime( '-1 day' ) ) );
+        return is_wp_error( $report ) ? $report : $report['rows'];
+    }
+
+    /**
+     * Page views per path between two dates (inclusive) from Google Analytics via Site Kit's token.
+     * Returns array( 'rows' => path => views, 'capped' => bool ): capped means the API's row ceiling was
+     * hit and the long tail is missing, so a page absent from the rows is not a measured zero.
+     */
+    public static function ga4_report( $start, $end ) {
         if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
             return new WP_Error( 'ga4_no_sitekit', 'Site Kit is not active.' );
         }
@@ -295,10 +517,9 @@ class AceSeoRetentionReport {
             return new WP_Error( 'ga4_no_property', 'Site Kit has no Analytics property connected.' );
         }
 
-        $days      = max( 1, min( 480, (int) $days ) );
-        $cache_key = 'ace_seo_ga4_paths_' . md5( $property . '|' . $days );
+        $cache_key = 'ace_seo_ga4_paths_' . md5( $property . '|' . $start . '|' . $end );
         $cached    = get_transient( $cache_key );
-        if ( is_array( $cached ) ) {
+        if ( is_array( $cached ) && isset( $cached['rows'] ) ) {
             return $cached;
         }
 
@@ -313,6 +534,7 @@ class AceSeoRetentionReport {
         $views  = array();
         $offset = 0;
         $limit  = 100000;
+        $max    = 500000;
         do {
             $response = wp_remote_post(
                 'https://analyticsdata.googleapis.com/v1beta/properties/' . rawurlencode( $property ) . ':runReport',
@@ -323,7 +545,7 @@ class AceSeoRetentionReport {
                         'Content-Type'  => 'application/json',
                     ),
                     'body'    => wp_json_encode( array(
-                        'dateRanges' => array( array( 'startDate' => $days . 'daysAgo', 'endDate' => 'yesterday' ) ),
+                        'dateRanges' => array( array( 'startDate' => $start, 'endDate' => $end ) ),
                         'dimensions' => array( array( 'name' => 'pagePath' ) ),
                         'metrics'    => array( array( 'name' => 'screenPageViews' ) ),
                         'limit'      => $limit,
@@ -347,10 +569,11 @@ class AceSeoRetentionReport {
                 }
             }
             $offset += $limit;
-        } while ( count( $rows ) === $limit && $offset < 500000 );
+        } while ( count( $rows ) === $limit && $offset < $max );
 
-        set_transient( $cache_key, $views, 12 * HOUR_IN_SECONDS );
-        return $views;
+        $report = array( 'rows' => $views, 'capped' => count( $rows ) === $limit && $offset >= $max );
+        set_transient( $cache_key, $report, 12 * HOUR_IN_SECONDS );
+        return $report;
     }
 
     /**
@@ -918,9 +1141,13 @@ class AceSeoRetentionReport {
     }
 
     public static function run_weekly() {
-        if ( ! self::is_building() ) {
-            self::start();
+        if ( self::is_building() ) {
+            // An unfinished build is resumed, never skipped: skipping it was how a stalled report
+            // blocked every later weekly run.
+            self::recover();
+            return;
         }
+        self::start();
     }
 
     /**
@@ -1124,6 +1351,8 @@ class AceSeoRetentionReport {
         delete_option( self::PROGRESS_OPTION );
         delete_option( self::SIGNALS_OPTION );
         wp_clear_scheduled_hook( self::CRON_HOOK );
+        wp_clear_scheduled_hook( self::WATCH_HOOK );
+        static::lock_delete( '' );
     }
 
     public static function csv( $bucket = '' ) {
@@ -1161,6 +1390,16 @@ class AceSeoRetentionReport {
             $overrides['days'] = max( 7, min( 480, (int) $_POST['days'] ) );
         }
         self::start( $overrides );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
+        exit;
+    }
+
+    public static function handle_resume() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_resume' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        $msg = self::resume() ? 'The build has been queued to continue from where it stopped.' : 'The build did not need resuming.';
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
         exit;
     }
@@ -1312,12 +1551,30 @@ class AceSeoRetentionReport {
             <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a> — read-only; the saved report remains unchanged.</p>
             <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Retention settings</a> <a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&ace_ret=scored' ) ); ?>">Review posts and export</a> <a href="#retention-help">What the labels mean</a></p>
 
+            <?php $state = self::worker_state(); ?>
             <?php if ( self::is_building() ) : ?>
-                <div class="notice notice-info"><p>
+                <div class="notice <?php echo 'interrupted' === $state ? 'notice-warning' : 'notice-info'; ?>"><p>
                     Building: <strong><?php echo esc_html( $p['phase'] ); ?></strong>
                     <?php if ( ! empty( $p['total'] ) ) : ?>— <?php echo esc_html( number_format_i18n( min( (int) $p['offset'], (int) $p['total'] ) ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $p['total'] ) ); ?><?php endif; ?>.
-                    It runs on cron in the background; reload to follow it.
-                </p></div>
+                    <?php if ( 'running' === $state ) : ?>
+                        A worker is on it now<?php echo ! empty( $p['tick_at'] ) ? ', last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago' : ''; ?>.
+                    <?php elseif ( 'queued' === $state ) : ?>
+                        The next step is queued on cron<?php echo ! empty( $p['tick_at'] ) ? '; last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago' : ''; ?>. Reload to follow it.
+                    <?php else : ?>
+                        <strong>Interrupted:</strong> nothing is queued and no worker holds it<?php echo ! empty( $p['tick_at'] ) ? ' (last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago)' : ''; ?>. It is resumed automatically within the hour, or now:
+                    <?php endif; ?>
+                    <?php if ( ! empty( $p['last_error'] ) ) : ?><br>Last error: <?php echo esc_html( $p['last_error'] ); ?><?php endif; ?>
+                </p>
+                <?php if ( 'interrupted' === $state ) : ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0 0 .6em">
+                    <?php wp_nonce_field( 'ace_seo_retention_resume' ); ?>
+                    <input type="hidden" name="action" value="ace_seo_retention_resume">
+                    <button class="button button-primary">Resume the build</button>
+                </form>
+                <?php endif; ?>
+                </div>
+            <?php elseif ( 'error' === $state ) : ?>
+                <div class="notice notice-error"><p>The last build stopped with an error<?php echo ! empty( $p['last_error'] ) ? ': ' . esc_html( $p['last_error'] ) : ''; ?>. The report shows the rows scored before it stopped; rebuild when the cause is fixed.</p></div>
             <?php elseif ( ! empty( $p['finished'] ) ) : ?>
                 <div class="notice notice-success"><p>Built <?php echo esc_html( human_time_diff( (int) $p['finished'] ) ); ?> ago: posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years, a <?php echo esc_html( (int) $settings['days'] ); ?>-day search window.</p></div>
             <?php endif; ?>
@@ -1502,6 +1759,36 @@ class AceSeoRetentionReport {
         WP_CLI::add_command( 'ace-crawl retention clear', array( __CLASS__, 'cli_clear' ) );
         WP_CLI::add_command( 'ace-crawl retention apply', array( __CLASS__, 'cli_apply' ) );
         WP_CLI::add_command( 'ace-crawl retention redirects', array( __CLASS__, 'cli_redirects' ) );
+        WP_CLI::add_command( 'ace-crawl retention status', array( __CLASS__, 'cli_status' ) );
+        WP_CLI::add_command( 'ace-crawl retention resume', array( __CLASS__, 'cli_resume' ) );
+    }
+
+    /** Where the background build is: idle, queued, running, interrupted, error or done, with the saved offset. */
+    public static function cli_status() {
+        $p     = self::progress();
+        $state = self::worker_state();
+        $lease = self::lease_active();
+        WP_CLI::log( sprintf( 'state: %s', $state ) );
+        if ( ! empty( $p['phase'] ) ) {
+            WP_CLI::log( sprintf( 'phase: %s %s/%s, started %s', $p['phase'], number_format_i18n( (int) ( $p['offset'] ?? 0 ) ), number_format_i18n( (int) ( $p['total'] ?? 0 ) ), gmdate( 'Y-m-d H:i', (int) ( $p['started'] ?? 0 ) ) ) );
+        }
+        WP_CLI::log( sprintf( 'last step: %s', ! empty( $p['tick_at'] ) ? gmdate( 'Y-m-d H:i:s', (int) $p['tick_at'] ) . ' by ' . (string) ( $p['worker'] ?? '?' ) : 'none recorded' ) );
+        WP_CLI::log( sprintf( 'next tick: %s', ( $next = wp_next_scheduled( self::CRON_HOOK ) ) ? gmdate( 'Y-m-d H:i:s', $next ) : 'none' ) );
+        WP_CLI::log( sprintf( 'watchdog: %s', ( $next = wp_next_scheduled( self::WATCH_HOOK ) ) ? gmdate( 'Y-m-d H:i:s', $next ) : 'none' ) );
+        WP_CLI::log( sprintf( 'lease: %s', $lease ? $lease['owner'] . ' until ' . gmdate( 'H:i:s', $lease['until'] ) : 'none' ) );
+        WP_CLI::log( sprintf( 'failures: %d%s', (int) ( $p['failures'] ?? 0 ), ! empty( $p['last_error'] ) ? ' (last: ' . $p['last_error'] . ')' : '' ) );
+        foreach ( (array) ( $p['notes'] ?? array() ) as $note ) {
+            WP_CLI::log( '  note: ' . $note );
+        }
+    }
+
+    /** Queue the next step of an interrupted build; nothing already scored is redone. */
+    public static function cli_resume() {
+        if ( self::resume() ) {
+            WP_CLI::success( 'Queued: the build continues from its saved offset on the next cron run.' );
+        } else {
+            WP_CLI::log( 'Nothing to resume: state is ' . self::worker_state() . '.' );
+        }
     }
 
     /**
