@@ -2057,6 +2057,24 @@ class AceSeoRetentionReport {
         WP_CLI::add_command( 'ace-crawl retention redirects', array( __CLASS__, 'cli_redirects' ) );
         WP_CLI::add_command( 'ace-crawl retention status', array( __CLASS__, 'cli_status' ) );
         WP_CLI::add_command( 'ace-crawl retention resume', array( __CLASS__, 'cli_resume' ) );
+        WP_CLI::add_command( 'ace-crawl retention suggestions', array( __CLASS__, 'cli_suggestions' ) );
+    }
+
+    /** Timing rules the site's own data suggests, per category or tag; --recompute works them out afresh. */
+    public static function cli_suggestions( $args, $assoc ) {
+        if ( ! class_exists( 'Ace_SEO_Timing_Suggestions' ) ) {
+            WP_CLI::error( 'Suggestions are not available.' );
+        }
+        $s = ! empty( $assoc['recompute'] ) ? Ace_SEO_Timing_Suggestions::recompute() : Ace_SEO_Timing_Suggestions::current();
+        if ( ! $s ) {
+            WP_CLI::log( 'No category or tag has a clear enough shape yet.' );
+            return;
+        }
+        $rows = array();
+        foreach ( $s as $key => $x ) {
+            $rows[] = array( 'term' => $key, 'posts' => $x['posts'], 'rule' => $x['rule'], 'confidence' => round( 100 * $x['confidence'] ) . '%', 'why' => $x['why'] );
+        }
+        WP_CLI\Utils\format_items( 'table', $rows, array( 'term', 'posts', 'rule', 'confidence', 'why' ) );
     }
 
     /** Where the background build is: idle, queued, running, interrupted, error or done, with the saved offset. */

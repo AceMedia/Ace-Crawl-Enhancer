@@ -76,6 +76,7 @@ class AceSeoRetentionActions {
             'thin_words'     => 300,
             'timing_policy'  => 'estimate',
             'timing_rules'   => array(),
+            'timing_ignored' => array(),
             'auto_build'     => 0,
             'track_views'    => 0,
             // Retained posts on the front end (AceSeoRetentionFront). All off until switched on.
@@ -147,8 +148,36 @@ class AceSeoRetentionActions {
         if ( isset( $input['timing_rules'] ) ) {
             $clean['timing_rules'] = self::parse_timing_rules( (string) $input['timing_rules'] );
         }
+        // Suggested rules: ticking "use it" adds the suggestion; unticking one that is in use as suggested
+        // removes it; hand-written rules for other terms are untouched. The box above stays the source of truth.
+        if ( ! empty( $input['timing_suggestions_present'] ) && isset( $clean['timing_rules'] ) ) {
+            $accept = is_array( $input['timing_accept'] ?? null ) ? $input['timing_accept'] : array();
+            foreach ( (array) ( $input['timing_suggested'] ?? array() ) as $key => $rule_text ) {
+                $key       = sanitize_key( strtok( (string) $key, ':' ) ) . ':' . sanitize_title( (string) strtok( ':' ) );
+                $suggested = self::parse_timing_rules( $key . ' = ' . (string) $rule_text );
+                if ( ! isset( $suggested[ $key ] ) ) {
+                    continue;
+                }
+                $existing = $clean['timing_rules'][ $key ] ?? null;
+                if ( isset( $accept[ $key ] ) ) {
+                    if ( null === $existing ) {
+                        $clean['timing_rules'][ $key ] = $suggested[ $key ];
+                    }
+                } elseif ( null !== $existing && $existing === $suggested[ $key ] ) {
+                    unset( $clean['timing_rules'][ $key ] );
+                }
+            }
+            $clean['timing_ignored'] = array_values( array_filter( array_map( static function ( $k ) {
+                return preg_match( '/^[a-z0-9_-]+:[a-z0-9_-]+$/', (string) $k ) ? (string) $k : '';
+            }, array_keys( is_array( $input['timing_ignore'] ?? null ) ? $input['timing_ignore'] : array() ) ) ) );
+        }
         update_option( self::OPTION, $clean, false );
         return self::options();
+    }
+
+    /** One rule as the text the box uses. */
+    public static function rule_to_text( array $rule ) {
+        return 'evergreen' === $rule['type'] ? 'evergreen' : ( 'event' === $rule['type'] ? 'event ' . (int) $rule['days'] : 'season ' . $rule['start'] . ' ' . $rule['end'] );
     }
 
     /**
@@ -183,8 +212,7 @@ class AceSeoRetentionActions {
     public static function timing_rules_text( array $rules ) {
         $lines = array();
         foreach ( $rules as $key => $rule ) {
-            $value = 'evergreen' === $rule['type'] ? 'evergreen' : ( 'event' === $rule['type'] ? 'event ' . (int) $rule['days'] : 'season ' . $rule['start'] . ' ' . $rule['end'] );
-            $lines[] = $key . ' = ' . $value;
+            $lines[] = $key . ' = ' . self::rule_to_text( $rule );
         }
         return implode( "\n", $lines );
     }

@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.65-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.66-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.65
+**Stable tag:** 1.0.66
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.66 (2026-10-07)
+- Timing rules suggested from the site's own data. For every category or tag with enough assessed posts, the plugin looks at how many of its older posts are still read at least monthly, when its posts fall across the year, and how often it publishes, and proposes evergreen, an event-bound window sized from its cadence, or a yearly season, each with a plain-English reason and a confidence. Accept or ignore each one from the settings tab; accepted rules join the hand-written ones, which always win. Suggestions recompute after every check. `wp ace-crawl retention suggestions [--recompute]`. Nothing is hard-coded: no sport, event or site name appears in the logic.
 
 ### 1.0.65 (2026-10-07)
 - Timing rules by category or tag, so an archive can be classified in bulk: `taxonomy:slug = evergreen`, `= event N` (relevant for N days from publication, one-off) or `= season MM-DD MM-DD` (every year). A setting on the post itself still wins. A one-off event that is over is judged on its readership since, not held; a period must contain a whole occurrence before it judges one.
