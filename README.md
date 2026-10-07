@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.60-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.61-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.60
+**Stable tag:** 1.0.61
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.61 (2026-10-07)
+- Five timing columns in the CSV and Google Sheets exports: *When it matters* (the editor's choice or the automatic anniversary estimate), *Relevant window*, *Timing basis* (editorial, verified event, or an estimate marked unverified), *Linked events* with their dates, and *Assessed in season?*, which says whether the saved assessment's traffic window overlapped the dates the article is about. Facts for the person deciding; the export still draws no verdict and calls no analytics API.
 
 ### 1.0.60 (2026-10-07)
 - The retention evidence preview now reads traffic for the exact dates chosen, not the saved "last N days" totals: Google Analytics page views and Search Console clicks, impressions and position via Site Kit, or the plugin's own view tracking where Analytics is absent. Each source states whether it covers the whole period (Search Console's 16-month limit, Analytics row caps and the day tracking began are all reported), and a page no complete source lists is a measured zero rather than an unknown. Incomplete coverage still holds back every negative conclusion.

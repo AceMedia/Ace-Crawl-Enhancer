@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AceSeoExport {
     public static function header() {
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings', 'When it matters', 'Relevant window', 'Timing basis', 'Linked events', 'Assessed in season?' );
         return array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
     }
 
@@ -49,7 +49,7 @@ class AceSeoExport {
              * @param array $line
              * @param int   $id
              */
-            $line = array_merge( $line, self::retention_context( $id, $row ) );
+            $line = array_merge( $line, self::retention_context( $id, $row ), self::timing_context( $id, $row ) );
             $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
         }
 
@@ -99,6 +99,25 @@ class AceSeoExport {
             $applied = 'Applied retention settings unavailable';
         }
         return array( $next, $why, $assessed, $applied );
+    }
+
+    /**
+     * The dates an article is about and whether the saved assessment looked at them. Site knowledge
+     * only (editor fields, linked events, anniversary estimate): an export never calls an analytics API.
+     */
+    public static function timing_context( $id, array $row ) {
+        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+            return array( '', '', '', '', '' );
+        }
+        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) ) {
+            require_once __DIR__ . '/admin/class-ace-seo-retention-evidence-view.php';
+        }
+        $row['published'] = $row['published'] ?? get_post_time( 'Y-m-d', false, $id );
+        try {
+            return Ace_SEO_Retention_Evidence_View::timing_columns( $id, $row, wp_date( 'Y-m-d' ) );
+        } catch ( Throwable $e ) {
+            return array( 'Unavailable', '', 'Timing could not be worked out: ' . $e->getMessage(), '', '' );
+        }
     }
 
     public static function post_types() {

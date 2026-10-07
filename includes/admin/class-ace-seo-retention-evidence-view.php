@@ -29,6 +29,15 @@ final class Ace_SEO_Retention_Evidence_View {
 
     /** Generic provider contract; third-party adapters can supply edition-bound occurrences. */
     public static function context( $id, array $row, array $period, $as_of ) {
+        /** Supply coverage, explicit editorial context and verified occurrence IDs here, in batches/cache where possible. */
+        return (array) apply_filters( 'ace_seo_retention_evidence_context', self::base_context( $id, $row, $period, $as_of ), (int) $id, $row );
+    }
+
+    /**
+     * What the site itself knows about an article's timing — editorial fields, linked events, the
+     * anniversary estimate — before any traffic provider runs. Exports read this: no API calls.
+     */
+    public static function base_context( $id, array $row, array $period, $as_of ) {
         $context = array( 'period' => $period, 'as_of' => $as_of, 'events' => array(), 'coverage' => array(), 'metric_period' => (array) ( $row['metric_period'] ?? array() ) );
         // Editorial timing, set per post on the Advanced tab: it takes precedence over any estimate.
         $timing = (string) get_post_meta( $id, self::META_TIMING, true );
@@ -67,8 +76,55 @@ final class Ace_SEO_Retention_Evidence_View {
                 }
             }
         }
-        /** Supply coverage, explicit editorial context and verified occurrence IDs here, in batches/cache where possible. */
-        return (array) apply_filters( 'ace_seo_retention_evidence_context', $context, (int) $id, $row );
+        return $context;
+    }
+
+    /**
+     * Timing facts for a spreadsheet row, so whoever decides can see the dates the article is about,
+     * where they came from, and whether the saved assessment even looked at the right period. No
+     * verdict is drawn here; the choice stays with the editor.
+     */
+    public static function timing_columns( $id, array $row, $as_of ) {
+        $built  = ! empty( $row['built'] ) ? (int) $row['built'] : 0;
+        $window = ! empty( $row['window'] ) ? (int) $row['window'] : 0;
+        $period = $built && $window ? array( 'start' => gmdate( 'Y-m-d', $built - $window * DAY_IN_SECONDS ), 'end' => gmdate( 'Y-m-d', $built ) ) : array();
+        $c      = self::base_context( $id, $row, $period, $as_of );
+        $r      = Ace_SEO_Retention_Evidence::relevance( $c );
+
+        $timing = (string) get_post_meta( $id, self::META_TIMING, true );
+        $set    = 'evergreen' === $timing ? 'Evergreen (editor)' : ( 'dates' === $timing ? ( isset( $c['override'] ) ? 'Set dates (editor)' : 'Set dates (editor) — incomplete, ignored' ) : 'Automatic (anniversary estimate)' );
+
+        $relevant = isset( $r['start'], $r['end'] ) ? $r['start'] . ' to ' . $r['end'] : ( ! empty( $r['evergreen'] ) ? 'Any period' : 'Not established' );
+        $basis    = (string) $r['source'] . ( empty( $r['verified'] ) && empty( $r['ambiguous'] ) && isset( $r['start'] ) ? ' — unverified' : '' );
+
+        $events = array();
+        foreach ( (array) ( $c['events'] ?? array() ) as $e ) {
+            $dates    = Ace_SEO_Retention_Evidence::date( $e['start'] ?? null ) ? ( $e['start'] . ( ! empty( $e['end'] ) && $e['end'] !== $e['start'] ? ' to ' . $e['end'] : '' ) ) : 'dates unknown';
+            $events[] = $e['label'] . ' (' . $dates . ( empty( $e['verified'] ) ? ', edition unverified' : ', verified' ) . ')';
+        }
+
+        if ( ! $period ) {
+            $in_season = 'No saved assessment';
+        } elseif ( ! empty( $r['evergreen'] ) ) {
+            $in_season = 'Not seasonal';
+        } elseif ( ! isset( $r['start'], $r['end'] ) ) {
+            $in_season = 'Unknown: relevant dates not established';
+        } else {
+            // An anniversary estimate recurs every year, so the assessed window is checked against each
+            // year's season; editorial or verified event dates are one-off and checked as given.
+            $recurring = empty( $r['verified'] ) && false !== strpos( (string) $r['source'], 'anniversary' );
+            $overlap   = false;
+            foreach ( $recurring ? range( -6, 1 ) : array( 0 ) as $years ) {
+                $s = $years ? ( new DateTimeImmutable( $r['start'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $r['start'];
+                $e = $years ? ( new DateTimeImmutable( $r['end'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $r['end'];
+                if ( $period['start'] <= $e && $period['end'] >= $s ) {
+                    $overlap = true;
+                    break;
+                }
+            }
+            $in_season = ( $overlap ? 'Yes' : 'No' ) . ' (assessed ' . $period['start'] . ' to ' . $period['end'] . ( empty( $r['verified'] ) ? ', relevant dates estimated' : '' ) . ')';
+        }
+        return array( $set, $relevant, $basis, $events ? implode( '; ', $events ) : '', $in_season );
     }
 
     public static function render() {
