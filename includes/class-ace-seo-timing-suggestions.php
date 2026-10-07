@@ -63,8 +63,9 @@ class Ace_SEO_Timing_Suggestions {
                 $out[ $k ] = $s;
             }
         }
+        // Impact first: the rule that settles 15,000 posts matters more than one that settles 30.
         uasort( $out, static function ( $a, $b ) {
-            return ( $b['confidence'] <=> $a['confidence'] ) ?: ( $b['posts'] <=> $a['posts'] );
+            return ( $b['posts'] <=> $a['posts'] ) ?: ( $b['confidence'] <=> $a['confidence'] );
         } );
         return $out;
     }
@@ -98,14 +99,16 @@ class Ace_SEO_Timing_Suggestions {
                 'why'        => sprintf( '%s%% of its %s older posts are still read at least monthly, years after publication, with no particular season. It behaves like reference content.', number_format_i18n( round( 100 * $persistence, 1 ) ), number_format_i18n( $n ) ),
             );
         }
-        // Event-bound: published often, all year round, and almost never read later.
-        if ( $persistence < 0.03 && null !== $gap ) {
-            $days = max( 2, min( 30, (int) ceil( $gap * 1.5 ) ) );
+        // Event-bound: publishes at least weekly, all year round, and its older posts are rarely read later.
+        // A sparse tag with no readers is just old, not day-of-event content: it gets no rule.
+        if ( $persistence < 0.08 && null !== $gap && $gap <= 7 ) {
+            $days    = max( 2, min( 14, (int) ceil( $gap * 1.5 ) + 1 ) );
+            $cadence = $gap < 0.75 ? 'more than once a day' : ( $gap < 1.5 ? 'about once a day' : sprintf( 'about every %s days', number_format_i18n( $gap, $gap < 10 ? 1 : 0 ) ) );
             return $base + array(
                 'type'       => 'event',
                 'rule'       => 'event ' . $days,
-                'confidence' => min( 0.9, 0.5 + ( 0.03 - $persistence ) * 10 + min( 0.2, $n / 5000 ) ),
-                'why'        => sprintf( 'Only %s%% of its %s older posts are still read at least monthly, and it publishes roughly every %s day%s all year round. That is the shape of day-of-event content, relevant for about %d days from publication.', number_format_i18n( round( 100 * $persistence, 1 ) ), number_format_i18n( $n ), $gap < 1 ? 'half a' : number_format_i18n( $gap, $gap < 10 ? 1 : 0 ), $gap < 1 || $gap >= 1.5 ? 's' : '', $days ),
+                'confidence' => min( 0.9, 0.45 + ( 0.08 - $persistence ) * 4 + min( 0.25, $n / 4000 ) ),
+                'why'        => sprintf( 'Only %s%% of its %s older posts are still read at least monthly, and it publishes %s all year round. That is the shape of day-of-event content, relevant for about %d days from publication.', number_format_i18n( round( 100 * $persistence, 1 ) ), number_format_i18n( $n ), $cadence, $days ),
             );
         }
         return null;
@@ -253,8 +256,8 @@ class Ace_SEO_Timing_Suggestions {
             <div style="overflow-x:auto"><table class="widefat striped" style="max-width:1100px">
                 <thead><tr><th scope="col">Category or tag</th><th scope="col">What we see</th><th scope="col">Suggested rule</th><th scope="col">Use it</th><th scope="col">Ignore</th></tr></thead>
                 <tbody>
-                <?php foreach ( $suggestions as $key => $s ) : $in_use = isset( $rules[ $key ] ); $is_ignored = in_array( $key, $ignored, true ); $same = $in_use && AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) === $s['rule']; ?>
-                    <tr<?php echo $is_ignored && ! $in_use ? ' style="opacity:.6"' : ''; ?>>
+                <?php $i = 0; foreach ( $suggestions as $key => $s ) : $i++; $in_use = isset( $rules[ $key ] ); $is_ignored = in_array( $key, $ignored, true ); $same = $in_use && AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) === $s['rule']; ?>
+                    <tr<?php echo $is_ignored && ! $in_use ? ' style="opacity:.6"' : ''; ?><?php echo $i > 30 && ! $in_use ? ' class="ace-timing-more" hidden' : ''; ?>>
                         <th scope="row"><?php echo esc_html( $s['label'] ); ?><br><small><code><?php echo esc_html( $key ); ?></code> · <?php echo esc_html( number_format_i18n( $s['posts'] ) ); ?> posts</small></th>
                         <td><?php echo esc_html( $s['why'] ); ?><br><small>Confidence <?php echo esc_html( (int) round( 100 * $s['confidence'] ) ); ?>%</small></td>
                         <td><code><?php echo esc_html( $s['rule'] ); ?></code><?php if ( $in_use ) : ?><br><small><?php echo $same ? 'In use' : 'A different rule is set by hand: ' . esc_html( AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) ); ?></small><?php endif; ?></td>
@@ -264,6 +267,9 @@ class Ace_SEO_Timing_Suggestions {
                 <?php endforeach; ?>
                 </tbody>
             </table></div>
+            <?php if ( count( $suggestions ) > 30 ) : ?>
+                <p><button type="button" class="button-link" onclick="document.querySelectorAll('.ace-timing-more').forEach(function(r){r.hidden=false;});this.hidden=true;">Show all <?php echo (int) count( $suggestions ); ?> suggestions (smaller categories and tags)</button></p>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
         <?php

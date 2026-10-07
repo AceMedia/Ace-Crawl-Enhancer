@@ -36,9 +36,15 @@ $check( 'the seasonal term gets a season rule covering March', isset( $s['catego
 $check( 'the season explanation names the months and years', false !== strpos( $s['category:festival']['why'], 'March' ) && false !== strpos( $s['category:festival']['why'], '4 years' ) );
 $check( 'the reference term is suggested evergreen', isset( $s['category:guides'] ) && 'evergreen' === $s['category:guides']['rule'] );
 $check( 'the day-of-event term gets a short event rule from its cadence', isset( $s['category:tips'] ) && preg_match( '/^event [2-3]$/', $s['category:tips']['rule'] ) );
+for ( $i = 0; $i < 60; $i++ ) { $rows[] = array( 'key' => 'post_tag:venue', 'label' => 'Venue', 'date' => gmdate( 'Y-m-d', strtotime( '2016-01-01 UTC' ) + ( $i * 40 ) * DAY_IN_SECONDS ), 'rank' => '', 'tier' => 'dormant' ); }
+for ( $i = 0; $i < 3000; $i++ ) { $rows[] = array( 'key' => 'category:daily-tips', 'label' => 'Daily tips', 'date' => gmdate( 'Y-m-d', strtotime( '2016-01-01 UTC' ) + intdiv( $i, 3 ) * DAY_IN_SECONDS ), 'rank' => $i % 20 ? 'occasional' : 'monthly', 'tier' => 'retained' ); }
+$s = Ace_SEO_Timing_Suggestions::infer( $rows );
+$check( 'a sparse tag with no readers is not called event-bound', ! isset( $s['post_tag:venue'] ) );
+$check( 'a very frequent category with 5% persistence is event-bound', isset( $s['category:daily-tips'] ) && 'event' === $s['category:daily-tips']['type'] && false !== strpos( $s['category:daily-tips']['why'], 'more than once a day' ) );
+$check( 'suggestions are ordered by how many posts they settle', array_keys( $s )[0] === 'category:daily-tips' );
 $check( 'too few posts: no suggestion', ! isset( $s['post_tag:rare'] ) );
 $check( 'nothing stands out: no suggestion', ! isset( $s['category:news'] ) );
-$check( 'best evidence first', array_keys( $s )[0] === 'category:festival' || array_keys( $s )[0] === 'category:tips' );
+$check( 'biggest term first', array_keys( $s )[0] === 'category:daily-tips' );
 $check( 'every suggestion carries plain-English evidence and a confidence', count( array_filter( $s, static function ( $x ) { return ! empty( $x['why'] ) && $x['confidence'] > 0 && $x['confidence'] <= 1; } ) ) === count( $s ) );
 $band = Ace_SEO_Timing_Suggestions::season_band( array_merge( array_fill( 0, 30, '2021-12-20' ), array_fill( 0, 30, '2022-01-04' ), array( '2021-06-01', '2021-08-01' ) ) );
 $check( 'a season across New Year is found as one band', $band && '12-' === substr( $band['start'], 0, 3 ) && '01-' === substr( $band['end'], 0, 3 ) );
