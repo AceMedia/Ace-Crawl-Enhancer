@@ -49,7 +49,8 @@ class Ace_SEO_Timing_Suggestions {
             if ( 'retained' === ( $r['tier'] ?? '' ) ) {
                 $terms[ $k ]['read']++;
             }
-            if ( preg_match( '/^\d{4}-\d{2}-\d{2}/', (string) ( $r['date'] ?? '' ) ) ) {
+            // A zero or legacy date (0000-00-00, year 1970) would stretch the cadence maths across centuries.
+            if ( preg_match( '/^((?:19|20)\d{2})-(\d{2})-(\d{2})/', (string) ( $r['date'] ?? '' ), $m ) && (int) $m[1] >= 1995 && (int) $m[1] <= (int) gmdate( 'Y' ) + 1 && checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
                 $terms[ $k ]['dates'][] = substr( $r['date'], 0, 10 );
             }
         }

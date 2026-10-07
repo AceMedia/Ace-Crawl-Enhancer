@@ -31,7 +31,9 @@ for ( $i = 0; $i < 1500; $i++ ) { $rows[] = array( 'key' => 'category:tips', 'la
 for ( $i = 0; $i < 12; $i++ ) { $rows[] = array( 'key' => 'post_tag:rare', 'label' => 'Rare', 'date' => '2020-05-0' . ( 1 + $i % 9 ), 'rank' => 'monthly', 'tier' => 'retained' ); }
 // Middling: spread, 8% persistence — nothing stands out.
 for ( $i = 0; $i < 200; $i++ ) { $rows[] = array( 'key' => 'category:news', 'label' => 'News', 'date' => gmdate( 'Y-m-d', strtotime( '2019-01-01 UTC' ) + ( $i * 6 ) * DAY_IN_SECONDS ), 'rank' => $i % 100 < 8 ? 'monthly' : 'occasional', 'tier' => 'retained' ); }
+for ( $i = 0; $i < 5; $i++ ) { $rows[] = array( 'key' => 'category:tips', 'label' => 'Tips', 'date' => '0000-00-00 00:00:00', 'rank' => '', 'tier' => 'dormant' ); }
 $s = Ace_SEO_Timing_Suggestions::infer( $rows );
+$check( 'zero dates do not stretch the cadence', isset( $s['category:tips'] ) && $s['category:tips']['cadence_days'] < 1 );
 $check( 'the seasonal term gets a season rule covering March', isset( $s['category:festival'] ) && 'season' === $s['category:festival']['type'] && '03-01' <= $s['category:festival']['rule'] && preg_match( '/^season 0[23]-\d\d 03-\d\d$/', $s['category:festival']['rule'] ) );
 $check( 'the season explanation names the months and years', false !== strpos( $s['category:festival']['why'], 'March' ) && false !== strpos( $s['category:festival']['why'], '4 years' ) );
 $check( 'the reference term is suggested evergreen', isset( $s['category:guides'] ) && 'evergreen' === $s['category:guides']['rule'] );
