@@ -83,14 +83,21 @@ final class Ace_SEO_Retention_Evidence {
      * estimate recurs yearly, so any year's season inside the period counts; editorial dates and verified
      * event occurrences are one-off. Positive evidence (readers, clicks) is never held back by this.
      */
-    public static function timing_hold( array $relevance, array $period ) {
+    public static function timing_hold( array $relevance, array $period, $strict = false ) {
         if ( ! self::interval( $period ) ) {
             return 'The assessed period is unknown.';
         }
         if ( ! empty( $relevance['ambiguous'] ) ) {
             return 'Several linked events could be the one this article covers; confirm which before judging it.';
         }
-        if ( ! empty( $relevance['evergreen'] ) || ! isset( $relevance['start'], $relevance['end'] ) || ! self::interval( $relevance ) ) {
+        if ( ! empty( $relevance['evergreen'] ) ) {
+            return '';
+        }
+        // Strict: only confirmed timing (an editor's dates, evergreen, or a verified event) can judge.
+        if ( $strict && empty( $relevance['verified'] ) ) {
+            return 'Its timing has not been confirmed: set "When this article matters" on the post (evergreen, or the dates of the event or season it covers) before it is judged. ' . ( isset( $relevance['start'] ) ? 'The current estimate is ' . $relevance['start'] . ' to ' . $relevance['end'] . ' (' . strtolower( (string) $relevance['source'] ) . ').' : 'No relevant dates are known.' );
+        }
+        if ( ! isset( $relevance['start'], $relevance['end'] ) || ! self::interval( $relevance ) ) {
             return '';
         }
         $recurring = empty( $relevance['verified'] ) && false !== stripos( (string) ( $relevance['source'] ?? '' ), 'anniversary' );

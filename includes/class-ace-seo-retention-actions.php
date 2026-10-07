@@ -74,6 +74,7 @@ class AceSeoRetentionActions {
             'report_days'    => 90,
             'retained_views' => 1,
             'thin_words'     => 300,
+            'timing_policy'  => 'estimate',
             'auto_build'     => 0,
             'track_views'    => 0,
             // Retained posts on the front end (AceSeoRetentionFront). All off until switched on.
@@ -138,6 +139,7 @@ class AceSeoRetentionActions {
             'report_days'    => max( 7, min( 480, (int) ( $input['report_days'] ?? 90 ) ) ),
             'retained_views' => max( 1, (int) ( $input['retained_views'] ?? 1 ) ),
             'thin_words'     => max( 0, (int) ( $input['thin_words'] ?? 300 ) ),
+            'timing_policy'  => 'strict' === ( $input['timing_policy'] ?? '' ) ? 'strict' : 'estimate',
             'auto_build'     => ! empty( $input['auto_build'] ) ? 1 : 0,
             'track_views'    => ! empty( $input['track_views'] ) ? 1 : 0,
         ) );

@@ -163,6 +163,11 @@ class Ace_SEO_Retention_Dated_Traffic {
         }
         $complete = ! $report['capped'];
         $note     = '';
+        $from     = method_exists( 'AceSeoRetentionReport', 'ga4_first_day' ) ? (string) AceSeoRetentionReport::ga4_first_day() : '';
+        if ( '' !== $from && $from > $period['start'] ) {
+            $complete = false;
+            $note     = sprintf( 'Google Analytics only has data from %s, after the chosen period began.', $from );
+        }
         if ( ! $report['rows'] ) {
             // A property that recorded nothing at all for the dates was not collecting then.
             $complete = false;

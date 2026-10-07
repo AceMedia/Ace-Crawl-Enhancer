@@ -111,6 +111,7 @@ class AceSeoRetentionReport {
             'refresh_max_pos'   => 20,     // and it has to be within reach: page 1 or 2
             'thin_words'        => (int) ( $saved['thin_words'] ?? 300 ),  // fewer words than this counts as thin
             'retained_views'    => (int) ( $saved['retained_views'] ?? 1 ), // views in the window that count as retained
+            'timing_policy'     => 'strict' === ( $saved['timing_policy'] ?? '' ) ? 'strict' : 'estimate', // see Ace_SEO_Retention_Evidence::timing_hold()
         );
         $settings = array_merge( $defaults, array_intersect_key( $overrides, $defaults ) );
         if ( ! isset( $overrides['demand_impressions'] ) ) {
@@ -474,6 +475,14 @@ class AceSeoRetentionReport {
             if ( $signals['ga4_capped'] ) {
                 $p['notes'][] = 'Google Analytics returned its maximum number of rows, so pages it did not list have unknown views rather than none.';
             }
+            // A property younger than the window cannot say a page was quiet for the whole window.
+            $from = self::ga4_first_day();
+            if ( is_string( $from ) && '' !== $from ) {
+                $signals['ga4_from'] = $from;
+                if ( $from > gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) ) ) {
+                    $p['notes'][] = sprintf( 'Google Analytics only has data from %s, so the %d-day window is not fully covered: posts without readers are held as "Not ready to judge" rather than called quiet.', $from, $days );
+                }
+            }
             $signals['ga4'] = array_intersect_key( $views, self::candidate_lookup( $p['settings'] ) );
             self::store_periods( 'ga4', $p['settings'] );
 
@@ -588,6 +597,52 @@ class AceSeoRetentionReport {
         $report = array( 'rows' => $views, 'capped' => count( $rows ) === $limit && $offset >= $max );
         set_transient( $cache_key, $report, 12 * HOUR_IN_SECONDS );
         return $report;
+    }
+
+    /**
+     * The first day the Analytics property has any page view for ('' when unknown): coverage cannot
+     * start earlier. One request a day; the API allows ranges back to 2015.
+     */
+    public static function ga4_first_day() {
+        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+            return '';
+        }
+        $property = AceSEOSiteKit::get_analytics_property_id();
+        if ( '' === $property ) {
+            return '';
+        }
+        $cache_key = 'ace_seo_ga4_first_' . md5( $property );
+        $cached    = get_transient( $cache_key );
+        if ( is_string( $cached ) ) {
+            return $cached;
+        }
+        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        if ( is_wp_error( $token ) || empty( $token ) ) {
+            return '';
+        }
+        $response = wp_remote_post(
+            'https://analyticsdata.googleapis.com/v1beta/properties/' . rawurlencode( $property ) . ':runReport',
+            array(
+                'timeout' => 30,
+                'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+                'body'    => wp_json_encode( array(
+                    'dateRanges'      => array( array( 'startDate' => '2015-08-14', 'endDate' => 'yesterday' ) ),
+                    'dimensions'      => array( array( 'name' => 'date' ) ),
+                    'metrics'         => array( array( 'name' => 'screenPageViews' ) ),
+                    'orderBys'        => array( array( 'dimension' => array( 'dimensionName' => 'date' ) ) ),
+                    'limit'           => 1,
+                    'keepEmptyRows'   => false,
+                ) ),
+            )
+        );
+        if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+            return '';
+        }
+        $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+        $raw  = (string) ( $body['rows'][0]['dimensionValues'][0]['value'] ?? '' );
+        $day  = preg_match( '/^(\d{4})(\d{2})(\d{2})$/', $raw, $m ) ? $m[1] . '-' . $m[2] . '-' . $m[3] : '';
+        set_transient( $cache_key, $day, DAY_IN_SECONDS );
+        return $day;
     }
 
     /**
@@ -726,7 +781,13 @@ class AceSeoRetentionReport {
             // Editor-set dates, a verified event occurrence or (recurring) the publication anniversary.
             // Readers and clicks still count: a retained article is never held.
             if ( 'retained' !== $row['tier'] && class_exists( 'Ace_SEO_Retention_Evidence' ) ) {
-                $hold = self::timing_hold_for( $id, $period );
+                $hold = '';
+                if ( ! empty( $signals['ga4_from'] ) && $signals['ga4_from'] > $period['start'] ) {
+                    $hold = sprintf( 'Google Analytics only has data from %s, so the %d-day window (%s to %s) is not fully covered; a quiet result cannot be trusted yet.', $signals['ga4_from'], (int) $settings['days'], $period['start'], $period['end'] );
+                }
+                if ( '' === $hold ) {
+                    $hold = self::timing_hold_for( $id, $period, 'strict' === ( $settings['timing_policy'] ?? 'estimate' ) );
+                }
                 if ( '' !== $hold ) {
                     $row['tier']   = 'unknown';
                     $row['bucket'] = 'no-signal';
@@ -797,13 +858,13 @@ class AceSeoRetentionReport {
     }
 
     /** Why this build's period cannot judge the post yet ('' when it can). Site knowledge only; no API calls. */
-    public static function timing_hold_for( $id, array $period ) {
+    public static function timing_hold_for( $id, array $period, $strict = false ) {
         if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) ) {
             return '';
         }
         try {
             $context = Ace_SEO_Retention_Evidence_View::base_context( (int) $id, array( 'published' => get_post_time( 'Y-m-d', true, $id ) ), $period, gmdate( 'Y-m-d' ) );
-            return Ace_SEO_Retention_Evidence::timing_hold( Ace_SEO_Retention_Evidence::relevance( $context ), $period );
+            return Ace_SEO_Retention_Evidence::timing_hold( Ace_SEO_Retention_Evidence::relevance( $context ), $period, $strict );
         } catch ( Throwable $e ) {
             return '';
         }

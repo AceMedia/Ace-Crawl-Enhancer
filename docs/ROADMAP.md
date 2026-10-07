@@ -184,6 +184,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
 
+## Strict timing policy and Analytics coverage start — 7 October 2026 (#32)
+
+1.0.63: `timing_policy` (`estimate` default | `strict`) in `ace_seo_retention_options` → `AceSeoRetentionReport::settings()['timing_policy']` → `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period, $strict )`. Strict holds any non-retained post whose relevance is not verified. `AceSeoRetentionReport::ga4_first_day()` (one cached GA4 request ordered by date) gives `signals['ga4_from']`; a window starting before it holds quiet posts with the coverage reason, and the dated-traffic provider marks such periods incomplete. The client site's property has data from mid-2025, so its 365-day window was covered; the volume of Dormant there was real low readership, which is why the strict policy exists as a choice rather than a default.
+
 ## Timing holds in the saved report — 7 October 2026 (#32)
 
 1.0.62: `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period )` is pure and shared by the preview and the scorer. `phase_score()` works out the build's period (started minus `days`), reads `base_context()` for each post (editor fields, linked events, anniversary; no API calls) and, unless the post is retained, sets tier `unknown` / bucket `no-signal` with `reason` "Not ready to judge. …" and `hold` when the period did not contain the relevant dates. `phase_ga4()` records `ga4_capped`; a capped Analytics list makes absent pages `null` views. `do_action( 'ace_seo_retention_built', $p )` fires once a build completes; `AceSeoSheetsSchedule::after_build()` (setting `after_build`) starts a manual-type refresh so the sheet follows the report. The first live run of 1.0.59 showed a 365-day window judging posts whose relevant dates were simply unknown — those are not held (the period stands on its own); only known dates outside the period hold.

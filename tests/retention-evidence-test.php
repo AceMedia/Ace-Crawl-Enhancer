@@ -65,4 +65,8 @@ evidence_check( '' === $hold( array( 'source' => 'Verified event occurrence', 'v
 evidence_check( '' === $hold( array( 'source' => 'Evergreen: chosen observation period', 'verified' => true, 'evergreen' => true ), $assessed ), 'Evergreen articles are never held for timing.' );
 evidence_check( '' === $hold( array( 'source' => 'Relevant dates not established', 'verified' => false ), $assessed ), 'Unknown relevance does not hold: the period stands on its own.' );
 evidence_check( false !== strpos( $hold( array( 'source' => 'Several event occurrences: choose the relevant one', 'verified' => false, 'ambiguous' => true ), $assessed ), 'confirm which' ), 'Ambiguous linked events hold until an editor confirms the edition.' );
+evidence_check( false !== strpos( $hold( array( 'source' => 'Publication anniversary estimate', 'verified' => false, 'start' => '2026-01-10', 'end' => '2026-05-10' ), $assessed, true ), 'timing has not been confirmed' ), 'Strict policy holds an anniversary estimate even inside the period.' );
+evidence_check( false !== strpos( $hold( array( 'source' => 'Relevant dates not established', 'verified' => false ), $assessed, true ), 'No relevant dates are known' ), 'Strict policy holds unknown timing.' );
+evidence_check( '' === $hold( array( 'source' => 'Editorial override', 'verified' => true, 'start' => '2026-03-10', 'end' => '2026-03-13' ), $assessed, true ), 'Strict policy judges confirmed dates inside the period.' );
+evidence_check( '' === $hold( array( 'source' => 'Evergreen: chosen observation period', 'verified' => true, 'evergreen' => true ), $assessed, true ), 'Strict policy judges evergreen articles.' );
 echo "$n retention evidence checks passed.\n";
