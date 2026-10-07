@@ -69,4 +69,12 @@ evidence_check( false !== strpos( $hold( array( 'source' => 'Publication anniver
 evidence_check( false !== strpos( $hold( array( 'source' => 'Relevant dates not established', 'verified' => false ), $assessed, true ), 'No relevant dates are known' ), 'Strict policy holds unknown timing.' );
 evidence_check( '' === $hold( array( 'source' => 'Editorial override', 'verified' => true, 'start' => '2026-03-10', 'end' => '2026-03-13' ), $assessed, true ), 'Strict policy judges confirmed dates inside the period.' );
 evidence_check( '' === $hold( array( 'source' => 'Evergreen: chosen observation period', 'verified' => true, 'evergreen' => true ), $assessed, true ), 'Strict policy judges evergreen articles.' );
+$year = array_merge( $legacy_settings, array( 'days' => 365, 'retained_views' => 1 ) );
+evidence_check( array( 'daily' => 365, 'weekly' => 53, 'monthly' => 13, 'occasional' => 1 ) === AceSeoRetentionReport::rank_cutoffs( $year ), 'Band cutoffs follow the window: a view a day, a week, a month, or at least one.' );
+evidence_check( array( 'daily' => 90, 'weekly' => 13, 'monthly' => 3, 'occasional' => 12 ) === AceSeoRetentionReport::rank_cutoffs( array( 'days' => 90, 'retained_views' => 12 ) ), 'A 90-day window scales the bands; the lowest band is the retained floor.' );
+evidence_check( 'daily' === AceSeoRetentionReport::rank( array( 'views' => 400 ), $year ) && 'weekly' === AceSeoRetentionReport::rank( array( 'views' => 60 ), $year ) && 'monthly' === AceSeoRetentionReport::rank( array( 'views' => 13 ), $year ) && 'occasional' === AceSeoRetentionReport::rank( array( 'views' => 1 ), $year ), 'Views place a retained post in the right band.' );
+evidence_check( 'occasional' === AceSeoRetentionReport::rank( array( 'views' => null, 'clicks' => 2 ), $year ), 'Search clicks alone keep a post retained in the lowest band.' );
+evidence_check( '' === AceSeoRetentionReport::rank( array( 'views' => 0, 'words' => 800 ), $year ) && 'dormant' === AceSeoRetentionReport::tier( array( 'views' => 0, 'words' => 800 ), $year ), 'Zero views and no clicks is Dormant with no band.' );
+evidence_check( '' === AceSeoRetentionReport::rank( array( 'views' => null ), $year ), 'Unknown views have no band.' );
+evidence_check( 'retained' === AceSeoRetentionReport::tier( array( 'views' => 1 ), $year ), 'With the floor at one view, any recorded reader is retained.' );
 echo "$n retention evidence checks passed.\n";

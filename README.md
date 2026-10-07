@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.63-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.64-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.63
+**Stable tag:** 1.0.64
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.64 (2026-10-07)
+- Retained is graded into readership bands with cutoffs derived from the traffic window: read daily (a view a day), weekly, monthly, or occasionally (at least the retained floor, or any search click). The bands are stored per post (`_ace_seo_ret_rank`), counted on the dashboard, filterable in the post list, and exported as a Readership column in the CSV and Google Sheet. Tiers and recommendations are unchanged underneath, so a held post has no band, Dormant stays "no recorded readers and no search clicks", and a quiet article can still be the best page on its subject.
 
 ### 1.0.63 (2026-10-07)
 - A "Judging timing" policy in the report settings. The default judges on the traffic window and holds only posts whose known relevant dates fall outside it. The strict policy holds every post as "Not ready to judge" until an editor confirms its timing (evergreen, set dates, or a verified event); the anniversary estimate is shown but not trusted. Posts with readers or search clicks are never held.

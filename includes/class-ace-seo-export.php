@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 
 class AceSeoExport {
     public static function header() {
-        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings', 'When it matters', 'Relevant window', 'Timing basis', 'Linked events', 'Assessed in season?' );
+        $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings', 'When it matters', 'Relevant window', 'Timing basis', 'Linked events', 'Assessed in season?', 'Readership' );
         return array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
     }
 
@@ -49,7 +49,7 @@ class AceSeoExport {
              * @param array $line
              * @param int   $id
              */
-            $line = array_merge( $line, self::retention_context( $id, $row ), self::timing_context( $id, $row ) );
+            $line = array_merge( $line, self::retention_context( $id, $row ), self::timing_context( $id, $row ), array( self::readership( $id, $row ) ) );
             $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
         }
 
@@ -99,6 +99,20 @@ class AceSeoExport {
             $applied = 'Applied retention settings unavailable';
         }
         return array( $next, $why, $assessed, $applied );
+    }
+
+    /** The readership band for a retained post, else its group, in plain words. */
+    public static function readership( $id, array $row ) {
+        if ( ! class_exists( 'AceSeoRetentionReport' ) || empty( $row['tier'] ) ) {
+            return '';
+        }
+        $rank = (string) get_post_meta( $id, AceSeoRetentionReport::META_RANK, true );
+        if ( 'retained' === $row['tier'] && '' !== $rank ) {
+            $labels = AceSeoRetentionReport::rank_labels();
+            return $labels[ $rank ] ?? $rank;
+        }
+        $tiers = AceSeoRetentionReport::tier_labels();
+        return $tiers[ $row['tier'] ] ?? $row['tier'];
     }
 
     /**

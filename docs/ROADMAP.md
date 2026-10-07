@@ -183,6 +183,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
 
+## Readership bands — 7 October 2026 (#25, #32)
+
+1.0.64: `AceSeoRetentionReport::RANKS` = daily | weekly | monthly | occasional, `rank_cutoffs( $settings )` = days, ceil(days/7), ceil(days/30), max(1, retained_views); `rank()` returns '' unless `tier()` is retained, so bands and tiers cannot disagree. Stored in `_ace_seo_ret_rank` (in `meta_keys()` so `clear()` removes it), counted in `progress['ranks']` and `rank_counts()`, shown under Retained on the dashboard with post-list links (`ace_ret=<band>` filters on the rank meta), exported as the last column "Readership" and in the CSV `rank` column. With the retained floor at one view, a year-long window on a large archive splits roughly daily 40 / weekly 400 / monthly 3,500 / occasional 27,000, leaving under 3,000 with no recorded readers.
+
 ## Strict timing policy and Analytics coverage start — 7 October 2026 (#32)
 
 1.0.63: `timing_policy` (`estimate` default | `strict`) in `ace_seo_retention_options` → `AceSeoRetentionReport::settings()['timing_policy']` → `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period, $strict )`. Strict holds any non-retained post whose relevance is not verified. `AceSeoRetentionReport::ga4_first_day()` (one cached GA4 request ordered by date) gives `signals['ga4_from']`; a window starting before it holds quiet posts with the coverage reason, and the dated-traffic provider marks such periods incomplete. The client site's property has data from mid-2025, so its 365-day window was covered; the volume of Dormant there was real low readership, which is why the strict policy exists as a choice rather than a default.

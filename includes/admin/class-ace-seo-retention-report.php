@@ -62,6 +62,13 @@ class AceSeoRetentionReport {
      */
     const TIERS = array( 'retained', 'candidate', 'dormant', 'unknown' );
 
+    /**
+     * Readership bands inside Retained, best first. The cutoffs come from the traffic window so they
+     * mean the same thing whatever its length: about a view a day, a week, a month, or at least one.
+     */
+    const RANKS     = array( 'daily', 'weekly', 'monthly', 'occasional' );
+    const META_RANK = '_ace_seo_ret_rank';
+
     /** Flat copies of the row, one meta key each, so the post list can filter and sort on them. */
     const META_TIER  = '_ace_seo_ret_tier';
     const META_VIEWS = '_ace_seo_ret_views';
@@ -795,6 +802,10 @@ class AceSeoRetentionReport {
                     $row['hold']   = $hold;
                 }
             }
+            $row['rank'] = 'retained' === $row['tier'] ? self::rank( $row, $settings ) : '';
+            if ( '' !== $row['rank'] ) {
+                $p['ranks'][ $row['rank'] ] = ( $p['ranks'][ $row['rank'] ] ?? 0 ) + 1;
+            }
 
             $row = apply_filters( 'ace_seo_retention_row', $row, $id, $settings );
             update_post_meta( $id, self::META, $row );
@@ -998,6 +1009,56 @@ class AceSeoRetentionReport {
      * The tier: retained if it is still being read, a candidate if nobody reads it and there is
      * little to it, dormant otherwise. Where no views source exists, search clicks stand in.
      */
+    /** Views needed in the window for each band, from its length; the last band is the retained floor. */
+    public static function rank_cutoffs( array $s ) {
+        $days = max( 7, (int) ( $s['days'] ?? 90 ) );
+        return array(
+            'daily'      => $days,
+            'weekly'     => (int) ceil( $days / 7 ),
+            'monthly'    => (int) ceil( $days / 30 ),
+            'occasional' => max( 1, (int) ( $s['retained_views'] ?? 1 ) ),
+        );
+    }
+
+    /**
+     * The band a retained post sits in by its views in the window; search clicks alone put it in the
+     * lowest band. '' for anything not retained, so bands and tiers never disagree.
+     */
+    public static function rank( array $r, array $s ) {
+        if ( 'retained' !== self::tier( $r, $s ) ) {
+            return '';
+        }
+        $views = isset( $r['views'] ) ? (int) $r['views'] : 0;
+        foreach ( self::rank_cutoffs( $s ) as $rank => $min ) {
+            if ( $views >= $min ) {
+                return $rank;
+            }
+        }
+        return 'occasional';
+    }
+
+    public static function rank_labels( array $s = array() ) {
+        $c = self::rank_cutoffs( $s ?: self::settings() );
+        return array(
+            'daily'      => sprintf( __( 'Read daily (%s+ views in the window)', 'ace-crawl-enhancer' ), number_format_i18n( $c['daily'] ) ),
+            'weekly'     => sprintf( __( 'Read weekly (%s+)', 'ace-crawl-enhancer' ), number_format_i18n( $c['weekly'] ) ),
+            'monthly'    => sprintf( __( 'Read monthly (%s+)', 'ace-crawl-enhancer' ), number_format_i18n( $c['monthly'] ) ),
+            'occasional' => sprintf( __( 'Read occasionally (%s+, or any search click)', 'ace-crawl-enhancer' ), number_format_i18n( $c['occasional'] ) ),
+        );
+    }
+
+    public static function rank_counts() {
+        global $wpdb;
+        $counts = array_fill_keys( self::RANKS, 0 );
+        $rows   = $wpdb->get_results( $wpdb->prepare( "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value", self::META_RANK ) );
+        foreach ( (array) $rows as $row ) {
+            if ( isset( $counts[ $row->meta_value ] ) ) {
+                $counts[ $row->meta_value ] = (int) $row->n;
+            }
+        }
+        return $counts;
+    }
+
     public static function tier( array $r, array $s ) {
         $views  = isset( $r['views'] ) ? $r['views'] : null;
         $clicks = (int) ( $r['clicks'] ?? 0 );
@@ -1034,6 +1095,11 @@ class AceSeoRetentionReport {
     /** One meta key per signal, so the post list can filter and sort without unpacking the row. */
     public static function write_flat_meta( $id, array $row, $build ) {
         update_post_meta( $id, self::META_TIER, (string) ( $row['tier'] ?? '' ) );
+        if ( ! empty( $row['rank'] ) ) {
+            update_post_meta( $id, self::META_RANK, (string) $row['rank'] );
+        } else {
+            delete_post_meta( $id, self::META_RANK );
+        }
         update_post_meta( $id, self::META_WORDS, (int) ( $row['words'] ?? 0 ) );
         update_post_meta( $id, self::META_LINKS, (int) ( $row['links_in'] ?? 0 ) );
         if ( isset( $row['views'] ) && null !== $row['views'] ) {
@@ -1052,7 +1118,7 @@ class AceSeoRetentionReport {
 
     /** Meta keys the report owns, for clearing. */
     public static function meta_keys() {
-        return array( self::META, self::META_TIER, self::META_VIEWS, self::META_WORDS, self::META_LINKS, self::META_BUILT, self::META_TREND, self::META_MOMENTUM );
+        return array( self::META, self::META_TIER, self::META_RANK, self::META_VIEWS, self::META_WORDS, self::META_LINKS, self::META_BUILT, self::META_TREND, self::META_MOMENTUM );
     }
 
     /* ---- Periods and trends --------------------------------------------------------------------- */
@@ -1465,7 +1531,7 @@ class AceSeoRetentionReport {
     }
 
     public static function csv( $bucket = '' ) {
-        $cols = array( 'id', 'tier', 'bucket', 'title', 'url', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'words', 'backlinks', 'reason' );
+        $cols = array( 'id', 'tier', 'rank', 'bucket', 'title', 'url', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'words', 'backlinks', 'reason' );
         $fh   = fopen( 'php://temp', 'w+' );
         fputcsv( $fh, $cols );
         foreach ( self::rows( $bucket, 0 ) as $row ) {
@@ -1715,10 +1781,20 @@ class AceSeoRetentionReport {
                 <h2>Groups of older posts</h2>
                 <p>Open a group in Posts to combine date and traffic filters, sort the results and export the same list. These groups do not mean an action has been applied:</p>
                 <ul style="list-style:disc;margin-left:2em">
+                    <?php $rank_counts = self::rank_counts(); $rank_labels = self::rank_labels( $settings ); ?>
                     <?php foreach ( self::tier_labels() as $t => $label ) : ?>
-                        <li><?php echo esc_html( $label ); ?>: <strong><?php echo esc_html( number_format_i18n( $tier_counts[ $t ] ) ); ?></strong></li>
+                        <li><?php echo esc_html( $label ); ?>: <strong><?php echo esc_html( number_format_i18n( $tier_counts[ $t ] ) ); ?></strong>
+                        <?php if ( 'retained' === $t && array_sum( $rank_counts ) > 0 ) : ?>
+                            <ul style="list-style:circle;margin-left:2em">
+                            <?php foreach ( $rank_labels as $r => $rl ) : ?>
+                                <li><a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'post', 'ace_ret' => $r ), admin_url( 'edit.php' ) ) ); ?>"><?php echo esc_html( $rl ); ?></a>: <strong><?php echo esc_html( number_format_i18n( $rank_counts[ $r ] ) ); ?></strong></li>
+                            <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                        </li>
                     <?php endforeach; ?>
                 </ul>
+                <p class="description">Retained is graded by how often an article was read in the traffic window; Dormant is only the posts with no recorded readers and no search clicks. The bands describe readership, not value: a quiet article can still be the best page on its subject.</p>
                 <ul style="list-style:disc;margin-left:2em">
                     <?php foreach ( self::shareable_links() as $link ) : ?>
                         <li><a href="<?php echo esc_url( $link[1] ); ?>"><?php echo esc_html( $link[0] ); ?></a></li>

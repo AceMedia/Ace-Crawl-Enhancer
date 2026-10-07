@@ -849,6 +849,11 @@ class AceSeoPostColumns {
             . esc_html__( 'Any retention group', 'ace-crawl-enhancer' ) . '</option>';
         foreach ( AceSeoRetentionReport::tier_labels() + array( 'scored' => __( 'Any reviewed older post', 'ace-crawl-enhancer' ) ) as $value => $label ) {
             printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $current, $value, false ), esc_html( $label ) );
+            if ( 'retained' === $value ) {
+                foreach ( AceSeoRetentionReport::rank_labels() as $rank => $rank_label ) {
+                    printf( '<option value="%s"%s>&nbsp;&nbsp;%s</option>', esc_attr( $rank ), selected( $current, $rank, false ), esc_html( $rank_label ) );
+                }
+            }
         }
         echo '</select>';
 
@@ -953,6 +958,8 @@ class AceSeoPostColumns {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'compare' => 'EXISTS' );
         } elseif ( in_array( $tier, AceSeoRetentionReport::TIERS, true ) ) {
             $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'value' => $tier );
+        } elseif ( in_array( $tier, AceSeoRetentionReport::RANKS, true ) ) {
+            $clauses[] = array( 'key' => AceSeoRetentionReport::META_RANK, 'value' => $tier );
         }
 
         $trend = isset( $params['ace_trend'] ) ? sanitize_key( wp_unslash( $params['ace_trend'] ) ) : '';
