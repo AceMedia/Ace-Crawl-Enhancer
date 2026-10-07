@@ -183,7 +183,7 @@ class AceSEOSearchConsoleCli {
      *
      *     wp ace-crawl gsc queries --days=28
      *     wp ace-crawl gsc queries --dimension=page --rows=30
-     *     wp ace-crawl gsc queries --url=https://sheff.events/whats-on/ --rows=20
+     *     wp ace-crawl gsc queries --url=https://example.com/whats-on/ --rows=20
      *     wp ace-crawl gsc queries --totals
      */
     public function queries( $args, $assoc_args ) {

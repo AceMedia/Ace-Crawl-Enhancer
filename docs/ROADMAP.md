@@ -1,8 +1,8 @@
 # Ace Crawl Enhancer — Roadmap
 
-Canonical improvement plan, agreed with Shane 2026-07-07. Executing agents: work top-down within a
+Canonical improvement plan, agreed 2026-07-07. Executing agents: work top-down within a
 phase; phases 0–3 are the priority order, 4–6 can interleave once 1 is done. Every task must respect
-the compatibility contract in [CLAUDE.md](../CLAUDE.md) (6 live consumer sites; additive-first).
+the compatibility contract in [AGENTS.md](../AGENTS.md) (live consumer sites; additive-first).
 
 **Decisions already made (don't re-litigate):**
 - Schema architecture = **provider API + built-in adapters** (registry/filter any plugin can inject
@@ -85,8 +85,8 @@ Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitte
   - [x] FAQ opt-in metabox toggle (`faq-schema` checkbox in the Advanced tab, saved via the
     standard meta-fields loop to `_ace_seo_faq-schema`).
 - [x] **Verification harness**: `bin/schema-check.php <url>…` — lists blocks/types, warns on
-  duplicates, per-node contexts and missing BreadcrumbList. Baselined against live
-  sheffieldparkour.org + uni-carts.com (old code shows exactly the issues fixed here).
+  duplicates, per-node contexts and missing BreadcrumbList. Baselined against two live
+  consumer sites still on the old code (which show exactly the issues fixed here).
   Verified new engine via stub harness: 28/28 assertions (single block, @id links, breadcrumbs,
   provider injection + merge, LocalBusiness gating, front-page shape).
 
@@ -97,7 +97,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 - [x] **Framework** (2026-07-07): `includes/integrations/class-ace-seo-integrations.php` — adapters
   run once on `template_redirect` (after all plugins register, before `wp_head`).
-- [x] **Ace-Community-Events** (SheffEvents): IMPORTANT — the current ACE-CE (SheffEvents submodule
+- [x] **Ace-Community-Events**: IMPORTANT — the current ACE-CE (the events site's submodule
   copy, far ahead of the stale canonical checkout) already emits its OWN Event JSON-LD +
   BreadcrumbList via its `ACE_SEO` class, and already has IndexNow. The adapter therefore: removes
   its duplicate BreadcrumbList emitter (the graph now covers every page), keeps its Event emitter
@@ -107,7 +107,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
   `address`/`geo_location` meta convention.
   - [x] Follow-up **done + LIVE** (2026-07-07): Ace-Community-Events `6afe3eb` registers its Event
     node into the graph via `ace_seo_register_schema_provider()` (standalone fallback kept for
-    non-Ace-SEO sites). Deployed to sheff.events (SheffEvents `bb03e7ba3`); event pages verified
+    non-Ace-SEO sites). Deployed to the events consumer site; event pages verified
     serving ONE `@graph` (WebPage+BreadcrumbList+Organization+Event), down from 2 blocks + a stray
     Article. Also shipped ace-crawl `12f8ed7`: Article gets an `@id`, and an `ace_seo_emit_article`
     filter lets typed CPTs (events/businesses/jobs/locations) skip the redundant Article node.
@@ -115,20 +115,20 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
   defaults off while Woo core emits its own); `ItemList` now emitted on ALL archives (incl.
   product-category) from the main query — new `ace-seo/archive-items` provider, capped at 10.
   - [ ] Active suppression of Woo core's per-listing Product blocks when Ace SEO owns product
-    schema (needs testing on IEG/unicarts before flipping).
-- [x] **NewsArticle mapping** (ppnews): per-post-type settings key
+    schema (needs testing on the WooCommerce consumer sites before flipping).
+- [x] **NewsArticle mapping** (news sites): per-post-type settings key
   `schema.article_type_{post_type}` / `schema.article_type` feeding the
-  `ace_seo_article_schema_type` filter — set `NewsArticle` in `ace_seo_options` on ppnews. No
+  `ace_seo_article_schema_type` filter — set `NewsArticle` in `ace_seo_options` on news sites. No
   settings UI yet (option/filter only).
   - [ ] `ace-tournament`/`ace-event-hub` → SportsEvent adapter: their plugin already emits its own
-    JSON-LD; adapt when ppnews bumps the submodule (or have them self-register via the API).
+    JSON-LD; adapt when the news site bumps the submodule (or have them self-register via the API).
 - [ ] **Ace-Image-Enhancer**: ensure og:image / ImageObject point at the optimised rendition
   (needs a look at how it rewrites attachment URLs first).
 - [x] The `ace_event` sitemap exclusion was already option-driven + filterable
   (`ace_sitemap_powertools_excluded_sitemap_taxonomies`) — no change needed.
-- [x] **SportsClub (SPKF)**: `local.business_type` in `ace_seo_options` is free-form and the
+- [x] **SportsClub**: `local.business_type` in `ace_seo_options` is free-form and the
   front-page LocalBusiness provider emits whatever type is configured (harness-tested with
-  SportsClub) — SPKF can move its theme-injected schema to config once it takes 1.0.6.
+  SportsClub) — the sports club site can move its theme-injected schema to config once it takes 1.0.6.
   - [ ] Settings UI for the `local` section (currently config-only via options).
 
 ## Phase 3 — Bots, feeds & instant indexing — issue #13
@@ -140,7 +140,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
   sites WANT bot traffic). Ensure dynamic robots.txt emits `Sitemap:` lines everywhere.
 - [ ] **IndexNow**: key generation + `/{key}.txt` endpoint, ping on publish/update/delete (queued,
   batched, respects noindex), log of recent pings in dashboard. Complements Site Kit/Google.
-- [ ] **News sitemap hardening** (ppnews): validate against Google News requirements (48h window,
+- [ ] **News sitemap hardening** (news sites): validate against Google News requirements (48h window,
   `<news:publication>`), per-post-type opt-in.
 - [ ] **Image/video sitemap entries** on existing providers; **RSS enrichment**: full content +
   `media:content` + featured image in feeds for aggregators.
@@ -160,7 +160,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 - [ ] Issue #1 remaining items: Abilities API registration (`ace-crawl/analyze-content`,
   `generate-meta-title`, `generate-meta-description`, `check-image-alt-coverage`) — this is also the
-  MCP exposure path via mcp-adapter (installed on IEG + SheffEvents); core Breadcrumbs block
+  MCP exposure path via mcp-adapter (installed on two consumer sites); core Breadcrumbs block
   deprecation path; `wp_get_image_alttext()` in alt coverage; Interactivity `watch()` for editor
   scores; DataForms evaluation. All version-gated, WP6 unchanged.
 - [ ] Issue #7: Site Kit indexing/sitemap surfaces — scope audit, read-only endpoints, clear
@@ -177,8 +177,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 ## Per-task protocol for agents
 
-1. Work on `main` in the canonical repo (`/var/www/html/plugins/ace-crawl-enhancer`); commit/push
-   only when Shane asks. British English everywhere; no AI/co-author trailers.
+1. Work on `main` in the canonical repo; commit/push only when asked. British English everywhere; no AI/co-author trailers.
 2. `npm run build` if `src/` touched; verify with the phase-1 harness or curl head-checks on a local
    consumer mirror before declaring done.
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
