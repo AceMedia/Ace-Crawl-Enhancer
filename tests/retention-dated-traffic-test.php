@@ -12,6 +12,7 @@ function add_filter( $hook, $cb, $prio = 10, $args = 1 ) { $GLOBALS['filters'][ 
 function apply_filters( $hook, $value, ...$args ) { foreach ( $GLOBALS['filters'][ $hook ] ?? array() as $cb ) { $value = call_user_func( $cb, $value, ...$args ); } return $value; }
 function get_permalink( $id ) { return 'https://ordinary-wordpress.test/sport/post-' . (int) $id . '/'; }
 function get_post_meta( $id, $key, $single ) { return $GLOBALS['meta'][ $id ][ $key ] ?? ''; }
+function get_option( $k, $d = false ) { return $d; }
 function wp_timezone() { return new DateTimeZone( 'Europe/London' ); }
 function taxonomy_exists( $name ) { return false; }
 function is_wp_error( $v ) { return $v instanceof WP_Error; }

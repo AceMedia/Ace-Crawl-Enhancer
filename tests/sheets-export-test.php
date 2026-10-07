@@ -32,7 +32,7 @@ function delete_transient( $key ) { unset( $GLOBALS['sheets_transients'][ $key ]
 function wp_json_encode( $value ) { return json_encode( $value ); }
 function current_user_can( $capability ) { return $GLOBALS['sheets_admin']; }
 function check_admin_referer( $action ) { return true; }
-function wp_unslash( $value ) { return stripslashes( $value ); }
+function wp_unslash( $value ) { return is_array( $value ) ? array_map( 'wp_unslash', $value ) : stripslashes( $value ); }
 function wp_die( $message ) { throw new RuntimeException( $message ); }
 function get_current_user_id() { return 1; }
 function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }

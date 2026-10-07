@@ -183,6 +183,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
 
+## Timing rules, one save bar, plain-English dashboard — 7 October 2026 (#32, #25)
+
+1.0.65: `AceSeoRetentionActions::parse_timing_rules()` / `timing_rule_for()` (option `timing_rules`) feed `Ace_SEO_Retention_Evidence_View::base_context()` as `content_type`, `override` (with its own `source`) or `season`; `relevance()` resolves a season to its current or next occurrence with `recurring => true`; `timing_hold()` judges a finished one-off event on the period after it and otherwise needs a whole occurrence inside the period. Settings tab: one `<form id="ace-retention-settings-form">` posting `ace_seo_retention_settings_save` (`AceSeoRetentionReport::handle_settings_save()` runs every section's existing saver; `AceSeoSheets::save_settings()` and `AceSeoSheetsSchedule::save_settings()` are the redirect-free savers; `render_fields()` / `render_controls()` split fields from run/stop/retry). Dashboard: `render_summary()` + `hold_reasons()`; `tier_labels( $settings )` wording depends on the retained floor. Design notes came from a read-only Codex review (scratch, not committed).
+
 ## Readership bands — 7 October 2026 (#25, #32)
 
 1.0.64: `AceSeoRetentionReport::RANKS` = daily | weekly | monthly | occasional, `rank_cutoffs( $settings )` = days, ceil(days/7), ceil(days/30), max(1, retained_views); `rank()` returns '' unless `tier()` is retained, so bands and tiers cannot disagree. Stored in `_ace_seo_ret_rank` (in `meta_keys()` so `clear()` removes it), counted in `progress['ranks']` and `rank_counts()`, shown under Retained on the dashboard with post-list links (`ace_ret=<band>` filters on the rank meta), exported as the last column "Readership" and in the CSV `rank` column. With the retained floor at one view, a year-long window on a large archive splits roughly daily 40 / weekly 400 / monthly 3,500 / occasional 27,000, leaving under 3,000 with no recorded readers.

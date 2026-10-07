@@ -2,12 +2,25 @@
 if ( PHP_SAPI !== 'cli' ) { exit; }
 define( 'ABSPATH', __DIR__ . '/' ); define( 'DAY_IN_SECONDS', 86400 );
 function wp_timezone() { return new DateTimeZone( 'Europe/London' ); }
-function taxonomy_exists( $name ) { return 'ace_event' === $name && ! empty( $GLOBALS['events_enabled'] ); }
-function get_the_terms( $id, $taxonomy ) { return array( (object) array( 'term_id' => 7, 'name' => 'Example event' ) ); }
+function taxonomy_exists( $name ) { return 'category' === $name || ( 'ace_event' === $name && ! empty( $GLOBALS['events_enabled'] ) ); }
+function get_the_terms( $id, $taxonomy ) { if ( 'ace_event' === $taxonomy ) { return array( (object) array( 'term_id' => 7, 'name' => 'Example event', 'slug' => 'example-event' ) ); } return $GLOBALS['terms'][ $taxonomy ] ?? false; }
 function get_term_meta( $id, $key, $single ) { return $GLOBALS['event_meta'][$key] ?? ''; }
 function get_post_meta( $id, $key, $single ) { return $GLOBALS['post_meta'][$key] ?? ''; }
+function get_option( $key, $default = false ) { return $GLOBALS['options'][$key] ?? $default; }
+function update_option( $key, $value, $autoload = null ) { $GLOBALS['options'][$key] = $value; }
+function sanitize_key( $s ) { return preg_replace( '/[^a-z0-9_-]/', '', strtolower( $s ) ); }
+function sanitize_title( $s ) { return sanitize_key( str_replace( ' ', '-', $s ) ); }
+function sanitize_text_field( $s ) { return trim( strip_tags( $s ) ); }
+function sanitize_textarea_field( $s ) { return trim( strip_tags( $s ) ); }
+function esc_url_raw( $s ) { return $s; }
+function sanitize_html_class( $s ) { return preg_replace( '/[^a-zA-Z0-9_-]/', '', $s ); }
+function get_post_types( $a = array(), $o = 'names' ) { return array( 'post' ); }
+function __( $s, $d = null ) { return $s; }
+function current_time( $t, $g = false ) { return '2026-10-07 14:00:00'; }
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) { define( 'HOUR_IN_SECONDS', 3600 ); }
 function wp_date( $format, $timestamp, $timezone ) { return ( new DateTimeImmutable( '@' . $timestamp ) )->setTimezone( $timezone )->format( $format ); }
 function apply_filters( $name, $value, ...$unused ) { return $value; }
+require_once dirname( __DIR__ ) . '/includes/class-ace-seo-retention-actions.php';
 require_once dirname( __DIR__ ) . '/includes/admin/class-ace-seo-retention-evidence-view.php';
 $checks = 0;
 function provider_check( $ok, $why ) { global $checks; ++$checks; if ( ! $ok ) { throw new RuntimeException( $why ); } }
@@ -60,4 +73,23 @@ $cols = Ace_SEO_Retention_Evidence_View::timing_columns( 9, $short, '2026-10-07'
 provider_check( false !== strpos( $cols[0], 'incomplete, ignored' ), 'Incomplete editor dates are flagged in the sheet rather than silently dropped.' );
 $cols = Ace_SEO_Retention_Evidence_View::timing_columns( 9, array( 'published' => '2019-03-10' ), '2026-10-07' );
 provider_check( 'No saved assessment' === $cols[4], 'A post without a saved assessment says so.' );
+
+/* Timing rules by category classify an archive in bulk; the post's own setting still wins. */
+$GLOBALS['options']['ace_seo_retention_options'] = array( 'timing_rules' => array( 'category:horse-racing-tips' => array( 'type' => 'event', 'days' => 3 ), 'category:guides' => array( 'type' => 'evergreen' ), 'category:cheltenham' => array( 'type' => 'season', 'start' => '03-01', 'end' => '03-20' ) ) );
+$GLOBALS['terms'] = array( 'category' => array( (object) array( 'term_id' => 3, 'slug' => 'horse-racing-tips', 'name' => 'Horse Racing Tips' ) ) );
+$GLOBALS['events_enabled'] = false; $GLOBALS['post_meta'] = array();
+$context = Ace_SEO_Retention_Evidence_View::context( 9, array( 'published' => '2021-03-12' ), $period, '2026-10-07' );
+$rel = Ace_SEO_Retention_Evidence::relevance( $context );
+provider_check( '2021-03-12' === $rel['start'] && '2021-03-14' === $rel['end'] && ! empty( $rel['verified'] ) && false !== strpos( $rel['source'], 'event-bound for 3 days' ), 'An event rule binds the article to its publication date for N days.' );
+$GLOBALS['terms'] = array( 'category' => array( (object) array( 'term_id' => 4, 'slug' => 'guides', 'name' => 'Guides' ) ) );
+$context = Ace_SEO_Retention_Evidence_View::context( 9, array( 'published' => '2021-03-12' ), $period, '2026-10-07' );
+provider_check( 'evergreen' === ( $context['content_type'] ?? '' ), 'An evergreen rule marks the article evergreen.' );
+$GLOBALS['terms'] = array( 'category' => array( (object) array( 'term_id' => 5, 'slug' => 'cheltenham', 'name' => 'Cheltenham' ) ) );
+$context = Ace_SEO_Retention_Evidence_View::context( 9, array( 'published' => '2021-03-12' ), $period, '2026-10-07' );
+$rel = Ace_SEO_Retention_Evidence::relevance( $context );
+provider_check( ! empty( $rel['recurring'] ) && '2027-03-01' === $rel['start'], 'A season rule gives verified recurring dates.' );
+$GLOBALS['post_meta'] = array( '_ace_seo_retention_timing' => 'evergreen' );
+$context = Ace_SEO_Retention_Evidence_View::context( 9, array( 'published' => '2021-03-12' ), $period, '2026-10-07' );
+provider_check( 'evergreen' === ( $context['content_type'] ?? '' ) && ! isset( $context['season'] ), 'The post\'s own setting wins over a category rule.' );
+$GLOBALS['terms'] = array(); $GLOBALS['post_meta'] = array();
 echo "$checks event provider checks passed.\n";

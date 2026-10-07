@@ -88,6 +88,7 @@ class AceSeoRetentionReport {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 20 );
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
             add_action( 'admin_post_ace_seo_retention_resume', array( __CLASS__, 'handle_resume' ) );
+            add_action( 'admin_post_ace_seo_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
@@ -1252,11 +1253,12 @@ class AceSeoRetentionReport {
         return $counts;
     }
 
-    public static function tier_labels() {
+    public static function tier_labels( array $s = array() ) {
+        $floor = max( 1, (int) ( ( $s ?: self::settings() )['retained_views'] ?? 1 ) );
         return array(
-            'retained'  => __( 'Retained', 'ace-crawl-enhancer' ),
-            'candidate' => __( 'Candidates for review', 'ace-crawl-enhancer' ),
-            'dormant'   => __( 'Dormant', 'ace-crawl-enhancer' ),
+            'retained'  => __( 'Still being read', 'ace-crawl-enhancer' ),
+            'candidate' => 1 === $floor ? __( 'Short, with no recorded readers', 'ace-crawl-enhancer' ) : sprintf( __( 'Short, with fewer than %d views', 'ace-crawl-enhancer' ), $floor ),
+            'dormant'   => 1 === $floor ? __( 'No recorded readers', 'ace-crawl-enhancer' ) : sprintf( __( 'Below the readership threshold (fewer than %d views)', 'ace-crawl-enhancer' ), $floor ),
             'unknown'   => __( 'Not ready to judge', 'ace-crawl-enhancer' ),
         );
     }
@@ -1266,8 +1268,8 @@ class AceSeoRetentionReport {
             'keep'        => __( 'Keep', 'ace-crawl-enhancer' ),
             'refresh'     => __( 'Needs an update', 'ace-crawl-enhancer' ),
             'consolidate' => __( 'Consider combining', 'ace-crawl-enhancer' ),
-            'noindex'     => __( 'Keep out of search', 'ace-crawl-enhancer' ),
-            'no-signal'   => __( 'No useful data yet', 'ace-crawl-enhancer' ),
+            'noindex'     => __( 'Review whether it should appear in search', 'ace-crawl-enhancer' ),
+            'no-signal'   => __( 'Not enough data yet', 'ace-crawl-enhancer' ),
         );
     }
 
@@ -1283,22 +1285,23 @@ class AceSeoRetentionReport {
     /** Plain explanations for administrators and editors; no controls or secrets. */
     public static function render_help() {
         ?>
-        <h3>Groups describe what we have observed</h3>
+        <?php $tl = self::tier_labels(); $c = self::rank_cutoffs( self::settings() ); ?>
+        <h3>Groups describe how older posts are read</h3>
         <ul>
-            <li><strong>Retained</strong> — an older post with enough recorded views, or any search click, in the report window.</li>
-            <li><strong>Candidates for review</strong> — older posts with no recorded visits and less text than the saved word limit. This is a review queue, not a decision to delete.</li>
-            <li><strong>Dormant</strong> — other older posts below the Retained threshold, usually with more text or a small amount of traffic. A quiet period may be seasonal; missing evidence is not proof that a post is unused.</li>
-            <li><strong>Not ready to judge</strong> — visitor counts are missing and there are no positive search clicks to establish readership. Unknown does not mean unused.</li>
+            <li><strong><?php echo esc_html( $tl['retained'] ); ?></strong> — an older post with at least <?php echo esc_html( number_format_i18n( $c['occasional'] ) ); ?> recorded visit<?php echo 1 === $c['occasional'] ? '' : 's'; ?> in the period, or any search click. Graded by how often: read daily (about a visit a day), weekly, monthly, or occasionally. The bands are averages over the period, not a promise that someone visited every day.</li>
+            <li><strong><?php echo esc_html( $tl['dormant'] ); ?></strong> — no visits and no search clicks in the period. Quiet is not the same as worthless: a reference piece can be the best page on its subject and still be quiet.</li>
+            <li><strong><?php echo esc_html( $tl['candidate'] ); ?></strong> — the same, with less text than the saved word limit. A review queue, never a decision to delete; short match reports have value too.</li>
+            <li><strong><?php echo esc_html( $tl['unknown'] ); ?></strong> — we hold back because the evidence is not good enough yet: the article’s relevant dates are unconfirmed, the period falls outside the data we hold, or there is no visitor data. Unknown does not mean unused.</li>
         </ul>
-        <h3>Recommendations suggest what to look at next</h3>
+        <h3>Suggestions say what might help</h3>
         <ul>
-            <li><strong>Keep</strong> — visits, search clicks or backlinks give a reason to keep the article.</li>
-            <li><strong>Needs an update</strong> — people see it in search but few click it. Review the article and its search preview.</li>
-            <li><strong>Consider combining</strong> — it appears in search but gets no clicks after the other rules are checked. Review whether another article covers the same subject; choose a redirect target only if appropriate. The report neither finds nor applies a target.</li>
-            <li><strong>Keep out of search</strong> — internal links still point here, but the report found no search or visitor activity. Review whether to keep the page available and exclude it from search.</li>
-            <li><strong>No useful data yet</strong> — no useful signals were recorded in this window. Check the connections and observation period before drawing a conclusion.</li>
+            <li><strong>Keep</strong> — visits, search clicks or links from other sites give a reason to keep the article as it is.</li>
+            <li><strong>Needs an update</strong> — people see it in search results but few click it. Look at the article, its title and its search description. A suggestion to look, not a finding that it is wrong.</li>
+            <li><strong>Consider combining</strong> — it appears in search but gets no clicks. Check whether a newer article covers the same subject; a redirect is only right if that article truly replaces this one. The report neither finds nor applies a target.</li>
+            <li><strong>Review whether it should appear in search</strong> — other pages on this site link here, but we found no visits or search activity. Review whether to keep the page available but out of search results.</li>
+            <li><strong>Not enough data yet</strong> — nothing useful was recorded for this period, or the post is held for timing. Check the connections and the dates before drawing a conclusion.</li>
         </ul>
-        <p>A recommendation does not change a post. A separate action is needed to change search visibility or redirect a visitor. The age cutoff is how old the article is; the traffic window is the period requested from the data sources; observation history is the evidence actually collected so far.</p>
+        <p>A suggestion never changes a post. Changing search visibility or redirecting readers is a separate, logged administrator action. “Older than” is the article’s age; the period is the dates we asked the traffic sources for; “Previous checks” shows how the picture has moved between checks.</p>
         <?php
     }
 
@@ -1579,6 +1582,38 @@ class AceSeoRetentionReport {
         exit;
     }
 
+    /**
+     * One save for the whole Retention tab. Each section's own saver still runs (and its own action still
+     * works), so nothing about how settings are stored changes; only the number of Save buttons does.
+     */
+    public static function handle_settings_save() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_settings_save' ) ) {
+            wp_die( 'Not allowed.' );
+        }
+        $in = wp_unslash( $_POST );
+        AceSeoRetentionActions::save_report_settings( $in );
+        $in['settings_section'] = 'notice-lifetimes';
+        AceSeoRetentionActions::save_options( $in );
+        AceSeoRetentionActions::save_front_settings( $in );
+        self::sync_weekly_schedule();
+        if ( class_exists( 'AceSeoViewTracker' ) ) {
+            AceSeoViewTracker::maybe_install();
+        }
+        $parts = array( 'All retention settings saved.' );
+        if ( class_exists( 'AceSeoSheets' ) && array_key_exists( 'sheet', $in ) ) {
+            $parts[] = 'Google Sheets: ' . AceSeoSheets::save_settings( $in );
+        }
+        if ( class_exists( 'AceSeoSheetsSchedule' ) && array_key_exists( 'frequency', $in ) ) {
+            $schedule = AceSeoSheetsSchedule::save_settings( $in );
+            if ( is_wp_error( $schedule ) ) {
+                $parts[] = 'Report schedule not saved: ' . $schedule->get_error_message() . ' Everything else was saved.';
+            }
+        }
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), implode( ' ', $parts ), 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention' ) );
+        exit;
+    }
+
     public static function handle_report_settings() {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_report_settings' ) ) {
             wp_die( 'Not allowed.' );
@@ -1696,6 +1731,103 @@ class AceSeoRetentionReport {
         exit;
     }
 
+    /** Why held posts are held, from the saved reasons: one primary reason per post so the counts add up. */
+    public static function hold_reasons() {
+        global $wpdb;
+        $out = array( 'timing' => 0, 'coverage' => 0, 'ambiguous' => 0, 'missing' => 0 );
+        $base = "SELECT COUNT(*) FROM {$wpdb->postmeta} t JOIN {$wpdb->postmeta} r ON r.post_id = t.post_id AND r.meta_key = %s WHERE t.meta_key = %s AND t.meta_value = 'unknown'";
+        $total = (int) $wpdb->get_var( $wpdb->prepare( $base, self::META, self::META_TIER ) );
+        if ( ! $total ) {
+            return $out;
+        }
+        $out['timing']    = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%timing has not been confirmed%' ) );
+        $out['coverage']  = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s AND r.meta_value NOT LIKE %s', self::META, self::META_TIER, '%only has data from%', '%timing has not been confirmed%' ) );
+        $out['ambiguous'] = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%Several linked events%' ) );
+        $out['missing']   = max( 0, $total - $out['timing'] - $out['coverage'] - $out['ambiguous'] );
+        return $out;
+    }
+
+    /** The plain-English summary at the top of the dashboard: what was looked at, what it found, what to do next. */
+    public static function render_summary( array $p, array $settings, $built ) {
+        $tiers  = self::tier_counts();
+        $total  = array_sum( $tiers );
+        if ( ! $total ) {
+            echo '<div class="ace-retention-summary"><p><strong>No assessment yet.</strong> Use “Check older posts” to look at how older articles are read. Nothing is changed by checking.</p></div>';
+            return;
+        }
+        $ranks   = self::rank_counts();
+        $buckets = self::counts();
+        $holds   = self::hold_reasons();
+        $labels  = self::tier_labels( $settings );
+        $rlabels = self::rank_labels( $settings );
+        $days    = (int) ( $settings['days'] ?? 90 );
+        $started = (int) ( $p['started'] ?? 0 );
+        $from    = $started ? wp_date( 'j F Y', $started - $days * DAY_IN_SECONDS ) : '';
+        $to      = $started ? wp_date( 'j F Y', $started - DAY_IN_SECONDS ) : '';
+        $notes   = implode( ' ', (array) ( $p['notes'] ?? array() ) );
+        $sources = array();
+        if ( false === stripos( $notes, 'Google Analytics:' ) && false === stripos( $notes, 'Site Kit is not active' ) ) { $sources[] = 'Google Analytics'; }
+        if ( false === stripos( $notes, 'Search Console is not connected' ) ) { $sources[] = 'Search Console'; }
+        if ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ) { $sources[] = 'the site’s own visitor count'; }
+        $sources  = $sources ? implode( ' and ', $sources ) : 'links between articles only';
+        $quiet    = (int) $tiers['dormant'] + (int) $tiers['candidate'];
+        $partial  = self::is_building();
+        $pct      = $total ? round( 100 * (int) $tiers['retained'] / $total ) : 0;
+        $share    = $p['share'] ?? null;
+        $posts    = admin_url( 'edit.php?post_type=post' );
+        ?>
+        <div class="ace-retention-summary">
+            <?php if ( $partial ) : ?><p><strong>Partial results:</strong> a check is still running, so these numbers will change until it finishes.</p><?php endif; ?>
+            <p>We checked <strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong> published posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years<?php echo $from ? ', looking for visits and search activity from ' . esc_html( $from ) . ' to ' . esc_html( $to ) : ''; ?>, using <?php echo esc_html( $sources ); ?>.</p>
+            <div class="ace-retention-cards">
+                <div class="ace-retention-card">
+                    <?php echo esc_html( $labels['retained'] ); ?>
+                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) $tiers['retained'] ) ); ?></span>
+                    <?php echo esc_html( $pct ); ?>% of the posts we checked. How often:
+                    <ul>
+                        <?php foreach ( $rlabels as $r => $rl ) : ?><li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', $r, $posts ) ); ?>"><?php echo esc_html( preg_replace( '/ \(.*$/', '', $rl ) ); ?></a>: <?php echo esc_html( number_format_i18n( (int) $ranks[ $r ] ) ); ?></li><?php endforeach; ?>
+                    </ul>
+                </div>
+                <div class="ace-retention-card">
+                    Worth checking for an update
+                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) ( $buckets['refresh'] ?? 0 ) ) ); ?></span>
+                    People see them in search but few click. A suggestion to look, not a finding that anything is wrong.
+                    <ul><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Review these</a></li></ul>
+                </div>
+                <div class="ace-retention-card">
+                    <?php echo esc_html( $labels['unknown'] ); ?>
+                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) $tiers['unknown'] ) ); ?></span>
+                    <ul>
+                        <?php if ( $holds['timing'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['timing'] ) ); ?> need their relevant dates confirmed</li><?php endif; ?>
+                        <?php if ( $holds['coverage'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['coverage'] ) ); ?> fall outside the dates our data covers</li><?php endif; ?>
+                        <?php if ( $holds['ambiguous'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['ambiguous'] ) ); ?> are linked to more than one event</li><?php endif; ?>
+                        <?php if ( $holds['missing'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['missing'] ) ); ?> have no visitor data</li><?php endif; ?>
+                        <li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', 'unknown', $posts ) ); ?>">See these posts</a></li>
+                    </ul>
+                </div>
+                <div class="ace-retention-card">
+                    <?php echo esc_html( $labels['dormant'] ); ?>
+                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( $quiet ) ); ?></span>
+                    No visits and no search clicks in the period<?php echo (int) $tiers['candidate'] ? ', including ' . esc_html( number_format_i18n( (int) $tiers['candidate'] ) ) . ' short posts' : ''; ?>. Quiet is not the same as worthless.
+                    <ul><li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', 'dormant', $posts ) ); ?>">See these posts</a></li></ul>
+                </div>
+            </div>
+            <?php if ( is_array( $share ) && ! empty( $share['total'] ) ) : ?>
+                <p>In the last <?php echo esc_html( (int) $share['days'] ); ?> days, <strong><?php echo esc_html( round( 100 * $share['old'] / $share['total'], 1 ) ); ?>%</strong> of all page views went to these older posts (<?php echo esc_html( number_format_i18n( (int) $share['old'] ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $share['total'] ) ); ?>, <?php echo esc_html( $share['source'] ); ?>).</p>
+            <?php endif; ?>
+            <div class="ace-retention-next-steps">
+                <strong>What to do next</strong>
+                <ol style="margin:.5em 0 0 1.5em">
+                    <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Start with the posts worth updating</a>: they already have an audience in search.</li>
+                    <?php if ( $holds['timing'] ) : ?><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) ); ?>">Say when articles in a category matter</a> (evergreen, event-bound or seasonal) so the held posts can be judged, or set it on individual posts.</li><?php endif; ?>
+                    <li>Groups and suggestions overlap: a post can be read weekly and still be worth an update. Decide with the client; this report only describes.</li>
+                    <?php if ( class_exists( 'AceSeoSheets' ) && AceSeoSheets::configured() ) : ?><li><a href="<?php echo esc_url( AceSeoSheets::sheet_url() ); ?>" target="_blank" rel="noopener noreferrer">Open the Google Sheet</a> for the full list with readership bands, timing and reasons.</li><?php endif; ?>
+                </ol>
+            </div>
+        </div>
+        <?php
+    }
+
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
@@ -1720,11 +1852,9 @@ class AceSeoRetentionReport {
         }
         ?>
         <div class="wrap ace-retention-dashboard">
-            <h1>Retention dashboard</h1>
+            <h1>Older posts: readership and review</h1>
             <?php self::render_message(); ?>
-            <p>See which older posts still help readers and which need a closer look. Groups describe the evidence; recommendations suggest a next step. Building this report does not delete, redirect or hide any post.</p>
-            <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a> — read-only; the saved report remains unchanged.</p>
-            <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Retention settings</a> <a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&ace_ret=scored' ) ); ?>">Review posts and export</a> <a href="#retention-help">What the labels mean</a></p>
+            <p class="ace-retention-reassure">Reading this report changes nothing. Nothing here deletes, redirects or hides a post; the only changes happen through the clearly labelled administrator actions further down, and each one is logged.</p>
 
             <?php $state = self::worker_state(); ?>
             <?php if ( self::is_building() ) : ?>
@@ -1757,56 +1887,37 @@ class AceSeoRetentionReport {
                 <div class="notice notice-warning"><p><?php echo esc_html( $note ); ?></p></div>
             <?php endforeach; ?>
 
-            <details class="ace-retention-detail">
-            <summary>Developer tools: rebuild the report</summary>
-            <p>Uses the <a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) ); ?>">saved report settings</a>. This updates recommendations, not actions already applied. The weekly check uses WordPress cron.</p>
-            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:1em 0">
-                <?php wp_nonce_field( 'ace_seo_retention_build' ); ?>
-                <input type="hidden" name="action" value="ace_seo_retention_build">
-                <button class="button" <?php disabled( self::is_building() ); ?>><?php echo $built ? 'Rebuild the report' : 'Build the report'; ?></button>
-            </form>
-            </details>
+            <?php self::render_summary( $p, $settings, $built ); ?>
+
+            <div class="ace-retention-controls" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin:0 0 1.5em">
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0">
+                    <?php wp_nonce_field( 'ace_seo_retention_build' ); ?>
+                    <input type="hidden" name="action" value="ace_seo_retention_build">
+                    <button class="button" <?php disabled( self::is_building() ); ?>><?php echo $built ? 'Check older posts again' : 'Check older posts'; ?></button>
+                </form>
                 <?php if ( $built ) : ?>
-                    <p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_retention_export' ) ); ?>">Export report CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ) . ')' : ''; ?></a></p>
+                    <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_retention_export' ) ); ?>">Download as CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ) . ')' : ''; ?></a>
                 <?php endif; ?>
+                <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Settings</a>
+                <a href="#retention-help">What the words mean</a>
+            </div>
+            <p class="description">Checking again uses the saved settings and takes a while on a large site; it runs in the background and this page shows its progress. It updates groups and suggestions, never the changes already applied.</p>
 
-            <?php
-            $share = $p['share'] ?? null;
-            if ( is_array( $share ) && ! empty( $share['total'] ) ) :
-                ?>
-                <p style="font-size:1.1em"><strong><?php echo esc_html( round( 100 * $share['old'] / $share['total'], 1 ) ); ?>%</strong> of page views in the last <?php echo esc_html( (int) $share['days'] ); ?> days went to posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years (<?php echo esc_html( number_format_i18n( (int) $share['old'] ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $share['total'] ) ); ?>, <?php echo esc_html( $share['source'] ); ?>, measured <?php echo esc_html( human_time_diff( (int) $share['at'] ) ); ?> ago).</p>
-            <?php endif; ?>
-
-            <?php $tier_counts = self::tier_counts(); if ( array_sum( $tier_counts ) > 0 ) : ?>
-                <h2>Groups of older posts</h2>
-                <p>Open a group in Posts to combine date and traffic filters, sort the results and export the same list. These groups do not mean an action has been applied:</p>
-                <ul style="list-style:disc;margin-left:2em">
-                    <?php $rank_counts = self::rank_counts(); $rank_labels = self::rank_labels( $settings ); ?>
-                    <?php foreach ( self::tier_labels() as $t => $label ) : ?>
-                        <li><?php echo esc_html( $label ); ?>: <strong><?php echo esc_html( number_format_i18n( $tier_counts[ $t ] ) ); ?></strong>
-                        <?php if ( 'retained' === $t && array_sum( $rank_counts ) > 0 ) : ?>
-                            <ul style="list-style:circle;margin-left:2em">
-                            <?php foreach ( $rank_labels as $r => $rl ) : ?>
-                                <li><a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'post', 'ace_ret' => $r ), admin_url( 'edit.php' ) ) ); ?>"><?php echo esc_html( $rl ); ?></a>: <strong><?php echo esc_html( number_format_i18n( $rank_counts[ $r ] ) ); ?></strong></li>
-                            <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-                <p class="description">Retained is graded by how often an article was read in the traffic window; Dormant is only the posts with no recorded readers and no search clicks. The bands describe readership, not value: a quiet article can still be the best page on its subject.</p>
+            <details class="ace-retention-detail"><summary>Previous checks</summary>
+            <?php self::render_history( $labels ); ?>
+            </details>
+            <details class="ace-retention-detail"><summary>Advanced: timing preview and other post lists</summary>
+                <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a> — read-only; the saved report remains unchanged.</p>
                 <ul style="list-style:disc;margin-left:2em">
                     <?php foreach ( self::shareable_links() as $link ) : ?>
                         <li><a href="<?php echo esc_url( $link[1] ); ?>"><?php echo esc_html( $link[0] ); ?></a></li>
                     <?php endforeach; ?>
                 </ul>
-            <?php endif; ?>
-
-            <?php self::render_history( $labels ); ?>
+            </details>
 
             <?php if ( $built ) : ?>
-                <h2>Review recommendations</h2>
-                <p>Use this table for evidence, or Posts for the full filter and export workflow. “Applied” shows actual changes; a recommendation does not.</p>
+                <h2>Suggestions, post by post</h2>
+                <p>Each row shows what we observed and what might help. “Applied” shows actual changes; a suggestion does not change anything.</p>
                 <ul class="subsubsub" style="margin-bottom:1em">
                     <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>
                     <?php foreach ( self::BUCKETS as $i => $b ) : ?>

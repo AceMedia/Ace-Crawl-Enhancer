@@ -75,14 +75,22 @@ class AceSeoSheets {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
+        $msg = self::save_settings( wp_unslash( $_POST ) );
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
+        exit;
+    }
+
+    /** Save the connection from submitted fields and return a plain-English result (no redirect). */
+    public static function save_settings( array $input ) {
         $o   = get_option( self::OPTION, array() );
         $o   = is_array( $o ) ? $o : array();
         $msg = 'Google Sheets settings saved.';
 
-        $o['sheet_id'] = self::parse_sheet_id( wp_unslash( $_POST['sheet'] ?? '' ) );
+        $o['sheet_id'] = self::parse_sheet_id( $input['sheet'] ?? '' );
 
-        $raw = trim( (string) wp_unslash( $_POST['key'] ?? '' ) );
-        if ( ! empty( $_POST['forget_key'] ) ) {
+        $raw = trim( (string) ( $input['key'] ?? '' ) );
+        if ( ! empty( $input['forget_key'] ) ) {
             unset( $o['key'] );
         } elseif ( '' !== $raw ) {
             $key = json_decode( $raw, true );
@@ -101,24 +109,35 @@ class AceSeoSheets {
                 ? 'Saved, but Google refused the connection: ' . $check->get_error_message()
                 : 'Connected to “' . ( $check['properties']['title'] ?? 'the spreadsheet' ) . '”.';
         }
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
-        exit;
+        return $msg;
     }
 
     /** The administrator-only connection form in Settings → Retention. */
+    /** Standalone form (own nonce, action and button). The Retention tab uses render_fields() inside its single form. */
     public static function render_settings() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+        wp_nonce_field( 'ace_seo_sheets_settings' );
+        echo '<input type="hidden" name="action" value="ace_seo_sheets_settings">';
+        self::render_fields( false );
+        echo '<p><button class="button">Save and check access</button></p></form>';
+        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
+            AceSeoSheetsSchedule::render_settings();
+        }
+    }
+
+    /** The connection fields only: no form, nonce, action or button, so a parent form can save them. */
+    public static function render_fields( $with_schedule = true ) {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
         $email  = self::account_email();
         $locked = defined( 'ACE_SEO_SHEETS_KEY_FILE' );
         ?>
-        <details id="retention-sheets" style="margin:1em 0">
-            <summary style="cursor:pointer;font-weight:600">Google Sheets snapshots <?php echo self::configured() ? '(details saved)' : '(not set up)'; ?></summary>
-            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <?php wp_nonce_field( 'ace_seo_sheets_settings' ); ?>
-                <input type="hidden" name="action" value="ace_seo_sheets_settings">
+        <details id="retention-sheets" style="margin:1em 0" <?php echo self::configured() ? '' : 'open'; ?>>
+            <summary style="cursor:pointer;font-weight:600">Connection <?php echo self::configured() ? '(connection details saved)' : '(not set up)'; ?></summary>
                 <p>Adds <strong>Export to Google Sheets</strong> beside Export CSV on the post list. Each export copies the currently filtered posts into a new tab in your spreadsheet. It is a snapshot: later changes in WordPress or the spreadsheet do not update each other.</p>
                 <p>To set it up:</p>
                 <ol style="margin-left:2em">
@@ -139,13 +158,11 @@ class AceSeoSheets {
                         <?php endif; ?>
                     </td></tr>
                 </tbody></table>
-                <p><button class="button">Save and check access</button></p>
-                <p class="description">This checks that Google lets us read the spreadsheet. Creating an export also needs Editor access. Saving here does not export any posts.</p>
-            </form>
+                <p class="description">Saving checks that Google lets us read the spreadsheet; the result is shown after saving. Creating an export also needs Editor access. Saving does not export any posts.</p>
         </details>
         <?php
-        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
-            AceSeoSheetsSchedule::render_settings();
+        if ( $with_schedule && class_exists( 'AceSeoSheetsSchedule' ) ) {
+            AceSeoSheetsSchedule::render_fields();
         }
     }
 

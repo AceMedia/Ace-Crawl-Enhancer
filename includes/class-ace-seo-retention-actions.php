@@ -75,6 +75,7 @@ class AceSeoRetentionActions {
             'retained_views' => 1,
             'thin_words'     => 300,
             'timing_policy'  => 'estimate',
+            'timing_rules'   => array(),
             'auto_build'     => 0,
             'track_views'    => 0,
             // Retained posts on the front end (AceSeoRetentionFront). All off until switched on.
@@ -143,8 +144,77 @@ class AceSeoRetentionActions {
             'auto_build'     => ! empty( $input['auto_build'] ) ? 1 : 0,
             'track_views'    => ! empty( $input['track_views'] ) ? 1 : 0,
         ) );
+        if ( isset( $input['timing_rules'] ) ) {
+            $clean['timing_rules'] = self::parse_timing_rules( (string) $input['timing_rules'] );
+        }
         update_option( self::OPTION, $clean, false );
         return self::options();
+    }
+
+    /**
+     * Timing rules by term, one per line, so an archive can be classified in bulk rather than post by
+     * post: when an article in that category or tag matters.
+     *
+     *   category:guides = evergreen                 relevant in any period
+     *   category:horse-racing-tips = event 3        relevant from its publication date for 3 days (one-off)
+     *   category:cheltenham-tips = season 03-01 03-20   relevant every year between those dates
+     *
+     * A per-post setting on the Advanced tab always wins over a rule.
+     */
+    public static function parse_timing_rules( $text ) {
+        $rules = array();
+        foreach ( preg_split( '/[\r\n]+/', $text ) as $line ) {
+            if ( ! preg_match( '/^\s*([a-z0-9_-]+)\s*:\s*([^=\s]+)\s*=\s*(evergreen|event\s+(\d+)|season\s+(\d{2}-\d{2})\s+(\d{2}-\d{2}))\s*$/i', $line, $m ) ) {
+                continue;
+            }
+            $key = sanitize_key( $m[1] ) . ':' . sanitize_title( $m[2] );
+            if ( 'evergreen' === strtolower( $m[3] ) ) {
+                $rules[ $key ] = array( 'type' => 'evergreen' );
+            } elseif ( ! empty( $m[4] ) ) {
+                $rules[ $key ] = array( 'type' => 'event', 'days' => max( 1, (int) $m[4] ) );
+            } elseif ( ! empty( $m[5] ) && checkdate( (int) substr( $m[5], 0, 2 ), (int) substr( $m[5], 3 ), 2024 ) && checkdate( (int) substr( $m[6], 0, 2 ), (int) substr( $m[6], 3 ), 2024 ) ) {
+                $rules[ $key ] = array( 'type' => 'season', 'start' => $m[5], 'end' => $m[6] );
+            }
+        }
+        return $rules;
+    }
+
+    /** The rules back as text for the textarea. */
+    public static function timing_rules_text( array $rules ) {
+        $lines = array();
+        foreach ( $rules as $key => $rule ) {
+            $value = 'evergreen' === $rule['type'] ? 'evergreen' : ( 'event' === $rule['type'] ? 'event ' . (int) $rule['days'] : 'season ' . $rule['start'] . ' ' . $rule['end'] );
+            $lines[] = $key . ' = ' . $value;
+        }
+        return implode( "\n", $lines );
+    }
+
+    /** The first timing rule that matches one of the post's terms, with the term it matched, or null. */
+    public static function timing_rule_for( $post_id ) {
+        $rules = (array) ( self::options()['timing_rules'] ?? array() );
+        if ( ! $rules ) {
+            return null;
+        }
+        $taxonomies = array();
+        foreach ( array_keys( $rules ) as $key ) {
+            $taxonomies[ strtok( $key, ':' ) ] = true;
+        }
+        foreach ( array_keys( $taxonomies ) as $taxonomy ) {
+            if ( ! taxonomy_exists( $taxonomy ) ) {
+                continue;
+            }
+            $terms = get_the_terms( $post_id, $taxonomy );
+            if ( ! is_array( $terms ) ) {
+                continue;
+            }
+            foreach ( $terms as $term ) {
+                $key = $taxonomy . ':' . $term->slug;
+                if ( isset( $rules[ $key ] ) ) {
+                    return array_merge( $rules[ $key ], array( 'key' => $key, 'label' => $term->name ) );
+                }
+            }
+        }
+        return null;
     }
 
     /** The front-end form for retained posts: notice, lighter render, continue reading. */

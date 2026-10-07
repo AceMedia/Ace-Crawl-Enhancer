@@ -52,6 +52,21 @@ final class Ace_SEO_Retention_Evidence_View {
                 $context['timing_note'] = 'Editorial dates are set but incomplete or invalid, so they are ignored.';
             }
         }
+        // Then a timing rule for one of its categories or tags: the way to classify an archive in bulk.
+        if ( ! isset( $context['content_type'], $context['override'] ) && '' === $timing && class_exists( 'AceSeoRetentionActions' ) && method_exists( 'AceSeoRetentionActions', 'timing_rule_for' ) ) {
+            $rule = AceSeoRetentionActions::timing_rule_for( $id );
+            if ( $rule && Ace_SEO_Retention_Evidence::date( $row['published'] ?? null ) ) {
+                $context['timing_rule'] = $rule;
+                if ( 'evergreen' === $rule['type'] ) {
+                    $context['content_type'] = 'evergreen';
+                } elseif ( 'event' === $rule['type'] ) {
+                    $end = ( new DateTimeImmutable( $row['published'] . ' UTC' ) )->modify( '+' . ( (int) $rule['days'] - 1 ) . ' days' )->format( 'Y-m-d' );
+                    $context['override'] = array( 'start' => $row['published'], 'end' => $end, 'source' => sprintf( 'Category rule: %s, event-bound for %d day%s from publication', $rule['label'], (int) $rule['days'], 1 === (int) $rule['days'] ? '' : 's' ) );
+                } elseif ( 'season' === $rule['type'] ) {
+                    $context['season'] = array( 'start' => $rule['start'], 'end' => $rule['end'], 'source' => sprintf( 'Category rule: %s, in season %s to %s each year', $rule['label'], $rule['start'], $rule['end'] ) );
+                }
+            }
+        }
         try {
             $anniversary = Ace_SEO_Seasonal_Window::preview( $row['published'], $as_of, wp_timezone() );
             $context['anniversary'] = array( 'start' => $anniversary['season_start'], 'end' => $anniversary['season_end'] );

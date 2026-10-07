@@ -156,30 +156,41 @@ class AceSeoSheetsSchedule {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_schedule' ) ) {
             wp_die( 'Not allowed.' );
         }
+        $saved = self::save_settings( wp_unslash( $_POST ) );
+        if ( is_wp_error( $saved ) ) {
+            wp_die( esc_html( $saved->get_error_message() ) );
+        }
+        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Snapshot schedule saved. The Google connection and retention settings have not changed.', 60 );
+        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets-schedule' ) );
+        exit;
+    }
+
+    /** Validate and save the schedule from submitted fields; true or a WP_Error, no redirect. */
+    public static function save_settings( array $input ) {
         self::dependencies();
         $old = self::settings();
-        $frequency = sanitize_key( wp_unslash( $_POST['frequency'] ?? 'off' ) );
+        $frequency = sanitize_key( $input['frequency'] ?? 'off' );
         if ( ! isset( self::frequencies()[ $frequency ] ) ) {
-            wp_die( 'Choose a recognised snapshot frequency.' );
+            return new WP_Error( 'ace_sheets_frequency', 'Choose a recognised refresh frequency.' );
         }
-        $types = array_values( array_intersect( AceSeoExport::post_types(), array_map( 'sanitize_key', (array) wp_unslash( $_POST['post_types'] ?? array() ) ) ) );
+        $types = array_values( array_intersect( AceSeoExport::post_types(), array_map( 'sanitize_key', (array) ( $input['post_types'] ?? array() ) ) ) );
         if ( 'off' !== $frequency && ( ! $types || ! AceSeoSheets::configured() ) ) {
-            wp_die( 'Choose at least one content type and save a Google Sheets connection before switching snapshots on.' );
+            return new WP_Error( 'ace_sheets_requirements', 'Choose at least one content type and save a Google Sheets connection before switching automatic refreshes on.' );
         }
-        $after_build = empty( $_POST['after_build'] ) ? 0 : 1;
+        $after_build = empty( $input['after_build'] ) ? 0 : 1;
         if ( $after_build && ( ! $types || ! AceSeoSheets::configured() ) ) {
-            wp_die( 'Choose at least one content type and save a Google Sheets connection before refreshing after each build.' );
+            return new WP_Error( 'ace_sheets_requirements', 'Choose at least one content type and save a Google Sheets connection before refreshing after each check.' );
         }
-        $new = array_merge( $old, array( 'frequency' => $frequency, 'post_types' => $types ?: array( 'post' ), 'include_unpublished' => empty( $_POST['include_unpublished'] ) ? 0 : 1, 'after_build' => $after_build, 'stop_generation' => (int) $old['stop_generation'], 'auto_stop_generation' => (int) $old['auto_stop_generation'] + ( 'off' === $frequency && 'off' !== $old['frequency'] ? 1 : 0 ) ) );
+        $new = array_merge( $old, array( 'frequency' => $frequency, 'post_types' => $types ?: array( 'post' ), 'include_unpublished' => empty( $input['include_unpublished'] ) ? 0 : 1, 'after_build' => $after_build, 'stop_generation' => (int) $old['stop_generation'], 'auto_stop_generation' => (int) $old['auto_stop_generation'] + ( 'off' === $frequency && 'off' !== $old['frequency'] ? 1 : 0 ) ) );
         wp_cache_delete( self::OPTION, 'options' );
         wp_cache_delete( 'alloptions', 'options' );
         wp_cache_delete( 'notoptions', 'options' );
         update_option( self::OPTION, $new, false );
-        if ( self::record( self::OPTION ) !== $new ) { wp_die( 'The schedule could not be saved. Please try again.' ); }
+        if ( self::record( self::OPTION ) !== $new ) {
+            return new WP_Error( 'ace_sheets_save', 'The refresh schedule could not be saved. Please try again.' );
+        }
         self::sync_schedule();
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Snapshot schedule saved. The Google connection and retention settings have not changed.', 60 );
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets-schedule' ) );
-        exit;
+        return true;
     }
 
     public static function start( $manual = false ) {
@@ -428,23 +439,30 @@ class AceSeoSheetsSchedule {
         exit;
     }
 
+    /** Standalone: fields in their own form plus the controls. The Retention tab uses render_fields() and render_controls(). */
     public static function render_settings() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+        wp_nonce_field( 'ace_seo_sheets_schedule' );
+        echo '<input type="hidden" name="action" value="ace_seo_sheets_schedule">';
+        self::render_fields();
+        echo '<p><button class="button button-primary">Save report schedule</button></p></form>';
+        self::render_controls();
+    }
+
+    /** The schedule fields only, for a parent form. */
+    public static function render_fields() {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
         self::dependencies();
         $settings = self::settings();
-        $job = self::record( self::JOB );
-        $next = wp_next_scheduled( self::START );
-        $history = self::record( self::HISTORY );
-        $last = $history ? end( $history ) : array();
         ?>
-        <section id="retention-sheets-schedule" class="ace-retention-section">
-            <h3>Keep the main Google Sheets report up to date</h3>
+        <div id="retention-sheets-schedule">
+            <h4>Keep the main report tab up to date</h4>
             <p>Refresh the first tab, “Ace SEO report”, from the saved SEO and retention data. The previous report stays visible until the new copy is complete. Other tabs are kept.</p>
-            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <?php wp_nonce_field( 'ace_seo_sheets_schedule' ); ?>
-                <input type="hidden" name="action" value="ace_seo_sheets_schedule">
                 <p><label for="ace-sheets-frequency">How often</label><br><select id="ace-sheets-frequency" name="frequency">
                     <?php foreach ( self::frequencies() as $value => $label ) : ?><option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['frequency'], $value ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
                 </select></p>
@@ -455,9 +473,24 @@ class AceSeoSheetsSchedule {
                 </fieldset>
                 <p><label><input type="checkbox" name="include_unpublished" value="1" <?php checked( ! empty( $settings['include_unpublished'] ) ); ?>> Also include drafts, pending, private and scheduled content</label></p>
                 <p><label><input type="checkbox" name="after_build" value="1" <?php checked( ! empty( $settings['after_build'] ) ); ?>> Also refresh the report each time a retention build finishes</label><br><span class="description">The weekly build (when switched on), a manual rebuild or a resumed one: the sheet then always shows the latest saved assessment.</span></p>
-                <p class="description">Otherwise, only published content is copied. The snapshot includes every item in the selected types and statuses, with the same columns as the post-list export. Trash, revisions and automatic drafts are excluded.</p>
-                <p><button class="button button-primary">Save report schedule</button></p>
-            </form>
+                <p class="description">Otherwise, only published content is copied. The refresh includes every item in the selected types and statuses, with the same columns as the post-list export. Trash, revisions and automatic drafts are excluded.</p>
+        </div>
+        <?php
+    }
+
+    /** Run, stop and retry: operational controls that use the saved settings and are never part of a save. */
+    public static function render_controls() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        self::dependencies();
+        $settings = self::settings();
+        $job = self::record( self::JOB );
+        $next = wp_next_scheduled( self::START );
+        $history = self::record( self::HISTORY );
+        $last = $history ? end( $history ) : array();
+        ?>
+        <section id="retention-sheets-controls" class="ace-retention-section">
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ace_seo_sheets_run' ); ?><input type="hidden" name="action" value="ace_seo_sheets_run"><p><button class="button">Refresh main report now</button></p><p class="description">Uses the saved content choices above. This one-off refresh works while automatic refreshes are off.</p></form>
             <?php if ( ( self::active( $job ) || 'failed' === ( $job['status'] ?? '' ) ) && ! self::stopped( $job ) ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ace_seo_sheets_stop' ); ?><input type="hidden" name="action" value="ace_seo_sheets_stop"><button class="button">Stop this refresh</button></form><?php endif; ?>
             <p><?php echo 'off' === $settings['frequency'] ? 'Automatic refreshes are off.' : ( $next ? 'Next refresh due: ' . esc_html( wp_date( 'j F Y, H:i', $next ) ) . '.' : 'No refresh is scheduled. Check that WordPress cron is working.' ); ?> Times use the site timezone. WordPress runs the job when its scheduler next runs, so a due time is not a guaranteed completion time.</p>

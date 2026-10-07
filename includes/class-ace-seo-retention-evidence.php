@@ -54,10 +54,25 @@ final class Ace_SEO_Retention_Evidence {
     /** Resolve provenance before using dates. A mutable taxonomy's next event is NOT a verified edition. */
     public static function relevance( array $context ) {
         if ( self::interval( $context['override'] ?? null ) ) {
-            return array_merge( $context['override'], array( 'source' => 'Editorial override', 'verified' => true ) );
+            return array_merge( $context['override'], array( 'source' => $context['override']['source'] ?? 'Editorial override', 'verified' => true ) );
         }
         if ( 'evergreen' === ( $context['content_type'] ?? '' ) ) {
             return array( 'source' => 'Evergreen: chosen observation period', 'verified' => true, 'evergreen' => true );
+        }
+        // A season from a category rule recurs every year: verified timing, with the occurrence that
+        // is current or next relative to as_of shown as its dates.
+        $season = $context['season'] ?? null;
+        if ( is_array( $season ) && preg_match( '/^\d{2}-\d{2}$/', (string) ( $season['start'] ?? '' ) ) && preg_match( '/^\d{2}-\d{2}$/', (string) ( $season['end'] ?? '' ) ) ) {
+            $year  = self::date( $context['as_of'] ?? '' ) ? (int) substr( $context['as_of'], 0, 4 ) : (int) gmdate( 'Y' );
+            $start = $year . '-' . $season['start'];
+            $end   = ( $season['end'] < $season['start'] ? $year + 1 : $year ) . '-' . $season['end'];
+            if ( self::date( $context['as_of'] ?? '' ) && $end < $context['as_of'] ) {
+                $start = ( $year + 1 ) . '-' . $season['start'];
+                $end   = ( $season['end'] < $season['start'] ? $year + 2 : $year + 1 ) . '-' . $season['end'];
+            }
+            if ( self::date( $start ) && self::date( $end ) ) {
+                return array( 'start' => $start, 'end' => $end, 'source' => $season['source'] ?? 'Category rule: season', 'verified' => true, 'recurring' => true );
+            }
         }
         $verified = array();
         foreach ( (array) ( $context['events'] ?? array() ) as $event ) {
@@ -100,11 +115,17 @@ final class Ace_SEO_Retention_Evidence {
         if ( ! isset( $relevance['start'], $relevance['end'] ) || ! self::interval( $relevance ) ) {
             return '';
         }
-        $recurring = empty( $relevance['verified'] ) && false !== stripos( (string) ( $relevance['source'] ?? '' ), 'anniversary' );
+        $recurring = ! empty( $relevance['recurring'] ) || ( empty( $relevance['verified'] ) && false !== stripos( (string) ( $relevance['source'] ?? '' ), 'anniversary' ) );
+        // A one-off event that ended before the period cannot be re-measured: the period measures its
+        // readership after the event, which is a fair judgement, not a hold.
+        if ( ! $recurring && $relevance['end'] < $period['start'] ) {
+            return '';
+        }
+        // The period must contain a whole occurrence: half an event tells half a story.
         foreach ( $recurring ? range( -6, 1 ) : array( 0 ) as $years ) {
             $start = $years ? ( new DateTimeImmutable( $relevance['start'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $relevance['start'];
             $end   = $years ? ( new DateTimeImmutable( $relevance['end'] . ' UTC' ) )->modify( $years . ' year' )->format( 'Y-m-d' ) : $relevance['end'];
-            if ( $period['start'] <= $end && $period['end'] >= $start ) {
+            if ( $period['start'] <= $start && $period['end'] >= $end ) {
                 return '';
             }
         }
@@ -137,8 +158,11 @@ final class Ace_SEO_Retention_Evidence {
         }
         if ( ! $covered ) { $reasons[] = 'Complete traffic coverage has not been established for the chosen dates.'; }
         if ( empty( $relevance['verified'] ) ) { $reasons[] = $relevance['source'] . ': confirm the timing before drawing a negative conclusion.'; }
+        $post_event = false;
         if ( empty( $relevance['evergreen'] ) && isset( $relevance['start'], $relevance['end'] ) ) {
-            if ( ! self::interval( $period ) || $period['start'] > $relevance['start'] || $period['end'] < $relevance['end'] ) {
+            if ( ! empty( $relevance['verified'] ) && empty( $relevance['recurring'] ) && self::interval( $period ) && $relevance['end'] < $period['start'] ) {
+                $post_event = true; // the event is over; this period measures what the article is worth afterwards
+            } elseif ( ! self::interval( $period ) || $period['start'] > $relevance['start'] || $period['end'] < $relevance['end'] ) {
                 $reasons[] = 'The chosen period does not cover the full relevant event or season.';
             }
         }
@@ -168,7 +192,7 @@ final class Ace_SEO_Retention_Evidence {
         if ( ! $suggestions ) { $suggestions[] = 'hold'; $reasons[] = 'An editorial review is needed; silence alone does not establish the best action.'; }
         $attention = ! $ready ? 'uncertain' : ( array( 'keep' ) === $suggestions ? 'useful' : 'review' );
         $activity = $ready && 0 === $views && 0 === $clicks && 0 === $impressions ? 'No activity measured in a complete relevant period' : ( $retained ? 'Positive readership evidence' : 'No conclusion about inactivity' );
-        return array( 'version' => self::VERSION, 'tier' => $tier, 'primary' => $suggestions[0], 'suggestions' => array_values( array_unique( $suggestions ) ), 'ready' => $ready, 'attention' => $attention, 'activity' => $activity, 'confidence' => $ready ? 'Complete relevant coverage established' : 'Evidence or timing still needs checking', 'reasons' => array_values( array_unique( $reasons ) ), 'relevance' => $relevance, 'period' => $period, 'coverage' => $coverage, 'as_of' => $as_of );
+        return array( 'version' => self::VERSION, 'post_event' => $post_event, 'tier' => $tier, 'primary' => $suggestions[0], 'suggestions' => array_values( array_unique( $suggestions ) ), 'ready' => $ready, 'attention' => $attention, 'activity' => $activity, 'confidence' => $ready ? 'Complete relevant coverage established' : 'Evidence or timing still needs checking', 'reasons' => array_values( array_unique( $reasons ) ), 'relevance' => $relevance, 'period' => $period, 'coverage' => $coverage, 'as_of' => $as_of );
     }
 
 }

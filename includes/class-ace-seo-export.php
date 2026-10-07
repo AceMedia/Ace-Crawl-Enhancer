@@ -106,12 +106,15 @@ class AceSeoExport {
         if ( ! class_exists( 'AceSeoRetentionReport' ) || empty( $row['tier'] ) ) {
             return '';
         }
+        static $labels = null, $tiers = null;
+        if ( null === $labels ) {
+            $labels = AceSeoRetentionReport::rank_labels();
+            $tiers  = AceSeoRetentionReport::tier_labels();
+        }
         $rank = (string) get_post_meta( $id, AceSeoRetentionReport::META_RANK, true );
         if ( 'retained' === $row['tier'] && '' !== $rank ) {
-            $labels = AceSeoRetentionReport::rank_labels();
             return $labels[ $rank ] ?? $rank;
         }
-        $tiers = AceSeoRetentionReport::tier_labels();
         return $tiers[ $row['tier'] ] ?? $row['tier'];
     }
 
