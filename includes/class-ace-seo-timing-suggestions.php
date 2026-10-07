@@ -111,6 +111,15 @@ class Ace_SEO_Timing_Suggestions {
                 'why'        => sprintf( 'Only %s%% of its %s older posts are still read at least monthly, and it publishes %s all year round. That is the shape of day-of-event content, relevant for about %d days from publication.', number_format_i18n( round( 100 * $persistence, 1 ) ), number_format_i18n( $n ), $cadence, $days ),
             );
         }
+        // A big term with no clear shape is worth saying so about, rather than leaving it out.
+        if ( $n >= 500 ) {
+            return $base + array(
+                'type'       => 'mixed',
+                'rule'       => '',
+                'confidence' => 0,
+                'why'        => sprintf( 'No clear shape: %s%% of its %s older posts are still read at least monthly (between the event-bound and evergreen marks), published all year round%s. Probably a mix of dated and lasting pieces; a narrower tag may suit a rule better, or set timing on the posts that matter.', number_format_i18n( round( 100 * $persistence, 1 ) ), number_format_i18n( $n ), null !== $gap ? ( $gap < 0.75 ? ', more than once a day' : ( $gap < 1.5 ? ', about daily' : sprintf( ', about every %s days', number_format_i18n( $gap, $gap < 10 ? 1 : 0 ) ) ) ) : '' ),
+            );
+        }
         return null;
     }
 
@@ -259,10 +268,14 @@ class Ace_SEO_Timing_Suggestions {
                 <?php $i = 0; foreach ( $suggestions as $key => $s ) : $i++; $in_use = isset( $rules[ $key ] ); $is_ignored = in_array( $key, $ignored, true ); $same = $in_use && AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) === $s['rule']; ?>
                     <tr<?php echo $is_ignored && ! $in_use ? ' style="opacity:.6"' : ''; ?><?php echo $i > 30 && ! $in_use ? ' class="ace-timing-more" hidden' : ''; ?>>
                         <th scope="row"><?php echo esc_html( $s['label'] ); ?><br><small><code><?php echo esc_html( $key ); ?></code> · <?php echo esc_html( number_format_i18n( $s['posts'] ) ); ?> posts</small></th>
-                        <td><?php echo esc_html( $s['why'] ); ?><br><small>Confidence <?php echo esc_html( (int) round( 100 * $s['confidence'] ) ); ?>%</small></td>
+                        <td><?php echo esc_html( $s['why'] ); ?><?php if ( 'mixed' !== $s['type'] ) : ?><br><small>Confidence <?php echo esc_html( (int) round( 100 * $s['confidence'] ) ); ?>%</small><?php endif; ?></td>
+                        <?php if ( 'mixed' === $s['type'] ) : ?>
+                        <td colspan="3"><em>No rule suggested.</em><?php if ( $in_use ) : ?> Set by hand: <code><?php echo esc_html( AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) ); ?></code><?php endif; ?></td>
+                        <?php else : ?>
                         <td><code><?php echo esc_html( $s['rule'] ); ?></code><?php if ( $in_use ) : ?><br><small><?php echo $same ? 'In use' : 'A different rule is set by hand: ' . esc_html( AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) ); ?></small><?php endif; ?></td>
                         <td><input type="hidden" name="timing_suggested[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $s['rule'] ); ?>"><label><input type="checkbox" name="timing_accept[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $same ); ?>> <?php echo $same ? 'Keep' : 'Accept'; ?></label></td>
                         <td><label><input type="checkbox" name="timing_ignore[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $is_ignored ); ?>> Ignore</label></td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

@@ -43,7 +43,10 @@ $check( 'a sparse tag with no readers is not called event-bound', ! isset( $s['p
 $check( 'a very frequent category with 5% persistence is event-bound', isset( $s['category:daily-tips'] ) && 'event' === $s['category:daily-tips']['type'] && false !== strpos( $s['category:daily-tips']['why'], 'more than once a day' ) );
 $check( 'suggestions are ordered by how many posts they settle', array_keys( $s )[0] === 'category:daily-tips' );
 $check( 'too few posts: no suggestion', ! isset( $s['post_tag:rare'] ) );
-$check( 'nothing stands out: no suggestion', ! isset( $s['category:news'] ) );
+$check( 'nothing stands out and under 500 posts: no row', ! isset( $s['category:news'] ) );
+for ( $i = 0; $i < 600; $i++ ) { $rows[] = array( 'key' => 'category:big-mixed', 'label' => 'Big mixed', 'date' => gmdate( 'Y-m-d', strtotime( '2016-01-01 UTC' ) + ( $i * 4 ) * DAY_IN_SECONDS ), 'rank' => $i % 100 < 11 ? 'monthly' : 'occasional', 'tier' => 'retained' ); }
+$s2 = Ace_SEO_Timing_Suggestions::infer( $rows );
+$check( 'a big term with no clear shape says so and suggests no rule', isset( $s2['category:big-mixed'] ) && 'mixed' === $s2['category:big-mixed']['type'] && '' === $s2['category:big-mixed']['rule'] && false !== strpos( $s2['category:big-mixed']['why'], 'No clear shape' ) );
 $check( 'biggest term first', array_keys( $s )[0] === 'category:daily-tips' );
 $check( 'every suggestion carries plain-English evidence and a confidence', count( array_filter( $s, static function ( $x ) { return ! empty( $x['why'] ) && $x['confidence'] > 0 && $x['confidence'] <= 1; } ) ) === count( $s ) );
 $band = Ace_SEO_Timing_Suggestions::season_band( array_merge( array_fill( 0, 30, '2021-12-20' ), array_fill( 0, 30, '2022-01-04' ), array( '2021-06-01', '2021-08-01' ) ) );

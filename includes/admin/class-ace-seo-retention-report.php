@@ -2072,7 +2072,7 @@ class AceSeoRetentionReport {
         }
         $rows = array();
         foreach ( $s as $key => $x ) {
-            $rows[] = array( 'term' => $key, 'posts' => $x['posts'], 'rule' => $x['rule'], 'confidence' => round( 100 * $x['confidence'] ) . '%', 'why' => $x['why'] );
+            $rows[] = array( 'term' => $key, 'posts' => $x['posts'], 'rule' => '' !== $x['rule'] ? $x['rule'] : '(no clear shape)', 'confidence' => $x['confidence'] ? round( 100 * $x['confidence'] ) . '%' : '-', 'why' => $x['why'] );
         }
         WP_CLI\Utils\format_items( 'table', $rows, array( 'term', 'posts', 'rule', 'confidence', 'why' ) );
     }

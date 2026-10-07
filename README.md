@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.67-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.68-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.67
+**Stable tag:** 1.0.68
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.68 (2026-10-07)
+- Suggested timing rules: a large category or tag with no clear shape (between the event-bound and evergreen marks) is now listed with that explanation and no rule, rather than silently left out.
 
 ### 1.0.67 (2026-10-07)
 - Suggested timing rules, tuned on a real archive: a term is only called event-bound when it publishes at least weekly (a sparse tag nobody reads is just old), the event window is sized from cadence and capped at a fortnight, suggestions are ordered by how many posts they settle, and the long tail of small tags sits behind a button.
