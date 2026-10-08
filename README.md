@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.71-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.72-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.71
+**Stable tag:** 1.0.72
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.72 (2026-10-08)
+- Fix: the suggested-rules dialog was painted open on the Retention tab because an older `.ace-modal` stylesheet rule forces that class visible; the dialog has its own class and scoped styles now, and only opens from "Manage suggested rules". Room beneath the tab so the fixed save bar no longer covers the last control.
 
 ### 1.0.71 (2026-10-08)
 - Dashboard: a live progress panel while a check or a Google Sheet refresh runs (phase, progress bar, counts so far, last step), updated every few seconds and shown again on reload; the page refreshes itself once everything has finished. Notes from the last check, report status, previous checks, recent actions, advanced tools and the glossary move to a right-hand column of accordions; notes can be dismissed per user and brought back.

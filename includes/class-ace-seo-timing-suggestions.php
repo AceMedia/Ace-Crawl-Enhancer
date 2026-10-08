@@ -356,7 +356,7 @@ class Ace_SEO_Timing_Suggestions {
         $ignored = (array) ( $options['timing_ignored'] ?? array() );
         $labels  = array( 'season' => 'Seasonal', 'evergreen' => 'Evergreen', 'event' => 'Event-bound', 'mixed' => 'No clear shape' );
         ?>
-        <dialog id="ace-timing-modal" class="ace-modal" aria-labelledby="ace-timing-modal-title">
+        <dialog id="ace-timing-modal" class="ace-timing-dialog" aria-labelledby="ace-timing-modal-title">
             <div class="ace-modal-head">
                 <h2 id="ace-timing-modal-title">Timing rules by category and tag</h2>
                 <button type="button" class="ace-modal-close" data-ace-modal-cancel aria-label="Close without saving">&times;</button>

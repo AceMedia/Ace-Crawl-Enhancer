@@ -3445,33 +3445,37 @@ input:checked + .ace-slider:before {
   .ace-retention-settings .form-table th { width: auto; }
 }
 
-/* Suggested timing rules: overview and modal */
+/* Suggested timing rules: overview and the dialog (scoped: the legacy .ace-modal rule forces display on anything using that class) */
 .ace-timing-overview .ace-timing-overview-line { margin: 0 0 8px; }
-.ace-modal { border: 0; border-radius: 8px; padding: 0; width: min(1100px, 94vw); max-height: 90vh; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
-.ace-modal::backdrop { background: rgba(0,0,0,.45); }
-.ace-modal .ace-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #dcdcde; }
-.ace-modal .ace-modal-head h2 { margin: 0; font-size: 1.2em; }
-.ace-modal .ace-modal-close { background: none; border: 0; font-size: 26px; line-height: 1; cursor: pointer; color: #50575e; padding: 0 4px; }
-.ace-modal .ace-modal-lead { margin: 12px 20px 6px; color: #50575e; }
-.ace-modal .ace-modal-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 6px 20px 10px; }
-.ace-modal .ace-modal-count { color: #50575e; font-size: 13px; }
-.ace-modal .ace-modal-body { overflow: auto; max-height: calc(90vh - 230px); padding: 0 20px; }
-.ace-modal .ace-timing-table th, .ace-modal .ace-timing-table td { vertical-align: top; }
-.ace-modal .ace-timing-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
-.ace-modal .ace-timing-why details summary { cursor: pointer; color: #2271b1; }
-.ace-modal .ace-timing-why { max-width: 420px; font-size: 13px; }
-.ace-modal .ace-timing-meaning { margin: 6px 0 4px; color: #1d2327; }
-.ace-modal .ace-timing-pick { min-width: 300px; }
-.ace-modal .ace-timing-pick select { max-width: 100%; }
-.ace-modal .ace-timing-custom { display: inline-block; margin: 6px 0 0; }
-.ace-modal .ace-timing-md { width: 5.5em; }
-.ace-modal .ace-timing-chosen { font-size: 13px; color: #50575e; }
-.ace-modal .ace-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #dcdcde; background: #f6f7f7; }
-.ace-modal .ace-modal-status { margin-right: auto; color: #50575e; }
+dialog.ace-timing-dialog { border: 0; border-radius: 8px; padding: 0; width: min(1100px, 94vw); max-height: 90vh; box-shadow: 0 10px 40px rgba(0,0,0,.25); position: fixed; inset: 0; margin: auto; }
+dialog.ace-timing-dialog:not([open]) { display: none; }
+dialog.ace-timing-dialog[open] { display: flex; flex-direction: column; }
+dialog.ace-timing-dialog::backdrop { background: rgba(0,0,0,.45); }
+dialog.ace-timing-dialog .ace-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #dcdcde; }
+dialog.ace-timing-dialog .ace-modal-head h2 { margin: 0; font-size: 1.2em; }
+dialog.ace-timing-dialog .ace-modal-close { background: none; border: 0; font-size: 26px; line-height: 1; cursor: pointer; color: #50575e; padding: 0 4px; }
+dialog.ace-timing-dialog .ace-modal-lead { margin: 12px 20px 6px; color: #50575e; }
+dialog.ace-timing-dialog .ace-modal-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 6px 20px 10px; }
+dialog.ace-timing-dialog .ace-modal-count { color: #50575e; font-size: 13px; }
+dialog.ace-timing-dialog .ace-modal-body { overflow: auto; flex: 1 1 auto; min-height: 0; padding: 0 20px; }
+dialog.ace-timing-dialog .ace-timing-table th, dialog.ace-timing-dialog .ace-timing-table td { vertical-align: top; }
+dialog.ace-timing-dialog .ace-timing-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+dialog.ace-timing-dialog .ace-timing-why details summary { cursor: pointer; color: #2271b1; }
+dialog.ace-timing-dialog .ace-timing-why { max-width: 420px; font-size: 13px; }
+dialog.ace-timing-dialog .ace-timing-meaning { margin: 6px 0 4px; color: #1d2327; }
+dialog.ace-timing-dialog .ace-timing-pick { min-width: 300px; }
+dialog.ace-timing-dialog .ace-timing-pick select { max-width: 100%; }
+dialog.ace-timing-dialog .ace-timing-custom { display: inline-block; margin: 6px 0 0; }
+dialog.ace-timing-dialog .ace-timing-md { width: 5.5em; }
+dialog.ace-timing-dialog .ace-timing-chosen { font-size: 13px; color: #50575e; }
+dialog.ace-timing-dialog .ace-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #dcdcde; background: #f6f7f7; }
+dialog.ace-timing-dialog .ace-modal-status { margin-right: auto; color: #50575e; }
 .ace-timing-type { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; margin-right: 4px; }
 .ace-timing-type-season { background: #e5f1fb; color: #0a4b78; }
 .ace-timing-type-evergreen { background: #edf5ee; color: #1e4620; }
 .ace-timing-type-event { background: #fcf0e4; color: #7a3f00; }
+/* Room beneath the tab so the fixed save bar never covers the last control. */
+.ace-retention-settings { padding-bottom: 96px; }
 
 /* Dashboard: two columns, live progress, sidebar accordions */
 .ace-retention-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; max-width: 1480px; }
