@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.73-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.74-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.73
+**Stable tag:** 1.0.74
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.74 (2026-10-08)
+- Timing rules explain themselves. The settings tab says what day-of-event, yearly season and evergreen mean, and reads every hand-written rule back in plain words under the box. The manager is now a full-screen dialog: categories and tags on the left; on the right the selected one's evidence (how much is still read, how often it publishes, its busiest stretch, a chart of the months its posts are published in), the suggestion and why, a choice of rule with a live explanation, a worked example using one of its real recent posts, and its latest posts. Rules show as plain names ("Day-of-event, 2 days") rather than codes.
+- Dashboard: the post-by-post table loads on request, so the page opens quickly; links that choose a group or page load it straight away. The action buttons sit near the top, and the redirect map is a card like the other sections.
 
 ### 1.0.73 (2026-10-08)
 - Dashboard: "How groups and suggestions overlap", a readership-group by suggestion table with counts from the last check, and "Seasons and events": a year strip per seasonal rule (in use or suggested) with today marked, event-bound and evergreen sections with how much of each is still read, posts covered by more than one rule, and a heatmap of when older posts were published. Read-only and cached per check.

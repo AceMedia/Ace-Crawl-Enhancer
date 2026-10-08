@@ -91,6 +91,7 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
             add_action( 'wp_ajax_ace_seo_retention_progress', array( __CLASS__, 'ajax_progress' ) );
             add_action( 'wp_ajax_ace_seo_retention_dismiss', array( __CLASS__, 'ajax_dismiss' ) );
+            add_action( 'wp_ajax_ace_seo_retention_rows', array( __CLASS__, 'ajax_rows' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
@@ -1859,6 +1860,96 @@ class AceSeoRetentionReport {
         <?php
     }
 
+    /** The post-by-post table, rendered on request (AJAX) so the dashboard loads quickly. */
+    public static function render_rows_section( $bucket, $paged ) {
+        $per    = 100;
+        $counts = self::counts();
+        $labels = self::recommendation_labels();
+        if ( ! in_array( $bucket, self::BUCKETS, true ) ) {
+            $bucket = '';
+        }
+        $paged = max( 1, (int) $paged );
+        ?>
+                <ul class="subsubsub" style="margin-bottom:1em">
+                    <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention#retention-rows' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>
+                    <?php foreach ( self::BUCKETS as $i => $b ) : ?>
+                        <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=' . $b . '#retention-rows' ) ); ?>" <?php echo $bucket === $b ? 'class="current"' : ''; ?>><?php echo esc_html( $labels[ $b ] ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $b ] ) ); ?>)</span></a><?php echo $i < count( self::BUCKETS ) - 1 ? ' |' : ''; ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                <div style="clear:both"></div>
+
+                <?php $rows = self::rows( $bucket, $per, ( $paged - 1 ) * $per ); ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="ace-seo-retention-apply" onsubmit="return this.scope.value !== 'bucket' || confirm('Apply to every post in this bucket?');">
+                <?php wp_nonce_field( 'ace_seo_retention_apply' ); ?>
+                <input type="hidden" name="action" value="ace_seo_retention_apply">
+                <input type="hidden" name="bucket" value="<?php echo esc_attr( $bucket ); ?>">
+                <p><strong>Applying an action below can change search visibility or redirect visitors. It does not delete the saved post.</strong></p>
+                <details class="ace-retention-detail"><summary>Administrator actions for selected posts</summary>
+                <div class="tablenav top" style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;height:auto;padding:.5em 0">
+                    <select name="retention_action" aria-label="Action to apply" required>
+                        <option value="">Bulk action…</option>
+                        <?php foreach ( AceSeoRetentionActions::ACTIONS as $k => $label ) : ?>
+                            <option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="date" name="action_date" title="For unavailable_after">
+                    <input type="url" name="action_url" placeholder="Redirect target URL" style="width:22em">
+                    <select name="scope" aria-label="Posts to change">
+                        <option value="ticked">Ticked rows</option>
+                        <?php if ( '' !== $bucket ) : ?><option value="bucket">Every post in “<?php echo esc_html( $labels[ $bucket ] ); ?>” (<?php echo esc_html( number_format_i18n( $counts[ $bucket ] ) ); ?>)</option><?php endif; ?>
+                    </select>
+                    <button class="button">Apply</button>
+                    <span class="description">Everything here is reversible and logged; nothing deletes a post.</span>
+                </div>
+                </details>
+                <div class="ace-retention-table"><table class="widefat striped">
+                    <thead><tr><td class="check-column"><input type="checkbox" aria-label="Select all posts on this page" onclick="document.querySelectorAll('#ace-seo-retention-apply input[name=\'post_ids[]\']').forEach(c=>c.checked=this.checked)"></td><th>Post</th><th>Published</th><th>Recommendation</th><th>Clicks</th><th>Search appearances</th><th>Average position</th><th>Links in</th><th>Views</th><th>Why</th><th>Applied</th></tr></thead>
+                    <tbody>
+                    <?php if ( ! $rows ) : ?>
+                        <tr><td colspan="11">No posts match this recommendation.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '', $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
+                        <tr>
+                            <th scope="row" class="check-column"><input type="checkbox" name="post_ids[]" value="<?php echo esc_attr( $r['id'] ); ?>"></th>
+                            <td><a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><?php echo esc_html( $r['title'] ?: '(no title)' ); ?></a><br><a href="<?php echo esc_url( $r['url'] ); ?>" target="_blank" rel="noopener" style="font-size:11px;color:#666"><?php echo esc_html( wp_make_link_relative( $r['url'] ) ); ?></a></td>
+                            <td><?php echo esc_html( $r['published'] ); ?></td>
+                            <td><strong><?php echo esc_html( $labels[ $r['bucket'] ] ?? $r['bucket'] ); ?></strong></td>
+                            <td><?php echo esc_html( number_format_i18n( $r['clicks'] ) ); ?></td>
+                            <td><?php echo esc_html( number_format_i18n( $r['impressions'] ) ); ?></td>
+                            <td><?php echo esc_html( $r['position'] ?: '–' ); ?></td>
+                            <td><?php echo esc_html( number_format_i18n( $r['links_in'] ) ); ?></td>
+                            <td><?php echo null === $r['views'] ? '–' : esc_html( number_format_i18n( $r['views'] ) ); ?></td>
+                            <td><?php echo esc_html( $r['reason'] ); ?></td>
+                            <td style="font-size:11px"><?php echo esc_html( implode( '; ', $flags ) ); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+                </form>
+                <?php
+                $total = '' === $bucket ? array_sum( $counts ) : $counts[ $bucket ];
+                $pages = (int) ceil( $total / $per );
+                if ( $pages > 1 ) {
+                    echo '<p class="tablenav-pages" style="margin-top:1em">' . paginate_links( array( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                        'base'    => add_query_arg( array( 'page' => 'ace-seo-retention', 'bucket' => $bucket, 'paged' => '%#%' ), admin_url( 'admin.php' ) ) . '#retention-rows',
+                        'format'  => '',
+                        'current' => $paged,
+                        'total'   => $pages,
+                    ) ) . '</p>';
+                }
+                ?>
+        <?php
+    }
+
+    public static function ajax_rows() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
+        ob_start();
+        self::render_rows_section( sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) ), (int) ( $_POST['paged'] ?? 1 ) );
+        wp_send_json_success( array( 'html' => ob_get_clean() ) );
+    }
+
     /** Plain names for the build phases. */
     public static function phase_labels() {
         return array( 'gsc' => 'Collecting search data', 'ga4' => 'Collecting visitor data', 'links' => 'Counting links between articles', 'score' => 'Judging posts', 'done' => 'Finished', 'error' => 'Stopped' );
@@ -2089,9 +2180,7 @@ class AceSeoRetentionReport {
             <div class="ace-retention-layout">
             <div class="ace-retention-main">
             <?php self::render_progress_panel( $live ); ?>
-            <?php self::render_summary( $p, $settings, $built ); ?>
-
-            <div class="ace-retention-controls" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin:0 0 1.5em">
+            <div class="ace-retention-controls">
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0">
                     <?php wp_nonce_field( 'ace_seo_retention_build' ); ?>
                     <input type="hidden" name="action" value="ace_seo_retention_build">
@@ -2103,7 +2192,9 @@ class AceSeoRetentionReport {
                 <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Settings</a>
                 <a href="#retention-help">What the words mean</a>
             </div>
-            <p class="description">Checking again uses the saved settings and takes a while on a large site; it runs in the background and this page shows its progress. It updates groups and suggestions, never the changes already applied.</p>
+            <p class="description ace-retention-controls-note">Checking again uses the saved settings and takes a while on a large site; it runs in the background and this page shows its progress. It updates groups and suggestions, never the changes already applied.</p>
+            <?php self::render_summary( $p, $settings, $built ); ?>
+
 
             <?php
             if ( $built ) {
@@ -2112,76 +2203,13 @@ class AceSeoRetentionReport {
             }
             ?>
             <?php if ( $built ) : ?>
-                <h2>Suggestions, post by post</h2>
-                <p>Each row shows what we observed and what might help. “Applied” shows actual changes; a suggestion does not change anything.</p>
-                <ul class="subsubsub" style="margin-bottom:1em">
-                    <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>" <?php echo '' === $bucket ? 'class="current"' : ''; ?>>All <span class="count">(<?php echo esc_html( number_format_i18n( array_sum( $counts ) ) ); ?>)</span></a> |</li>
-                    <?php foreach ( self::BUCKETS as $i => $b ) : ?>
-                        <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=' . $b ) ); ?>" <?php echo $bucket === $b ? 'class="current"' : ''; ?>><?php echo esc_html( $labels[ $b ] ); ?> <span class="count">(<?php echo esc_html( number_format_i18n( $counts[ $b ] ) ); ?>)</span></a><?php echo $i < count( self::BUCKETS ) - 1 ? ' |' : ''; ?></li>
-                    <?php endforeach; ?>
-                </ul>
-                <div style="clear:both"></div>
-
-                <?php $rows = self::rows( $bucket, $per, ( $paged - 1 ) * $per ); ?>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="ace-seo-retention-apply" onsubmit="return this.scope.value !== 'bucket' || confirm('Apply to every post in this bucket?');">
-                <?php wp_nonce_field( 'ace_seo_retention_apply' ); ?>
-                <input type="hidden" name="action" value="ace_seo_retention_apply">
-                <input type="hidden" name="bucket" value="<?php echo esc_attr( $bucket ); ?>">
-                <p><strong>Applying an action below can change search visibility or redirect visitors. It does not delete the saved post.</strong></p>
-                <details class="ace-retention-detail"><summary>Administrator actions for selected posts</summary>
-                <div class="tablenav top" style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;height:auto;padding:.5em 0">
-                    <select name="retention_action" aria-label="Action to apply" required>
-                        <option value="">Bulk action…</option>
-                        <?php foreach ( AceSeoRetentionActions::ACTIONS as $k => $label ) : ?>
-                            <option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <input type="date" name="action_date" title="For unavailable_after">
-                    <input type="url" name="action_url" placeholder="Redirect target URL" style="width:22em">
-                    <select name="scope" aria-label="Posts to change">
-                        <option value="ticked">Ticked rows</option>
-                        <?php if ( '' !== $bucket ) : ?><option value="bucket">Every post in “<?php echo esc_html( $labels[ $bucket ] ); ?>” (<?php echo esc_html( number_format_i18n( $counts[ $bucket ] ) ); ?>)</option><?php endif; ?>
-                    </select>
-                    <button class="button">Apply</button>
-                    <span class="description">Everything here is reversible and logged; nothing deletes a post.</span>
-                </div>
-                </details>
-                <div class="ace-retention-table"><table class="widefat striped">
-                    <thead><tr><td class="check-column"><input type="checkbox" aria-label="Select all posts on this page" onclick="document.querySelectorAll('#ace-seo-retention-apply input[name=\'post_ids[]\']').forEach(c=>c.checked=this.checked)"></td><th>Post</th><th>Published</th><th>Recommendation</th><th>Clicks</th><th>Search appearances</th><th>Average position</th><th>Links in</th><th>Views</th><th>Why</th><th>Applied</th></tr></thead>
-                    <tbody>
-                    <?php if ( ! $rows ) : ?>
-                        <tr><td colspan="11">No posts match this recommendation.</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '', $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
-                        <tr>
-                            <th scope="row" class="check-column"><input type="checkbox" name="post_ids[]" value="<?php echo esc_attr( $r['id'] ); ?>"></th>
-                            <td><a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><?php echo esc_html( $r['title'] ?: '(no title)' ); ?></a><br><a href="<?php echo esc_url( $r['url'] ); ?>" target="_blank" rel="noopener" style="font-size:11px;color:#666"><?php echo esc_html( wp_make_link_relative( $r['url'] ) ); ?></a></td>
-                            <td><?php echo esc_html( $r['published'] ); ?></td>
-                            <td><strong><?php echo esc_html( $labels[ $r['bucket'] ] ?? $r['bucket'] ); ?></strong></td>
-                            <td><?php echo esc_html( number_format_i18n( $r['clicks'] ) ); ?></td>
-                            <td><?php echo esc_html( number_format_i18n( $r['impressions'] ) ); ?></td>
-                            <td><?php echo esc_html( $r['position'] ?: '–' ); ?></td>
-                            <td><?php echo esc_html( number_format_i18n( $r['links_in'] ) ); ?></td>
-                            <td><?php echo null === $r['views'] ? '–' : esc_html( number_format_i18n( $r['views'] ) ); ?></td>
-                            <td><?php echo esc_html( $r['reason'] ); ?></td>
-                            <td style="font-size:11px"><?php echo esc_html( implode( '; ', $flags ) ); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table></div>
-                </form>
-                <?php
-                $total = '' === $bucket ? array_sum( $counts ) : $counts[ $bucket ];
-                $pages = (int) ceil( $total / $per );
-                if ( $pages > 1 ) {
-                    echo '<p class="tablenav-pages" style="margin-top:1em">' . paginate_links( array( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-                        'base'    => add_query_arg( 'paged', '%#%' ),
-                        'format'  => '',
-                        'current' => $paged,
-                        'total'   => $pages,
-                    ) ) . '</p>';
-                }
-                ?>
+                <section class="ace-retention-section ace-retention-rows" id="retention-rows">
+                    <h2>Suggestions, post by post</h2>
+                    <p class="ace-section-lead">Every assessed post with what we observed and what might help, 100 at a time, with the administrator actions. Loaded on request so this page stays quick. "Applied" shows actual changes; a suggestion changes nothing.</p>
+                    <div id="ace-retention-rows" data-bucket="<?php echo esc_attr( $bucket ); ?>" data-paged="<?php echo (int) $paged; ?>" data-autoload="<?php echo ( '' !== $bucket || $paged > 1 ) ? '1' : '0'; ?>">
+                        <p><button type="button" class="button button-primary" id="ace-retention-rows-load">Show the posts<?php echo '' !== $bucket ? ': ' . esc_html( $labels[ $bucket ] ) : ''; ?> (<?php echo esc_html( number_format_i18n( '' === $bucket ? array_sum( $counts ) : (int) $counts[ $bucket ] ) ); ?>)</button></p>
+                    </div>
+                </section>
 
                 <details class="ace-retention-detail"><summary>Developer tools: clear report scores</summary>
                 <p>Clears the report scores. Posts and actions already applied stay unchanged.</p>
@@ -2193,7 +2221,8 @@ class AceSeoRetentionReport {
                 </details>
             <?php endif; ?>
 
-            <h2 id="redirects" style="margin-top:2em">Redirect map</h2>
+            <section class="ace-retention-section" id="redirects">
+            <h2>Redirects and unavailable pages <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) AceSeoRetentionActions::redirects( 500 ) ) ) ); ?></span></h2>
             <p>Posts that answer with a 301 to a stronger page, or with 410 Gone. All of these are still in the database: clearing the entry (bulk action above, or the post's Advanced SEO tab) brings the page straight back.</p>
             <details class="ace-retention-detail"><summary>Administrator tools: redirects and unavailable pages</summary>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin-bottom:1em">
@@ -2217,6 +2246,7 @@ class AceSeoRetentionReport {
                 <p><em>No redirects yet.</em></p>
             <?php endif; ?>
             </details>
+            </section>
 
             </div><!-- .ace-retention-main -->
             <?php self::render_aside( $p, $settings, $labels, $built ); ?>

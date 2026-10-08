@@ -75,6 +75,36 @@
         setTimeout(poll, 5000);
     }
 
+    // The post-by-post table loads on request; a link that already chose a group or page loads it at once.
+    var rows = document.getElementById('ace-retention-rows');
+    function loadRows() {
+        if (!rows || rows.dataset.loading === '1') { return; }
+        rows.dataset.loading = '1';
+        var btn = document.getElementById('ace-retention-rows-load');
+        if (btn) { btn.disabled = true; btn.textContent = 'Loading the posts…'; }
+        var data = new FormData();
+        data.append('action', 'ace_seo_retention_rows');
+        data.append('nonce', cfg.nonce || '');
+        data.append('bucket', rows.dataset.bucket || '');
+        data.append('paged', rows.dataset.paged || '1');
+        fetch(cfg.ajaxUrl || window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: data })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (!json || !json.success) { throw new Error('load failed'); }
+                rows.innerHTML = json.data.html;
+                if (rows.dataset.autoload === '1') { rows.closest('section').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+            })
+            .catch(function () {
+                rows.dataset.loading = '0';
+                if (btn) { btn.disabled = false; btn.textContent = 'Could not load the posts. Try again'; }
+            });
+    }
+    if (rows) {
+        var lb = document.getElementById('ace-retention-rows-load');
+        if (lb) { lb.addEventListener('click', loadRows); }
+        if (rows.dataset.autoload === '1' || window.location.hash === '#retention-rows') { loadRows(); }
+    }
+
     // Dismissible notes in the sidebar.
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.ace-retention-dismiss, .ace-retention-undismiss');

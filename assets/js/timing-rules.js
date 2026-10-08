@@ -1,114 +1,297 @@
 /**
- * Timing rules modal: each row picks the suggested rule, a rule of its own, or none; "Save and close"
- * posts the choices through admin-ajax and updates the overview and the hand-written rules box;
- * "Cancel" puts every row back as it was.
+ * Timing rules manager: a full-screen dialog with categories and tags on the left and the selected
+ * one's evidence, rule and choices on the right. "Save and close" posts every choice through
+ * admin-ajax and updates the settings page; "Cancel" discards everything changed since opening.
  */
 (function () {
     'use strict';
     var modal = document.getElementById('ace-timing-modal');
     var open = document.getElementById('ace-timing-open');
-    if (!modal || !open) { return; }
+    var dataEl = document.getElementById('ace-timing-data');
+    if (!modal || !open || !dataEl) { return; }
+
     var cfg = window.aceSeoTimingRules || {};
-    var rows = Array.prototype.slice.call(modal.querySelectorAll('tbody tr'));
-    var status = modal.querySelector('.ace-modal-status');
-    var count = document.getElementById('ace-timing-count');
+    var items = JSON.parse(dataEl.textContent || '[]');
+    var byKey = {};
+    items.forEach(function (it) { byKey[it.key] = it; });
+    var listEl = document.getElementById('ace-timing-list');
+    var detailEl = document.getElementById('ace-timing-detail');
     var filter = document.getElementById('ace-timing-filter');
     var type = document.getElementById('ace-timing-type');
-    var snapshot = [];
-    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var count = document.getElementById('ace-timing-count');
+    var status = modal.querySelector('.ace-modal-status');
+    var changesEl = document.getElementById('ace-timing-changes');
+    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var SHORT = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
-    function mdLabel(md) {
-        var m = /^(\d{2})-(\d{2})$/.exec(md || '');
-        return m ? (parseInt(m[2], 10) + ' ' + (MONTHS[parseInt(m[1], 10) - 1] || '?')) : '?';
+    // Working state per key: { mode, days, start, end, ignored }. Saved state is kept to detect changes.
+    var state = {}, saved = {}, selected = null, samples = {};
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function fmt(n) { return Number(n || 0).toLocaleString(); }
+    function md(s) { var m = /^(\d{2})-(\d{2})$/.exec(s || ''); return m ? parseInt(m[2], 10) + ' ' + MONTHS[parseInt(m[1], 10) - 1] : '?'; }
+    function longDate(iso) { var d = new Date(iso + 'T00:00:00Z'); return isNaN(d) ? iso : d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+    function addDays(iso, n) { var d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+    function parseRule(text) {
+        var m;
+        if (!text) { return { mode: 'none' }; }
+        if (text === 'evergreen') { return { mode: 'evergreen' }; }
+        if ((m = /^event (\d+)$/.exec(text))) { return { mode: 'event', days: parseInt(m[1], 10) }; }
+        if ((m = /^season (\d{2}-\d{2}) (\d{2}-\d{2})$/.exec(text))) { return { mode: 'season', start: m[1], end: m[2] }; }
+        return { mode: 'none' };
     }
-    function ruleText(row) {
-        var mode = row.querySelector('.ace-timing-mode').value;
-        if (mode === 'suggested') { return row.dataset.suggested || ''; }
-        if (mode === 'evergreen') { return 'evergreen'; }
-        if (mode === 'event') { return 'event ' + Math.max(1, parseInt(row.querySelector('.ace-timing-days').value, 10) || 1); }
-        if (mode === 'season') { return 'season ' + (row.querySelector('.ace-timing-start').value || '') + ' ' + (row.querySelector('.ace-timing-end').value || ''); }
+    function ruleText(st) {
+        if (st.mode === 'evergreen') { return 'evergreen'; }
+        if (st.mode === 'event') { return 'event ' + Math.max(1, parseInt(st.days, 10) || 1); }
+        if (st.mode === 'season') { return 'season ' + (st.start || '') + ' ' + (st.end || ''); }
         return '';
     }
-    function explain(text) {
-        var m;
-        if (!text) { return 'No rule: judged on the traffic period alone, holding only posts whose own dates fall outside it.'; }
-        if (text === 'evergreen') { return 'Always relevant: judged on any period, with no seasonal allowance.'; }
-        if ((m = /^event (\d+)$/.exec(text))) { return 'Day-of-event content: each post matters for ' + m[1] + ' day' + (m[1] === '1' ? '' : 's') + ' from the day it was published; afterwards, how it is read since is a fair judgement, so old posts are never held.'; }
-        if ((m = /^season (\d{2}-\d{2}) (\d{2}-\d{2})$/.exec(text))) { return 'A yearly season from ' + mdLabel(m[1]) + ' to ' + mdLabel(m[2]) + ': judged only on a period that contains a whole season; outside it, held rather than called quiet.'; }
-        return 'Incomplete: an event needs a number of days; a season needs two dates as MM-DD.';
+    function ruleName(text) {
+        var r = parseRule(text);
+        if (r.mode === 'evergreen') { return 'Evergreen'; }
+        if (r.mode === 'event') { return 'Day-of-event, ' + r.days + ' day' + (r.days === 1 ? '' : 's'); }
+        if (r.mode === 'season') { return 'Yearly season, ' + md(r.start) + ' to ' + md(r.end); }
+        return 'No rule';
     }
-    function paint(row) {
-        var mode = row.querySelector('.ace-timing-mode').value;
-        row.querySelector('.ace-timing-custom-event').hidden = mode !== 'event';
-        row.querySelector('.ace-timing-custom-season').hidden = mode !== 'season';
-        var chosen = row.querySelector('.ace-timing-chosen');
-        var text = ruleText(row);
-        chosen.textContent = mode === 'suggested' ? '' : explain(text);
-        row.dataset.rule = text;
+    function meaning(text) {
+        var r = parseRule(text);
+        if (r.mode === 'evergreen') { return 'Always relevant. Each post is judged on whatever period the report looks at, with no seasonal allowance.'; }
+        if (r.mode === 'event') { return 'Each post matters for ' + r.days + ' day' + (r.days === 1 ? '' : 's') + ' from the day it is published. After that the event is over, so the report judges it on how it has been read since. It is never held back just for being old.'; }
+        if (r.mode === 'season') { return 'Posts matter every year from ' + md(r.start) + ' to ' + md(r.end) + '. The report only judges them on a period that contains a whole season; outside it they are held rather than called quiet.'; }
+        return 'No timing rule. The report judges these posts on its normal traffic period, holding only those whose own dates fall outside it.';
     }
-    function remember() {
-        snapshot = rows.map(function (r) {
-            return { mode: r.querySelector('.ace-timing-mode').value, days: r.querySelector('.ace-timing-days').value, start: r.querySelector('.ace-timing-start').value, end: r.querySelector('.ace-timing-end').value, ignore: (r.querySelector('.ace-timing-ignore') || {}).checked };
+    function example(text, post) {
+        var r = parseRule(text);
+        if (!post) { return ''; }
+        var t = '<strong>' + esc(post.title) + '</strong>, published ' + esc(longDate(post.date));
+        if (r.mode === 'event') {
+            var end = addDays(post.date, r.days - 1);
+            return t + ', matters ' + (r.days === 1 ? 'on ' + esc(longDate(post.date)) : 'from ' + esc(longDate(post.date)) + ' to ' + esc(longDate(end))) + '. From the next day it is judged on how it has been read since.';
+        }
+        if (r.mode === 'season') { return t + ', is judged against the ' + md(r.start) + ' to ' + md(r.end) + ' season in any year the report covers in full.'; }
+        if (r.mode === 'evergreen') { return t + ', is judged on the report\'s normal period, whenever that is.'; }
+        return t + ', is judged on the report\'s normal period.';
+    }
+    function cadenceText(c) {
+        if (c === null || c === undefined) { return 'not enough posts to tell'; }
+        if (c < 0.75) { return 'more than once a day'; }
+        if (c < 1.5) { return 'about once a day'; }
+        if (c < 10) { return 'about every ' + (Math.round(c * 10) / 10) + ' days'; }
+        return 'about every ' + Math.round(c) + ' days';
+    }
+    function statusOf(key) {
+        var st = state[key];
+        if (st.ignored) { return { cls: 'is-ignored', text: 'Ignored' }; }
+        var t = ruleText(st);
+        if (!t) { return { cls: 'is-open', text: 'No rule' }; }
+        if (t === byKey[key].rule) { return { cls: 'is-suggested', text: 'Suggestion in use' }; }
+        return { cls: 'is-custom', text: 'Your rule' };
+    }
+    function changedKeys() {
+        return Object.keys(state).filter(function (k) {
+            var a = state[k], b = saved[k];
+            return ruleText(a) !== ruleText(b) || !!a.ignored !== !!b.ignored;
         });
     }
-    function restore() {
-        rows.forEach(function (r, n) {
-            var s = snapshot[n]; if (!s) { return; }
-            r.querySelector('.ace-timing-mode').value = s.mode;
-            r.querySelector('.ace-timing-days').value = s.days;
-            r.querySelector('.ace-timing-start').value = s.start;
-            r.querySelector('.ace-timing-end').value = s.end;
-            var i = r.querySelector('.ace-timing-ignore'); if (i) { i.checked = !!s.ignore; }
-            paint(r);
+    function paintChanges() {
+        var n = changedKeys().length;
+        changesEl.textContent = n ? n + ' change' + (n === 1 ? '' : 's') + ' not saved yet' : '';
+    }
+
+    function resetState() {
+        items.forEach(function (it) {
+            var cur = parseRule(it.current);
+            var st = { mode: cur.mode, days: cur.days || (parseRule(it.rule).days || 3), start: cur.start || (it.season ? it.season.start : ''), end: cur.end || (it.season ? it.season.end : ''), ignored: !!it.ignored };
+            state[it.key] = st;
+            saved[it.key] = JSON.parse(JSON.stringify(st));
         });
     }
-    function applyFilter() {
-        var q = (filter.value || '').toLowerCase().trim(), t = type.value, shown = 0;
-        rows.forEach(function (r) {
-            var ok = (!q || r.dataset.label.indexOf(q) !== -1);
-            if (ok && t) {
-                if (t === 'rule') { ok = !!ruleText(r); }
-                else if (t === 'ignored') { var i = r.querySelector('.ace-timing-ignore'); ok = !!(i && i.checked); }
-                else { ok = r.dataset.type === t; }
-            }
-            r.hidden = !ok;
-            if (ok) { shown++; }
-        });
-        count.textContent = shown + ' of ' + rows.length + ' shown';
+
+    function visible(it) {
+        var q = (filter.value || '').toLowerCase().trim();
+        if (q && (it.label + ' ' + it.key).toLowerCase().indexOf(q) === -1) { return false; }
+        var t = type.value, st = state[it.key];
+        if (!t) { return true; }
+        if (t === 'chosen') { return !!ruleText(st); }
+        if (t === 'open') { return !ruleText(st) && !st.ignored; }
+        if (t === 'ignored') { return !!st.ignored; }
+        return it.type === t;
     }
+
+    function renderList() {
+        var html = '', shown = 0;
+        items.forEach(function (it) {
+            if (!visible(it)) { return; }
+            shown++;
+            var s = statusOf(it.key);
+            html += '<li><button type="button" role="option" class="ace-timing-item' + (it.key === selected ? ' is-selected' : '') + '" data-key="' + esc(it.key) + '" aria-selected="' + (it.key === selected) + '">' +
+                '<span class="ace-timing-item-name">' + esc(it.label) + '</span>' +
+                '<span class="ace-timing-item-meta">' + fmt(it.posts) + ' posts · ' + (it.type === 'mixed' ? 'no clear shape' : esc(it.ruleName)) + '</span>' +
+                '<span class="ace-timing-badge ' + s.cls + '">' + esc(s.text) + '</span></button></li>';
+        });
+        listEl.innerHTML = html || '<li class="ace-timing-empty">Nothing matches.</li>';
+        count.textContent = shown + ' of ' + items.length;
+    }
+
+    function monthChart(it) {
+        var max = Math.max.apply(null, (it.months || []).concat([1]));
+        var r = parseRule(ruleText(state[it.key]));
+        var inSeason = function (m) {
+            if (r.mode !== 'season' || !r.start || !r.end) { return false; }
+            var a = parseInt(r.start.slice(0, 2), 10), b = parseInt(r.end.slice(0, 2), 10);
+            return a <= b ? (m >= a && m <= b) : (m >= a || m <= b);
+        };
+        var bars = (it.months || []).map(function (n, i) {
+            var h = Math.round(100 * n / max);
+            return '<span class="ace-month' + (inSeason(i + 1) ? ' is-season' : '') + '" title="' + MONTHS[i] + ': ' + fmt(n) + ' posts"><i style="height:' + Math.max(2, h) + '%"></i><b>' + SHORT[i] + '</b></span>';
+        }).join('');
+        return '<div class="ace-month-chart" aria-label="Posts published by month">' + bars + '</div>';
+    }
+
+    function isSuggestion(key) {
+        var st = state[key], it = byKey[key];
+        return it.type !== 'mixed' && st.mode !== 'none' && ruleText(st) === it.rule && st.picked !== 'custom';
+    }
+    function choice(key, mode, label, body) {
+        var st = state[key], sugg = isSuggestion(key);
+        var checked = mode === 'suggested' ? sugg : (!sugg && st.mode === mode);
+        return '<label class="ace-choice' + (checked ? ' is-checked' : '') + '"><input type="radio" name="ace-timing-choice" value="' + mode + '"' + (checked ? ' checked' : '') + '> <span class="ace-choice-label">' + label + '</span>' + (body || '') + '</label>';
+    }
+
+    function renderDetail() {
+        var it = byKey[selected];
+        if (!it) { detailEl.innerHTML = '<p class="ace-timing-placeholder">Choose a category or tag on the left.</p>'; return; }
+        var st = state[it.key];
+        var current = ruleText(st);
+        var post = (samples[it.key] || [])[0];
+        var tiles = [
+            ['Posts assessed', fmt(it.posts), it.firstYear ? 'published ' + it.firstYear + (it.lastYear && it.lastYear !== it.firstYear ? ' to ' + it.lastYear : '') : ''],
+            ['Still read at least monthly', it.persistence + '%', 'of its older posts, years later'],
+            ['Read at all in the period', it.readShare + '%', 'at least one visit or search click'],
+            ['Publishes', cadenceText(it.cadence), it.years ? 'across ' + it.years + ' year' + (it.years === 1 ? '' : 's') : '']
+        ];
+        if (it.season) { tiles.push(['Busiest stretch', md(it.season.start) + ' to ' + md(it.season.end), it.season.share + '% of its posts']); }
+        var html = '<div class="ace-timing-detail-head"><div><h3>' + esc(it.label) + '</h3><code>' + esc(it.key) + '</code></div>' +
+            '<span class="ace-timing-badge ' + statusOf(it.key).cls + '">' + esc(statusOf(it.key).text) + '</span></div>';
+        html += '<h4>What the data shows</h4><div class="ace-tiles">' + tiles.map(function (t) {
+            return '<div class="ace-tile"><span class="ace-tile-label">' + esc(t[0]) + '</span><span class="ace-tile-value">' + esc(t[1]) + '</span><span class="ace-tile-sub">' + esc(t[2]) + '</span></div>';
+        }).join('') + '</div>';
+        html += '<div class="ace-timing-chart-wrap"><span class="ace-tile-label">When its posts are published</span>' + monthChart(it) + '</div>';
+
+        if (it.type !== 'mixed') {
+            html += '<div class="ace-suggestion-card"><span class="ace-timing-type ace-timing-type-' + esc(it.type) + '">Suggested: ' + esc(it.ruleName) + '</span> <small>' + it.confidence + '% confidence</small>' +
+                '<p>' + esc(meaning(it.rule)) + '</p><p class="ace-why"><strong>Why:</strong> ' + esc(it.why) + '</p></div>';
+        } else {
+            html += '<div class="ace-suggestion-card is-mixed"><span class="ace-timing-type">No clear shape</span><p>' + esc(it.why) + '</p></div>';
+        }
+
+        html += '<h4>Your choice</h4><div class="ace-choices">';
+        if (it.type !== 'mixed') { html += choice(it.key, 'suggested', 'Use the suggestion: ' + esc(it.ruleName)); }
+        html += choice(it.key, 'event', 'Day-of-event', ' <span class="ace-choice-input">matters for <input type="number" min="1" max="366" class="small-text" data-field="days" value="' + esc(st.days) + '"> days after publishing</span>');
+        html += choice(it.key, 'season', 'Yearly season', ' <span class="ace-choice-input">from <input type="text" class="ace-md" data-field="start" placeholder="MM-DD" value="' + esc(st.start) + '"> to <input type="text" class="ace-md" data-field="end" placeholder="MM-DD" value="' + esc(st.end) + '"></span>');
+        html += choice(it.key, 'evergreen', 'Evergreen: always relevant');
+        html += choice(it.key, 'none', 'No rule');
+        html += '</div>';
+        html += '<div class="ace-effect"><h4>What this does</h4><p>' + esc(meaning(current)) + '</p>' +
+            '<p class="ace-example" id="ace-timing-example">' + (post ? 'For example: ' + example(current, post) : (samples[it.key] ? '' : 'Loading an example…')) + '</p></div>';
+        html += '<label class="ace-ignore"><input type="checkbox" data-field="ignored"' + (st.ignored ? ' checked' : '') + '> Ignore this suggestion (hides it from the "no rule yet" list; it does not set a rule)</label>';
+        html += '<h4>Recent posts in this ' + (it.key.indexOf('post_tag:') === 0 ? 'tag' : 'category') + '</h4><ul class="ace-samples" id="ace-timing-samples">' + samplesHtml(it.key) + '</ul>';
+        detailEl.innerHTML = html;
+        if (!samples[it.key]) { loadSamples(it.key); }
+    }
+
+    function samplesHtml(key) {
+        var s = samples[key];
+        if (!s) { return '<li class="description">Loading…</li>'; }
+        if (!s.length) { return '<li class="description">No assessed posts found.</li>'; }
+        return s.map(function (p) { return '<li><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a> <span>' + esc(longDate(p.date)) + ' · ' + esc(p.group) + '</span></li>'; }).join('');
+    }
+
+    function loadSamples(key) {
+        var data = new FormData();
+        data.append('action', 'ace_seo_timing_detail');
+        data.append('nonce', cfg.nonce || '');
+        data.append('key', key);
+        fetch(cfg.ajaxUrl || window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: data })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                samples[key] = json && json.success ? (json.data.posts || []) : [];
+                if (selected === key) { renderDetail(); }
+            })
+            .catch(function () { samples[key] = []; if (selected === key) { renderDetail(); } });
+    }
+
+    function select(key) {
+        selected = key;
+        renderList();
+        renderDetail();
+    }
+
+    listEl.addEventListener('click', function (e) {
+        var b = e.target.closest('.ace-timing-item');
+        if (b) { select(b.dataset.key); }
+    });
+    filter.addEventListener('input', renderList);
+    type.addEventListener('change', renderList);
+
+    detailEl.addEventListener('change', function (e) {
+        var t = e.target, st = state[selected], it = byKey[selected];
+        if (!st) { return; }
+        if (t.name === 'ace-timing-choice') {
+            if (t.value === 'suggested') { var r = parseRule(it.rule); st.mode = r.mode; if (r.days) { st.days = r.days; } if (r.start) { st.start = r.start; st.end = r.end; } st.picked = 'suggested'; }
+            else { st.mode = t.value; st.picked = 'custom'; }
+            if (st.mode !== 'none') { st.ignored = false; }
+        } else if (t.dataset.field === 'ignored') {
+            st.ignored = t.checked;
+            if (t.checked) { st.mode = 'none'; }
+        }
+        renderDetail(); renderList(); paintChanges();
+    });
+    detailEl.addEventListener('input', function (e) {
+        var t = e.target, st = state[selected];
+        if (!st || !t.dataset.field || t.dataset.field === 'ignored') { return; }
+        st[t.dataset.field] = t.value;
+        st.mode = t.dataset.field === 'days' ? 'event' : 'season';
+        st.picked = 'custom';
+        // Keep focus while typing: only refresh the explanation, list and change count.
+        var eff = detailEl.querySelector('.ace-effect p');
+        if (eff) { eff.textContent = meaning(ruleText(st)); }
+        var ex = document.getElementById('ace-timing-example');
+        var post = (samples[selected] || [])[0];
+        if (ex && post) { ex.innerHTML = 'For example: ' + example(ruleText(st), post); }
+        detailEl.querySelectorAll('input[name="ace-timing-choice"]').forEach(function (r) { r.checked = r.value === st.mode; r.closest('.ace-choice').classList.toggle('is-checked', r.checked); });
+        renderList(); paintChanges();
+    });
+
     function show() {
-        rows.forEach(paint);
-        remember();
+        resetState();
+        filter.value = ''; type.value = '';
+        selected = items.length ? items[0].key : null;
         if (typeof modal.showModal === 'function') { modal.showModal(); } else { modal.setAttribute('open', ''); }
-        applyFilter();
+        renderList(); renderDetail(); paintChanges();
         status.textContent = '';
     }
     function hide() {
         if (typeof modal.close === 'function' && modal.open) { modal.close(); } else { modal.removeAttribute('open'); }
     }
+    function cancel() {
+        if (changedKeys().length && !window.confirm('Discard ' + changedKeys().length + ' unsaved change(s)?')) { return; }
+        hide();
+    }
     open.addEventListener('click', show);
-    modal.querySelectorAll('[data-ace-modal-cancel]').forEach(function (b) { b.addEventListener('click', function () { restore(); hide(); }); });
-    modal.addEventListener('cancel', function (e) { e.preventDefault(); restore(); hide(); });
-    filter.addEventListener('input', applyFilter);
-    type.addEventListener('change', applyFilter);
-    modal.addEventListener('input', function (e) { var r = e.target.closest('tr'); if (r) { paint(r); } });
-    modal.addEventListener('change', function (e) {
-        var t = e.target, r = t.closest('tr'); if (!r) { return; }
-        if (t.classList.contains('ace-timing-ignore') && t.checked) { r.querySelector('.ace-timing-mode').value = 'none'; }
-        if (t.classList.contains('ace-timing-mode') && t.value !== 'none') { var i = r.querySelector('.ace-timing-ignore'); if (i) { i.checked = false; } }
-        paint(r);
-    });
+    modal.querySelectorAll('[data-ace-modal-cancel]').forEach(function (b) { b.addEventListener('click', cancel); });
+    modal.addEventListener('cancel', function (e) { e.preventDefault(); cancel(); });
 
     document.getElementById('ace-timing-save').addEventListener('click', function () {
         var btn = this, data = new FormData(), bad = [];
         data.append('action', 'ace_seo_timing_rules');
         data.append('nonce', cfg.nonce || '');
-        rows.forEach(function (r) {
-            var text = ruleText(r), mode = r.querySelector('.ace-timing-mode').value;
-            if (mode === 'season' && !/^season \d{2}-\d{2} \d{2}-\d{2}$/.test(text)) { bad.push(r.querySelector('th strong').textContent); }
-            data.append('rule[' + r.dataset.key + ']', text);
-            var i = r.querySelector('.ace-timing-ignore');
-            if (i && i.checked) { data.append('ignore[]', r.dataset.key); }
+        items.forEach(function (it) {
+            var st = state[it.key], text = ruleText(st);
+            if (st.mode === 'season' && !/^season \d{2}-\d{2} \d{2}-\d{2}$/.test(text)) { bad.push(it.label); }
+            data.append('rule[' + it.key + ']', text);
+            if (st.ignored) { data.append('ignore[]', it.key); }
         });
         if (bad.length) { status.textContent = 'Season dates are missing for: ' + bad.join(', ') + ' (use MM-DD).'; return; }
         btn.disabled = true;
@@ -118,21 +301,43 @@
             .then(function (json) {
                 if (!json || !json.success) { throw new Error((json && json.data && json.data.message) || 'Save failed.'); }
                 var d = json.data || {};
+                items.forEach(function (it) { it.current = ruleText(state[it.key]); it.ignored = !!state[it.key].ignored; });
                 var box = document.getElementById('retention-timing-rules');
                 if (box && typeof d.rules === 'string') {
                     var bar = window.aceCrawlEnhancerAdmin && window.aceCrawlEnhancerAdmin.saveBar;
                     var form = box.form, wasDirty = bar && form && bar.dirty && bar.dirty['#' + form.id];
                     box.value = d.rules;
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
                     if (bar) { if (wasDirty) { bar.checkForChanges(); } else { bar.captureOriginalFormData(); bar.checkForChanges(); } }
                 }
                 Object.keys(d.overview || {}).forEach(function (k) {
                     var el = document.querySelector('#ace-timing-overview [data-overview="' + k + '"]');
                     if (el) { el.textContent = Number(d.overview[k]).toLocaleString(); }
                 });
-                remember();
                 hide();
             })
             .catch(function (err) { status.textContent = err.message || 'Save failed.'; })
             .then(function () { btn.disabled = false; });
     });
+
+    // Plain-English reading of the hand-written rules box, under the box itself.
+    var box = document.getElementById('retention-timing-rules');
+    var preview = document.getElementById('ace-timing-rules-preview');
+    if (box && preview) {
+        var labels = {};
+        items.forEach(function (it) { labels[it.key] = it.label; });
+        var paintPreview = function () {
+            var lines = box.value.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+            if (!lines.length) { preview.innerHTML = '<li class="description">No rules yet.</li>'; return; }
+            preview.innerHTML = lines.map(function (l) {
+                var m = /^([a-z0-9_-]+:[a-z0-9_-]+)\s*=\s*(.+)$/i.exec(l);
+                if (!m) { return '<li class="is-bad"><code>' + esc(l) + '</code> is not understood. Use <code>taxonomy:slug = evergreen</code>, <code>= event N</code> or <code>= season MM-DD MM-DD</code>.</li>'; }
+                var name = ruleName(m[2].trim().replace(/\s+/g, ' '));
+                var ok = name !== 'No rule';
+                return '<li' + (ok ? '' : ' class="is-bad"') + '><strong>' + esc(labels[m[1].toLowerCase()] || m[1]) + '</strong>: ' + esc(ok ? name : 'not understood') + (ok ? ' <span>' + esc(meaning(m[2].trim().replace(/\s+/g, ' '))) + '</span>' : '') + '</li>';
+            }).join('');
+        };
+        box.addEventListener('input', paintPreview);
+        paintPreview();
+    }
 })();

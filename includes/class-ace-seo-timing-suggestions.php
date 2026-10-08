@@ -27,6 +27,7 @@ class Ace_SEO_Timing_Suggestions {
         if ( is_admin() ) {
             add_action( 'admin_post_ace_seo_timing_suggest', array( __CLASS__, 'handle_recompute' ) );
             add_action( 'wp_ajax_ace_seo_timing_rules', array( __CLASS__, 'ajax_save' ) );
+            add_action( 'wp_ajax_ace_seo_timing_detail', array( __CLASS__, 'ajax_detail' ) );
         }
     }
 
@@ -49,6 +50,42 @@ class Ace_SEO_Timing_Suggestions {
             'rules'    => AceSeoRetentionActions::timing_rules_text( (array) $result['options']['timing_rules'] ),
             'overview' => self::overview( self::current(), $result['options'] ),
         ) );
+    }
+
+    /** Recent assessed posts in one category or tag, for the dialog's worked example. */
+    public static function ajax_detail() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_timing_rules', 'nonce', false ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
+        $key = sanitize_text_field( wp_unslash( $_POST['key'] ?? '' ) );
+        if ( ! preg_match( '/^([a-z0-9_-]+):([a-z0-9_-]+)$/', $key, $m ) ) {
+            wp_send_json_error( array( 'message' => 'Unknown term.' ) );
+        }
+        global $wpdb;
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT p.ID, p.post_title, p.post_date, t.meta_value AS tier, r.meta_value AS rank_value
+             FROM {$wpdb->term_taxonomy} tt
+             JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id AND tm.slug = %s
+             JOIN {$wpdb->term_relationships} tr ON tr.term_taxonomy_id = tt.term_taxonomy_id
+             JOIN {$wpdb->posts} p ON p.ID = tr.object_id
+             JOIN {$wpdb->postmeta} t ON t.post_id = p.ID AND t.meta_key = %s
+             LEFT JOIN {$wpdb->postmeta} r ON r.post_id = p.ID AND r.meta_key = %s
+             WHERE tt.taxonomy = %s
+             ORDER BY p.post_date DESC LIMIT 6",
+            $m[2], AceSeoRetentionReport::META_TIER, AceSeoRetentionReport::META_RANK, $m[1]
+        ), ARRAY_A );
+        $tiers = AceSeoRetentionReport::tier_labels();
+        $ranks = array( 'daily' => 'read daily', 'weekly' => 'read weekly', 'monthly' => 'read monthly', 'occasional' => 'read occasionally' );
+        $out   = array();
+        foreach ( (array) $rows as $r ) {
+            $out[] = array(
+                'title' => html_entity_decode( $r['post_title'] ?: '(no title)', ENT_QUOTES, 'UTF-8' ),
+                'date'  => substr( $r['post_date'], 0, 10 ),
+                'group' => ( $ranks[ $r['rank_value'] ] ?? '' ) ?: ( $tiers[ $r['tier'] ] ?? $r['tier'] ),
+                'edit'  => get_edit_post_link( (int) $r['ID'], 'raw' ),
+            );
+        }
+        wp_send_json_success( array( 'posts' => $out ) );
     }
 
     /** What a rule means for the posts it covers, in plain words. Accepts the stored array or the text form. */
@@ -159,7 +196,23 @@ class Ace_SEO_Timing_Suggestions {
         $season = self::season_band( $t['dates'] );
         $gap    = self::median_gap_days( $t['dates'] );
         $years  = count( array_unique( array_map( static function ( $d ) { return substr( $d, 0, 4 ); }, $t['dates'] ) ) );
-        $base   = array( 'key' => $t['key'], 'label' => $t['label'], 'posts' => $n, 'persistence' => round( 100 * $persistence, 1 ), 'read_share' => round( 100 * $read_share, 1 ), 'years' => $years, 'cadence_days' => $gap );
+        $months = array_fill( 1, 12, 0 );
+        foreach ( $t['dates'] as $d ) {
+            $months[ (int) substr( $d, 5, 2 ) ]++;
+        }
+        $base   = array(
+            'key'          => $t['key'],
+            'label'        => $t['label'],
+            'posts'        => $n,
+            'persistence'  => round( 100 * $persistence, 1 ),
+            'read_share'   => round( 100 * $read_share, 1 ),
+            'years'        => $years,
+            'first_year'   => $t['dates'] ? (int) substr( $t['dates'][0], 0, 4 ) : 0,
+            'last_year'    => $t['dates'] ? (int) substr( end( $t['dates'] ), 0, 4 ) : 0,
+            'cadence_days' => $gap,
+            'months'       => array_values( $months ),
+            'season'       => $season ? array( 'start' => $season['start'], 'end' => $season['end'], 'share' => round( 100 * $season['share'] ) ) : null,
+        );
 
         // Seasonal: most posts land in one part of the year, in more than one year.
         if ( $season && $years >= 2 ) {
@@ -308,7 +361,8 @@ class Ace_SEO_Timing_Suggestions {
     public static function current() {
         $stored = get_option( self::OPTION, array() );
         $built  = (int) ( AceSeoRetentionReport::progress()['finished'] ?? 0 );
-        if ( ! is_array( $stored ) || ! isset( $stored['suggestions'] ) || (int) ( $stored['computed'] ?? 0 ) < $built ) {
+        $first  = is_array( $stored['suggestions'] ?? null ) ? reset( $stored['suggestions'] ) : null;
+        if ( ! is_array( $stored ) || ! isset( $stored['suggestions'] ) || (int) ( $stored['computed'] ?? 0 ) < $built || ( is_array( $first ) && ! isset( $first['months'] ) ) ) {
             return self::recompute();
         }
         return (array) $stored['suggestions'];
@@ -331,9 +385,26 @@ class Ace_SEO_Timing_Suggestions {
 
     /* ---- UI --------------------------------------------------------------------------------------- */
 
+    /** The plain name of a rule, for chips and lists ("Day-of-event, 2 days"). */
+    public static function rule_name( $text ) {
+        if ( '' === (string) $text ) {
+            return 'No rule';
+        }
+        if ( 'evergreen' === $text ) {
+            return 'Evergreen';
+        }
+        if ( preg_match( '/^event (\d+)$/', $text, $m ) ) {
+            return 'Day-of-event, ' . $m[1] . ' day' . ( '1' === $m[1] ? '' : 's' );
+        }
+        if ( preg_match( '/^season (\d{2}-\d{2}) (\d{2}-\d{2})$/', $text, $m ) ) {
+            return 'Yearly season, ' . self::md_label( $m[1] ) . ' to ' . self::md_label( $m[2] );
+        }
+        return $text;
+    }
+
     /**
-     * Inside the settings form: a short overview and a button. The table itself lives in a modal
-     * rendered by render_modal() outside the form, which saves on its own and closes, or cancels.
+     * Inside the settings form: what the three kinds of rule mean, a one-line overview and a button.
+     * The manager itself is a dialog rendered by render_modal() outside the form.
      */
     public static function render_fields( array $options ) {
         $suggestions = self::current();
@@ -343,23 +414,30 @@ class Ace_SEO_Timing_Suggestions {
         wp_localize_script( 'ace-seo-timing-rules', 'aceSeoTimingRules', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ace_seo_timing_rules' ) ) );
         ?>
         <div id="ace-timing-overview" class="ace-timing-overview">
+            <div class="ace-timing-kinds">
+                <div class="ace-timing-kind"><span class="ace-timing-type ace-timing-type-event">Day-of-event</span><p>Matters for a set number of days after it is published, like tips for a race or a match. Once that has passed it is judged on how it is read since, so it is never held back for being old.</p></div>
+                <div class="ace-timing-kind"><span class="ace-timing-type ace-timing-type-season">Yearly season</span><p>Matters at the same time every year, like a festival or a tournament. It is only judged on a period that contains a whole season, so a quiet off-season never counts against it.</p></div>
+                <div class="ace-timing-kind"><span class="ace-timing-type ace-timing-type-evergreen">Evergreen</span><p>Matters all year round, like a guide or reference page. It is judged on any period.</p></div>
+            </div>
             <?php if ( ! $suggestions ) : ?>
                 <p><em>No suggestions yet: there is no completed assessment, or no category or tag has a clear enough shape.</em></p>
             <?php else : ?>
-                <p class="ace-timing-overview-line"><strong><span data-overview="total"><?php echo esc_html( number_format_i18n( $o['total'] ) ); ?></span> suggested rules</strong> from this site's own data:
+                <p class="ace-timing-overview-line"><strong><span data-overview="total"><?php echo esc_html( number_format_i18n( $o['total'] ) ); ?></span> suggestions</strong> from this site's own data:
+                    <span data-overview="event"><?php echo esc_html( number_format_i18n( $o['event'] ) ); ?></span> day-of-event,
                     <span data-overview="season"><?php echo esc_html( number_format_i18n( $o['season'] ) ); ?></span> seasonal,
-                    <span data-overview="evergreen"><?php echo esc_html( number_format_i18n( $o['evergreen'] ) ); ?></span> evergreen,
-                    <span data-overview="event"><?php echo esc_html( number_format_i18n( $o['event'] ) ); ?></span> event-bound.
-                    <span data-overview="in_use"><?php echo esc_html( number_format_i18n( $o['in_use'] ) ); ?></span> in use (covering <span data-overview="in_use_posts"><?php echo esc_html( number_format_i18n( $o['in_use_posts'] ) ); ?></span> posts),
-                    <span data-overview="ignored"><?php echo esc_html( number_format_i18n( $o['ignored'] ) ); ?></span> ignored<?php echo $o['mixed'] ? ', ' . esc_html( number_format_i18n( $o['mixed'] ) ) . ' large terms with no clear shape' : ''; ?>.</p>
-                <p><button type="button" class="button" id="ace-timing-open">Manage suggested rules</button>
-                    <span class="description">Worked out <?php echo $computed ? esc_html( human_time_diff( $computed ) ) . ' ago' : 'now'; ?> from the saved assessment; refreshed after every check. <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_timing_suggest' ), 'ace_seo_timing_suggest' ) ); ?>">Recalculate now</a></span></p>
+                    <span data-overview="evergreen"><?php echo esc_html( number_format_i18n( $o['evergreen'] ) ); ?></span> evergreen.
+                    <span data-overview="in_use"><?php echo esc_html( number_format_i18n( $o['in_use'] ) ); ?></span> in use, covering <span data-overview="in_use_posts"><?php echo esc_html( number_format_i18n( $o['in_use_posts'] ) ); ?></span> posts.</p>
+                <p><button type="button" class="button button-primary" id="ace-timing-open">Review and choose timing rules</button>
+                    <span class="description">Worked out <?php echo $computed ? esc_html( human_time_diff( $computed ) ) . ' ago' : 'now'; ?> from the saved assessment and refreshed after every check. <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_timing_suggest' ), 'ace_seo_timing_suggest' ) ); ?>">Recalculate now</a></span></p>
             <?php endif; ?>
         </div>
         <?php
     }
 
-    /** The modal: rendered outside any form. Saves through admin-ajax and closes, or cancels. */
+    /**
+     * The manager: a full-screen dialog with the categories and tags on the left and the selected one's
+     * evidence, rule and choices on the right. Data travels as JSON; the panel is drawn by timing-rules.js.
+     */
     public static function render_modal( array $options ) {
         $suggestions = self::current();
         if ( ! $suggestions ) {
@@ -367,64 +445,65 @@ class Ace_SEO_Timing_Suggestions {
         }
         $rules   = (array) ( $options['timing_rules'] ?? array() );
         $ignored = (array) ( $options['timing_ignored'] ?? array() );
-        $labels  = array( 'season' => 'Seasonal', 'evergreen' => 'Evergreen', 'event' => 'Event-bound', 'mixed' => 'No clear shape' );
+        $items   = array();
+        foreach ( $suggestions as $key => $s ) {
+            $items[] = array(
+                'key'        => $key,
+                'label'      => $s['label'],
+                'posts'      => (int) $s['posts'],
+                'type'       => $s['type'],
+                'rule'       => $s['rule'],
+                'ruleName'   => self::rule_name( $s['rule'] ),
+                'confidence' => (int) round( 100 * $s['confidence'] ),
+                'why'        => $s['why'],
+                'persistence' => $s['persistence'] ?? 0,
+                'readShare'  => $s['read_share'] ?? 0,
+                'cadence'    => $s['cadence_days'] ?? null,
+                'years'      => $s['years'] ?? 0,
+                'firstYear'  => $s['first_year'] ?? 0,
+                'lastYear'   => $s['last_year'] ?? 0,
+                'months'     => $s['months'] ?? array(),
+                'season'     => $s['season'] ?? null,
+                'current'    => isset( $rules[ $key ] ) ? AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) : '',
+                'ignored'    => in_array( $key, $ignored, true ),
+            );
+        }
         ?>
         <dialog id="ace-timing-modal" class="ace-timing-dialog" aria-labelledby="ace-timing-modal-title">
             <div class="ace-modal-head">
-                <h2 id="ace-timing-modal-title">Timing rules by category and tag</h2>
+                <div>
+                    <h2 id="ace-timing-modal-title">Timing rules by category and tag</h2>
+                    <p class="ace-modal-lead">Tell the report <strong>when</strong> each section's posts matter, so a seasonal piece is never called quiet in its off-season. Pick a category or tag on the left to see what its own data shows and what each rule would do. Nothing here changes a post; rules apply from the next check.</p>
+                </div>
                 <button type="button" class="ace-modal-close" data-ace-modal-cancel aria-label="Close without saving">&times;</button>
             </div>
-            <p class="ace-modal-lead">A timing rule tells the report <em>when</em> the posts in a category or tag matter, so it judges them on the right period instead of calling a seasonal piece quiet in the off-season. Each row shows what this site's own data suggests and why, and what that rule would do. Pick the suggestion, your own rule, or no rule; Ignore just hides a suggestion you do not want to see again. Nothing here changes a post; the rules apply from the next check.</p>
-            <div class="ace-modal-tools">
-                <label>Search <input type="search" id="ace-timing-filter" placeholder="Category or tag"></label>
-                <label>Show <select id="ace-timing-type"><option value="">all</option><option value="season">seasonal suggestions</option><option value="evergreen">evergreen suggestions</option><option value="event">event-bound suggestions</option><option value="rule">with a rule set</option><option value="ignored">ignored</option><option value="mixed">no clear shape</option></select></label>
-                <span class="ace-modal-count" id="ace-timing-count"></span>
-            </div>
-            <div class="ace-modal-body">
-                <table class="widefat striped ace-timing-table">
-                    <thead><tr><th scope="col">Category or tag</th><th scope="col">What the data suggests, and why</th><th scope="col">Rule to use</th><th scope="col">Ignore</th></tr></thead>
-                    <tbody>
-                    <?php foreach ( $suggestions as $key => $s ) :
-                        $current_rule = isset( $rules[ $key ] ) ? AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) : '';
-                        $is_ignored   = in_array( $key, $ignored, true );
-                        $has_sugg     = 'mixed' !== $s['type'];
-                        $mode         = '' === $current_rule ? 'none' : ( $has_sugg && $current_rule === $s['rule'] ? 'suggested' : 'custom' );
-                        $cur          = $current_rule ? AceSeoRetentionActions::parse_timing_rules( 'x:y = ' . $current_rule )['x:y'] : array();
-                        ?>
-                        <tr data-key="<?php echo esc_attr( $key ); ?>" data-type="<?php echo esc_attr( $s['type'] ); ?>" data-label="<?php echo esc_attr( strtolower( $s['label'] . ' ' . $key ) ); ?>" data-suggested="<?php echo esc_attr( $s['rule'] ); ?>" data-ignored="<?php echo $is_ignored ? '1' : '0'; ?>">
-                            <th scope="row"><strong><?php echo esc_html( $s['label'] ); ?></strong><br><small><code><?php echo esc_html( $key ); ?></code> · <?php echo esc_html( number_format_i18n( $s['posts'] ) ); ?> assessed posts</small></th>
-                            <td class="ace-timing-why">
-                                <?php if ( $has_sugg ) : ?>
-                                    <span class="ace-timing-type ace-timing-type-<?php echo esc_attr( $s['type'] ); ?>"><?php echo esc_html( $labels[ $s['type'] ] ); ?></span> <code><?php echo esc_html( $s['rule'] ); ?></code> <small>(<?php echo esc_html( (int) round( 100 * $s['confidence'] ) ); ?>% confidence)</small>
-                                    <p class="ace-timing-meaning"><?php echo esc_html( self::explain_rule( $s['rule'] ) ); ?></p>
-                                <?php else : ?>
-                                    <span class="ace-timing-type"><?php echo esc_html( $labels['mixed'] ); ?></span>
-                                <?php endif; ?>
-                                <details><summary>Why the data says so</summary><p><?php echo esc_html( $s['why'] ); ?></p></details>
-                            </td>
-                            <td class="ace-timing-pick">
-                                <select class="ace-timing-mode" aria-label="Rule for <?php echo esc_attr( $s['label'] ); ?>">
-                                    <?php if ( $has_sugg ) : ?><option value="suggested" <?php selected( $mode, 'suggested' ); ?>>Use the suggestion (<?php echo esc_html( $s['rule'] ); ?>)</option><?php endif; ?>
-                                    <option value="none" <?php selected( $mode, 'none' ); ?>>No rule</option>
-                                    <option value="evergreen" <?php selected( 'custom' === $mode && 'evergreen' === ( $cur['type'] ?? '' ) ); ?>>Evergreen: always relevant</option>
-                                    <option value="event" <?php selected( 'custom' === $mode && 'event' === ( $cur['type'] ?? '' ) ); ?>>Event-bound: N days from publication</option>
-                                    <option value="season" <?php selected( 'custom' === $mode && 'season' === ( $cur['type'] ?? '' ) ); ?>>Yearly season: from … to …</option>
-                                </select>
-                                <span class="ace-timing-custom ace-timing-custom-event" hidden><input type="number" class="small-text ace-timing-days" min="1" max="366" value="<?php echo esc_attr( 'event' === ( $cur['type'] ?? '' ) ? (int) $cur['days'] : 3 ); ?>" aria-label="Days from publication"> days</span>
-                                <span class="ace-timing-custom ace-timing-custom-season" hidden><input type="text" class="ace-timing-md ace-timing-start" pattern="[0-1][0-9]-[0-3][0-9]" placeholder="MM-DD" value="<?php echo esc_attr( $cur['start'] ?? '' ); ?>" aria-label="Season start, MM-DD"> to <input type="text" class="ace-timing-md ace-timing-end" pattern="[0-1][0-9]-[0-3][0-9]" placeholder="MM-DD" value="<?php echo esc_attr( $cur['end'] ?? '' ); ?>" aria-label="Season end, MM-DD"></span>
-                                <p class="ace-timing-meaning ace-timing-chosen"></p>
-                            </td>
-                            <td><?php if ( $has_sugg ) : ?><label><input type="checkbox" class="ace-timing-ignore" value="<?php echo esc_attr( $key ); ?>" <?php checked( $is_ignored ); ?>> Ignore</label><?php endif; ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div class="ace-timing-layout">
+                <div class="ace-timing-list-pane">
+                    <div class="ace-timing-list-tools">
+                        <input type="search" id="ace-timing-filter" placeholder="Search categories and tags" aria-label="Search categories and tags">
+                        <select id="ace-timing-type" aria-label="Show">
+                            <option value="">All suggestions</option>
+                            <option value="event">Day-of-event</option>
+                            <option value="season">Yearly season</option>
+                            <option value="evergreen">Evergreen</option>
+                            <option value="chosen">Rule chosen</option>
+                            <option value="open">No rule yet</option>
+                            <option value="ignored">Ignored</option>
+                            <option value="mixed">No clear shape</option>
+                        </select>
+                        <span class="ace-modal-count" id="ace-timing-count"></span>
+                    </div>
+                    <ul class="ace-timing-list" id="ace-timing-list" role="listbox" aria-label="Categories and tags"></ul>
+                </div>
+                <div class="ace-timing-detail" id="ace-timing-detail" aria-live="polite"></div>
             </div>
             <div class="ace-modal-foot">
                 <span class="ace-modal-status" role="status" aria-live="polite"></span>
+                <span class="ace-timing-changes" id="ace-timing-changes"></span>
                 <button type="button" class="button" data-ace-modal-cancel>Cancel</button>
                 <button type="button" class="button button-primary" id="ace-timing-save">Save and close</button>
             </div>
+            <script type="application/json" id="ace-timing-data"><?php echo wp_json_encode( $items, JSON_HEX_TAG | JSON_HEX_AMP ); ?></script>
         </dialog>
         <?php
     }

@@ -3445,36 +3445,85 @@ input:checked + .ace-slider:before {
   .ace-retention-settings .form-table th { width: auto; }
 }
 
-/* Suggested timing rules: overview and the dialog (scoped: the legacy .ace-modal rule forces display on anything using that class) */
+/* Timing rules: legend, overview, preview and the full-screen manager */
+.ace-timing-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0 0 14px; max-width: 1100px; }
+.ace-timing-kind { background: #f6f7f7; border-radius: 6px; padding: 10px 12px; }
+.ace-timing-kind p { margin: 6px 0 0; font-size: 13px; color: #3c434a; }
 .ace-timing-overview .ace-timing-overview-line { margin: 0 0 8px; }
-dialog.ace-timing-dialog { border: 0; border-radius: 8px; padding: 0; width: min(1100px, 94vw); max-height: 90vh; box-shadow: 0 10px 40px rgba(0,0,0,.25); position: fixed; inset: 0; margin: auto; }
-dialog.ace-timing-dialog:not([open]) { display: none; }
-dialog.ace-timing-dialog[open] { display: flex; flex-direction: column; }
-dialog.ace-timing-dialog::backdrop { background: rgba(0,0,0,.45); }
-dialog.ace-timing-dialog .ace-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #dcdcde; }
-dialog.ace-timing-dialog .ace-modal-head h2 { margin: 0; font-size: 1.2em; }
-dialog.ace-timing-dialog .ace-modal-close { background: none; border: 0; font-size: 26px; line-height: 1; cursor: pointer; color: #50575e; padding: 0 4px; }
-dialog.ace-timing-dialog .ace-modal-lead { margin: 12px 20px 6px; color: #50575e; }
-dialog.ace-timing-dialog .ace-modal-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 6px 20px 10px; }
-dialog.ace-timing-dialog .ace-modal-count { color: #50575e; font-size: 13px; }
-dialog.ace-timing-dialog .ace-modal-body { overflow: auto; flex: 1 1 auto; min-height: 0; padding: 0 20px; }
-dialog.ace-timing-dialog .ace-timing-table th, dialog.ace-timing-dialog .ace-timing-table td { vertical-align: top; }
-dialog.ace-timing-dialog .ace-timing-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
-dialog.ace-timing-dialog .ace-timing-why details summary { cursor: pointer; color: #2271b1; }
-dialog.ace-timing-dialog .ace-timing-why { max-width: 420px; font-size: 13px; }
-dialog.ace-timing-dialog .ace-timing-meaning { margin: 6px 0 4px; color: #1d2327; }
-dialog.ace-timing-dialog .ace-timing-pick { min-width: 300px; }
-dialog.ace-timing-dialog .ace-timing-pick select { max-width: 100%; }
-dialog.ace-timing-dialog .ace-timing-custom { display: inline-block; margin: 6px 0 0; }
-dialog.ace-timing-dialog [hidden] { display: none !important; }
-dialog.ace-timing-dialog .ace-timing-md { width: 5.5em; }
-dialog.ace-timing-dialog .ace-timing-chosen { font-size: 13px; color: #50575e; }
-dialog.ace-timing-dialog .ace-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #dcdcde; background: #f6f7f7; }
-dialog.ace-timing-dialog .ace-modal-status { margin-right: auto; color: #50575e; }
-.ace-timing-type { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; margin-right: 4px; }
+.ace-timing-rules-preview { margin: 8px 0 0; font-size: 13px; max-width: 900px; }
+.ace-timing-rules-preview li { margin: 0 0 4px; }
+.ace-timing-rules-preview li span { color: #50575e; }
+.ace-timing-rules-preview li.is-bad { color: #8a1f1f; }
+.ace-timing-type { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; background: #f0f0f1; color: #3c434a; }
 .ace-timing-type-season { background: #e5f1fb; color: #0a4b78; }
 .ace-timing-type-evergreen { background: #edf5ee; color: #1e4620; }
 .ace-timing-type-event { background: #fcf0e4; color: #7a3f00; }
+
+dialog.ace-timing-dialog { border: 0; border-radius: 10px; padding: 0; width: calc(100vw - 40px); max-width: none; height: calc(100vh - 40px); max-height: none; box-shadow: 0 12px 48px rgba(0,0,0,.3); position: fixed; inset: 0; margin: auto; overflow: hidden; }
+dialog.ace-timing-dialog:not([open]) { display: none; }
+dialog.ace-timing-dialog[open] { display: flex; flex-direction: column; }
+dialog.ace-timing-dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog.ace-timing-dialog [hidden] { display: none !important; }
+dialog.ace-timing-dialog .ace-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 16px 24px 12px; border-bottom: 1px solid #dcdcde; }
+dialog.ace-timing-dialog .ace-modal-head h2 { margin: 0 0 4px; font-size: 1.3em; }
+dialog.ace-timing-dialog .ace-modal-lead { margin: 0; color: #50575e; max-width: 1000px; }
+dialog.ace-timing-dialog .ace-modal-close { background: none; border: 0; font-size: 28px; line-height: 1; cursor: pointer; color: #50575e; padding: 0 4px; }
+dialog.ace-timing-dialog .ace-timing-layout { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; flex: 1 1 auto; min-height: 0; }
+dialog.ace-timing-dialog .ace-timing-list-pane { display: flex; flex-direction: column; border-right: 1px solid #dcdcde; min-height: 0; background: #fbfbfb; }
+dialog.ace-timing-dialog .ace-timing-list-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f1; }
+dialog.ace-timing-dialog .ace-timing-list-tools input[type=search] { flex: 1 1 100%; }
+dialog.ace-timing-dialog .ace-modal-count { color: #50575e; font-size: 12px; margin-left: auto; }
+dialog.ace-timing-dialog .ace-timing-list { margin: 0; padding: 6px; overflow: auto; flex: 1 1 auto; }
+dialog.ace-timing-dialog .ace-timing-list li { margin: 0; }
+dialog.ace-timing-dialog .ace-timing-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+dialog.ace-timing-dialog .ace-timing-item:hover { background: #fff; border-color: #dcdcde; }
+dialog.ace-timing-dialog .ace-timing-item.is-selected { background: #fff; border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; }
+dialog.ace-timing-dialog .ace-timing-item-name { font-weight: 600; }
+dialog.ace-timing-dialog .ace-timing-item-meta { grid-column: 1; font-size: 12px; color: #50575e; }
+dialog.ace-timing-dialog .ace-timing-item .ace-timing-badge { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.ace-timing-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; background: #f0f0f1; color: #50575e; }
+.ace-timing-badge.is-suggested { background: #edf5ee; color: #1e4620; }
+.ace-timing-badge.is-custom { background: #e5f1fb; color: #0a4b78; }
+.ace-timing-badge.is-ignored { background: #f6f7f7; color: #8c8f94; }
+dialog.ace-timing-dialog .ace-timing-empty { padding: 12px; color: #50575e; }
+dialog.ace-timing-dialog .ace-timing-detail { overflow: auto; padding: 18px 28px 28px; }
+dialog.ace-timing-dialog .ace-timing-placeholder { color: #50575e; }
+dialog.ace-timing-dialog .ace-timing-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+dialog.ace-timing-dialog .ace-timing-detail-head h3 { margin: 0 0 2px; font-size: 1.4em; }
+dialog.ace-timing-dialog .ace-timing-detail h4 { margin: 20px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: #50575e; }
+dialog.ace-timing-dialog .ace-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+dialog.ace-timing-dialog .ace-tile { background: #f6f7f7; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.ace-tile-label { font-size: 12px; color: #50575e; }
+dialog.ace-timing-dialog .ace-tile-value { font-size: 18px; font-weight: 600; color: #1d2327; }
+dialog.ace-timing-dialog .ace-tile-sub { font-size: 12px; color: #646970; }
+dialog.ace-timing-dialog .ace-timing-chart-wrap { margin: 14px 0 0; }
+dialog.ace-timing-dialog .ace-month-chart { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; height: 110px; align-items: end; margin-top: 6px; max-width: 720px; }
+dialog.ace-timing-dialog .ace-month { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+dialog.ace-timing-dialog .ace-month i { display: block; width: 100%; background: #c3c4c7; border-radius: 3px 3px 0 0; }
+dialog.ace-timing-dialog .ace-month.is-season i { background: #2271b1; }
+dialog.ace-timing-dialog .ace-month b { font-weight: 400; font-size: 11px; color: #50575e; margin-top: 4px; }
+dialog.ace-timing-dialog .ace-suggestion-card { margin: 18px 0 0; padding: 12px 14px; border: 1px solid #dcdcde; border-left: 4px solid #2271b1; border-radius: 6px; background: #fff; }
+dialog.ace-timing-dialog .ace-suggestion-card.is-mixed { border-left-color: #8c8f94; }
+dialog.ace-timing-dialog .ace-suggestion-card p { margin: 8px 0 0; }
+dialog.ace-timing-dialog .ace-why { color: #50575e; font-size: 13px; }
+dialog.ace-timing-dialog .ace-choices { display: grid; gap: 8px; max-width: 900px; }
+dialog.ace-timing-dialog .ace-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #dcdcde; border-radius: 6px; cursor: pointer; background: #fff; }
+dialog.ace-timing-dialog .ace-choice.is-checked { border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; background: #f6faff; }
+dialog.ace-timing-dialog .ace-choice-label { font-weight: 600; }
+dialog.ace-timing-dialog .ace-choice-input { color: #3c434a; }
+dialog.ace-timing-dialog .ace-md { width: 5.5em; }
+dialog.ace-timing-dialog .ace-effect { margin: 16px 0 0; padding: 12px 14px; background: #f6f7f7; border-radius: 6px; max-width: 900px; }
+dialog.ace-timing-dialog .ace-effect h4 { margin-top: 0; }
+dialog.ace-timing-dialog .ace-effect p { margin: 6px 0 0; }
+dialog.ace-timing-dialog .ace-example { color: #3c434a; }
+dialog.ace-timing-dialog .ace-ignore { display: block; margin: 14px 0 0; color: #50575e; }
+dialog.ace-timing-dialog .ace-samples { margin: 0; }
+dialog.ace-timing-dialog .ace-samples li { margin: 0 0 6px; }
+dialog.ace-timing-dialog .ace-samples li span { color: #646970; font-size: 12px; margin-left: 6px; }
+dialog.ace-timing-dialog .ace-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 24px; border-top: 1px solid #dcdcde; background: #f6f7f7; }
+dialog.ace-timing-dialog .ace-modal-status { margin-right: auto; color: #50575e; }
+dialog.ace-timing-dialog .ace-timing-changes { color: #996800; font-weight: 600; }
+@media (max-width: 900px) { dialog.ace-timing-dialog .ace-timing-layout { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; } dialog.ace-timing-dialog .ace-timing-list-pane { border-right: 0; border-bottom: 1px solid #dcdcde; } }
 /* Room beneath the tab so the fixed save bar never covers the last control. */
 .ace-retention-settings { padding-bottom: 96px; }
 
@@ -3538,3 +3587,10 @@ dialog.ace-timing-dialog .ace-modal-status { margin-right: auto; color: #50575e;
 .ace-heatmap th { padding: 3px 6px; color: #50575e; font-weight: 600; }
 .ace-heatmap td { width: 44px; height: 22px; text-align: center; border: 1px solid #fff; color: #1d2327; }
 @media (max-width: 782px) { .ace-season-strip-head, .ace-season-row { grid-template-columns: 120px 1fr; } .ace-season-split { display: none; } }
+
+/* Dashboard polish: toolbar near the top, card headings */
+.ace-retention-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 4px; }
+.ace-retention-controls-note { margin: 0 0 16px; }
+.ace-retention-dashboard .ace-retention-section > h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 1.25em; }
+.ace-retention-rows #ace-retention-rows > p:first-child { margin: 4px 0 0; }
+.ace-retention-dashboard h1 { margin-bottom: 4px; }
