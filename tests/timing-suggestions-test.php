@@ -69,5 +69,15 @@ AceSeoRetentionActions::save_report_settings( array( 'timing_rules' => "category
 $check( 'a hand-written rule for a suggested term wins over the suggestion', array( 'type' => 'event', 'days' => 7 ) === AceSeoRetentionActions::options()['timing_rules']['category:tips'] );
 AceSeoRetentionActions::save_report_settings( array( 'timing_rules' => "category:tips = event 7" ) );
 $check( 'a save without the suggestions table leaves ignored keys alone', array() === AceSeoRetentionActions::options()['timing_ignored'] && isset( AceSeoRetentionActions::options()['timing_rules']['category:tips'] ) );
+/* The modal's explicit choices. */
+$GLOBALS['opt'] = array();
+$r = AceSeoRetentionActions::set_timing_rules( array( 'category:tips' => 'event 2', 'category:guides' => 'evergreen', 'category:festival' => 'season 02-24 03-25', 'category:news' => '', 'post_tag:bad' => 'season 13-99 01-01' ), array( 'category:news' ) );
+$o = $r['options'];
+$check( 'explicit rules of each type are saved', array( 'type' => 'event', 'days' => 2 ) === $o['timing_rules']['category:tips'] && array( 'type' => 'evergreen' ) === $o['timing_rules']['category:guides'] && 'season' === $o['timing_rules']['category:festival']['type'] );
+$check( 'an invalid rule is reported and not saved', array( 'post_tag:bad' ) === $r['invalid'] && ! isset( $o['timing_rules']['post_tag:bad'] ) );
+$check( 'an empty choice removes the rule and the ignore list is kept', ! isset( $o['timing_rules']['category:news'] ) && array( 'category:news' ) === $o['timing_ignored'] );
+$r = AceSeoRetentionActions::set_timing_rules( array( 'category:tips' => '' ), array() );
+$check( 'terms not mentioned keep their rules', ! isset( $r['options']['timing_rules']['category:tips'] ) && isset( $r['options']['timing_rules']['category:guides'] ) );
+$check( 'rules explain themselves in plain words', false !== strpos( Ace_SEO_Timing_Suggestions::explain_rule( 'event 2' ), '2 days from the day it was published' ) && false !== strpos( Ace_SEO_Timing_Suggestions::explain_rule( 'season 02-24 03-25' ), '24 February to 25 March' ) && false !== strpos( Ace_SEO_Timing_Suggestions::explain_rule( 'evergreen' ), 'Always relevant' ) && false !== strpos( Ace_SEO_Timing_Suggestions::explain_rule( '' ), 'No rule' ) );
 echo "\n", $checks - $failures, ' of ', $checks, " timing suggestion checks passed.\n";
 exit( $failures ? 1 : 0 );

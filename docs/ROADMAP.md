@@ -183,6 +183,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 3. Never close a GitHub issue for a partially-shipped or gated feature — comment status, keep open.
 4. Tick the box here + note the commit hash when a task lands; keep issues #1/#7 in sync.
 
+## Live progress, sidebar notes, rule modal — 8 October 2026 (#25, #32)
+
+1.0.71: `AceSeoRetentionReport::progress_payload()` (also `wp_ajax_ace_seo_retention_progress`, nonce `ace_seo_retention_live`), `render_progress_panel()`, `render_aside()`, `ajax_dismiss` (user meta `ace_seo_retention_dismissed`, md5 of note text), `assets/js/retention-dashboard.js` polls every 5 s while `data-live="1"` and reloads when the check and any Sheet refresh are both quiet. `Ace_SEO_Timing_Suggestions::render_fields()` is the overview; `render_modal()` (outside the form) is a `<dialog>` with per-row pickers; `wp_ajax_ace_seo_timing_rules` → `AceSeoRetentionActions::set_timing_rules( $choices, $ignore )` (explicit rule text per term, '' removes); `explain_rule()` gives the plain-English meaning; `assets/js/timing-rules.js`.
+
 ## Shared save bar and the at-a-glance pass — 8 October 2026 (#25)
 
 1.0.70: `src/components/SaveBar.js` takes `forms: [{ selector, save(formEl), autoSave }]`, tracks dirty state per form and saves the dirty ones from one button; `SaveBar.autoRegister()` adds every `<form data-ace-savebar="admin-post">` (posted to its own `action` with `ace_json=1`, expecting `wp_send_json_success( { message, reload } )`; `data-ace-savebar-autosave="0"`, `data-ace-savebar-reload="1"`). `src/savebar.js` is a second webpack entry (`webpack.config.js`) built to `build/savebar.js`, registered as the `ace-savebar` handle in `AceSeoSettings::enqueue` for other Ace plugins; `window.AceSaveBar`. The Retention form declares itself and `handle_settings_save()` answers JSON when `ace_json` is posted. CSS: `.ace-retention-status`, `.ace-retention-bar`, `.ace-retention-card.is-*`, `.ace-step`, `.ace-section-lead`. Suite follow-up: other Ace plugins' settings pages should enqueue `ace-savebar` and drop their own buttons.

@@ -89,6 +89,8 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
             add_action( 'admin_post_ace_seo_retention_resume', array( __CLASS__, 'handle_resume' ) );
             add_action( 'admin_post_ace_seo_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
+            add_action( 'wp_ajax_ace_seo_retention_progress', array( __CLASS__, 'ajax_progress' ) );
+            add_action( 'wp_ajax_ace_seo_retention_dismiss', array( __CLASS__, 'ajax_dismiss' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
@@ -1857,6 +1859,200 @@ class AceSeoRetentionReport {
         <?php
     }
 
+    /** Plain names for the build phases. */
+    public static function phase_labels() {
+        return array( 'gsc' => 'Collecting search data', 'ga4' => 'Collecting visitor data', 'links' => 'Counting links between articles', 'score' => 'Judging posts', 'done' => 'Finished', 'error' => 'Stopped' );
+    }
+
+    /** Everything the live progress panel needs, as one array (also the AJAX payload). */
+    public static function progress_payload() {
+        $p     = self::progress();
+        $state = self::worker_state();
+        $sheet = null;
+        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
+            $job = AceSeoSheetsSchedule::record( AceSeoSheetsSchedule::JOB );
+            if ( is_array( $job ) && ! empty( $job['status'] ) ) {
+                $sheet = array(
+                    'status'  => (string) $job['status'],
+                    'phase'   => (string) ( $job['phase'] ?? '' ),
+                    'written' => (int) ( $job['written'] ?? 0 ),
+                    'total'   => (int) ( $job['total'] ?? 0 ),
+                    'active'  => in_array( $job['status'], array( 'queued', 'running', 'retrying' ), true ),
+                    'error'   => (string) ( $job['error'] ?? '' ),
+                    'updated' => (int) ( $job['updated'] ?? 0 ),
+                );
+            }
+        }
+        return array(
+            'state'     => $state,
+            'building'  => self::is_building(),
+            'phase'     => (string) ( $p['phase'] ?? '' ),
+            'label'     => self::phase_labels()[ $p['phase'] ?? '' ] ?? '',
+            'offset'    => (int) ( $p['offset'] ?? 0 ),
+            'total'     => (int) ( $p['total'] ?? 0 ),
+            'started'   => (int) ( $p['started'] ?? 0 ),
+            'finished'  => (int) ( $p['finished'] ?? 0 ),
+            'tick_at'   => (int) ( $p['tick_at'] ?? 0 ),
+            'tiers'     => (array) ( $p['tiers'] ?? array() ),
+            'ranks'     => (array) ( $p['ranks'] ?? array() ),
+            'counts'    => (array) ( $p['counts'] ?? array() ),
+            'notes'     => array_values( (array) ( $p['notes'] ?? array() ) ),
+            'error'     => (string) ( $p['last_error'] ?? '' ),
+            'sheet'     => $sheet,
+            'now'       => time(),
+        );
+    }
+
+    public static function ajax_progress() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
+        wp_send_json_success( self::progress_payload() );
+    }
+
+    /** Notes a user has dismissed, by hash of their text, so a note returns only if it changes. */
+    public static function dismissed_notes() {
+        $d = get_user_meta( get_current_user_id(), 'ace_seo_retention_dismissed', true );
+        return is_array( $d ) ? array_values( array_map( 'strval', $d ) ) : array();
+    }
+
+    public static function ajax_dismiss() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
+        $hash  = sanitize_key( wp_unslash( $_POST['hash'] ?? '' ) );
+        $undo  = ! empty( $_POST['undo'] );
+        $list  = self::dismissed_notes();
+        if ( $undo ) {
+            $list = array();
+        } elseif ( preg_match( '/^[a-f0-9]{32}$/', $hash ) ) {
+            $list[] = $hash;
+        }
+        update_user_meta( get_current_user_id(), 'ace_seo_retention_dismissed', array_values( array_unique( $list ) ) );
+        wp_send_json_success( array( 'dismissed' => count( $list ) ) );
+    }
+
+    /**
+     * The live progress panel: server-rendered with the current state so a reload lands on it, then
+     * kept fresh by assets/js/retention-dashboard.js until the check (and any Sheet refresh) finishes.
+     */
+    public static function render_progress_panel( array $live ) {
+        $show = $live['building'] || 'error' === $live['state'] || ( $live['sheet'] && $live['sheet']['active'] );
+        if ( ! $show ) {
+            return;
+        }
+        $pct = $live['total'] ? min( 100, round( 100 * $live['offset'] / $live['total'] ) ) : 0;
+        ?>
+        <div id="ace-retention-progress" class="ace-retention-progress" data-live="<?php echo $live['building'] || ( $live['sheet'] && $live['sheet']['active'] ) ? '1' : '0'; ?>">
+            <?php if ( $live['building'] || 'error' === $live['state'] ) : ?>
+            <div class="ace-retention-progress-row" data-part="build">
+                <div class="ace-retention-progress-head">
+                    <strong data-field="title"><?php echo 'error' === $live['state'] ? 'The last check stopped' : 'Checking older posts'; ?></strong>
+                    <span class="ace-retention-state is-<?php echo esc_attr( $live['state'] ); ?>" data-field="state"><?php echo esc_html( self::state_label( $live['state'] ) ); ?></span>
+                </div>
+                <div class="ace-retention-progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int) $pct; ?>"><span data-field="bar" style="width:<?php echo (int) $pct; ?>%"></span></div>
+                <p class="ace-retention-progress-text"><span data-field="label"><?php echo esc_html( $live['label'] ); ?></span><?php if ( 'score' === $live['phase'] || 'links' === $live['phase'] ) : ?>: <?php endif; ?><span data-field="count"><?php echo $live['total'] ? esc_html( number_format_i18n( min( $live['offset'], $live['total'] ) ) . ' of ' . number_format_i18n( $live['total'] ) ) : ''; ?></span>
+                    <span class="ace-retention-progress-meta" data-field="meta"><?php echo $live['tick_at'] ? '· last step ' . esc_html( human_time_diff( $live['tick_at'] ) ) . ' ago' : ''; ?></span></p>
+                <p class="ace-retention-progress-sofar" data-field="sofar"><?php if ( 'score' === $live['phase'] ) : ?>So far: <?php echo esc_html( number_format_i18n( (int) ( $live['tiers']['retained'] ?? 0 ) ) ); ?> still being read, <?php echo esc_html( number_format_i18n( (int) ( $live['tiers']['unknown'] ?? 0 ) ) ); ?> not ready to judge, <?php echo esc_html( number_format_i18n( (int) ( $live['tiers']['dormant'] ?? 0 ) + (int) ( $live['tiers']['candidate'] ?? 0 ) ) ); ?> with no readers.<?php endif; ?></p>
+                <?php if ( $live['error'] ) : ?><p class="ace-retention-progress-error" data-field="error">Last error: <?php echo esc_html( $live['error'] ); ?></p><?php endif; ?>
+                <?php if ( 'interrupted' === $live['state'] ) : ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:6px 0 0">
+                    <?php wp_nonce_field( 'ace_seo_retention_resume' ); ?>
+                    <input type="hidden" name="action" value="ace_seo_retention_resume">
+                    <button class="button button-primary">Resume the check</button>
+                </form>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <?php if ( $live['sheet'] && $live['sheet']['active'] ) : $sp = $live['sheet']['total'] ? min( 100, round( 100 * $live['sheet']['written'] / $live['sheet']['total'] ) ) : 0; ?>
+            <div class="ace-retention-progress-row" data-part="sheet">
+                <div class="ace-retention-progress-head"><strong>Refreshing the Google Sheet</strong> <span class="ace-retention-state is-running" data-field="sheet-state"><?php echo esc_html( ucfirst( $live['sheet']['status'] ) ); ?></span></div>
+                <div class="ace-retention-progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int) $sp; ?>"><span data-field="sheet-bar" style="width:<?php echo (int) $sp; ?>%"></span></div>
+                <p class="ace-retention-progress-text"><span data-field="sheet-count"><?php echo esc_html( number_format_i18n( $live['sheet']['written'] ) . ' of ' . number_format_i18n( $live['sheet']['total'] ) ); ?> rows</span>. The old tab stays until the new one is complete.</p>
+            </div>
+            <?php endif; ?>
+            <p class="ace-retention-progress-note">This page updates itself every few seconds; reloading brings you straight back here. Nothing is changed by a check.</p>
+        </div>
+        <?php
+    }
+
+    public static function state_label( $state ) {
+        $labels = array( 'idle' => 'Not started', 'queued' => 'Waiting for the next step', 'running' => 'Working now', 'interrupted' => 'Interrupted', 'error' => 'Stopped with an error', 'done' => 'Finished' );
+        return $labels[ $state ] ?? $state;
+    }
+
+    /** The right-hand column: notes, status, previous checks, recent actions, advanced tools, help. */
+    public static function render_aside( array $p, array $settings, array $labels, $built ) {
+        $dismissed = self::dismissed_notes();
+        $notes     = array();
+        $hidden    = 0;
+        foreach ( (array) ( $p['notes'] ?? array() ) as $note ) {
+            $h = md5( (string) $note );
+            if ( in_array( $h, $dismissed, true ) ) {
+                $hidden++;
+                continue;
+            }
+            $notes[ $h ] = (string) $note;
+        }
+        $weekly = wp_next_scheduled( self::WEEKLY_HOOK );
+        ?>
+        <aside class="ace-retention-aside" aria-label="Report details">
+            <details class="ace-retention-acc" <?php echo $notes ? 'open' : ''; ?>>
+                <summary>Notes from the last check <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( $notes ) ) ); ?></span></summary>
+                <div class="ace-retention-acc-body">
+                    <?php if ( ! $notes ) : ?><p class="description">Nothing to report<?php echo $hidden ? ', ' . esc_html( number_format_i18n( $hidden ) ) . ' dismissed' : ''; ?>.</p><?php endif; ?>
+                    <?php foreach ( $notes as $h => $note ) : ?>
+                        <div class="ace-retention-note" data-hash="<?php echo esc_attr( $h ); ?>"><p><?php echo esc_html( $note ); ?></p><button type="button" class="ace-retention-dismiss" aria-label="Dismiss this note" title="Dismiss">&times;</button></div>
+                    <?php endforeach; ?>
+                    <?php if ( $hidden ) : ?><p><button type="button" class="button-link ace-retention-undismiss">Show <?php echo esc_html( number_format_i18n( $hidden ) ); ?> dismissed</button></p><?php endif; ?>
+                </div>
+            </details>
+            <details class="ace-retention-acc">
+                <summary>Report status</summary>
+                <div class="ace-retention-acc-body">
+                    <p><strong>State:</strong> <?php echo esc_html( self::state_label( self::worker_state() ) ); ?></p>
+                    <?php if ( ! empty( $p['finished'] ) ) : ?><p><strong>Last check finished:</strong> <?php echo esc_html( wp_date( 'j M Y, H:i', (int) $p['finished'] ) ); ?> (<?php echo esc_html( human_time_diff( (int) $p['finished'] ) ); ?> ago)</p><?php endif; ?>
+                    <?php if ( ! empty( $p['started'] ) ) : ?><p><strong>Started:</strong> <?php echo esc_html( wp_date( 'j M Y, H:i', (int) $p['started'] ) ); ?></p><?php endif; ?>
+                    <p><strong>Settings used:</strong> posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years, a <?php echo esc_html( (int) $settings['days'] ); ?>-day traffic period, retained from <?php echo esc_html( (int) ( $settings['retained_views'] ?? 1 ) ); ?> view<?php echo 1 === (int) ( $settings['retained_views'] ?? 1 ) ? '' : 's'; ?>, timing <?php echo esc_html( $settings['timing_policy'] ?? 'estimate' ); ?>.</p>
+                    <p><strong>Next automatic check:</strong> <?php echo $weekly ? esc_html( wp_date( 'D j M, H:i', $weekly ) ) : 'off (switch on weekly checks in settings)'; ?></p>
+                    <?php if ( ! empty( $p['last_error'] ) ) : ?><p><strong>Last error:</strong> <?php echo esc_html( $p['last_error'] ); ?></p><?php endif; ?>
+                </div>
+            </details>
+            <details class="ace-retention-acc">
+                <summary>Previous checks</summary>
+                <div class="ace-retention-acc-body ace-retention-acc-scroll"><?php self::render_history( $labels ); ?></div>
+            </details>
+            <?php $log = AceSeoRetentionActions::recent_log( 30 ); ?>
+            <details class="ace-retention-acc">
+                <summary>Recent actions <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) $log ) ) ); ?></span></summary>
+                <div class="ace-retention-acc-body ace-retention-acc-scroll">
+                    <?php if ( $log ) : ?>
+                    <table class="widefat striped"><thead><tr><th>When</th><th>Post</th><th>Action</th><th>By</th></tr></thead><tbody>
+                    <?php foreach ( $log as $e ) : ?>
+                        <tr><td><?php echo esc_html( human_time_diff( (int) $e['time'] ) ); ?> ago</td><td><a href="<?php echo esc_url( get_edit_post_link( (int) $e['post'] ) ); ?>"><?php echo esc_html( wp_trim_words( get_the_title( (int) $e['post'] ) ?: ( '#' . (int) $e['post'] ), 6 ) ); ?></a></td><td><?php echo esc_html( $e['action'] . ( ! empty( $e['value'] ) ? ' → ' . $e['value'] : '' ) ); ?></td><td><?php echo esc_html( $e['by'] ?? '' ); ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody></table>
+                    <?php else : ?><p class="description">No administrator actions recorded yet.</p><?php endif; ?>
+                </div>
+            </details>
+            <details class="ace-retention-acc">
+                <summary>Advanced: timing preview and other lists</summary>
+                <div class="ace-retention-acc-body">
+                    <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a></p>
+                    <p class="description">Read-only; the saved report remains unchanged.</p>
+                    <ul style="list-style:disc;margin-left:1.4em">
+                        <?php foreach ( self::shareable_links() as $link ) : ?><li><a href="<?php echo esc_url( $link[1] ); ?>"><?php echo esc_html( $link[0] ); ?></a></li><?php endforeach; ?>
+                    </ul>
+                </div>
+            </details>
+            <details class="ace-retention-acc" id="retention-help">
+                <summary>What the words mean</summary>
+                <div class="ace-retention-acc-body ace-retention-help"><?php self::render_help(); ?></div>
+            </details>
+        </aside>
+        <?php
+    }
+
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
@@ -1885,37 +2081,14 @@ class AceSeoRetentionReport {
             <?php self::render_message(); ?>
             <p class="ace-retention-reassure"><span class="dashicons dashicons-lock" aria-hidden="true"></span>Reading this report changes nothing. Nothing here deletes, redirects or hides a post; the only changes happen through the clearly labelled administrator actions further down, and each one is logged.</p>
 
-            <?php $state = self::worker_state(); ?>
-            <?php if ( self::is_building() ) : ?>
-                <div class="notice <?php echo 'interrupted' === $state ? 'notice-warning' : 'notice-info'; ?>"><p>
-                    Building: <strong><?php echo esc_html( $p['phase'] ); ?></strong>
-                    <?php if ( ! empty( $p['total'] ) ) : ?>— <?php echo esc_html( number_format_i18n( min( (int) $p['offset'], (int) $p['total'] ) ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $p['total'] ) ); ?><?php endif; ?>.
-                    <?php if ( 'running' === $state ) : ?>
-                        A worker is on it now<?php echo ! empty( $p['tick_at'] ) ? ', last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago' : ''; ?>.
-                    <?php elseif ( 'queued' === $state ) : ?>
-                        The next step is queued on cron<?php echo ! empty( $p['tick_at'] ) ? '; last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago' : ''; ?>. Reload to follow it.
-                    <?php else : ?>
-                        <strong>Interrupted:</strong> nothing is queued and no worker holds it<?php echo ! empty( $p['tick_at'] ) ? ' (last step ' . esc_html( human_time_diff( (int) $p['tick_at'] ) ) . ' ago)' : ''; ?>. It is resumed automatically within the hour, or now:
-                    <?php endif; ?>
-                    <?php if ( ! empty( $p['last_error'] ) ) : ?><br>Last error: <?php echo esc_html( $p['last_error'] ); ?><?php endif; ?>
-                </p>
-                <?php if ( 'interrupted' === $state ) : ?>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0 0 .6em">
-                    <?php wp_nonce_field( 'ace_seo_retention_resume' ); ?>
-                    <input type="hidden" name="action" value="ace_seo_retention_resume">
-                    <button class="button button-primary">Resume the build</button>
-                </form>
-                <?php endif; ?>
-                </div>
-            <?php elseif ( 'error' === $state ) : ?>
-                <div class="notice notice-error"><p>The last build stopped with an error<?php echo ! empty( $p['last_error'] ) ? ': ' . esc_html( $p['last_error'] ) : ''; ?>. The report shows the rows scored before it stopped; rebuild when the cause is fixed.</p></div>
-            <?php elseif ( ! empty( $p['finished'] ) ) : ?>
-                <div class="notice notice-success"><p>Built <?php echo esc_html( human_time_diff( (int) $p['finished'] ) ); ?> ago: posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years, a <?php echo esc_html( (int) $settings['days'] ); ?>-day search window.</p></div>
-            <?php endif; ?>
-            <?php foreach ( (array) ( $p['notes'] ?? array() ) as $note ) : ?>
-                <div class="notice notice-warning"><p><?php echo esc_html( $note ); ?></p></div>
-            <?php endforeach; ?>
-
+            <?php
+            $live = self::progress_payload();
+            wp_enqueue_script( 'ace-seo-retention-dashboard', ACE_SEO_URL . 'assets/js/retention-dashboard.js', array(), ACE_SEO_VERSION, true );
+            wp_localize_script( 'ace-seo-retention-dashboard', 'aceSeoRetentionLive', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ace_seo_retention_live' ), 'labels' => self::phase_labels(), 'states' => array( 'idle' => self::state_label( 'idle' ), 'queued' => self::state_label( 'queued' ), 'running' => self::state_label( 'running' ), 'interrupted' => self::state_label( 'interrupted' ), 'error' => self::state_label( 'error' ), 'done' => self::state_label( 'done' ) ) ) );
+            ?>
+            <div class="ace-retention-layout">
+            <div class="ace-retention-main">
+            <?php self::render_progress_panel( $live ); ?>
             <?php self::render_summary( $p, $settings, $built ); ?>
 
             <div class="ace-retention-controls" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin:0 0 1.5em">
@@ -1931,18 +2104,6 @@ class AceSeoRetentionReport {
                 <a href="#retention-help">What the words mean</a>
             </div>
             <p class="description">Checking again uses the saved settings and takes a while on a large site; it runs in the background and this page shows its progress. It updates groups and suggestions, never the changes already applied.</p>
-
-            <details class="ace-retention-detail"><summary>Previous checks</summary>
-            <?php self::render_history( $labels ); ?>
-            </details>
-            <details class="ace-retention-detail"><summary>Advanced: timing preview and other post lists</summary>
-                <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">Preview event timing and suggestion overlaps</a> — read-only; the saved report remains unchanged.</p>
-                <ul style="list-style:disc;margin-left:2em">
-                    <?php foreach ( self::shareable_links() as $link ) : ?>
-                        <li><a href="<?php echo esc_url( $link[1] ); ?>"><?php echo esc_html( $link[0] ); ?></a></li>
-                    <?php endforeach; ?>
-                </ul>
-            </details>
 
             <?php if ( $built ) : ?>
                 <h2>Suggestions, post by post</h2>
@@ -2051,27 +2212,9 @@ class AceSeoRetentionReport {
             <?php endif; ?>
             </details>
 
-            <?php $log = AceSeoRetentionActions::recent_log( 30 ); if ( $log ) : ?>
-                <h2 style="margin-top:2em">Recent actions</h2>
-                <table class="widefat striped" style="max-width:900px">
-                    <thead><tr><th>When</th><th>Post</th><th>Action</th><th>Value</th><th>By</th></tr></thead>
-                    <tbody>
-                    <?php foreach ( $log as $e ) : ?>
-                        <tr><td><?php echo esc_html( human_time_diff( (int) $e['time'] ) ); ?> ago</td><td><a href="<?php echo esc_url( get_edit_post_link( (int) $e['post'] ) ); ?>"><?php echo esc_html( get_the_title( (int) $e['post'] ) ?: '#' . (int) $e['post'] ); ?></a></td><td><?php echo esc_html( AceSeoRetentionActions::ACTIONS[ $e['action'] ] ?? $e['action'] ); ?></td><td><?php echo esc_html( $e['value'] ); ?></td><td><?php echo esc_html( $e['by'] ); ?></td></tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
-
-            <section id="retention-help">
-                <h2>Understand the report</h2>
-                <?php self::render_help(); ?>
-                <details class="ace-retention-detail"><summary>Developer details: scoring rules and data sources</summary>
-                    <p>The first matching rule wins. “Needs an update” requires at least <?php echo esc_html( number_format_i18n( (int) $settings['demand_impressions'] ) ); ?> search appearances, an average position within <?php echo esc_html( (int) $settings['refresh_max_pos'] ); ?> and a click-through rate below <?php echo esc_html( round( $settings['refresh_max_ctr'] * 100, 1 ) ); ?>%. Remaining rules check clicks, backlinks, views, appearances and internal links in that order.</p>
-                    <p>Thresholds use <code>ace_seo_retention_settings</code>; rows use <code>ace_seo_retention_row</code>; additional view sources use <code>ace_seo_retention_pageviews</code>. CLI: <code>wp ace-crawl retention build</code> and <code>wp ace-crawl retention report</code>.</p>
-                    <p>Old rows keep the explanation recorded when they were built. Rebuild to apply updated wording or thresholds. A missing traffic source is not evidence of zero traffic.</p>
-                </details>
-            </section>
+            </div><!-- .ace-retention-main -->
+            <?php self::render_aside( $p, $settings, $labels, $built ); ?>
+            </div><!-- .ace-retention-layout -->
         </div>
         <?php
     }

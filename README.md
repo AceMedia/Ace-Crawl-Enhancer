@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.70-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.71-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.70
+**Stable tag:** 1.0.71
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.71 (2026-10-08)
+- Dashboard: a live progress panel while a check or a Google Sheet refresh runs (phase, progress bar, counts so far, last step), updated every few seconds and shown again on reload; the page refreshes itself once everything has finished. Notes from the last check, report status, previous checks, recent actions, advanced tools and the glossary move to a right-hand column of accordions; notes can be dismissed per user and brought back.
+- Settings: step 2 (when there is enough evidence) is its own card. Suggested timing rules are now a one-line overview with a "Manage suggested rules" modal: every row explains in plain words what the rule would do and why the data suggests it, and lets you use the suggestion, pick your own rule (evergreen, event-bound for N days, or a yearly season with dates), or no rule, and ignore suggestions you do not want to see. The modal saves and closes, or cancels; accepted rules appear in the hand-written box.
 
 ### 1.0.70 (2026-10-08)
 - One save bar for the whole settings page. The shared SaveBar now tracks several forms, so the Retention tab saves from the same fixed bar as every other tab, with no per-section buttons and no auto-save for retention. Any `<form data-ace-savebar="admin-post">` joins the bar by markup alone, and `build/savebar.js` is registered as the `ace-savebar` script handle for the rest of the Ace plugin suite to enqueue.

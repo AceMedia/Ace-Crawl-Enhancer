@@ -151,27 +151,95 @@ class AceSeoRetentionActions {
         // Suggested rules: ticking "use it" adds the suggestion; unticking one that is in use as suggested
         // removes it; hand-written rules for other terms are untouched. The box above stays the source of truth.
         if ( ! empty( $input['timing_suggestions_present'] ) && isset( $clean['timing_rules'] ) ) {
-            $accept = is_array( $input['timing_accept'] ?? null ) ? $input['timing_accept'] : array();
-            foreach ( (array) ( $input['timing_suggested'] ?? array() ) as $key => $rule_text ) {
-                $key       = sanitize_key( strtok( (string) $key, ':' ) ) . ':' . sanitize_title( (string) strtok( ':' ) );
-                $suggested = self::parse_timing_rules( $key . ' = ' . (string) $rule_text );
-                if ( ! isset( $suggested[ $key ] ) ) {
-                    continue;
-                }
-                $existing = $clean['timing_rules'][ $key ] ?? null;
-                if ( isset( $accept[ $key ] ) ) {
-                    if ( null === $existing ) {
-                        $clean['timing_rules'][ $key ] = $suggested[ $key ];
-                    }
-                } elseif ( null !== $existing && $existing === $suggested[ $key ] ) {
-                    unset( $clean['timing_rules'][ $key ] );
-                }
-            }
-            $clean['timing_ignored'] = array_values( array_filter( array_map( static function ( $k ) {
-                return preg_match( '/^[a-z0-9_-]+:[a-z0-9_-]+$/', (string) $k ) ? (string) $k : '';
-            }, array_keys( is_array( $input['timing_ignore'] ?? null ) ? $input['timing_ignore'] : array() ) ) ) );
+            $merged = self::merge_timing_suggestions(
+                $clean['timing_rules'],
+                (array) ( $input['timing_suggested'] ?? array() ),
+                array_keys( is_array( $input['timing_accept'] ?? null ) ? $input['timing_accept'] : array() ),
+                array_keys( is_array( $input['timing_ignore'] ?? null ) ? $input['timing_ignore'] : array() )
+            );
+            $clean['timing_rules']   = $merged['rules'];
+            $clean['timing_ignored'] = $merged['ignored'];
         }
         update_option( self::OPTION, $clean, false );
+        return self::options();
+    }
+
+    /**
+     * Apply accept/ignore choices for suggested rules to a rule set. Accepting adds the suggestion
+     * where no rule is written by hand; un-accepting a rule that is in use exactly as suggested removes
+     * it; hand-written rules for other terms are untouched.
+     *
+     * @param array $rules     key => rule (the hand-written set).
+     * @param array $suggested key => rule text, from the stored suggestions.
+     * @param array $accept    keys ticked.
+     * @param array $ignore    keys ticked as ignored.
+     */
+    public static function merge_timing_suggestions( array $rules, array $suggested, array $accept, array $ignore ) {
+        $accept = array_fill_keys( array_map( 'strval', $accept ), true );
+        foreach ( $suggested as $key => $rule_text ) {
+            $key    = sanitize_key( strtok( (string) $key, ':' ) ) . ':' . sanitize_title( (string) strtok( ':' ) );
+            $parsed = self::parse_timing_rules( $key . ' = ' . (string) $rule_text );
+            if ( ! isset( $parsed[ $key ] ) ) {
+                continue;
+            }
+            $existing = $rules[ $key ] ?? null;
+            if ( isset( $accept[ $key ] ) ) {
+                if ( null === $existing ) {
+                    $rules[ $key ] = $parsed[ $key ];
+                }
+            } elseif ( null !== $existing && $existing === $parsed[ $key ] ) {
+                unset( $rules[ $key ] );
+            }
+        }
+        $ignored = array_values( array_filter( array_map( static function ( $k ) {
+            return preg_match( '/^[a-z0-9_-]+:[a-z0-9_-]+$/', (string) $k ) ? (string) $k : '';
+        }, $ignore ) ) );
+        return array( 'rules' => $rules, 'ignored' => $ignored );
+    }
+
+    /**
+     * The modal's save: an explicit rule (or none) per term, plus the ignore list. Each choice is the
+     * rule text the box understands ('evergreen', 'event 3', 'season 02-24 03-25') or '' for no rule.
+     * Terms not mentioned keep whatever they had.
+     */
+    public static function set_timing_rules( array $choices, array $ignore ) {
+        $current = get_option( self::OPTION, array() );
+        $current = is_array( $current ) ? $current : array();
+        $rules   = (array) ( $current['timing_rules'] ?? array() );
+        $invalid = array();
+        foreach ( $choices as $key => $text ) {
+            $key = sanitize_key( strtok( (string) $key, ':' ) ) . ':' . sanitize_title( (string) strtok( ':' ) );
+            if ( ! preg_match( '/^[a-z0-9_-]+:[a-z0-9_-]+$/', $key ) ) {
+                continue;
+            }
+            $text = trim( (string) $text );
+            if ( '' === $text ) {
+                unset( $rules[ $key ] );
+                continue;
+            }
+            $parsed = self::parse_timing_rules( $key . ' = ' . $text );
+            if ( isset( $parsed[ $key ] ) ) {
+                $rules[ $key ] = $parsed[ $key ];
+            } else {
+                $invalid[] = $key;
+            }
+        }
+        $current['timing_rules']   = $rules;
+        $current['timing_ignored'] = array_values( array_filter( array_map( static function ( $k ) {
+            return preg_match( '/^[a-z0-9_-]+:[a-z0-9_-]+$/', (string) $k ) ? (string) $k : '';
+        }, $ignore ) ) );
+        update_option( self::OPTION, $current, false );
+        return array( 'options' => self::options(), 'invalid' => $invalid );
+    }
+
+    /** The modal's save: choices against the stored suggestions, written straight to the option. */
+    public static function apply_timing_suggestions( array $suggested, array $accept, array $ignore ) {
+        $current = get_option( self::OPTION, array() );
+        $current = is_array( $current ) ? $current : array();
+        $merged  = self::merge_timing_suggestions( (array) ( $current['timing_rules'] ?? array() ), $suggested, $accept, $ignore );
+        $current['timing_rules']   = $merged['rules'];
+        $current['timing_ignored'] = $merged['ignored'];
+        update_option( self::OPTION, $current, false );
         return self::options();
     }
 

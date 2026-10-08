@@ -25,7 +25,13 @@ $o = AceSeoRetentionActions::options();
                 <tr><th scope="row"><label for="retention-days">Look at traffic from the last</label></th><td><input id="retention-days" type="number" name="report_days" min="7" max="480" value="<?php echo esc_attr( (int) $o['report_days'] ); ?>" class="small-text"> days<p class="description">This is the period requested from the traffic sources, not how long this site has been collecting evidence.</p></td></tr>
                 <tr><th scope="row"><label for="retention-views">Views needed to count as retained</label></th><td><input id="retention-views" type="number" name="retained_views" min="1" value="<?php echo esc_attr( (int) $o['retained_views'] ); ?>" class="small-text"><p class="description">An older post joins the Retained group when it reaches this many views in the traffic window, or gets any search click.</p></td></tr>
                 <tr><th scope="row"><label for="retention-words">Shorter than</label></th><td><input id="retention-words" type="number" name="thin_words" min="0" value="<?php echo esc_attr( (int) $o['thin_words'] ); ?>" class="small-text"> words<p class="description">Posts below this length with no recorded visits are candidates for review. Length alone does not decide their value.</p></td></tr>
-                <tr><td colspan="2" style="padding:18px 0 4px"><h3 style="margin:0;display:flex;align-items:center;gap:10px"><span class="ace-step">2</span>When is there enough evidence to judge a post?</h3><p class="ace-section-lead" style="margin-top:6px">A tips piece is only fairly judged around its race; a guide any time. Say how strict to be, and tell the report when articles in each category matter. It suggests rules from this site's own data.</p></td></tr>
+            </tbody></table>
+    </section>
+
+    <section id="retention-timing-section" class="ace-retention-section">
+        <h3><span class="ace-step">2</span>When is there enough evidence to judge a post?</h3>
+        <p class="ace-section-lead">A tips piece is only fairly judged around its race; a guide any time. Say how strict to be, and tell the report when articles in each category matter. It suggests rules from this site's own data.</p>
+            <table class="form-table"><tbody>
                 <tr><th scope="row"><label for="retention-timing">How strict to be</label></th><td><select id="retention-timing" name="timing_policy">
                     <option value="estimate" <?php selected( $o['timing_policy'] ?? 'estimate', 'estimate' ); ?>>Judge on the traffic window, holding only posts whose known relevant dates fall outside it</option>
                     <option value="strict" <?php selected( $o['timing_policy'] ?? 'estimate', 'strict' ); ?>>Hold every post until its timing is confirmed (evergreen, set dates, or a verified event)</option>
@@ -100,6 +106,7 @@ $o = AceSeoRetentionActions::options();
         <?php if ( class_exists( 'AceSeoSheets' ) ) { AceSeoSheets::render_fields(); } ?>
     </section>
     </form>
+    <?php if ( class_exists( 'Ace_SEO_Timing_Suggestions' ) ) { Ace_SEO_Timing_Suggestions::render_modal( $o ); } ?>
     <section class="ace-retention-section">
         <h3>Google Sheets report: run, stop or retry</h3>
         <p class="ace-section-lead">These act now, using the saved settings above. They are not settings and are never part of a save.</p>
