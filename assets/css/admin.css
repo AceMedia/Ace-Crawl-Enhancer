@@ -3620,3 +3620,28 @@ dialog.ace-timing-dialog table.ace-samples td { padding: 6px 8px; border-top: 1p
 dialog.ace-timing-dialog table.ace-samples tr:first-child td { border-top: 0; }
 dialog.ace-timing-dialog .ace-samples-date, dialog.ace-timing-dialog .ace-samples-group { white-space: nowrap; color: #646970; font-size: 12px; }
 @media (max-width: 1300px) { dialog.ace-timing-dialog .ace-detail-row { grid-template-columns: 1fr; } }
+
+/* Dashboard: groups × options cross-reference */
+.ace-xref-key { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; font-size: 12px; }
+.ace-xref-key-item { padding: 3px 9px; border-radius: 4px; border: 1px solid #dcdcde; }
+.ace-xref { table-layout: fixed; min-width: 900px; }
+.ace-xref th, .ace-xref td { vertical-align: top; padding: 10px 12px; }
+.ace-xref thead th { background: #f6f7f7; }
+.ace-xref thead th a { font-weight: 600; }
+.ace-xref thead th small { display: block; font-weight: 400; color: #646970; margin-top: 2px; }
+.ace-xref .ace-xref-corner { width: 200px; }
+.ace-xref tbody th { font-weight: 600; }
+.ace-xref-tool, .ace-xref-note { display: block; margin-top: 6px; font-weight: 400; font-size: 11px; padding: 1px 6px; border-radius: 3px; width: fit-content; }
+.ace-xref-tool { background: #eaf3fb; color: #12466b; border: 1px solid #b6d3ec; }
+.ace-xref-note { background: #f6f7f7; color: #646970; border: 1px solid #dcdcde; }
+.ace-xref-cell strong { display: block; }
+.ace-xref-why { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; }
+.ace-xref-count { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 10px; background: #1d2327; color: #fff; font-size: 12px; }
+.ace-xref-count b, .ace-xref-key-item.is-count b { font-weight: 700; }
+.ace-xref-cell.is-useful, .ace-xref-key-item.is-useful { background: #edf5ee; color: #1e4620; }
+.ace-xref-cell.is-review, .ace-xref-key-item.is-review { background: #fff8e5; color: #3c2c00; }
+.ace-xref-cell.is-uncertain, .ace-xref-key-item.is-uncertain { background: #f6f7f7; color: #50575e; }
+.ace-xref-cell.is-quiet, .ace-xref-key-item.is-quiet { background: #fafafa; color: #8c8f94; }
+.ace-xref-key-item.is-count { background: #fff; }
+.ace-xref-key-item.is-count b { background: #1d2327; color: #fff; border-radius: 8px; padding: 0 6px; }
+.ace-xref-cell.is-quiet .ace-xref-why { color: #a7aaad; }

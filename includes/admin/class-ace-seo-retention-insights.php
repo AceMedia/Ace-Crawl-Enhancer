@@ -146,41 +146,68 @@ class Ace_SEO_Retention_Insights {
         self::render_timing( $d );
     }
 
+    /**
+     * The cross-reference: every potential option against every readership group. Each cell says
+     * whether that option suits that group and why (the reference guide), and how many posts the
+     * last check actually suggested it for. Options the report never computes show the guide alone.
+     */
     private static function render_matrix( array $m ) {
-        $tiers   = AceSeoRetentionReport::tier_labels();
-        $buckets = AceSeoRetentionReport::recommendation_labels();
-        $col     = array();
-        foreach ( $m as $row ) {
-            foreach ( $row as $b => $n ) {
-                $col[ $b ] = ( $col[ $b ] ?? 0 ) + $n;
-            }
+        if ( ! class_exists( 'Ace_SEO_Retention_Evidence' ) ) {
+            require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-evidence.php';
         }
-        $max = 0;
-        foreach ( $m as $row ) {
-            $max = max( $max, max( $row ) );
+        $tiers   = array( 'retained', 'candidate', 'dormant', 'unknown' );
+        $tlabels = AceSeoRetentionReport::tier_labels();
+        $tsub    = array( 'retained' => 'Read in the period', 'candidate' => 'Short, nobody read it', 'dormant' => 'Nobody read it', 'unknown' => 'Held: evidence not good enough yet' );
+        $options = Ace_SEO_Retention_Evidence::recommendations();
+        // Which saved suggestion each option corresponds to (seasonal-refresh is not computed yet).
+        $bucket  = array( 'keep' => 'keep', 'refresh' => 'refresh', 'seasonal-refresh' => '', 'consolidate' => 'consolidate', 'noindex' => 'noindex', 'hold' => 'no-signal' );
+        $tools   = array( 'consolidate' => 'Manual redirect tool available', 'noindex' => 'Manual noindex tool available' );
+        $posts   = admin_url( 'edit.php?post_type=post' );
+        $totals  = array();
+        foreach ( $tiers as $t ) {
+            $totals[ $t ] = array_sum( (array) ( $m[ $t ] ?? array() ) );
         }
-        $posts = admin_url( 'edit.php?post_type=post' );
         ?>
         <section class="ace-retention-section ace-retention-insight" id="retention-matrix">
-            <h2>How groups and suggestions overlap</h2>
-            <p class="ace-section-lead">Each cell counts posts from the last check with that readership group and that suggestion. A post can be read every week and still be worth an update; the two describe different things. Darker cells hold more posts. Click a group to open those posts.</p>
+            <h2>Groups and options: what fits, and what the last check found</h2>
+            <p class="ace-section-lead">Rows are the things you could do with an older post; columns are the readership groups. Each cell says whether that option suits that group and why, and, where the report makes that suggestion, how many posts the last check put there. A suggestion never changes a post; the manual tools below the table do, and only when you use them.</p>
+            <div class="ace-xref-key" aria-label="Key">
+                <span class="ace-xref-key-item is-useful">Fits: keep helping readers</span>
+                <span class="ace-xref-key-item is-review">Possible: review first</span>
+                <span class="ace-xref-key-item is-uncertain">Wait: timing or evidence uncertain</span>
+                <span class="ace-xref-key-item is-quiet">Not usually a fit</span>
+                <span class="ace-xref-key-item is-count"><b>123</b> posts the last check suggested it for</span>
+            </div>
             <div class="ace-retention-table">
-            <table class="widefat ace-matrix">
-                <thead><tr><th scope="col">Readership group</th><?php foreach ( $buckets as $b => $bl ) : if ( empty( $col[ $b ] ) ) { continue; } ?><th scope="col"><?php echo esc_html( $bl ); ?></th><?php endforeach; ?><th scope="col">Total</th></tr></thead>
+            <table class="widefat ace-xref">
+                <thead><tr><th scope="col" class="ace-xref-corner">Option</th>
+                <?php foreach ( $tiers as $t ) : ?>
+                    <th scope="col"><a href="<?php echo esc_url( add_query_arg( 'ace_ret', $t, $posts ) ); ?>"><?php echo esc_html( $tlabels[ $t ] ?? $t ); ?></a><small><?php echo esc_html( $tsub[ $t ] ); ?> · <?php echo esc_html( number_format_i18n( $totals[ $t ] ) ); ?> posts</small></th>
+                <?php endforeach; ?>
+                </tr></thead>
                 <tbody>
-                <?php foreach ( $tiers as $t => $tl ) : if ( empty( $m[ $t ] ) ) { continue; } $total = array_sum( $m[ $t ] ); ?>
+                <?php foreach ( $options as $opt => $olabel ) : ?>
                     <tr>
-                        <th scope="row"><a href="<?php echo esc_url( add_query_arg( 'ace_ret', $t, $posts ) ); ?>"><?php echo esc_html( $tl ); ?></a></th>
-                        <?php foreach ( $buckets as $b => $bl ) : if ( empty( $col[ $b ] ) ) { continue; } $n = (int) ( $m[ $t ][ $b ] ?? 0 ); $a = $max ? round( 0.08 + 0.6 * $n / $max, 2 ) : 0; ?>
-                            <td class="ace-matrix-cell<?php echo $n ? '' : ' is-empty'; ?>" style="<?php echo $n ? 'background:rgba(34,113,177,' . esc_attr( $a ) . ');' . ( $a > 0.45 ? 'color:#fff;' : '' ) : ''; ?>"><?php echo $n ? esc_html( number_format_i18n( $n ) ) : '–'; ?></td>
+                        <th scope="row"><?php echo esc_html( $olabel ); ?>
+                            <?php if ( isset( $tools[ $opt ] ) ) : ?><span class="ace-xref-tool"><?php echo esc_html( $tools[ $opt ] ); ?></span><?php endif; ?>
+                            <?php if ( '' === $bucket[ $opt ] ) : ?><span class="ace-xref-note">Not suggested automatically yet</span><?php endif; ?>
+                        </th>
+                        <?php foreach ( $tiers as $t ) :
+                            $cell = Ace_SEO_Retention_Evidence::reference_cell( $t, $opt );
+                            $n    = '' !== $bucket[ $opt ] ? (int) ( $m[ $t ][ $bucket[ $opt ] ] ?? 0 ) : 0;
+                            ?>
+                            <td class="ace-xref-cell is-<?php echo esc_attr( $cell['status'] ); ?>">
+                                <strong><?php echo esc_html( $cell['label'] ); ?></strong>
+                                <span class="ace-xref-why"><?php echo esc_html( $cell['why'] ); ?></span>
+                                <?php if ( $n ) : ?><span class="ace-xref-count"><b><?php echo esc_html( number_format_i18n( $n ) ); ?></b> posts</span><?php endif; ?>
+                            </td>
                         <?php endforeach; ?>
-                        <td><strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
             </div>
-            <p class="description">The <a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&evidence_preview=1' ) ); ?>">reference guide</a> explains which suggestions suit each group in general, without counts.</p>
+            <p class="description">"Keep it off search" means keeping the page available but out of search results; "Combine" means pointing it at a newer article that truly replaces it. Both are manual, logged and reversible, and nothing here applies them.</p>
         </section>
         <?php
     }

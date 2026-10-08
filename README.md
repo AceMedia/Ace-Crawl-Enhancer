@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.77-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.78-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.77
+**Stable tag:** 1.0.78
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.78 (2026-10-08)
+- Dashboard: the groups and options cross-reference is back on the dashboard, merged with the counts. Every potential option (keep, improve, get ready for the next event, combine, keep off search, check again later) against every readership group, each cell saying whether it fits and why, how many posts the last check suggested it for, and which options have a manual tool.
 
 ### 1.0.77 (2026-10-08)
 - Settings page: the robots.txt notice now shows only on the SEO dashboard and WordPress's Reading settings, the "Cache Not Generated" notice is gone (the cache status list already says so, and the dashboard builds its cache on first visit), and any other admin notice appears at the top of the content instead of being moved into the sidebar.
