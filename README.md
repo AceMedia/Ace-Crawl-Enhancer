@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.74-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.75-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.74
+**Stable tag:** 1.0.75
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,9 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.75 (2026-10-08)
+- Timing rules dialog: every list row says whether it is a category or a tag (two sections can share a name), the month chart always highlights the season in question, and the suggestion carries its own worked example with the season's dates spelt out for that post's year.
 
 ### 1.0.74 (2026-10-08)
 - Timing rules explain themselves. The settings tab says what day-of-event, yearly season and evergreen mean, and reads every hand-written rule back in plain words under the box. The manager is now a full-screen dialog: categories and tags on the left; on the right the selected one's evidence (how much is still read, how often it publishes, its busiest stretch, a chart of the months its posts are published in), the suggestion and why, a choice of rule with a live explanation, a worked example using one of its real recent posts, and its latest posts. Rules show as plain names ("Day-of-event, 2 days") rather than codes.

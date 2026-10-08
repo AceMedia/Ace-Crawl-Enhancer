@@ -69,7 +69,7 @@
             var end = addDays(post.date, r.days - 1);
             return t + ', matters ' + (r.days === 1 ? 'on ' + esc(longDate(post.date)) : 'from ' + esc(longDate(post.date)) + ' to ' + esc(longDate(end))) + '. From the next day it is judged on how it has been read since.';
         }
-        if (r.mode === 'season') { return t + ', is judged against the ' + md(r.start) + ' to ' + md(r.end) + ' season in any year the report covers in full.'; }
+        if (r.mode === 'season') { var y = post.date.slice(0, 4); return t + ', belongs to the ' + md(r.start) + ' to ' + md(r.end) + ' season (in ' + y + ', ' + longDate(y + '-' + r.start) + ' to ' + longDate(y + '-' + r.end) + '). The report only judges it on a period that contains a whole season, so a quiet summer never counts against it.'; }
         if (r.mode === 'evergreen') { return t + ', is judged on the report\'s normal period, whenever that is.'; }
         return t + ', is judged on the report\'s normal period.';
     }
@@ -127,16 +127,22 @@
             var s = statusOf(it.key);
             html += '<li><button type="button" role="option" class="ace-timing-item' + (it.key === selected ? ' is-selected' : '') + '" data-key="' + esc(it.key) + '" aria-selected="' + (it.key === selected) + '">' +
                 '<span class="ace-timing-item-name">' + esc(it.label) + '</span>' +
-                '<span class="ace-timing-item-meta">' + fmt(it.posts) + ' posts · ' + (it.type === 'mixed' ? 'no clear shape' : esc(it.ruleName)) + '</span>' +
+                '<span class="ace-timing-item-meta">' + kindOf(it.key) + ' · ' + fmt(it.posts) + ' posts · ' + (it.type === 'mixed' ? 'no clear shape' : esc(it.ruleName)) + '</span>' +
                 '<span class="ace-timing-badge ' + s.cls + '">' + esc(s.text) + '</span></button></li>';
         });
         listEl.innerHTML = html || '<li class="ace-timing-empty">Nothing matches.</li>';
         count.textContent = shown + ' of ' + items.length;
     }
 
+    function kindOf(key) {
+        var tax = key.split(':')[0];
+        return tax === 'category' ? 'Category' : (tax === 'post_tag' ? 'Tag' : tax.replace(/[_-]/g, ' '));
+    }
     function monthChart(it) {
         var max = Math.max.apply(null, (it.months || []).concat([1]));
+        // Highlight the season chosen, or else the suggested one, so the chart always shows the stretch in question.
         var r = parseRule(ruleText(state[it.key]));
+        if (r.mode !== 'season' && it.season) { r = { mode: 'season', start: it.season.start, end: it.season.end }; }
         var inSeason = function (m) {
             if (r.mode !== 'season' || !r.start || !r.end) { return false; }
             var a = parseInt(r.start.slice(0, 2), 10), b = parseInt(r.end.slice(0, 2), 10);
@@ -172,16 +178,17 @@
             ['Publishes', cadenceText(it.cadence), it.years ? 'across ' + it.years + ' year' + (it.years === 1 ? '' : 's') : '']
         ];
         if (it.season) { tiles.push(['Busiest stretch', md(it.season.start) + ' to ' + md(it.season.end), it.season.share + '% of its posts']); }
-        var html = '<div class="ace-timing-detail-head"><div><h3>' + esc(it.label) + '</h3><code>' + esc(it.key) + '</code></div>' +
+        var html = '<div class="ace-timing-detail-head"><div><h3>' + esc(it.label) + ' <small class="ace-timing-kind-label">' + kindOf(it.key) + '</small></h3><code>' + esc(it.key) + '</code></div>' +
             '<span class="ace-timing-badge ' + statusOf(it.key).cls + '">' + esc(statusOf(it.key).text) + '</span></div>';
         html += '<h4>What the data shows</h4><div class="ace-tiles">' + tiles.map(function (t) {
             return '<div class="ace-tile"><span class="ace-tile-label">' + esc(t[0]) + '</span><span class="ace-tile-value">' + esc(t[1]) + '</span><span class="ace-tile-sub">' + esc(t[2]) + '</span></div>';
         }).join('') + '</div>';
-        html += '<div class="ace-timing-chart-wrap"><span class="ace-tile-label">When its posts are published</span>' + monthChart(it) + '</div>';
+        html += '<div class="ace-timing-chart-wrap"><span class="ace-tile-label">When its posts are published, all years together' + (it.season ? ' (blue: the season)' : '') + '</span>' + monthChart(it) + '</div>';
 
         if (it.type !== 'mixed') {
             html += '<div class="ace-suggestion-card"><span class="ace-timing-type ace-timing-type-' + esc(it.type) + '">Suggested: ' + esc(it.ruleName) + '</span> <small>' + it.confidence + '% confidence</small>' +
-                '<p>' + esc(meaning(it.rule)) + '</p><p class="ace-why"><strong>Why:</strong> ' + esc(it.why) + '</p></div>';
+                '<p>' + esc(meaning(it.rule)) + '</p>' + (post ? '<p class="ace-example">For example: ' + example(it.rule, post) + '</p>' : '') +
+                '<p class="ace-why"><strong>Why:</strong> ' + esc(it.why) + '</p></div>';
         } else {
             html += '<div class="ace-suggestion-card is-mixed"><span class="ace-timing-type">No clear shape</span><p>' + esc(it.why) + '</p></div>';
         }
