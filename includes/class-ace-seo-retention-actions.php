@@ -285,7 +285,10 @@ class AceSeoRetentionActions {
         return implode( "\n", $lines );
     }
 
-    /** The first timing rule that matches one of the post's terms, with the term it matched, or null. */
+    /**
+     * The timing rule for a post from its categories and tags, or null. When several match, the most
+     * specific term wins: the one with the fewest posts (a festival tag over the whole racing section).
+     */
     public static function timing_rule_for( $post_id ) {
         $rules = (array) ( self::options()['timing_rules'] ?? array() );
         if ( ! $rules ) {
@@ -306,11 +309,14 @@ class AceSeoRetentionActions {
             foreach ( $terms as $term ) {
                 $key = $taxonomy . ':' . $term->slug;
                 if ( isset( $rules[ $key ] ) ) {
-                    return array_merge( $rules[ $key ], array( 'key' => $key, 'label' => $term->name ) );
+                    $count = isset( $term->count ) ? (int) $term->count : PHP_INT_MAX;
+                    if ( ! isset( $best ) || $count < $best['count'] || ( $count === $best['count'] && strcmp( $key, $best['key'] ) < 0 ) ) {
+                        $best = array_merge( $rules[ $key ], array( 'key' => $key, 'label' => $term->name, 'count' => $count ) );
+                    }
                 }
             }
         }
-        return null;
+        return $best ?? null;
     }
 
     /** The front-end form for retained posts: notice, lighter render, continue reading. */

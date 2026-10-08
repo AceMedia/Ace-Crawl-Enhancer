@@ -123,12 +123,22 @@ class Ace_SEO_Timing_Suggestions {
                 $terms[ $k ]['dates'][] = substr( $r['date'], 0, 10 );
             }
         }
+        // Persistence needs a readership source. If almost nothing on the whole site counts as read
+        // (no Analytics, tracking only just switched on), "nobody reads it later" is an artefact of
+        // missing data, so only the date-based seasonal suggestions are offered.
+        $all = 0;
+        $read = 0;
+        foreach ( $terms as $t ) {
+            $all  += $t['n'];
+            $read += $t['read'];
+        }
+        $readership_known = $all > 0 && $read / $all >= 0.02;
         $out = array();
         foreach ( $terms as $k => $t ) {
             if ( $t['n'] < $min_posts ) {
                 continue;
             }
-            $s = self::suggest_for( $t );
+            $s = self::suggest_for( $t, $readership_known );
             if ( $s ) {
                 $out[ $k ] = $s;
             }
@@ -141,7 +151,7 @@ class Ace_SEO_Timing_Suggestions {
     }
 
     /** One term's shape → one suggestion (or null when nothing stands out). */
-    public static function suggest_for( array $t ) {
+    public static function suggest_for( array $t, $readership_known = true ) {
         $n           = (int) $t['n'];
         $persistence = $n ? $t['persistent'] / $n : 0;      // share still read at least monthly, years later
         $read_share  = $n ? $t['read'] / $n : 0;
@@ -159,6 +169,9 @@ class Ace_SEO_Timing_Suggestions {
                 'confidence' => min( 0.95, 0.5 + $season['share'] / 2 + min( 0.2, $years / 20 ) ),
                 'why'        => sprintf( '%d%% of its %s posts were published between %s and %s, across %d years. Older posts should be judged in that season, not in the quiet months.', (int) round( 100 * $season['share'] ), number_format_i18n( $n ), self::md_label( $season['start'] ), self::md_label( $season['end'] ), $years ),
             );
+        }
+        if ( ! $readership_known ) {
+            return null; // Evergreen and event-bound both read persistence, which needs real readership data.
         }
         // Evergreen: a clear share of its old posts is still read monthly or better, all year round.
         if ( $persistence >= 0.15 ) {

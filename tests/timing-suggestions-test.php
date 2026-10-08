@@ -69,6 +69,12 @@ AceSeoRetentionActions::save_report_settings( array( 'timing_rules' => "category
 $check( 'a hand-written rule for a suggested term wins over the suggestion', array( 'type' => 'event', 'days' => 7 ) === AceSeoRetentionActions::options()['timing_rules']['category:tips'] );
 AceSeoRetentionActions::save_report_settings( array( 'timing_rules' => "category:tips = event 7" ) );
 $check( 'a save without the suggestions table leaves ignored keys alone', array() === AceSeoRetentionActions::options()['timing_ignored'] && isset( AceSeoRetentionActions::options()['timing_rules']['category:tips'] ) );
+/* No readership source: only seasons are suggested. */
+$blind = array();
+foreach ( $rows as $r ) { $r['rank'] = ''; $r['tier'] = 'dormant'; $blind[] = $r; }
+$sb = Ace_SEO_Timing_Suggestions::infer( $blind );
+$check( 'without readership data, no event-bound or evergreen guesses', ! array_filter( $sb, static function ( $x ) { return in_array( $x['type'], array( 'event', 'evergreen' ), true ); } ) );
+$check( 'without readership data, seasons are still found from dates alone', isset( $sb['category:festival'] ) && 'season' === $sb['category:festival']['type'] );
 /* The modal's explicit choices. */
 $GLOBALS['opt'] = array();
 $r = AceSeoRetentionActions::set_timing_rules( array( 'category:tips' => 'event 2', 'category:guides' => 'evergreen', 'category:festival' => 'season 02-24 03-25', 'category:news' => '', 'post_tag:bad' => 'season 13-99 01-01' ), array( 'category:news' ) );

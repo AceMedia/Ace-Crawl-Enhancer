@@ -2105,6 +2105,12 @@ class AceSeoRetentionReport {
             </div>
             <p class="description">Checking again uses the saved settings and takes a while on a large site; it runs in the background and this page shows its progress. It updates groups and suggestions, never the changes already applied.</p>
 
+            <?php
+            if ( $built ) {
+                require_once __DIR__ . '/class-ace-seo-retention-insights.php';
+                Ace_SEO_Retention_Insights::render();
+            }
+            ?>
             <?php if ( $built ) : ?>
                 <h2>Suggestions, post by post</h2>
                 <p>Each row shows what we observed and what might help. “Applied” shows actual changes; a suggestion does not change anything.</p>

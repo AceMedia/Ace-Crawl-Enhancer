@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.72-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.73-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.72
+**Stable tag:** 1.0.73
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,11 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.73 (2026-10-08)
+- Dashboard: "How groups and suggestions overlap", a readership-group by suggestion table with counts from the last check, and "Seasons and events": a year strip per seasonal rule (in use or suggested) with today marked, event-bound and evergreen sections with how much of each is still read, posts covered by more than one rule, and a heatmap of when older posts were published. Read-only and cached per check.
+- When several timing rules match a post, the most specific term wins (the one with fewest posts), so a festival tag outranks the whole section it sits in. Previously the first rule listed won.
+- Suggested rules: event-bound and evergreen suggestions need readership data; on a site where almost nothing counts as read (no Analytics, tracking just switched on), only date-based seasonal suggestions are made. The rule dialog's day and date boxes now hide properly when not in use.
 
 ### 1.0.72 (2026-10-08)
 - Fix: the suggested-rules dialog was painted open on the Retention tab because an older `.ace-modal` stylesheet rule forces that class visible; the dialog has its own class and scoped styles now, and only opens from "Manage suggested rules". Room beneath the tab so the fixed save bar no longer covers the last control.

@@ -91,5 +91,9 @@ provider_check( ! empty( $rel['recurring'] ) && '2027-03-01' === $rel['start'], 
 $GLOBALS['post_meta'] = array( '_ace_seo_retention_timing' => 'evergreen' );
 $context = Ace_SEO_Retention_Evidence_View::context( 9, array( 'published' => '2021-03-12' ), $period, '2026-10-07' );
 provider_check( 'evergreen' === ( $context['content_type'] ?? '' ) && ! isset( $context['season'] ), 'The post\'s own setting wins over a category rule.' );
+$GLOBALS['post_meta'] = array();
+$GLOBALS['terms'] = array( 'category' => array( (object) array( 'term_id' => 3, 'slug' => 'horse-racing-tips', 'name' => 'Horse Racing Tips', 'count' => 15000 ), (object) array( 'term_id' => 5, 'slug' => 'cheltenham', 'name' => 'Cheltenham', 'count' => 1200 ) ) );
+$rule = AceSeoRetentionActions::timing_rule_for( 9 );
+provider_check( 'category:cheltenham' === $rule['key'] && 'season' === $rule['type'], 'When several rules match, the most specific term (fewest posts) wins.' );
 $GLOBALS['terms'] = array(); $GLOBALS['post_meta'] = array();
 echo "$checks event provider checks passed.\n";
