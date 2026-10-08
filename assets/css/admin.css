@@ -3596,3 +3596,27 @@ dialog.ace-timing-dialog .ace-timing-changes { color: #996800; font-weight: 600;
 .ace-retention-dashboard h1 { margin-bottom: 4px; }
 
 dialog.ace-timing-dialog .ace-timing-kind-label { font-size: 12px; font-weight: 600; color: #50575e; background: #f0f0f1; border-radius: 10px; padding: 1px 8px; vertical-align: middle; }
+
+/* Timing rules dialog: panel layout on the right */
+dialog.ace-timing-dialog .ace-timing-banner { margin: 0; padding: 10px 24px; background: #fcf9e8; border-bottom: 1px solid #f0e6b8; color: #50410a; }
+dialog.ace-timing-dialog .ace-detail-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0 0; align-items: stretch; }
+dialog.ace-timing-dialog .ace-panel { background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 14px 16px; margin: 0; }
+dialog.ace-timing-dialog > .ace-timing-layout .ace-timing-detail > .ace-panel { margin-top: 16px; }
+dialog.ace-timing-dialog .ace-panel h4 { margin: 0 0 10px; }
+dialog.ace-timing-dialog .ace-panel-sub { margin: -6px 0 8px; color: #646970; font-size: 12px; }
+dialog.ace-timing-dialog .ace-panel .ace-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+dialog.ace-timing-dialog .ace-panel .ace-month-chart { max-width: none; height: 150px; }
+dialog.ace-timing-dialog .ace-suggestion-card { border-left: 4px solid #2271b1; }
+dialog.ace-timing-dialog .ace-suggestion-card p { margin: 8px 0 0; }
+dialog.ace-timing-dialog .ace-why { margin-top: 10px; font-size: 13px; color: #50575e; }
+dialog.ace-timing-dialog .ace-why summary { cursor: pointer; color: #2271b1; }
+dialog.ace-timing-dialog .ace-choices { max-width: none; }
+dialog.ace-timing-dialog .ace-choice { padding: 8px 10px; }
+dialog.ace-timing-dialog .ace-effect { max-width: none; margin-top: 12px; }
+dialog.ace-timing-dialog .ace-effect p:first-child { margin-top: 0; }
+dialog.ace-timing-dialog .ace-ignore span { color: #8c8f94; font-size: 12px; }
+dialog.ace-timing-dialog table.ace-samples { width: 100%; border-collapse: collapse; }
+dialog.ace-timing-dialog table.ace-samples td { padding: 6px 8px; border-top: 1px solid #f0f0f1; vertical-align: top; }
+dialog.ace-timing-dialog table.ace-samples tr:first-child td { border-top: 0; }
+dialog.ace-timing-dialog .ace-samples-date, dialog.ace-timing-dialog .ace-samples-group { white-space: nowrap; color: #646970; font-size: 12px; }
+@media (max-width: 1300px) { dialog.ace-timing-dialog .ace-detail-row { grid-template-columns: 1fr; } }

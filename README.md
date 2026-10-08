@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.75-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.76-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.75
+**Stable tag:** 1.0.76
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.76 (2026-10-08)
+- Timing rules dialog: the right side is laid out in panels, two columns on wide screens (the evidence beside the month chart, the suggestion beside your choice and what it does) with the latest posts as a table underneath.
+- When a site has too little readership data for day-of-event and evergreen suggestions (no Analytics, or own counting only just switched on), the dialog says so in a banner and in the list, instead of an empty filter. Seasons still appear, and any rule can still be chosen by hand.
 
 ### 1.0.75 (2026-10-08)
 - Timing rules dialog: every list row says whether it is a category or a tag (two sections can share a name), the month chart always highlights the season in question, and the suggestion carries its own worked example with the season's dates spelt out for that post's year.

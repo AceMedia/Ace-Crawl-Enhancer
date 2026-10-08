@@ -19,6 +19,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Ace_SEO_Timing_Suggestions {
 
     const OPTION   = 'ace_seo_timing_suggestions';
+
+    /** Whether the last infer() had enough readership data for day-of-event and evergreen suggestions. */
+    public static $readership_known = true;
+    public static $readership_share = 0.0;
     /** Fewer assessed posts than this and a term tells us nothing reliable. */
     const MIN_POSTS = 30;
 
@@ -170,6 +174,8 @@ class Ace_SEO_Timing_Suggestions {
             $read += $t['read'];
         }
         $readership_known = $all > 0 && $read / $all >= 0.02;
+        self::$readership_known = $readership_known;
+        self::$readership_share = $all > 0 ? round( 100 * $read / $all, 2 ) : 0.0;
         $out = array();
         foreach ( $terms as $k => $t ) {
             if ( $t['n'] < $min_posts ) {
@@ -353,7 +359,7 @@ class Ace_SEO_Timing_Suggestions {
     /** Work the suggestions out from the current assessment and store them. */
     public static function recompute() {
         $suggestions = self::infer( self::rows() );
-        update_option( self::OPTION, array( 'computed' => time(), 'suggestions' => $suggestions ), false );
+        update_option( self::OPTION, array( 'computed' => time(), 'suggestions' => $suggestions, 'readership_known' => self::$readership_known, 'readership_share' => self::$readership_share ), false );
         return $suggestions;
     }
 
@@ -362,10 +368,16 @@ class Ace_SEO_Timing_Suggestions {
         $stored = get_option( self::OPTION, array() );
         $built  = (int) ( AceSeoRetentionReport::progress()['finished'] ?? 0 );
         $first  = is_array( $stored['suggestions'] ?? null ) ? reset( $stored['suggestions'] ) : null;
-        if ( ! is_array( $stored ) || ! isset( $stored['suggestions'] ) || (int) ( $stored['computed'] ?? 0 ) < $built || ( is_array( $first ) && ! isset( $first['months'] ) ) ) {
+        if ( ! is_array( $stored ) || ! isset( $stored['suggestions'], $stored['readership_known'] ) || (int) ( $stored['computed'] ?? 0 ) < $built || ( is_array( $first ) && ! isset( $first['months'] ) ) ) {
             return self::recompute();
         }
         return (array) $stored['suggestions'];
+    }
+
+    /** Readership coverage behind the stored suggestions: array( known, share% ). */
+    public static function readership() {
+        $stored = get_option( self::OPTION, array() );
+        return array( 'known' => ! isset( $stored['readership_known'] ) || (bool) $stored['readership_known'], 'share' => (float) ( $stored['readership_share'] ?? 0 ) );
     }
 
     public static function computed_at() {
@@ -468,8 +480,9 @@ class Ace_SEO_Timing_Suggestions {
                 'ignored'    => in_array( $key, $ignored, true ),
             );
         }
+        $rd = self::readership();
         ?>
-        <dialog id="ace-timing-modal" class="ace-timing-dialog" aria-labelledby="ace-timing-modal-title">
+        <dialog id="ace-timing-modal" class="ace-timing-dialog" aria-labelledby="ace-timing-modal-title" data-readership-known="<?php echo $rd['known'] ? '1' : '0'; ?>" data-readership-share="<?php echo esc_attr( $rd['share'] ); ?>">
             <div class="ace-modal-head">
                 <div>
                     <h2 id="ace-timing-modal-title">Timing rules by category and tag</h2>
@@ -477,6 +490,9 @@ class Ace_SEO_Timing_Suggestions {
                 </div>
                 <button type="button" class="ace-modal-close" data-ace-modal-cancel aria-label="Close without saving">&times;</button>
             </div>
+            <?php if ( ! $rd['known'] ) : ?>
+            <div class="ace-timing-banner" role="note"><strong>Only seasonal suggestions on this site.</strong> Just <?php echo esc_html( number_format_i18n( $rd['share'], 2 ) ); ?>% of assessed posts count as read, because there is no Google Analytics or enough of the site's own visitor counting yet. Day-of-event and evergreen suggestions depend on knowing which old posts are still read, so none are made rather than guessing. Seasons only need publication dates, so they still appear. You can still choose any rule yourself.</div>
+            <?php endif; ?>
             <div class="ace-timing-layout">
                 <div class="ace-timing-list-pane">
                     <div class="ace-timing-list-tools">

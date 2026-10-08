@@ -130,7 +130,11 @@
                 '<span class="ace-timing-item-meta">' + kindOf(it.key) + ' · ' + fmt(it.posts) + ' posts · ' + (it.type === 'mixed' ? 'no clear shape' : esc(it.ruleName)) + '</span>' +
                 '<span class="ace-timing-badge ' + s.cls + '">' + esc(s.text) + '</span></button></li>';
         });
-        listEl.innerHTML = html || '<li class="ace-timing-empty">Nothing matches.</li>';
+        var empty = 'Nothing matches.';
+        if (!html && (type.value === 'event' || type.value === 'evergreen') && modal.dataset.readershipKnown === '0') {
+            empty = 'No ' + (type.value === 'event' ? 'day-of-event' : 'evergreen') + ' suggestions on this site: there is not enough readership data to tell which old posts are still read (' + modal.dataset.readershipShare + '% count as read). You can still pick any category and choose that rule yourself.';
+        }
+        listEl.innerHTML = html || '<li class="ace-timing-empty">' + esc(empty) + '</li>';
         count.textContent = shown + ' of ' + items.length;
     }
 
@@ -178,41 +182,49 @@
             ['Publishes', cadenceText(it.cadence), it.years ? 'across ' + it.years + ' year' + (it.years === 1 ? '' : 's') : '']
         ];
         if (it.season) { tiles.push(['Busiest stretch', md(it.season.start) + ' to ' + md(it.season.end), it.season.share + '% of its posts']); }
+        var s0 = statusOf(it.key);
         var html = '<div class="ace-timing-detail-head"><div><h3>' + esc(it.label) + ' <small class="ace-timing-kind-label">' + kindOf(it.key) + '</small></h3><code>' + esc(it.key) + '</code></div>' +
-            '<span class="ace-timing-badge ' + statusOf(it.key).cls + '">' + esc(statusOf(it.key).text) + '</span></div>';
-        html += '<h4>What the data shows</h4><div class="ace-tiles">' + tiles.map(function (t) {
+            '<span class="ace-timing-badge ' + s0.cls + '">' + esc(s0.text) + '</span></div>';
+
+        // Row 1: the evidence beside the month chart.
+        html += '<div class="ace-detail-row">';
+        html += '<section class="ace-panel"><h4>What the data shows</h4><div class="ace-tiles">' + tiles.map(function (t) {
             return '<div class="ace-tile"><span class="ace-tile-label">' + esc(t[0]) + '</span><span class="ace-tile-value">' + esc(t[1]) + '</span><span class="ace-tile-sub">' + esc(t[2]) + '</span></div>';
-        }).join('') + '</div>';
-        html += '<div class="ace-timing-chart-wrap"><span class="ace-tile-label">When its posts are published, all years together' + (it.season ? ' (blue: the season)' : '') + '</span>' + monthChart(it) + '</div>';
-
-        if (it.type !== 'mixed') {
-            html += '<div class="ace-suggestion-card"><span class="ace-timing-type ace-timing-type-' + esc(it.type) + '">Suggested: ' + esc(it.ruleName) + '</span> <small>' + it.confidence + '% confidence</small>' +
-                '<p>' + esc(meaning(it.rule)) + '</p>' + (post ? '<p class="ace-example">For example: ' + example(it.rule, post) + '</p>' : '') +
-                '<p class="ace-why"><strong>Why:</strong> ' + esc(it.why) + '</p></div>';
-        } else {
-            html += '<div class="ace-suggestion-card is-mixed"><span class="ace-timing-type">No clear shape</span><p>' + esc(it.why) + '</p></div>';
-        }
-
-        html += '<h4>Your choice</h4><div class="ace-choices">';
-        if (it.type !== 'mixed') { html += choice(it.key, 'suggested', 'Use the suggestion: ' + esc(it.ruleName)); }
-        html += choice(it.key, 'event', 'Day-of-event', ' <span class="ace-choice-input">matters for <input type="number" min="1" max="366" class="small-text" data-field="days" value="' + esc(st.days) + '"> days after publishing</span>');
-        html += choice(it.key, 'season', 'Yearly season', ' <span class="ace-choice-input">from <input type="text" class="ace-md" data-field="start" placeholder="MM-DD" value="' + esc(st.start) + '"> to <input type="text" class="ace-md" data-field="end" placeholder="MM-DD" value="' + esc(st.end) + '"></span>');
-        html += choice(it.key, 'evergreen', 'Evergreen: always relevant');
-        html += choice(it.key, 'none', 'No rule');
+        }).join('') + '</div></section>';
+        html += '<section class="ace-panel"><h4>When its posts are published</h4><p class="ace-panel-sub">All years together' + (it.season ? '; blue is the season' : '') + '.</p>' + monthChart(it) + '</section>';
         html += '</div>';
-        html += '<div class="ace-effect"><h4>What this does</h4><p>' + esc(meaning(current)) + '</p>' +
-            '<p class="ace-example" id="ace-timing-example">' + (post ? 'For example: ' + example(current, post) : (samples[it.key] ? '' : 'Loading an example…')) + '</p></div>';
-        html += '<label class="ace-ignore"><input type="checkbox" data-field="ignored"' + (st.ignored ? ' checked' : '') + '> Ignore this suggestion (hides it from the "no rule yet" list; it does not set a rule)</label>';
-        html += '<h4>Recent posts in this ' + (it.key.indexOf('post_tag:') === 0 ? 'tag' : 'category') + '</h4><ul class="ace-samples" id="ace-timing-samples">' + samplesHtml(it.key) + '</ul>';
+
+        // Row 2: the suggestion beside your choice and what it does.
+        html += '<div class="ace-detail-row">';
+        if (it.type !== 'mixed') {
+            html += '<section class="ace-panel ace-suggestion-card"><h4>Suggested rule</h4><p><span class="ace-timing-type ace-timing-type-' + esc(it.type) + '">' + esc(it.ruleName) + '</span> <small>' + it.confidence + '% confidence</small></p>' +
+                '<p>' + esc(meaning(it.rule)) + '</p>' + (post ? '<p class="ace-example"><strong>Example:</strong> ' + example(it.rule, post) + '</p>' : '') +
+                '<details class="ace-why"><summary>Why the data suggests it</summary><p>' + esc(it.why) + '</p></details></section>';
+        } else {
+            html += '<section class="ace-panel ace-suggestion-card is-mixed"><h4>Suggested rule</h4><p><span class="ace-timing-type">No clear shape</span></p><p>' + esc(it.why) + '</p></section>';
+        }
+        html += '<section class="ace-panel"><h4>Your choice</h4><div class="ace-choices">';
+        if (it.type !== 'mixed') { html += choice(it.key, 'suggested', 'Use the suggestion', ' <span class="ace-choice-input">' + esc(it.ruleName) + '</span>'); }
+        html += choice(it.key, 'event', 'Day-of-event', ' <span class="ace-choice-input">for <input type="number" min="1" max="366" class="small-text" data-field="days" value="' + esc(st.days) + '"> days after publishing</span>');
+        html += choice(it.key, 'season', 'Yearly season', ' <span class="ace-choice-input">from <input type="text" class="ace-md" data-field="start" placeholder="MM-DD" value="' + esc(st.start) + '"> to <input type="text" class="ace-md" data-field="end" placeholder="MM-DD" value="' + esc(st.end) + '"></span>');
+        html += choice(it.key, 'evergreen', 'Evergreen', ' <span class="ace-choice-input">always relevant</span>');
+        html += choice(it.key, 'none', 'No rule');
+        html += '</div><div class="ace-effect"><p class="ace-effect-text">' + esc(meaning(current)) + '</p>' +
+            '<p class="ace-example" id="ace-timing-example">' + (post ? '<strong>Example:</strong> ' + example(current, post) : (samples[it.key] ? '' : 'Loading an example…')) + '</p></div>' +
+            '<label class="ace-ignore"><input type="checkbox" data-field="ignored"' + (st.ignored ? ' checked' : '') + '> Ignore this suggestion <span>(hides it from "no rule yet"; sets no rule)</span></label></section>';
+        html += '</div>';
+
+        // Row 3: recent posts, full width.
+        html += '<section class="ace-panel"><h4>Latest posts in this ' + (it.key.indexOf('post_tag:') === 0 ? 'tag' : 'category') + '</h4><table class="ace-samples"><tbody id="ace-timing-samples">' + samplesHtml(it.key) + '</tbody></table></section>';
         detailEl.innerHTML = html;
         if (!samples[it.key]) { loadSamples(it.key); }
     }
 
     function samplesHtml(key) {
         var s = samples[key];
-        if (!s) { return '<li class="description">Loading…</li>'; }
-        if (!s.length) { return '<li class="description">No assessed posts found.</li>'; }
-        return s.map(function (p) { return '<li><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a> <span>' + esc(longDate(p.date)) + ' · ' + esc(p.group) + '</span></li>'; }).join('');
+        if (!s) { return '<tr><td class="description">Loading…</td></tr>'; }
+        if (!s.length) { return '<tr><td class="description">No assessed posts found.</td></tr>'; }
+        return s.map(function (p) { return '<tr><td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a></td><td class="ace-samples-date">' + esc(longDate(p.date)) + '</td><td class="ace-samples-group">' + esc(p.group) + '</td></tr>'; }).join('');
     }
 
     function loadSamples(key) {
@@ -262,11 +274,11 @@
         st.mode = t.dataset.field === 'days' ? 'event' : 'season';
         st.picked = 'custom';
         // Keep focus while typing: only refresh the explanation, list and change count.
-        var eff = detailEl.querySelector('.ace-effect p');
+        var eff = detailEl.querySelector('.ace-effect-text');
         if (eff) { eff.textContent = meaning(ruleText(st)); }
         var ex = document.getElementById('ace-timing-example');
         var post = (samples[selected] || [])[0];
-        if (ex && post) { ex.innerHTML = 'For example: ' + example(ruleText(st), post); }
+        if (ex && post) { ex.innerHTML = '<strong>Example:</strong> ' + example(ruleText(st), post); }
         detailEl.querySelectorAll('input[name="ace-timing-choice"]').forEach(function (r) { r.checked = r.value === st.mode; r.closest('.ace-choice').classList.toggle('is-checked', r.checked); });
         renderList(); paintChanges();
     });
