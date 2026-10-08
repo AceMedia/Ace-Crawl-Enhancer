@@ -141,6 +141,8 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
         <!-- Main Content Area -->
         <div class="ace-redis-content">
 
+            <?php // WordPress moves admin notices after the first heading, which here is the sidebar's; this keeps them in the content. ?>
+            <hr class="wp-header-end">
             <?php settings_errors(); ?>
             <!-- Settings Success/Error Messages -->
             <div id="ace-redis-messages" style="display: none;"></div>
@@ -960,12 +962,6 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                 </li>
                                 <li>Cache Duration: <?php echo human_time_diff(0, $cache_status['cache_duration']); ?></li>
                             </ul>
-
-                            <?php if (isset($cache_status['needs_generation']) && $cache_status['needs_generation']): ?>
-                            <div class="notice notice-info ace-cache-info-notice">
-                                <p><strong>ℹ️ Cache Not Generated:</strong> The dashboard cache hasn't been created yet. Click "Refresh Dashboard Cache" to generate it and improve dashboard performance. The cache will also be automatically created the first time you visit the ACE SEO Dashboard.</p>
-                            </div>
-                            <?php endif; ?>
 
                             <p><strong>What this does:</strong></p>
                             <ul>
@@ -1867,14 +1863,6 @@ jQuery(document).ready(function($) {
 
         $statusList.html(statusHtml);
 
-        var $infoNotice = $('.ace-cache-info-notice');
-        if (cacheStatus.needs_generation && !cacheStatus.stats_cached) {
-            if (!$infoNotice.length) {
-                $statusList.after('<div class="notice notice-info ace-cache-info-notice"><p><strong>ℹ️ Cache Not Generated:</strong> The dashboard cache hasn\'t been created yet. Click "Refresh Dashboard Cache" to generate it and improve dashboard performance. The cache will also be automatically created the first time you visit the ACE SEO Dashboard.</p></div>');
-            }
-        } else {
-            $infoNotice.remove();
-        }
     }
 
     function humanTimeDiff(seconds) {

@@ -72,7 +72,9 @@ function ace_seo_robots_file_notice() {
         return;
     }
 
-    $relevant = 'options-reading' === $screen->id || false !== strpos( (string) $screen->id, 'ace-seo' );
+    // The SEO dashboard and core's Reading settings only: on the settings and retention screens it
+    // repeated on every tab and pushed the navigation down.
+    $relevant = in_array( $screen->id, array( 'options-reading', 'toplevel_page_ace-seo' ), true );
     if ( ! $relevant ) {
         return;
     }
