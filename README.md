@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.69-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.70-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.69
+**Stable tag:** 1.0.70
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.70 (2026-10-08)
+- One save bar for the whole settings page. The shared SaveBar now tracks several forms, so the Retention tab saves from the same fixed bar as every other tab, with no per-section buttons and no auto-save for retention. Any `<form data-ace-savebar="admin-post">` joins the bar by markup alone, and `build/savebar.js` is registered as the `ace-savebar` script handle for the rest of the Ace plugin suite to enqueue.
+- Dashboard at a glance: a status strip (last checked, posts, dates, sources, next check), a proportion bar of still read / not ready / no readers, four colour-coded cards with icons, and numbered next steps. Settings tab laid out as five numbered steps with a one-line plain-English lead each.
 
 ### 1.0.69 (2026-10-07)
 - Suggested timing rules ignore posts with a zero or legacy publication date, which had stretched the publishing cadence of the largest terms across centuries.

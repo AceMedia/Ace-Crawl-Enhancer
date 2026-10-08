@@ -161,17 +161,11 @@ import SaveBar from './components/SaveBar.js';
         }
 
         initSaveBar() {
-            // Initialize SaveBar component if we're on the settings page
-            const $form = $('#ace-redis-settings-form, #ace-seo-settings-form');
-            if ($form.length) {
-                const selector = $('#ace-redis-settings-form').length ? '#ace-redis-settings-form' : '#ace-seo-settings-form';
-                $(document).ready(() => {
-                    this.saveBar = new SaveBar({
-                        containerSelector: selector,
-                        messageContainerSelector: '#ace-redis-messages'
-                    });
-                });
-            }
+            // One bar for the main settings form and every form that declares data-ace-savebar
+            // (the Retention tab, for instance). Nothing else on the page needs a Save button.
+            $(document).ready(() => {
+                this.saveBar = SaveBar.autoRegister({ messageContainerSelector: '#ace-redis-messages' });
+            });
         }
 
         initFormValidation() {

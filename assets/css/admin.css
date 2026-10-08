@@ -41,9 +41,6 @@
   max-width: 100%;
   overflow-x: auto;
 }
-body:has(#retention.active) .ace-redis-save-bar {
-  display: none;
-}
 @media (max-width: 782px) {
   .ace-retention-settings .form-table th,
   .ace-retention-settings .form-table td {
@@ -3333,32 +3330,117 @@ input:checked + .ace-slider:before {
 }
 
 
-/* Retention settings: one sticky save bar for the whole tab. */
-.ace-retention-save-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  margin: 0 0 24px;
-  padding: 12px 16px;
+/* ---- Retention: a shared visual system for the settings tab and the dashboard ---- */
+.ace-retention-settings .ace-retention-section,
+.ace-retention-dashboard .ace-retention-section {
   background: #fff;
   border: 1px solid #c3c4c7;
-  border-radius: 4px;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 18px 22px 20px;
+  margin: 0 0 20px;
+  max-width: 1100px;
 }
-.ace-retention-save-bar .ace-retention-save-status { color: #50575e; }
-.ace-retention-save-bar.is-dirty { border-color: #dba617; }
-.ace-retention-save-bar.is-dirty .ace-retention-save-status { color: #996800; font-weight: 600; }
+.ace-retention-settings .ace-retention-section > h3 {
+  margin: 0 0 6px;
+  font-size: 1.15em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ace-retention-settings .ace-retention-section > h3 .ace-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2271b1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ace-retention-settings .ace-section-lead {
+  margin: 0 0 12px;
+  color: #50575e;
+  font-size: 13.5px;
+}
+.ace-retention-settings .form-table th { width: 260px; }
+.ace-retention-settings .form-table td .description { max-width: 720px; }
 
-/* Retention dashboard: the summary first. */
-.ace-retention-summary { max-width: 980px; margin: 16px 0 24px; }
-.ace-retention-summary .ace-retention-reassure { font-weight: 600; }
-.ace-retention-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 16px 0; }
-.ace-retention-card { background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; padding: 14px 16px; }
-.ace-retention-card .ace-retention-card-number { display: block; font-size: 28px; line-height: 1.2; font-weight: 600; margin: 4px 0; }
-.ace-retention-card ul { margin: 8px 0 0; color: #50575e; }
-.ace-retention-card ul li { margin: 0; }
-.ace-retention-next-steps { background: #f6f7f7; border-left: 4px solid #2271b1; padding: 12px 16px; margin: 16px 0; }
+/* Dashboard summary */
+.ace-retention-summary { max-width: 1100px; margin: 16px 0 24px; }
+.ace-retention-reassure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 12px 0 16px;
+  background: #edf5ee;
+  border-left: 4px solid #00a32a;
+  border-radius: 4px;
+  font-weight: 600;
+  max-width: 1100px;
+}
+.ace-retention-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0 0 12px;
+  color: #50575e;
+  font-size: 13px;
+}
+.ace-retention-status strong { color: #1d2327; }
+.ace-retention-bar {
+  display: flex;
+  height: 18px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #f0f0f1;
+  margin: 12px 0 6px;
+}
+.ace-retention-bar span { display: block; height: 100%; min-width: 2px; }
+.ace-retention-bar .is-read { background: #00a32a; }
+.ace-retention-bar .is-held { background: #8c8f94; }
+.ace-retention-bar .is-quiet { background: #d63638; opacity: .75; }
+.ace-retention-bar-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: #50575e; margin: 0 0 14px; }
+.ace-retention-bar-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.ace-retention-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 12px 0 18px;
+}
+.ace-retention-card {
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-top: 4px solid #8c8f94;
+  border-radius: 6px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ace-retention-card.is-read { border-top-color: #00a32a; }
+.ace-retention-card.is-update { border-top-color: #dba617; }
+.ace-retention-card.is-held { border-top-color: #8c8f94; }
+.ace-retention-card.is-quiet { border-top-color: #d63638; }
+.ace-retention-card .ace-retention-card-title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.ace-retention-card .ace-retention-card-title .dashicons { color: #50575e; }
+.ace-retention-card .ace-retention-card-number { font-size: 30px; line-height: 1.1; font-weight: 600; margin: 2px 0 4px; }
+.ace-retention-card .ace-retention-card-sub { color: #50575e; font-size: 13px; }
+.ace-retention-card ul { margin: 6px 0 0; color: #50575e; font-size: 13px; }
+.ace-retention-card ul li { margin: 0 0 2px; }
+.ace-retention-card .ace-retention-card-link { margin-top: auto; padding-top: 8px; }
+.ace-retention-next-steps {
+  background: #f6f7f7;
+  border-left: 4px solid #2271b1;
+  border-radius: 4px;
+  padding: 12px 16px 14px;
+  margin: 16px 0;
+}
+.ace-retention-next-steps ol { margin: 8px 0 0 1.4em; }
+.ace-retention-next-steps li { margin: 0 0 6px; }
+.ace-retention-controls { display: flex; gap: .5em; flex-wrap: wrap; align-items: center; margin: 0 0 1.5em; }
+@media (max-width: 782px) {
+  .ace-retention-settings .form-table th { width: auto; }
+}

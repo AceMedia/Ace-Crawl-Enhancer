@@ -299,6 +299,10 @@ class AceSEOSettings {
             $script_deps[] = 'jquery';
         }
 
+        // The suite-wide save bar on its own, for other Ace plugins' settings pages to enqueue.
+        if ( file_exists( ACE_SEO_PATH . 'build/savebar.js' ) && ! wp_script_is( 'ace-savebar', 'registered' ) ) {
+            wp_register_script( 'ace-savebar', ACE_SEO_URL . 'build/savebar.js', array( 'jquery' ), ACE_SEO_VERSION, true );
+        }
         wp_enqueue_script(
             'ace-seo-admin',
             ACE_SEO_URL . 'build/index.js',

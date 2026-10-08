@@ -7,24 +7,26 @@ if ( ! current_user_can( 'manage_options' ) || ! class_exists( 'AceSeoRetentionA
 $o = AceSeoRetentionActions::options();
 ?>
 <div id="retention" class="tab-content ace-retention-settings">
-    <h2>Retention settings</h2>
+    <h2>Older posts: how we look at them and what readers see</h2>
     <?php AceSeoRetentionReport::render_message(); ?>
-    <p>Choose which older posts to review and what readers see. Saving report settings does not delete, redirect or hide any post.</p>
+    <p>Five short steps: which posts to look at, when there is enough evidence to judge one, what readers see on older articles, how to lead them to current ones, and where the report goes. Saving here never deletes, redirects or hides a post.</p>
     <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>">Open the retention dashboard</a> · <a href="#retention-help" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-help">What the groups and recommendations mean</a></p>
-    <p class="description">Change anything below, then use the single <strong>Save all retention settings</strong> button at the bottom. Running, stopping or retrying a Google Sheets refresh is separate and never part of a save.</p>
-    <form id="ace-retention-settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+    <p class="description">Change anything below and use the save bar at the bottom of the screen, the same one as every other Ace settings page. Nothing here auto-saves. Running, stopping or retrying a Google Sheets refresh is separate and never part of a save.</p>
+    <form id="ace-retention-settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-ace-savebar="admin-post" data-ace-savebar-autosave="0" data-ace-savebar-reload="1">
         <?php wp_nonce_field( 'ace_seo_retention_settings_save' ); ?>
         <input type="hidden" name="action" value="ace_seo_retention_settings_save">
+        <noscript><p><button class="button button-primary">Save all retention settings</button></p></noscript>
 
     <section id="retention-report" class="ace-retention-section">
-        <h3>Choose the posts to review</h3>
-        <p class="description">Saved changes apply to the next report build. The dashboard keeps showing the period and settings used for its existing results.</p>
+        <h3><span class="ace-step">1</span>Which posts to look at, and what counts as being read</h3>
+        <p class="ace-section-lead">Pick the age that makes a post "older", the stretch of traffic to look at, and the smallest readership that still counts. Changes apply from the next check; the dashboard keeps showing the settings its current results used.</p>
             <table class="form-table"><tbody>
                 <tr><th scope="row"><label for="retention-years">Review posts older than</label></th><td><input id="retention-years" type="number" name="report_years" min="1" max="20" value="<?php echo esc_attr( (int) $o['report_years'] ); ?>" class="small-text"> years<p class="description">This is the age of the article, measured from its publication date.</p></td></tr>
                 <tr><th scope="row"><label for="retention-days">Look at traffic from the last</label></th><td><input id="retention-days" type="number" name="report_days" min="7" max="480" value="<?php echo esc_attr( (int) $o['report_days'] ); ?>" class="small-text"> days<p class="description">This is the period requested from the traffic sources, not how long this site has been collecting evidence.</p></td></tr>
                 <tr><th scope="row"><label for="retention-views">Views needed to count as retained</label></th><td><input id="retention-views" type="number" name="retained_views" min="1" value="<?php echo esc_attr( (int) $o['retained_views'] ); ?>" class="small-text"><p class="description">An older post joins the Retained group when it reaches this many views in the traffic window, or gets any search click.</p></td></tr>
                 <tr><th scope="row"><label for="retention-words">Shorter than</label></th><td><input id="retention-words" type="number" name="thin_words" min="0" value="<?php echo esc_attr( (int) $o['thin_words'] ); ?>" class="small-text"> words<p class="description">Posts below this length with no recorded visits are candidates for review. Length alone does not decide their value.</p></td></tr>
-                <tr><th scope="row"><label for="retention-timing">Judging timing</label></th><td><select id="retention-timing" name="timing_policy">
+                <tr><td colspan="2" style="padding:18px 0 4px"><h3 style="margin:0;display:flex;align-items:center;gap:10px"><span class="ace-step">2</span>When is there enough evidence to judge a post?</h3><p class="ace-section-lead" style="margin-top:6px">A tips piece is only fairly judged around its race; a guide any time. Say how strict to be, and tell the report when articles in each category matter. It suggests rules from this site's own data.</p></td></tr>
+                <tr><th scope="row"><label for="retention-timing">How strict to be</label></th><td><select id="retention-timing" name="timing_policy">
                     <option value="estimate" <?php selected( $o['timing_policy'] ?? 'estimate', 'estimate' ); ?>>Judge on the traffic window, holding only posts whose known relevant dates fall outside it</option>
                     <option value="strict" <?php selected( $o['timing_policy'] ?? 'estimate', 'strict' ); ?>>Hold every post until its timing is confirmed (evergreen, set dates, or a verified event)</option>
                 </select><p class="description">Posts with readers or search clicks are never held. Under the strict policy, unconfirmed posts are "Not ready to judge" until an editor sets "When this article matters" on them or a rule below covers them; the anniversary estimate is shown but not trusted.</p></td></tr>
@@ -41,7 +43,8 @@ $o = AceSeoRetentionActions::options();
     </section>
 
     <section id="retention-notice" class="ace-retention-section">
-        <h3>Help readers recognise older articles</h3>
+        <h3><span class="ace-step">3</span>What readers see on older articles</h3>
+        <p class="ace-section-lead">A gentle notice that an article is older, and, further down, the advanced rules that can take content out of search results after a set time.</p>
             <input type="hidden" name="settings_section" value="notice-lifetimes">
             <p><label><input type="checkbox" name="notice_enabled" value="1" <?php checked( ! empty( $o['notice_enabled'] ) ); ?>> Show an old-article notice</label></p>
             <p class="description">Adds a message above older articles. It does not change the saved article or its search visibility.</p>
@@ -70,8 +73,8 @@ $o = AceSeoRetentionActions::options();
                 </section>
 
     <section id="retention-readers" class="ace-retention-section">
-        <h3>Help readers move from older posts to current ones</h3>
-        <p>These controls use the Retained group from the latest report. They do not move or delete the article.</p>
+        <h3><span class="ace-step">4</span>Helping readers of older posts find current ones</h3>
+        <p class="ace-section-lead">For posts that are still being read: a notice, a lighter page for signed-out readers, and a link on to the latest article in the same section. None of this moves or deletes anything.</p>
             <p><label><input type="checkbox" name="retained_notice" value="1" <?php checked( ! empty( $o['retained_notice'] ) ); ?>> Show a notice on retained posts</label></p>
             <p class="description">This notice follows the Retained group rather than the age rule above. When both apply, this message takes priority; a post’s own notice override still wins.</p>
             <p><label for="retained-notice-text">Message for readers</label><br><input id="retained-notice-text" type="text" name="retained_notice_text" value="<?php echo esc_attr( $o['retained_notice_text'] ); ?>" class="large-text"></p>
@@ -92,47 +95,16 @@ $o = AceSeoRetentionActions::options();
             </details>
                 </section>
     <section class="ace-retention-section">
-        <h3>Google Sheets</h3>
-        <p>Connect a spreadsheet to export filtered post lists as separate tabs and to keep the main report tab up to date.</p>
+        <h3><span class="ace-step">5</span>Where the report goes: Google Sheets</h3>
+        <p class="ace-section-lead">Connect a spreadsheet to export filtered post lists as separate tabs and to keep the main report tab up to date after each check.</p>
         <?php if ( class_exists( 'AceSeoSheets' ) ) { AceSeoSheets::render_fields(); } ?>
     </section>
     </form>
-    <div class="ace-retention-save-bar" aria-label="Retention settings">
-        <span class="ace-retention-save-status" role="status" aria-live="polite" data-clean="No unsaved changes" data-dirty="You have unsaved changes" data-saving="Saving…">No unsaved changes</span>
-        <button type="submit" form="ace-retention-settings-form" class="button button-primary">Save all retention settings</button>
-    </div>
     <section class="ace-retention-section">
         <h3>Google Sheets report: run, stop or retry</h3>
+        <p class="ace-section-lead">These act now, using the saved settings above. They are not settings and are never part of a save.</p>
         <?php if ( class_exists( 'AceSeoSheetsSchedule' ) ) { AceSeoSheetsSchedule::render_controls(); } ?>
     </section>
-    <script>
-    (function () {
-        var form = document.getElementById('ace-retention-settings-form');
-        var status = document.querySelector('.ace-retention-save-status');
-        var bar = status ? status.closest('.ace-retention-save-bar') : null;
-        if (!form || !status || !bar) { return; }
-        var snapshot = function () {
-            var out = [];
-            Array.prototype.forEach.call(form.elements, function (el) {
-                if (!el.name) { return; }
-                if (el.type === 'checkbox' || el.type === 'radio') { out.push(el.name + '=' + (el.checked ? el.value : '')); }
-                else if (el.multiple) { out.push(el.name + '=' + Array.prototype.map.call(el.selectedOptions, function (o) { return o.value; }).join('|')); }
-                else { out.push(el.name + '=' + el.value); }
-            });
-            return out.join('\n');
-        };
-        var clean = snapshot(), dirty = false, saving = false;
-        var paint = function () {
-            dirty = !saving && snapshot() !== clean;
-            status.textContent = saving ? status.dataset.saving : (dirty ? status.dataset.dirty : status.dataset.clean);
-            bar.classList.toggle('is-dirty', dirty);
-        };
-        form.addEventListener('input', paint);
-        form.addEventListener('change', paint);
-        form.addEventListener('submit', function () { saving = true; paint(); });
-        window.addEventListener('beforeunload', function (e) { if (dirty && !saving) { e.preventDefault(); e.returnValue = ''; } });
-    })();
-    </script>
     <section id="retention-help" class="ace-retention-section">
         <?php AceSeoRetentionReport::render_help(); ?>
     </section>

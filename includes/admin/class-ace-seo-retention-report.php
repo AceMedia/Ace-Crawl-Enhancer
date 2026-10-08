@@ -1609,6 +1609,10 @@ class AceSeoRetentionReport {
                 $parts[] = 'Report schedule not saved: ' . $schedule->get_error_message() . ' Everything else was saved.';
             }
         }
+        if ( ! empty( $in['ace_json'] ) ) {
+            // The shared save bar posted this; it reloads the tab so accepted rules and the hold table re-render.
+            wp_send_json_success( array( 'message' => implode( ' ', $parts ), 'reload' => true ) );
+        }
         set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), implode( ' ', $parts ), 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention' ) );
         exit;
@@ -1775,51 +1779,76 @@ class AceSeoRetentionReport {
         $pct      = $total ? round( 100 * (int) $tiers['retained'] / $total ) : 0;
         $share    = $p['share'] ?? null;
         $posts    = admin_url( 'edit.php?post_type=post' );
+        $weekly = wp_next_scheduled( self::WEEKLY_HOOK );
+        $held   = (int) $tiers['unknown'];
+        $readp  = $total ? 100 * (int) $tiers['retained'] / $total : 0;
+        $heldp  = $total ? 100 * $held / $total : 0;
+        $quietp = max( 0, 100 - $readp - $heldp );
         ?>
         <div class="ace-retention-summary">
+            <div class="ace-retention-status">
+                <span>Last checked: <strong><?php echo ! empty( $p['finished'] ) ? esc_html( wp_date( 'j M Y, H:i', (int) $p['finished'] ) ) : 'in progress'; ?></strong></span>
+                <span>Posts checked: <strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong> (older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years)</span>
+                <?php if ( $from ) : ?><span>Traffic from: <strong><?php echo esc_html( $from ); ?> to <?php echo esc_html( $to ); ?></strong></span><?php endif; ?>
+                <span>Sources: <strong><?php echo esc_html( $sources ); ?></strong></span>
+                <span>Next automatic check: <strong><?php echo $weekly ? esc_html( wp_date( 'D j M, H:i', $weekly ) ) : 'off'; ?></strong></span>
+            </div>
             <?php if ( $partial ) : ?><p><strong>Partial results:</strong> a check is still running, so these numbers will change until it finishes.</p><?php endif; ?>
-            <p>We checked <strong><?php echo esc_html( number_format_i18n( $total ) ); ?></strong> published posts older than <?php echo esc_html( (int) $settings['older_than_years'] ); ?> years<?php echo $from ? ', looking for visits and search activity from ' . esc_html( $from ) . ' to ' . esc_html( $to ) : ''; ?>, using <?php echo esc_html( $sources ); ?>.</p>
+
+            <div class="ace-retention-bar" role="img" aria-label="<?php echo esc_attr( sprintf( '%d%% still being read, %d%% not ready to judge, %d%% with no recorded readers', round( $readp ), round( $heldp ), round( $quietp ) ) ); ?>">
+                <span class="is-read" style="width:<?php echo esc_attr( $readp ); ?>%"></span>
+                <span class="is-held" style="width:<?php echo esc_attr( $heldp ); ?>%"></span>
+                <span class="is-quiet" style="width:<?php echo esc_attr( $quietp ); ?>%"></span>
+            </div>
+            <div class="ace-retention-bar-key">
+                <span><i style="background:#00a32a"></i><?php echo esc_html( round( $readp ) ); ?>% still being read</span>
+                <span><i style="background:#8c8f94"></i><?php echo esc_html( round( $heldp ) ); ?>% not ready to judge</span>
+                <span><i style="background:#d63638;opacity:.75"></i><?php echo esc_html( round( $quietp ) ); ?>% no recorded readers</span>
+            </div>
+
             <div class="ace-retention-cards">
-                <div class="ace-retention-card">
-                    <?php echo esc_html( $labels['retained'] ); ?>
+                <div class="ace-retention-card is-read">
+                    <span class="ace-retention-card-title"><span class="dashicons dashicons-visibility"></span><?php echo esc_html( $labels['retained'] ); ?></span>
                     <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) $tiers['retained'] ) ); ?></span>
-                    <?php echo esc_html( $pct ); ?>% of the posts we checked. How often:
+                    <span class="ace-retention-card-sub">Somebody read them in the period. How often, on average:</span>
                     <ul>
                         <?php foreach ( $rlabels as $r => $rl ) : ?><li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', $r, $posts ) ); ?>"><?php echo esc_html( preg_replace( '/ \(.*$/', '', $rl ) ); ?></a>: <?php echo esc_html( number_format_i18n( (int) $ranks[ $r ] ) ); ?></li><?php endforeach; ?>
                     </ul>
                 </div>
-                <div class="ace-retention-card">
-                    Worth checking for an update
+                <div class="ace-retention-card is-update">
+                    <span class="ace-retention-card-title"><span class="dashicons dashicons-edit"></span>Worth checking for an update</span>
                     <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) ( $buckets['refresh'] ?? 0 ) ) ); ?></span>
-                    People see them in search but few click. A suggestion to look, not a finding that anything is wrong.
-                    <ul><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Review these</a></li></ul>
+                    <span class="ace-retention-card-sub">People see them in search but few click. A suggestion to look, not a finding that anything is wrong.</span>
+                    <span class="ace-retention-card-link"><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Review these</a></span>
                 </div>
-                <div class="ace-retention-card">
-                    <?php echo esc_html( $labels['unknown'] ); ?>
-                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( (int) $tiers['unknown'] ) ); ?></span>
+                <div class="ace-retention-card is-held">
+                    <span class="ace-retention-card-title"><span class="dashicons dashicons-clock"></span><?php echo esc_html( $labels['unknown'] ); ?></span>
+                    <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( $held ) ); ?></span>
+                    <span class="ace-retention-card-sub">We hold back rather than guess:</span>
                     <ul>
                         <?php if ( $holds['timing'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['timing'] ) ); ?> need their relevant dates confirmed</li><?php endif; ?>
                         <?php if ( $holds['coverage'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['coverage'] ) ); ?> fall outside the dates our data covers</li><?php endif; ?>
                         <?php if ( $holds['ambiguous'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['ambiguous'] ) ); ?> are linked to more than one event</li><?php endif; ?>
                         <?php if ( $holds['missing'] ) : ?><li><?php echo esc_html( number_format_i18n( $holds['missing'] ) ); ?> have no visitor data</li><?php endif; ?>
-                        <li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', 'unknown', $posts ) ); ?>">See these posts</a></li>
+                        <?php if ( ! $held ) : ?><li>Nothing is held.</li><?php endif; ?>
                     </ul>
+                    <?php if ( $held ) : ?><span class="ace-retention-card-link"><a class="button" href="<?php echo esc_url( add_query_arg( 'ace_ret', 'unknown', $posts ) ); ?>">See these posts</a></span><?php endif; ?>
                 </div>
-                <div class="ace-retention-card">
-                    <?php echo esc_html( $labels['dormant'] ); ?>
+                <div class="ace-retention-card is-quiet">
+                    <span class="ace-retention-card-title"><span class="dashicons dashicons-hidden"></span><?php echo esc_html( $labels['dormant'] ); ?></span>
                     <span class="ace-retention-card-number"><?php echo esc_html( number_format_i18n( $quiet ) ); ?></span>
-                    No visits and no search clicks in the period<?php echo (int) $tiers['candidate'] ? ', including ' . esc_html( number_format_i18n( (int) $tiers['candidate'] ) ) . ' short posts' : ''; ?>. Quiet is not the same as worthless.
-                    <ul><li><a href="<?php echo esc_url( add_query_arg( 'ace_ret', 'dormant', $posts ) ); ?>">See these posts</a></li></ul>
+                    <span class="ace-retention-card-sub">No visits and no search clicks in the period<?php echo (int) $tiers['candidate'] ? ', including ' . esc_html( number_format_i18n( (int) $tiers['candidate'] ) ) . ' short posts' : ''; ?>. Quiet is not the same as worthless.</span>
+                    <?php if ( $quiet ) : ?><span class="ace-retention-card-link"><a class="button" href="<?php echo esc_url( add_query_arg( 'ace_ret', 'dormant', $posts ) ); ?>">See these posts</a></span><?php endif; ?>
                 </div>
             </div>
             <?php if ( is_array( $share ) && ! empty( $share['total'] ) ) : ?>
-                <p>In the last <?php echo esc_html( (int) $share['days'] ); ?> days, <strong><?php echo esc_html( round( 100 * $share['old'] / $share['total'], 1 ) ); ?>%</strong> of all page views went to these older posts (<?php echo esc_html( number_format_i18n( (int) $share['old'] ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $share['total'] ) ); ?>, <?php echo esc_html( $share['source'] ); ?>).</p>
+                <p>In the last <?php echo esc_html( (int) $share['days'] ); ?> days, <strong><?php echo esc_html( round( 100 * $share['old'] / $share['total'], 1 ) ); ?>%</strong> of all page views on the site went to these older posts (<?php echo esc_html( number_format_i18n( (int) $share['old'] ) ); ?> of <?php echo esc_html( number_format_i18n( (int) $share['total'] ) ); ?>, <?php echo esc_html( $share['source'] ); ?>).</p>
             <?php endif; ?>
             <div class="ace-retention-next-steps">
                 <strong>What to do next</strong>
-                <ol style="margin:.5em 0 0 1.5em">
+                <ol>
                     <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Start with the posts worth updating</a>: they already have an audience in search.</li>
-                    <?php if ( $holds['timing'] ) : ?><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) ); ?>">Say when articles in a category matter</a> (evergreen, event-bound or seasonal) so the held posts can be judged, or set it on individual posts.</li><?php endif; ?>
+                    <?php if ( $holds['timing'] ) : ?><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) ); ?>">Accept or set timing rules for categories</a> so the held posts can be judged; the settings tab suggests rules from this site's own data.</li><?php endif; ?>
                     <li>Groups and suggestions overlap: a post can be read weekly and still be worth an update. Decide with the client; this report only describes.</li>
                     <?php if ( class_exists( 'AceSeoSheets' ) && AceSeoSheets::configured() ) : ?><li><a href="<?php echo esc_url( AceSeoSheets::sheet_url() ); ?>" target="_blank" rel="noopener noreferrer">Open the Google Sheet</a> for the full list with readership bands, timing and reasons.</li><?php endif; ?>
                 </ol>
@@ -1854,7 +1883,7 @@ class AceSeoRetentionReport {
         <div class="wrap ace-retention-dashboard">
             <h1>Older posts: readership and review</h1>
             <?php self::render_message(); ?>
-            <p class="ace-retention-reassure">Reading this report changes nothing. Nothing here deletes, redirects or hides a post; the only changes happen through the clearly labelled administrator actions further down, and each one is logged.</p>
+            <p class="ace-retention-reassure"><span class="dashicons dashicons-lock" aria-hidden="true"></span>Reading this report changes nothing. Nothing here deletes, redirects or hides a post; the only changes happen through the clearly labelled administrator actions further down, and each one is logged.</p>
 
             <?php $state = self::worker_state(); ?>
             <?php if ( self::is_building() ) : ?>

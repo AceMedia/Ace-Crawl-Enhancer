@@ -1,7 +1,18 @@
 /**
- * SaveBar Component for Ace Crawl Enhancer
+ * SaveBar: the one fixed save bar every Ace settings page uses.
  *
- * Redis-style fixed bottom save bar with auto-save and change tracking.
+ * Tracks changes across one or more forms and saves whichever are dirty from a single button, so a
+ * page never needs a Save button per section. A form joins in two ways:
+ *
+ *   1. `containerSelector` / `forms` options when the page's own script builds the bar, or
+ *   2. markup alone: any `<form data-ace-savebar="admin-post">` on the page is picked up by
+ *      `SaveBar.autoRegister()`. Such a form is posted to its own `action` with `ace_json=1`, and its
+ *      handler replies with WordPress JSON (`wp_send_json_success( { message, reload } )`).
+ *      `data-ace-savebar-autosave="0"` keeps it out of auto-save; `data-ace-savebar-reload="1"`
+ *      reloads the page once it has saved (for server-rendered state).
+ *
+ * Shared by the Ace plugin suite: the built file is registered as the `ace-savebar` script handle and
+ * exposed as `window.AceSaveBar`, so other plugins enqueue it rather than ship their own buttons.
  *
  * @package AceCrawlEnhancer
  * @since 1.0.3
@@ -16,8 +27,17 @@ class SaveBar {
             saveButtonSelector: '#ace-redis-save-btn',
             messageContainerSelector: '#ace-redis-messages',
             onSave: null,
+            forms: null,
             ...options
         };
+        // Every form this bar looks after: { selector, save(formEl) -> Promise<{success,message,reload}>, autoSave }.
+        this.forms = this.options.forms || [{
+            selector: this.options.containerSelector,
+            save: null,
+            autoSave: true
+        }];
+        this.original = {};
+        this.dirty = {};
 
         this.isInitialized = false;
         this.hasUnsavedChanges = false;
@@ -83,7 +103,7 @@ class SaveBar {
     }
 
     setupEventListeners() {
-        $(this.options.containerSelector).on('input change', 'input, select, textarea', () => {
+        $(this.formSelectors()).on('input change', 'input, select, textarea', () => {
             setTimeout(() => this.checkForChanges(), 10);
         });
 
@@ -123,9 +143,16 @@ class SaveBar {
         }
     }
 
+    formSelectors() {
+        return this.forms.map((f) => f.selector).join(', ');
+    }
+
     captureOriginalFormData() {
-        const $form = $(this.options.containerSelector);
-        this.originalFormData = this.getFormDataObject($form);
+        this.forms.forEach((f) => {
+            this.original[f.selector] = this.getFormDataObject($(f.selector));
+            this.dirty[f.selector] = false;
+        });
+        this.originalFormData = this.original;
     }
 
     getFormDataObject($form) {
@@ -148,11 +175,18 @@ class SaveBar {
     checkForChanges() {
         if (!this.originalFormData) return;
 
-        const $form = $(this.options.containerSelector);
-        const currentData = this.getFormDataObject($form);
-        const hasChanges = JSON.stringify(this.originalFormData) !== JSON.stringify(currentData);
+        let any = false;
+        this.forms.forEach((f) => {
+            const current = this.getFormDataObject($(f.selector));
+            this.dirty[f.selector] = JSON.stringify(this.original[f.selector]) !== JSON.stringify(current);
+            any = any || this.dirty[f.selector];
+        });
+        this.setUnsavedChanges(any);
+    }
 
-        this.setUnsavedChanges(hasChanges);
+    /** Dirty forms that may be saved automatically; a form that opted out waits for the button. */
+    autoSaveable() {
+        return this.forms.filter((f) => this.dirty[f.selector] && f.autoSave !== false);
     }
 
     setUnsavedChanges(hasChanges) {
@@ -162,7 +196,7 @@ class SaveBar {
 
             if (hasChanges) {
                 this.startElapsedTimeTracking();
-                if (this.isAutoSaveEnabled) {
+                if (this.isAutoSaveEnabled && this.autoSaveable().length) {
                     setTimeout(() => this.handleAutoSave(), 500);
                 }
             } else {
@@ -186,7 +220,7 @@ class SaveBar {
             $icon.removeClass('dashicons-admin-settings dashicons-update').addClass('dashicons-yes-alt');
         } else if (this.hasUnsavedChanges) {
             $button.prop('disabled', false).removeClass('success');
-            $buttonText.text('Save Changes');
+            $buttonText.text('Save changes');
             $icon.removeClass('dashicons-update dashicons-yes-alt').addClass('dashicons-admin-settings');
         } else {
             $button.prop('disabled', true).removeClass('success');
@@ -195,55 +229,136 @@ class SaveBar {
         }
     }
 
+    /** Save one form; normalises every saver to { success, message, reload }. */
+    async saveForm(f) {
+        const formEl = document.querySelector(f.selector);
+        if (!formEl) return { success: false };
+        let result;
+        if (typeof f.save === 'function') {
+            result = await f.save(formEl);
+        } else if (this.options.onSave && typeof this.options.onSave === 'function' && f.selector === this.options.containerSelector) {
+            result = await this.options.onSave();
+        } else {
+            result = await this.defaultSave(formEl);
+        }
+        if (typeof result === 'boolean') return { success: result };
+        return result || { success: false };
+    }
+
+    /** Save every dirty form in the given list, one after another. */
+    async saveForms(list) {
+        const outcome = { success: true, messages: [], reload: false };
+        for (const f of list) {
+            const r = await this.saveForm(f);
+            if (r.success) {
+                this.original[f.selector] = this.getFormDataObject($(f.selector));
+                this.dirty[f.selector] = false;
+                if (r.message) outcome.messages.push(r.message);
+                outcome.reload = outcome.reload || !!r.reload;
+            } else {
+                outcome.success = false;
+                if (r.message) outcome.messages.push(r.message);
+            }
+        }
+        return outcome;
+    }
+
     async handleSave() {
         if (!this.hasUnsavedChanges || this.isSaving) return;
 
         this.setSaving(true);
 
         try {
-            const success = this.options.onSave && typeof this.options.onSave === 'function'
-                ? await this.options.onSave()
-                : await this.defaultSave();
-
-            if (success) {
-                this.showMessage('Settings saved successfully!', 'success');
+            const outcome = await this.saveForms(this.forms.filter((f) => this.dirty[f.selector]));
+            if (outcome.success) {
+                this.showMessage(outcome.messages.join(' ') || 'Settings saved.', 'success');
                 this.setSuccess(true);
-                this.captureOriginalFormData();
-                this.setUnsavedChanges(false);
+                this.checkForChanges();
                 setTimeout(() => this.setSuccess(false), 3000);
+                if (outcome.reload) {
+                    this.isSaving = true; // keep the leave-page warning quiet while we reload
+                    setTimeout(() => window.location.reload(), 600);
+                    return;
+                }
             } else {
-                this.showMessage('Save failed. Please try again.', 'error');
+                this.showMessage(outcome.messages.join(' ') || 'Save failed. Please try again.', 'error');
             }
         } catch (error) {
             this.showMessage('An error occurred while saving.', 'error');
         } finally {
+            if (!this.isSaving) return;
             this.setSaving(false);
         }
     }
 
     async handleAutoSave() {
         if (!this.hasUnsavedChanges || this.isSaving) return;
+        const list = this.autoSaveable();
+        if (!list.length) return;
 
         try {
-            const success = this.options.onSave && typeof this.options.onSave === 'function'
-                ? await this.options.onSave()
-                : await this.defaultSave();
-
-            if (success) {
-                this.showMessage('Changes auto-saved!', 'success');
-                this.captureOriginalFormData();
-                this.setUnsavedChanges(false);
+            const outcome = await this.saveForms(list);
+            if (outcome.success) {
+                this.showMessage(outcome.messages.join(' ') || 'Changes auto-saved.', 'success');
+                this.checkForChanges();
             } else {
-                this.showMessage('Auto-save failed', 'error');
+                this.showMessage(outcome.messages.join(' ') || 'Auto-save failed', 'error');
             }
         } catch (error) {
             this.showMessage('Auto-save error occurred', 'error');
         }
     }
 
-    async defaultSave() {
+    /** A form marked data-ace-savebar="admin-post": post it to its own action and read WordPress JSON back. */
+    static async adminPostSave(formEl) {
+        const formData = new FormData(formEl);
+        formData.append('ace_json', '1');
+        try {
+            const response = await fetch(formEl.getAttribute('action') || window.location.href, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const text = await response.text();
+            let json = null;
+            try { json = JSON.parse(text); } catch (e) { json = null; }
+            if (json && typeof json.success !== 'undefined') {
+                const data = json.data || {};
+                return { success: !!json.success, message: data.message || (typeof json.data === 'string' ? json.data : ''), reload: !!data.reload };
+            }
+            return { success: response.ok, reload: response.ok && formEl.getAttribute('data-ace-savebar-reload') === '1' };
+        } catch (e) {
+            return { success: false, message: 'The server could not be reached.' };
+        }
+    }
+
+    /** Forms declared in markup: every <form data-ace-savebar> on the page. */
+    static declaredForms() {
+        return Array.prototype.map.call(document.querySelectorAll('form[data-ace-savebar]'), (formEl, i) => {
+            if (!formEl.id) formEl.id = 'ace-savebar-form-' + i;
+            return {
+                selector: '#' + formEl.id,
+                save: SaveBar.adminPostSave,
+                autoSave: formEl.getAttribute('data-ace-savebar-autosave') !== '0'
+            };
+        });
+    }
+
+    /** Build one bar for the page's main form (if any) plus every declared form. */
+    static autoRegister(options = {}) {
+        const main = document.querySelector(options.containerSelector || '#ace-redis-settings-form, #ace-seo-settings-form');
+        const forms = SaveBar.declaredForms();
+        if (main) {
+            forms.unshift({ selector: '#' + main.id, save: null, autoSave: true });
+        }
+        if (!forms.length) return null;
+        return new SaveBar({ ...options, containerSelector: forms[0].selector, forms });
+    }
+
+    async defaultSave(formEl) {
         return new Promise((resolve) => {
-            const formEl = document.querySelector(this.options.containerSelector);
+            formEl = formEl || document.querySelector(this.options.containerSelector);
             if (!formEl) {
                 resolve(false);
                 return;
