@@ -512,6 +512,7 @@ class AceSeoTracking {
     // ------------------------------------------------------------ cron
 
     public static function run() {
+        AceSeoTrackingClarity::snapshot();
         $detect = self::detect();
         $page = self::probe_page( true );
         $series = self::series( true );
@@ -639,6 +640,7 @@ class AceSeoTracking {
         }
         $series = self::series();
         $commerce = AceSeoTrackingCommerce::series( array_keys( $series['days'] ) );
+        if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::snapshot(); }
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
         $email_on = (bool) get_option( self::OPT_EMAIL, 1 );
@@ -686,7 +688,7 @@ class AceSeoTracking {
         }
 
         // Chart.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] ) {
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() ) {
             $jp_on = ! empty( $series['jp']['ok'] );
             echo '<h2>Last ' . self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
             if ( $a ) {
@@ -785,6 +787,15 @@ class AceSeoTracking {
      */
     public static function render_chart( $series, $commerce, $metric, $gap ) {
         $days = $series['days'];
+        $clarity_history = AceSeoTrackingClarity::history();
+        $clarity_available = array();
+        foreach ( $days as $date => &$day ) {
+            if ( ! isset( $clarity_history[ $date ] ) ) { continue; }
+            $saved = $clarity_history[ $date ];
+            foreach ( $saved['values'] as $key => $value ) { $day[ 'clarity_' . $key ] = $value; $clarity_available[ $key ] = true; }
+            $day['clarity_window'] = wp_date( 'j M H:i T', $saved['at'] - 86400 ) . ' – ' . wp_date( 'j M H:i T', $saved['at'] );
+        }
+        unset( $day );
         foreach ( $days as $date => &$day ) { $day = array_merge( $day, $commerce['days'][ $date ] ?? array() ); }
         unset( $day );
         $ga = ! empty( $series['ga']['ok'] );
@@ -795,7 +806,15 @@ class AceSeoTracking {
         if ( $commerce['ok'] ) {
             echo '<label><input type="checkbox" name="orders"' . ( ! $ga && ! $jp ? ' checked' : '' ) . '> Orders</label><label><input type="checkbox" name="value"> Order value (' . esc_html( $commerce['currency'] ) . ')</label>';
         }
+        if ( $clarity_available ) {
+            echo '<label class="ace-trk-clarity-select">Clarity <select name="clarity_metric"><option value="">Not shown</option>';
+            foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) {
+                if ( isset( $clarity_available[ $key ] ) ) { echo '<option value="' . esc_attr( $key ) . '"' . ( 'sessions' === $key ? ' selected' : '' ) . '>' . esc_html( $definition[0] ) . ' · 24h snapshot</option>'; }
+            }
+            echo '</select></label>';
+        }
         echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><p class="ace-trk-chart-note">Hover or touch to inspect a day. Focus the chart and use the arrow keys to move between dates. Missing data is shown as unavailable, not zero.</p>';
+        if ( $clarity_available ) { echo '<p class="ace-trk-chart-note">Clarity: one saved 24-hour window per capture date, drawn as a dashed line. Hover for the exact window. Missing days are unavailable; these snapshots are not daily totals and may overlap.</p>'; }
         if ( $commerce['ok'] ) {
             echo '<p class="ace-trk-chart-note">Orders in processing, completed or refunded status, grouped by creation date in the site timezone. Order value is the total less refunds, including tax and delivery; refunds reduce the original order day. Counts use the left axis; ' . esc_html( $commerce['currency'] ) . ' uses the right. Refreshed hourly.</p>';
             if ( $commerce['skipped_currency'] ) { echo '<p class="ace-trk-chart-note">' . esc_html( number_format_i18n( $commerce['skipped_currency'] ) ) . ' orders in other currencies are excluded.</p>'; }

@@ -21,6 +21,7 @@ $order_calls = $http_calls = 0;
 $report_failure = false;
 $response = array( 'code' => 200, 'body' => '[{"metricName":"Traffic","information":[{"totalSessionCount":"42","distantUserCount":"30"}]}]' );
 function get_option( $key, $default = false ) { return $GLOBALS['options'][ $key ] ?? $default; }
+function update_option( $key, $value, $autoload = null ) { $GLOBALS['options'][ $key ] = $value; }
 function get_transient( $key ) { return $GLOBALS['cache'][ $key ] ?? false; }
 function set_transient( $key, $value, $ttl ) { $GLOBALS['cache'][ $key ] = $value; $GLOBALS['expiries'][ $key ] = $ttl; }
 function wc_get_orders( $args ) {
@@ -78,4 +79,37 @@ AceSeoTrackingClarity::snapshot();
 expect( 2 === $http_calls, 'API errors are cached too.' );
 $markup = AceSeoTrackingUI::detail( 'Project fwnvysplfv; G-SE5LH3QSWL <script>alert(1)</script>' );
 expect( false === strpos( $markup, '<script>' ) && 2 === substr_count( $markup, '<code' ), 'Highlighted metadata remains escaped.' );
+$metric_data = array(
+    array( 'metricName' => 'Traffic', 'information' => array( array( 'totalSessionCount' => '42', 'distinctUserCount' => '30' ) ) ),
+    array( 'metricName' => 'DeadClickCount', 'information' => array( array( 'subTotal' => '7', 'sessionsCount' => '42' ) ) ),
+    array( 'metricName' => 'RageClickCount', 'information' => array( array( 'sessionsWithMetricPercentage' => '10' ) ) ),
+    array( 'metricName' => 'ScriptErrorCount', 'information' => array( array( 'subTotal' => '0' ) ) ),
+);
+$metrics = AceSeoTrackingClarity::normalise( $metric_data );
+$values = AceSeoTrackingClarity::values( $metrics );
+expect( 7.0 === $values['dead'] && 30.0 === $values['users'], 'Interaction totals and correctly spelt distinct users are extracted.' );
+expect( ! isset( $values['rage'] ) && 0.0 === $values['errors'], 'Missing counts stay missing; explicit zero is preserved.' );
+$segmented = $metrics; $segmented[] = $metrics[0];
+expect( ! isset( AceSeoTrackingClarity::values( $segmented )['users'] ), 'Segmented unique users are not summed.' );
+$negative = array( array( 'label' => 'Dead Click Count', 'fields' => array( 'Sub total' => '-1' ) ) );
+expect( array() === AceSeoTrackingClarity::values( $negative ), 'Invalid negative counts are not plotted.' );
+$options[ AceSeoTrackingClarity::HISTORY ] = array();
+$at = time() - 3 * 86400;
+$sample = array( 'ok' => true, 'project' => 'project1', 'at' => $at, 'metrics' => $metrics );
+AceSeoTrackingClarity::remember( $sample );
+$history = AceSeoTrackingClarity::history();
+expect( 1 === count( $history ) && $at === reset( $history )['at'], 'Saved points retain their exact reporting timestamp.' );
+$sample['at'] += 60; $sample['metrics'] = array();
+AceSeoTrackingClarity::remember( $sample );
+expect( $history === AceSeoTrackingClarity::history(), 'An empty report cannot erase a good saved window.' );
+$sample['metrics'] = $metrics; AceSeoTrackingClarity::remember( $sample );
+expect( $history === AceSeoTrackingClarity::history(), 'The first snapshot for a date remains immutable.' );
+$sample['at'] = time(); AceSeoTrackingClarity::remember( $sample );
+expect( 2 === count( AceSeoTrackingClarity::history() ), 'Missed days are not filled with zero or copied values.' );
+$options['clarity_project_id'] = 'project2';
+expect( array() === AceSeoTrackingClarity::history(), 'A changed project cannot display the previous project history.' );
+$sample['project'] = 'project2'; AceSeoTrackingClarity::remember( $sample );
+expect( 1 === count( AceSeoTrackingClarity::history() ), 'The new project starts an isolated history.' );
+$sample['at'] = time() - 70 * 86400; AceSeoTrackingClarity::remember( $sample );
+expect( 1 === count( AceSeoTrackingClarity::history() ), 'Expired history is pruned.' );
 echo "$checks tracking data checks passed.\n";

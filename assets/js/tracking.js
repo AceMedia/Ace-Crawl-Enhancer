@@ -15,7 +15,7 @@
         let money;
         try { money = new Intl.NumberFormat(undefined, {style: 'currency', currency: data.currency || 'GBP'}); }
         catch (_) { money = new Intl.NumberFormat(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
-        const colours = {ga: '#2271b1', jp: '#c45116', orders: '#137333', value: '#7c3aad'};
+        const colours = {ga: '#2271b1', jp: '#c45116', orders: '#137333', value: '#7c3aad', clarity: '#007c83'};
         let svg, cursor, lines = [], x, y, moneyY, selected = days.length - 1;
         const W = 1100, H = 340, left = 62, right = 108, top = 28, bottom = 46;
         const width = W - left - right, height = H - top - bottom;
@@ -44,6 +44,8 @@
             if (checked('jp')) result.push({id: 'jp', key: views ? 'jp_views' : 'jp_visitors', label: views ? 'Jetpack views' : 'Jetpack visitors'});
             if (checked('orders')) result.push({id: 'orders', key: 'wc_orders', label: 'Orders'});
             if (checked('value')) result.push({id: 'value', key: 'wc_value', label: 'Order value', money: true});
+            const clarity = root.querySelector('[name="clarity_metric"]');
+            if (clarity && clarity.value) result.push({id: 'clarity', key: 'clarity_' + clarity.value, label: 'Clarity ' + clarity.selectedOptions[0].textContent.split(' · ')[0].toLowerCase(), snapshot: true});
             return result;
         }
         function show(index) {
@@ -63,6 +65,9 @@
                 row.append(label, amount); tooltip.appendChild(row);
                 if (value !== null) element('circle', {cx: x(selected), cy: (line.money ? moneyY : y)(value), r: 4, fill: colours[line.id], stroke: '#fff', 'stroke-width': 2}, cursor);
             });
+            if (lines.some(line => line.snapshot) && day.clarity_window) {
+                const note = document.createElement('small'); note.textContent = 'Clarity rolling 24h: ' + day.clarity_window; tooltip.appendChild(note);
+            }
             if (day.date === data.today || data.gaps.includes(day.date)) {
                 const note = document.createElement('small');
                 note.textContent = day.date === data.today ? 'Today is incomplete; reporting may be delayed.' : 'Possible Analytics gap.';
@@ -101,7 +106,7 @@
             lines.forEach(function (line) {
                 let segment = [];
                 function flush() {
-                    if (segment.length > 1) element('polyline', {points: segment.join(' '), fill: 'none', stroke: colours[line.id], 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'data-series': line.id}, svg);
+                    if (segment.length > 1) element('polyline', {points: segment.join(' '), fill: 'none', stroke: colours[line.id], 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'stroke-dasharray': line.snapshot ? '6 4' : 'none', 'data-series': line.id}, svg);
                     else if (segment.length) { const point = segment[0].split(','); element('circle', {cx: point[0], cy: point[1], r: 3, fill: colours[line.id], 'data-series': line.id}, svg); }
                     segment = [];
                 }

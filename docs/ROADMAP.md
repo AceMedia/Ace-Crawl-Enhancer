@@ -235,3 +235,10 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 ## Retention evidence preview — 7 October 2026
 
 Local implementation for #32 adds a counts-free bucket/suggestion reference table, explicit event-edition/coverage guards, separate expandable evidence timelines and a private resumable baseline/preview CSV runner. Read [RETENTION-EVIDENCE-PREVIEW.md](RETENTION-EVIDENCE-PREVIEW.md) for the provider contract and precise remaining work. The old report worker is not yet generation-safe (#30), and real dated traffic collection/occurrence controls remain prerequisites for live seasonal assessment. Curated automatic management (#34) is shown as planned, not implemented or enabled. No live assessments or Sheets were rewritten.
+
+### Tracking 1.0.83 — Clarity reporting and history
+
+- Clarity summary cards with a dated rolling window, report shortcuts and collapsible details/connection settings.
+- Save up to 60 project-specific rolling 24-hour snapshots, one immutable point per capture date; existing daily tracking cron collects without requiring an admin visit. Missing days stay missing, and project changes isolate history.
+- Optional Clarity count selector on the main chart (sessions, unique visitors, dead/rage/error clicks, quick backs and script errors when supplied). Dashed lines and tooltips distinguish rolling windows from calendar-day Analytics/sales. No unsupported historical backfill or total-click estimate.
+- Verified against the connected IEG Clarity response; 73 PHP assertions cover tracking, cron and data handling, including zero/missing metrics, segmented users, history isolation and retention. Browser checks cover chart selection, missing-day gaps, exact window tooltips and responsive cards.
