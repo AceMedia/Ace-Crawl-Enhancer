@@ -607,6 +607,7 @@ class AceSeoTracking {
         $s = self::series();
         $commerce = AceSeoTrackingCommerce::series( array_keys( $s['days'] ) );
         $google = AceSeoTrackingGoogle::series( array_keys( $s['days'] ) );
+        $google = AceSeoAggregateViews::enrich( $google, array_keys( $s['days'] ) );
         $clarity = AceSeoTrackingClarity::history();
         $host = wp_parse_url( home_url(), PHP_URL_HOST );
         header( 'Content-Type: text/csv; charset=utf-8' );
@@ -653,6 +654,7 @@ class AceSeoTracking {
         $series = self::series();
         $commerce = AceSeoTrackingCommerce::series( array_keys( $series['days'] ) );
         $google = AceSeoTrackingGoogle::series( array_keys( $series['days'] ) );
+        $google = AceSeoAggregateViews::enrich( $google, array_keys( $series['days'] ) );
         if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::snapshot(); }
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
@@ -699,6 +701,8 @@ class AceSeoTracking {
             }
             echo '</ul></div>';
         }
+
+        AceSeoAggregateViews::settings();
 
         // Chart.
         if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() || $google['definitions'] ) {
@@ -787,12 +791,14 @@ class AceSeoTracking {
         }
 
         // Daily table.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] ) {
-            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th>' . ( $commerce['ok'] ? '<th>Orders</th><th>Order value (' . $e( $commerce['currency'] ) . ')</th>' : '' ) . '</tr></thead><tbody>';
+        $has_baseline = isset( $google['definitions']['baseline_views'] );
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || $has_baseline ) {
+            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th>' . ( $has_baseline ? '<th>Basic page views</th>' : '' ) . ( $commerce['ok'] ? '<th>Orders</th><th>Order value (' . $e( $commerce['currency'] ) . ')</th>' : '' ) . '</tr></thead><tbody>';
             $gap = $a ? $a['gap_days'] : array();
             foreach ( array_reverse( $series['days'] ) as $d ) {
                 $mark = in_array( $d['date'], $gap, true ) ? ' style="background:#fde8e6"' : '';
                 echo '<tr' . $mark . '><td>' . $e( $d['date'] ) . '</td><td class="n">' . $e( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . $e( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . $e( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . $e( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td>';
+                if ( $has_baseline ) { $count = $google['days'][ $d['date'] ]['baseline_views'] ?? null; echo '<td class="n">' . $e( null === $count ? '–' : number_format_i18n( $count ) ) . '</td>'; }
                 if ( $commerce['ok'] ) { $sale = $commerce['days'][ $d['date'] ]; echo '<td class="n">' . $e( number_format_i18n( $sale['wc_orders'] ) ) . '</td><td class="n">' . $e( number_format_i18n( $sale['wc_value'], 2 ) ) . '</td>'; }
                 echo '</tr>';
             }
@@ -832,11 +838,12 @@ class AceSeoTracking {
         $has_sources = false;
         foreach ( $google['definitions'] ?? array() as $key => $definition ) {
             $has_sources = $has_sources || ! empty( $definition['area'] );
-            echo '<label><input type="checkbox" name="' . esc_attr( $key ) . '" data-google-label="' . esc_attr( $definition['label'] ) . '" data-group="' . esc_attr( $definition['group'] ) . '"' . ( ! empty( $definition['area'] ) ? ' data-area="1"' : '' ) . '> ' . esc_html( $definition['label'] ) . '</label>';
+            echo '<label><input type="checkbox" name="' . esc_attr( $key ) . '" data-google-label="' . esc_attr( $definition['label'] ) . '" data-group="' . esc_attr( $definition['group'] ) . '"' . ( ! empty( $definition['area'] ) ? ' data-area="1"' : '' ) . ( 'baseline_views' === $key ? ' checked' : '' ) . '> ' . esc_html( $definition['label'] ) . '</label>';
         }
         if ( $has_sources ) { echo '<button type="button" class="button ace-trk-show-sources">Show traffic mix</button><label class="ace-trk-source-style">Sources <select name="source_style"><option value="area">Filled</option><option value="lines">Lines</option></select></label>'; }
         echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><div class="ace-trk-chart-guides" aria-label="About the selected chart data"><p class="ace-trk-chart-hint">Hover or touch to inspect a date. Use the arrow keys when the chart is focused. Missing data stays blank.</p>';
         echo '<p data-guide="ga"><strong>Google Analytics</strong> Dates use ' . esc_html( $google['timezone'] ?? 'the property timezone' ) . '. Today’s figures may still be processing.</p>';
+        echo '<p data-guide="baseline"><strong>Basic page views</strong> Daily first-party counts in ' . esc_html( wp_timezone_string() ) . '. No visitor IDs or tracking cookies. Includes React history navigation; excludes known bots and opt-outs. These are views, not unique people. Unrecorded dates stay blank.</p>';
         if ( ! empty( $google['definitions'] ) ) {
             echo '<p data-guide="sources"><strong>Traffic sources</strong> <span class="ace-trk-source-explanation">The coloured bands stack session counts. Their combined height is the total for the selected sources, not unique visitors.</span></p>';
             echo '<p data-guide="ai"><strong>AI traffic</strong> Google’s AI Assistant channel plus recognised AI referral hosts. Visits without an identifiable AI source remain in other channels.</p>';

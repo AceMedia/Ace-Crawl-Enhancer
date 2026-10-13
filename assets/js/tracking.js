@@ -190,6 +190,7 @@
         const help = document.createElement('div'); help.className = 'ace-trk-series-help';
         help.id = 'ace-trk-series-help-' + chartIndex; help.setAttribute('role', 'tooltip'); help.hidden = true; root.appendChild(help);
         const descriptions = {
+            baseline_views: 'First-party page-view totals, including before optional analytics consent. No cookies or visitor IDs; known bots and opt-outs are excluded. Dates use the site timezone. Not unique visitors.',
             ga: 'GA4 active users or page views, chosen using the Traffic selector. Users and sessions are different measures.',
             jp: 'Jetpack visitors or views, chosen using the Traffic selector. This is independent of Google Analytics.',
             orders: 'WooCommerce orders in processing, completed or refunded status, grouped by creation date in the site timezone.',
@@ -252,6 +253,7 @@
         function updateGuides() {
             const hasSource = lines.some(line => line.area);
             const show = {
+                baseline: checked('baseline_views'),
                 ga: checked('ga') || lines.some(line => ['Traffic sources', 'Engagement', 'Advertising'].includes(root.querySelector('input[name="' + line.id + '"]')?.dataset.group)),
                 sources: hasSource, ai: checked('source_ai'), advertising: checked('ads_clicks') || checked('ads_impressions'),
                 search: checked('search_clicks') || checked('search_impressions'), clarity: lines.some(line => line.snapshot),

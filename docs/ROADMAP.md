@@ -255,3 +255,11 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 - CSV includes all available Google series and saved Clarity metrics with exact UTC windows. Google reporting cache clears with Re-run checks.
 - Live IEG probes confirmed all four report types. Validation now includes 93 PHP assertions plus browser checks for summed-area scaling, overlays, source-line mode, multi-selection, persistence and mobile layout.
 - Active labels use a responsive grid with accessible hover/focus metric help. Unified toolbar styling covers the traffic-mix button, selectors and Add series picker. Guidance follows the selected metrics and filled/line source mode; inactive controls and explanations are hidden. Desktop/mobile checks verify overflow, tooltip bounds, keyboard operation and search-only/empty context.
+
+### Tracking 1.0.85 — independent basic view counts
+
+- Explicit per-site enablement of first-party daily totals, with a public privacy explanation and opt-out. One date/counter row per day; no visitor IDs, URLs, referrers, IP addresses or user agents stored by the counter. Requests omit credentials and referrers. Ordinary web-server logs remain separate.
+- Counts visible page loads, React History API transitions and Back/Forward restoration. Coalesces hydration/history updates, ignores same-URL updates and ordinary anchor jumps, and waits for prerendered/hidden pages. Does not replay views missed before deployment.
+- Optional Google/Clarity enrichment keeps its existing consent controls. Explicit analytics refusal, basic-count opt-out, DNT and GPC stop the baseline. Known bots are excluded; disguised bots, blocking, disabled JavaScript and excluded signed-in page renders mean this is not an exact human-audience count.
+- New Basic page views chart series, contextual explanation, CSV and daily-table column. Missing coverage stays null, not zero. Aggregate rows retained for 400 days; enablement creates only the current site's table.
+- Validation: 93 existing PHP checks, 14 counter PHP checks and 16 JavaScript checks; real local WordPress/MariaDB atomic increments; browser requests verified without Cookie/Referer headers, React/Back counts and opt-out; chart selection and guidance verified.
