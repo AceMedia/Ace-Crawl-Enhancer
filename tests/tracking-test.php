@@ -62,6 +62,31 @@ expect( 1 === count( $multi_problems ) && 'warn' === $multi_problems[0][0], 'mul
 expect( false !== strpos( $multi_problems[0][1], 'different properties report separately' ), 'separate properties are not described as automatic duplicate reporting' );
 
 // --- analyse(): a 60-day series with Jetpack, Analytics dead from day 40.
+$ads_detect = array(
+    'ads' => array( 'key' => 'ads', 'label' => 'Google Ads (Site Kit)', 'status' => 'warn', 'detail' => 'No conversion ID', 'ids' => array() ),
+    'gla' => array( 'key' => 'gla', 'label' => 'Google for WooCommerce', 'status' => 'ok', 'detail' => 'Ads account 123', 'ids' => array() ),
+);
+$ads_page = AceSeoTracking::scan_html( '<script>gtag("config", "AW-123");</script>' ) + array( 'ok' => true );
+$group = AceSeoTracking::google_ads( $ads_detect, $ads_page );
+expect( array( 'gla' ) === $group['configured'] && $group['tag_found'], 'WooCommerce can provide Ads without Site Kit' );
+expect( array() === AceSeoTracking::problems( $ads_detect, $ads_page, array() ), 'unused Site Kit alternative does not raise a setup warning' );
+$ads_page['configs'] = array();
+expect( 2 === count( AceSeoTracking::problems( $ads_detect, $ads_page, array() ) ), 'missing Ads tag remains a warning; unused provider is not assumed healthy' );
+$ads_detect['gla']['status'] = 'warn';
+expect( array() === AceSeoTracking::google_ads( $ads_detect, $ads_page )['configured'], 'unlinked Ads account is not a configured provider' );
+$ads_detect['ads']['status'] = 'ok';
+$ads_detect['ads']['ids'] = array( 'AW-123' );
+$ads_detect['gla']['status'] = 'ok';
+expect( 2 === count( AceSeoTracking::google_ads( $ads_detect, $ads_page )['configured'] ), 'both configured providers remain visible for review' );
+
+$native_page = AceSeoTracking::scan_html( '<script id="ace-consent-gate">gtag("consent", "default", {analytics_storage:"denied"});</script>' ) + array( 'ok' => true );
+expect( 'Theme consent banner' === $native_page['banner'] && $native_page['consent_default'], 'theme-provided consent is recognised' );
+$native_detect = array( 'consent' => array( 'key' => 'consent', 'label' => 'Consent mode (Site Kit)', 'status' => 'warn', 'detail' => 'Off', 'ids' => array() ) );
+expect( array() === AceSeoTracking::problems( $native_detect, $native_page, array() ), 'consent provided outside Site Kit is not flagged as missing' );
+$native_page['consent_default'] = false;
+expect( 1 === count( AceSeoTracking::problems( $native_detect, $native_page, array() ) ), 'missing consent defaults retain the warning' );
+
+// --- analyse(): a 60-day series with Jetpack, Analytics dead from day 40.
 $days = array();
 $t0 = new DateTime( '2026-08-15' );
 for ( $i = 0; $i < 60; $i++ ) {

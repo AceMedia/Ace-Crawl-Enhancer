@@ -123,13 +123,13 @@ class AceSeoTracking {
         }
         if ( self::plugin_on( 'google-listings-and-ads/google-listings-and-ads.php' ) ) {
             $gla = (string) get_option( 'gla_ads_id', '' );
-            $add( 'gla', 'Google for WooCommerce', 'ok', $gla ? 'Ads account ' . $gla . '; its AW- conversion tag prints on the page.' : 'Active; no Ads account linked yet.' );
+            $add( 'gla', 'Google for WooCommerce', $gla ? 'ok' : 'warn', $gla ? 'Ads account ' . $gla . '.' : 'Active; no Ads account linked yet.' );
         }
 
         // Consent.
         if ( $sk_on ) {
             $on = ! empty( $consent['enabled'] );
-            $add( 'consent', 'Consent mode (Site Kit)', $on ? 'ok' : 'warn', $on ? count( (array) ( $consent['regions'] ?? array() ) ) . ' regions default to denied until the banner answers.' : 'Off. Visitors in the EEA and UK are tracked before they answer the banner, and Site Kit will nag about it.' );
+            $add( 'consent', 'Consent mode (Site Kit)', $on ? 'ok' : 'warn', $on ? count( (array) ( $consent['regions'] ?? array() ) ) . ' regions default to denied until the banner answers.' : 'Site Kit does not manage consent defaults. Another banner or integration may provide them; check the page and browser consent behaviour.' );
         }
         $add( 'wp_consent_api', 'WP Consent API', function_exists( 'wp_has_consent' ) ? 'ok' : 'off', function_exists( 'wp_has_consent' ) ? 'Present: cookie banners can hand their answer to Site Kit and other plugins.' : 'Not installed. Site Kit consent mode then relies on the banner updating Google itself.' );
         $banners = array(
@@ -263,7 +263,7 @@ class AceSeoTracking {
             }
         }
         $o['wp_consent_api'] = false !== strpos( $html, 'wp-consent-api' );
-        foreach ( array( 'cookieyes' => 'CookieYes', 'cmplz' => 'Complianz', 'Cookiebot' => 'Cookiebot', 'moove_gdpr' => 'GDPR Cookie Compliance' ) as $needle => $name ) {
+        foreach ( array( 'ace-consent-gate' => 'Theme consent banner', 'cookieyes' => 'CookieYes', 'cmplz' => 'Complianz', 'Cookiebot' => 'Cookiebot', 'moove_gdpr' => 'GDPR Cookie Compliance' ) as $needle => $name ) {
             if ( false !== strpos( $html, $needle ) ) {
                 $o['banner'] = $name;
                 break;
@@ -475,12 +475,33 @@ class AceSeoTracking {
         } elseif ( ! empty( $detect['ga4'] ) && 'ok' === $detect['ga4']['status'] ) {
             $p[] = array( 'warn', 'Analytics is connected but its report could not be read: ' . $series['ga']['error'] );
         }
+        $ads = self::google_ads( $detect, $page );
+        if ( $ads && ! empty( $page['ok'] ) && $ads['configured'] && ! $ads['tag_found'] ) {
+            $p[] = array( 'warn', 'Google Ads has a configured provider, but no AW- tag configuration was found on the home page.' );
+        }
         foreach ( $detect as $row ) {
+            if ( 'consent' === $row['key'] && ! empty( $page['ok'] ) && ! empty( $page['consent_default'] ) ) {
+                continue; // Consent may be provided outside Site Kit.
+            }
+            if ( 'ads' === $row['key'] && empty( $row['ids'] ) && $ads && $ads['tag_found'] && in_array( 'gla', $ads['configured'], true ) ) {
+                continue; // Site Kit is an unused alternative to the configured WooCommerce provider.
+            }
             if ( 'warn' === $row['status'] ) {
                 $p[] = array( 'warn', $row['label'] . ': ' . $row['detail'] );
             }
         }
         return $p;
+    }
+
+    /** Group alternative Google Ads providers without treating both as required. */
+    public static function google_ads( $detect, $page ) {
+        $providers = array_intersect_key( $detect, array_flip( array( 'ads', 'gla' ) ) );
+        if ( ! $providers ) {
+            return null;
+        }
+        $configured = array_keys( array_filter( $providers, function ( $row ) { return 'ok' === $row['status']; } ) );
+        $tag_found = ! empty( $page['ok'] ) && (bool) array_filter( $page['configs'] ?? array(), function ( $id ) { return 0 === strpos( $id, 'AW-' ); } );
+        return compact( 'providers', 'configured', 'tag_found' );
     }
 
     // ------------------------------------------------------------ cron
@@ -591,6 +612,14 @@ class AceSeoTracking {
         $metric = ( isset( $_GET['metric'] ) && 'views' === $_GET['metric'] ) ? 'views' : 'visitors';
         $detect = self::detect();
         $page = self::probe_page();
+        if ( ! empty( $page['ok'] ) && ! empty( $page['consent_default'] ) && isset( $detect['consent'] ) && 'ok' !== $detect['consent']['status'] ) {
+            $detect['consent']['label'] = 'Consent mode';
+            $detect['consent']['status'] = 'ok';
+            $detect['consent']['detail'] = 'Consent defaults are present on the page, managed outside Site Kit. Verify acceptance and rejection in a browser.';
+        }
+        if ( 'Theme consent banner' === ( $page['banner'] ?? '' ) && ! empty( $page['ok'] ) ) {
+            $detect['banner'] = array( 'key' => 'banner', 'label' => 'Cookie banner', 'status' => 'ok', 'detail' => 'The theme provides the consent banner and sends Google consent updates directly.', 'ids' => array() );
+        }
         $series = self::series();
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
@@ -669,7 +698,30 @@ class AceSeoTracking {
 
         // Integrations.
         echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>State</th><th>Details</th></tr></thead><tbody>';
+        $ads = self::google_ads( $detect, $page );
+        $ads_shown = false;
         foreach ( $detect as $row ) {
+            if ( in_array( $row['key'], array( 'ads', 'gla' ), true ) ) {
+                if ( $ads_shown ) { continue; }
+                $ads_shown = true;
+                $ads_ok = 1 === count( $ads['configured'] ) && $ads['tag_found'];
+                echo '<tr><td><strong>Google Ads</strong></td><td><span class="pill pill-' . ( $ads_ok ? 'ok' : 'warn' ) . '">' . ( $ads_ok ? 'On' : 'Check' ) . '</span></td><td><p style="margin:0 0 10px">Alternative providers &mdash; you do not need to configure both for the same conversion.</p><div style="display:flex;flex-wrap:wrap;gap:10px">';
+                foreach ( $ads['providers'] as $key => $provider ) {
+                    $configured = in_array( $key, $ads['configured'], true );
+                    $alternative = ! $configured && ! empty( $ads['configured'] );
+                    $label = $configured ? 'Configured provider' : ( $alternative ? 'Unused alternative' : 'Not configured' );
+                    $detail = $alternative ? 'Available if you choose to use this provider instead.' : $provider['detail'];
+                    echo '<div style="flex:1 1 220px;border:1px solid ' . ( $configured ? '#a8d5b5' : '#dcdcde' ) . ';border-left:4px solid ' . ( $configured ? '#137333' : '#a7aaad' ) . ';background:' . ( $configured ? '#f0f8f2' : '#f6f7f7' ) . ';padding:10px 12px"><strong>' . $e( 'ads' === $key ? 'Site Kit' : 'Google for WooCommerce' ) . '</strong><br><span class="pill pill-' . ( $configured ? 'ok' : 'off' ) . '" style="margin:6px 0">' . $e( $label ) . '</span><br>' . $e( $detail ) . '</div>';
+                }
+                echo '</div>';
+                if ( count( $ads['configured'] ) > 1 ) {
+                    echo '<p>Both providers are configured. Check their conversion destinations to avoid counting the same conversion twice.</p>';
+                } elseif ( ! $ads['tag_found'] ) {
+                    echo '<p>No AW- tag configuration was verified on the home page.</p>';
+                }
+                echo '</td></tr>';
+                continue;
+            }
             echo '<tr><td><strong>' . $e( $row['label'] ) . '</strong></td><td><span class="pill pill-' . $e( $row['status'] ) . '">' . $e( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . $e( $row['detail'] ) . '</td></tr>';
         }
         echo '</tbody></table>';
@@ -697,7 +749,7 @@ class AceSeoTracking {
             if ( $page['fb_pixel'] ) {
                 $found[] = array( 'Meta Pixel', $page['fb_pixel'], 'ok', 'fbq init present' );
             }
-            $found[] = array( 'Consent default', $page['consent_default'] ? ( $page['consent_regions'] . ' regions' ) : 'none', $page['consent_default'] ? 'ok' : 'off', $page['consent_default'] ? 'gtag consent default is set before the tag loads' : 'No consent default; Google stores cookies before the banner answers' );
+            $found[] = array( 'Consent default', $page['consent_default'] ? ( $page['consent_regions'] ? $page['consent_regions'] . ' regions' : 'No region restriction found' ) : 'none', $page['consent_default'] ? 'ok' : 'off', $page['consent_default'] ? 'gtag consent default is present; verify its ordering and updates in a browser' : 'No consent default found; verify whether the banner blocks tracking until consent' );
             $found[] = array( 'Cookie banner', $page['banner'] ?: 'none', $page['banner'] ? 'ok' : 'off', $page['wp_consent_api'] ? 'WP Consent API script present' : 'No WP Consent API script' );
             foreach ( $page['others'] as $name ) {
                 $found[] = array( 'Third-party script', $name, 'ok', 'Present' );
