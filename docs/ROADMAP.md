@@ -19,6 +19,15 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Tracking report — shipped in 1.0.82 (13 October)
+
+- Daily checks now schedule when the component loads during `init`; unchanged faults retain their email-delivery marker.
+- Alternative Ads providers share one compact row, with highlighted identifiers and integration/settings links. Theme-provided consent defaults are recognised independently of Site Kit.
+- The chart supports pointer, touch and keyboard inspection, visitor/page-view switching, and optional WooCommerce orders and order value on a separate currency axis. Orders use WooCommerce's storage API, include processing/completed/refunded statuses, and are grouped by site-local creation date. Value includes tax/delivery less refunds, applied to the original order date; other currencies are excluded. Reports cache for an hour and exports include these columns.
+- Clarity reporting is an optional encrypted, project-bound Data Export token connection. The rolling 24-hour snapshot caches for six hours, including errors; it is not historical daily data. Tokens are entered in Tracking, never displayed, and are separate from the Clarity tracking plugin connection.
+- Checks: `php tests/tracking-test.php`, `php tests/tracking-runtime-test.php /path/to/wp/core`, `php tests/tracking-data-test.php`, plus browser checks of chart controls, missing values, currency scales and consent transitions.
+
+
 - Seasonal retention: [#32](https://github.com/AceMedia/Ace-Crawl-Enhancer/issues/32).
   A read-only calendar preview is available through
   `wp eval-file <plugin>/bin/seasonal-retention-preview.php YYYY-MM-DD > preview.csv`.

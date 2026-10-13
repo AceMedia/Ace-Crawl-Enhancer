@@ -15,6 +15,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+require_once __DIR__ . '/class-ace-seo-tracking-commerce.php';
+require_once __DIR__ . '/class-ace-seo-tracking-clarity.php';
+require_once __DIR__ . '/class-ace-seo-tracking-ui.php';
 
 class AceSeoTracking {
     const SLUG       = 'ace-seo-tracking';
@@ -36,10 +39,12 @@ class AceSeoTracking {
         }
         add_action( self::CRON, array( __CLASS__, 'run' ) );
         add_action( 'admin_menu', array( __CLASS__, 'menu' ), 20 );
+        add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
         add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
         add_action( 'admin_post_ace_seo_tracking_refresh', array( __CLASS__, 'admin_refresh' ) );
         add_action( 'admin_post_ace_seo_tracking_email', array( __CLASS__, 'admin_email_toggle' ) );
         add_action( 'admin_post_ace_seo_tracking_csv', array( __CLASS__, 'admin_csv' ) );
+        add_action( 'admin_post_ace_seo_tracking_clarity', array( 'AceSeoTrackingClarity', 'save' ) );
     }
 
     public static function schedule() {
@@ -559,6 +564,12 @@ class AceSeoTracking {
         add_submenu_page( 'ace-seo', 'Tracking', 'Tracking', 'manage_options', self::SLUG, array( __CLASS__, 'render_admin' ) );
     }
 
+    public static function assets() {
+        if ( ( $_GET['page'] ?? '' ) !== self::SLUG ) { return; }
+        wp_enqueue_style( 'ace-seo-tracking', ACE_SEO_URL . 'assets/css/tracking.css', array(), ACE_SEO_VERSION );
+        wp_enqueue_script( 'ace-seo-tracking', ACE_SEO_URL . 'assets/js/tracking.js', array(), ACE_SEO_VERSION, true );
+    }
+
     public static function admin_refresh() {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'No.' );
@@ -566,6 +577,7 @@ class AceSeoTracking {
         check_admin_referer( 'ace_seo_tracking_refresh' );
         delete_transient( self::T_PAGE );
         delete_transient( self::T_SERIES );
+        delete_transient( AceSeoTrackingCommerce::CACHE );
         if ( class_exists( 'AceSEOSiteKit' ) ) {
             AceSEOSiteKit::clear_token_cache();
         }
@@ -590,13 +602,18 @@ class AceSeoTracking {
         }
         check_admin_referer( 'ace_seo_tracking_csv' );
         $s = self::series();
+        $commerce = AceSeoTrackingCommerce::series( array_keys( $s['days'] ) );
         $host = wp_parse_url( home_url(), PHP_URL_HOST );
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="tracking-' . sanitize_file_name( $host ) . '-' . wp_date( 'Y-m-d' ) . '.csv"' );
         $fh = fopen( 'php://output', 'w' );
-        fputcsv( $fh, array( 'date', 'ga4_active_users', 'ga4_page_views', 'jetpack_visitors', 'jetpack_views' ) );
+        $columns = array( 'date', 'ga4_active_users', 'ga4_page_views', 'jetpack_visitors', 'jetpack_views' );
+        if ( $commerce['ok'] ) { $columns = array_merge( $columns, array( 'orders', 'order_value_after_refunds', 'currency' ) ); }
+        fputcsv( $fh, $columns );
         foreach ( $s['days'] as $d ) {
-            fputcsv( $fh, array( $d['date'], $d['ga_users'] ?? '', $d['ga_views'] ?? '', $d['jp_visitors'] ?? '', $d['jp_views'] ?? '' ) );
+            $row = array( $d['date'], $d['ga_users'] ?? '', $d['ga_views'] ?? '', $d['jp_visitors'] ?? '', $d['jp_views'] ?? '' );
+            if ( $commerce['ok'] ) { $row = array_merge( $row, array( $commerce['days'][ $d['date'] ]['wc_orders'], $commerce['days'][ $d['date'] ]['wc_value'], $commerce['currency'] ) ); }
+            fputcsv( $fh, $row );
         }
         fclose( $fh );
         exit;
@@ -621,6 +638,7 @@ class AceSeoTracking {
             $detect['banner'] = array( 'key' => 'banner', 'label' => 'Cookie banner', 'status' => 'ok', 'detail' => 'The theme provides the consent banner and sends Google consent updates directly.', 'ids' => array() );
         }
         $series = self::series();
+        $commerce = AceSeoTrackingCommerce::series( array_keys( $series['days'] ) );
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
         $email_on = (bool) get_option( self::OPT_EMAIL, 1 );
@@ -668,9 +686,9 @@ class AceSeoTracking {
         }
 
         // Chart.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) ) {
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] ) {
             $jp_on = ! empty( $series['jp']['ok'] );
-            echo '<h2>Last ' . self::DAYS . ' days: Google Analytics' . ( $jp_on ? ' against Jetpack Stats' : '' ) . '</h2>';
+            echo '<h2>Last ' . self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
             if ( $a ) {
                 echo '<div class="tiles">';
                 echo '<div class="tile"><b>' . $e( number_format_i18n( $a['ga_total'] ) ) . '</b><span>GA4 active users' . ( $jp_on ? ', complete days' : '' ) . '</span></div>';
@@ -683,9 +701,8 @@ class AceSeoTracking {
                 echo '<div class="tile"><b>' . $e( count( $a['gap_days'] ) ) . '</b><span>days Analytics missed' . ( $a['missing_users'] ? ', about ' . number_format_i18n( $a['missing_users'] ) . ' users unrecorded' : '' ) . '</span></div>';
                 echo '</div>';
             }
-            $base = admin_url( 'admin.php?page=' . self::SLUG );
-            echo '<p class="legend"><i style="background:#2a78d6"></i>Google Analytics 4 ' . ( 'views' === $metric ? 'page views' : 'active users' ) . ( $jp_on ? ' &nbsp; <i style="background:#eb6834"></i>Jetpack ' . ( 'views' === $metric ? 'views' : 'visitors' ) : '' ) . ' &nbsp; <i style="background:#fde8e6;height:10px;border:1px dashed #d63638"></i>Analytics missed &nbsp;|&nbsp; ' . ( 'views' === $metric ? '<a href="' . esc_url( $base ) . '">Visitors</a> · <b>Page views</b>' : '<b>Visitors</b> · <a href="' . esc_url( $base . '&metric=views' ) . '">Page views</a>' ) . '</p>';
-            echo self::svg_chart( $series['days'], $metric, $a ? $a['gap_days'] : array() );
+            echo '<p class="legend"><i style="background:#fde8e6;height:10px;border:1px dashed #d63638"></i>Possible Analytics gap</p>';
+            self::render_chart( $series, $commerce, $metric, $a ? $a['gap_days'] : array() );
             if ( ! empty( $series['ga']['error'] ) ) {
                 echo '<p>Analytics: ' . $e( $series['ga']['error'] ) . '</p>';
             }
@@ -695,6 +712,7 @@ class AceSeoTracking {
         } else {
             echo '<h2>Daily numbers</h2><p>No counter is readable yet. Analytics: ' . $e( $series['ga']['error'] ) . ' Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
         }
+        if ( $commerce['enabled'] && ! $commerce['ok'] && ! empty( $commerce['error'] ) ) { echo '<p>WooCommerce: ' . $e( $commerce['error'] ) . '</p>'; }
 
         // Integrations.
         echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>State</th><th>Details</th></tr></thead><tbody>';
@@ -704,27 +722,13 @@ class AceSeoTracking {
             if ( in_array( $row['key'], array( 'ads', 'gla' ), true ) ) {
                 if ( $ads_shown ) { continue; }
                 $ads_shown = true;
-                $ads_ok = 1 === count( $ads['configured'] ) && $ads['tag_found'];
-                echo '<tr><td><strong>Google Ads</strong></td><td><span class="pill pill-' . ( $ads_ok ? 'ok' : 'warn' ) . '">' . ( $ads_ok ? 'On' : 'Check' ) . '</span></td><td><p style="margin:0 0 10px">Alternative providers &mdash; you do not need to configure both for the same conversion.</p><div style="display:flex;flex-wrap:wrap;gap:10px">';
-                foreach ( $ads['providers'] as $key => $provider ) {
-                    $configured = in_array( $key, $ads['configured'], true );
-                    $alternative = ! $configured && ! empty( $ads['configured'] );
-                    $label = $configured ? 'Configured provider' : ( $alternative ? 'Unused alternative' : 'Not configured' );
-                    $detail = $alternative ? 'Available if you choose to use this provider instead.' : $provider['detail'];
-                    echo '<div style="flex:1 1 220px;border:1px solid ' . ( $configured ? '#a8d5b5' : '#dcdcde' ) . ';border-left:4px solid ' . ( $configured ? '#137333' : '#a7aaad' ) . ';background:' . ( $configured ? '#f0f8f2' : '#f6f7f7' ) . ';padding:10px 12px"><strong>' . $e( 'ads' === $key ? 'Site Kit' : 'Google for WooCommerce' ) . '</strong><br><span class="pill pill-' . ( $configured ? 'ok' : 'off' ) . '" style="margin:6px 0">' . $e( $label ) . '</span><br>' . $e( $detail ) . '</div>';
-                }
-                echo '</div>';
-                if ( count( $ads['configured'] ) > 1 ) {
-                    echo '<p>Both providers are configured. Check their conversion destinations to avoid counting the same conversion twice.</p>';
-                } elseif ( ! $ads['tag_found'] ) {
-                    echo '<p>No AW- tag configuration was verified on the home page.</p>';
-                }
-                echo '</td></tr>';
+                AceSeoTrackingUI::ads( $ads );
                 continue;
             }
-            echo '<tr><td><strong>' . $e( $row['label'] ) . '</strong></td><td><span class="pill pill-' . $e( $row['status'] ) . '">' . $e( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . $e( $row['detail'] ) . '</td></tr>';
+            echo '<tr><td><strong>' . $e( $row['label'] ) . '</strong></td><td><span class="pill pill-' . $e( $row['status'] ) . '">' . $e( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . AceSeoTrackingUI::detail( $row['detail'] ) . '<span class="ace-trk-row-links">' . AceSeoTrackingUI::links( $row['key'], $row ) . '</span></td></tr>';
         }
         echo '</tbody></table>';
+        if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::render(); }
 
         // On the page.
         echo '<h2>Found on the home page</h2>';
@@ -762,12 +766,14 @@ class AceSeoTracking {
         }
 
         // Daily table.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) ) {
-            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th></tr></thead><tbody>';
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] ) {
+            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th>' . ( $commerce['ok'] ? '<th>Orders</th><th>Order value (' . $e( $commerce['currency'] ) . ')</th>' : '' ) . '</tr></thead><tbody>';
             $gap = $a ? $a['gap_days'] : array();
             foreach ( array_reverse( $series['days'] ) as $d ) {
                 $mark = in_array( $d['date'], $gap, true ) ? ' style="background:#fde8e6"' : '';
-                echo '<tr' . $mark . '><td>' . $e( $d['date'] ) . '</td><td class="n">' . $e( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . $e( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . $e( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . $e( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td></tr>';
+                echo '<tr' . $mark . '><td>' . $e( $d['date'] ) . '</td><td class="n">' . $e( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . $e( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . $e( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . $e( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td>';
+                if ( $commerce['ok'] ) { $sale = $commerce['days'][ $d['date'] ]; echo '<td class="n">' . $e( number_format_i18n( $sale['wc_orders'] ) ) . '</td><td class="n">' . $e( number_format_i18n( $sale['wc_value'], 2 ) ) . '</td>'; }
+                echo '</tr>';
             }
             echo '</tbody></table></details>';
         }
@@ -775,8 +781,29 @@ class AceSeoTracking {
     }
 
     /**
-     * Inline SVG line chart, one scale, gap days shaded, a native tooltip per day.
+     * Interactive chart with an SVG fallback and optional WooCommerce series.
      */
+    public static function render_chart( $series, $commerce, $metric, $gap ) {
+        $days = $series['days'];
+        foreach ( $days as $date => &$day ) { $day = array_merge( $day, $commerce['days'][ $date ] ?? array() ); }
+        unset( $day );
+        $ga = ! empty( $series['ga']['ok'] );
+        $jp = ! empty( $series['jp']['ok'] );
+        echo '<div class="ace-trk-chart"><div class="ace-trk-chart-controls" hidden><label>Traffic <select name="traffic_metric"><option value="visitors"' . ( 'views' !== $metric ? ' selected' : '' ) . '>Visitors</option><option value="views"' . ( 'views' === $metric ? ' selected' : '' ) . '>Page views</option></select></label>';
+        if ( $ga ) { echo '<label><input type="checkbox" name="ga" checked> Google Analytics</label>'; }
+        if ( $jp ) { echo '<label><input type="checkbox" name="jp" checked> Jetpack</label>'; }
+        if ( $commerce['ok'] ) {
+            echo '<label><input type="checkbox" name="orders"' . ( ! $ga && ! $jp ? ' checked' : '' ) . '> Orders</label><label><input type="checkbox" name="value"> Order value (' . esc_html( $commerce['currency'] ) . ')</label>';
+        }
+        echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><p class="ace-trk-chart-note">Hover or touch to inspect a day. Focus the chart and use the arrow keys to move between dates. Missing data is shown as unavailable, not zero.</p>';
+        if ( $commerce['ok'] ) {
+            echo '<p class="ace-trk-chart-note">Orders in processing, completed or refunded status, grouped by creation date in the site timezone. Order value is the total less refunds, including tax and delivery; refunds reduce the original order day. Counts use the left axis; ' . esc_html( $commerce['currency'] ) . ' uses the right. Refreshed hourly.</p>';
+            if ( $commerce['skipped_currency'] ) { echo '<p class="ace-trk-chart-note">' . esc_html( number_format_i18n( $commerce['skipped_currency'] ) ) . ' orders in other currencies are excluded.</p>'; }
+        }
+        $data = array( 'days' => array_values( $days ), 'gaps' => array_values( $gap ), 'today' => wp_date( 'Y-m-d' ), 'currency' => $commerce['currency'] ?? '' );
+        echo '<script type="application/json">' . wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ) . '</script></div>';
+    }
+
     public static function svg_chart( array $days, $metric, array $gap ) {
         $days = array_values( $days );
         $n = count( $days );
