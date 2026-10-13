@@ -1,0 +1,774 @@
+<?php
+/**
+ * Tracking: which analytics and marketing tags this site runs, whether they are
+ * actually on the page, and whether Google Analytics agrees with an independent
+ * counter (Jetpack Stats) day by day.
+ *
+ * Everything here is read-only against the site. Detection reads plugin state
+ * and options; the page probe fetches the site's own home page as a browser
+ * would and scans the HTML; the series come from the GA4 Data API (through the
+ * Site Kit token bridge) and Jetpack's stats endpoint. A daily cron tick repeats
+ * the checks and raises an admin notice (and optionally an email) when a tag
+ * loads without being configured, a tag Site Kit expects is missing, or Analytics
+ * has reported nothing for two days while visitors were counted elsewhere.
+ */
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+class AceSeoTracking {
+    const SLUG       = 'ace-seo-tracking';
+    const CRON       = 'ace_seo_tracking_check';
+    const OPT_ALERTS = 'ace_seo_tracking_alerts';
+    const OPT_EMAIL  = 'ace_seo_tracking_email';
+    const T_PAGE     = 'ace_seo_tracking_page';
+    const T_SERIES   = 'ace_seo_tracking_series';
+    const DAYS       = 60;
+    const MIN_TRAFFIC = 10;
+
+    public static function init() {
+        add_action( 'init', array( __CLASS__, 'schedule' ) );
+        add_action( self::CRON, array( __CLASS__, 'run' ) );
+        add_action( 'admin_menu', array( __CLASS__, 'menu' ), 20 );
+        add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
+        add_action( 'admin_post_ace_seo_tracking_refresh', array( __CLASS__, 'admin_refresh' ) );
+        add_action( 'admin_post_ace_seo_tracking_email', array( __CLASS__, 'admin_email_toggle' ) );
+        add_action( 'admin_post_ace_seo_tracking_csv', array( __CLASS__, 'admin_csv' ) );
+    }
+
+    public static function schedule() {
+        if ( ! wp_next_scheduled( self::CRON ) ) {
+            $at = new DateTime( 'tomorrow 05:10', wp_timezone() );
+            wp_schedule_event( $at->getTimestamp(), 'daily', self::CRON );
+        }
+    }
+
+    // ------------------------------------------------------------ detection
+
+    /**
+     * Is a plugin active on this site (or network-wide)?
+     */
+    public static function plugin_on( $file ) {
+        if ( in_array( $file, (array) get_option( 'active_plugins', array() ), true ) ) {
+            return true;
+        }
+        return is_multisite() && array_key_exists( $file, (array) get_site_option( 'active_sitewide_plugins', array() ) );
+    }
+
+    private static function sitekit_option( $name ) {
+        $v = get_option( 'googlesitekit_' . $name, array() );
+        return is_array( $v ) ? $v : array();
+    }
+
+    /**
+     * Everything the site thinks it is running. Each row: key, label, status
+     * (ok|warn|bad|off), detail, ids (what should appear on the page).
+     */
+    public static function detect() {
+        $rows = array();
+        $add  = function ( $key, $label, $status, $detail, $ids = array() ) use ( &$rows ) {
+            $rows[ $key ] = compact( 'key', 'label', 'status', 'detail', 'ids' );
+        };
+
+        // Google Site Kit.
+        $sk_on = class_exists( 'AceSEOSiteKit' ) && AceSEOSiteKit::is_active();
+        $modules = (array) get_option( 'googlesitekit_active_modules', array() );
+        $a4 = self::sitekit_option( 'analytics-4_settings' );
+        $tm = self::sitekit_option( 'tagmanager_settings' );
+        $ads = self::sitekit_option( 'ads_settings' );
+        $consent = self::sitekit_option( 'consent_mode' );
+        $sharing = self::sitekit_option( 'dashboard_sharing' );
+        $owner = (int) get_option( 'googlesitekit_owner_id', 0 );
+        $connected = (bool) get_option( 'googlesitekit_has_connected_admins', false );
+        if ( ! $sk_on ) {
+            $add( 'sitekit', 'Google Site Kit', 'off', 'Not installed or not active on this site.' );
+        } else {
+            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+            $token_ok = ! is_wp_error( $token ) && $token;
+            $detail = 'Modules: ' . ( $modules ? implode( ', ', $modules ) : 'none' ) . '. ';
+            $detail .= $owner ? 'Owner: user ' . $owner . '. ' : '';
+            $detail .= $connected ? 'A connected admin exists. ' : 'No admin is connected. ';
+            $detail .= $token_ok ? 'Analytics read token available.' : 'No usable Analytics token: ' . ( is_wp_error( $token ) ? $token->get_error_message() : 'none' );
+            $add( 'sitekit', 'Google Site Kit', $connected && $token_ok ? 'ok' : 'warn', $detail );
+        }
+
+        // Google Analytics tag (Site Kit).
+        $ga_ids = array_values( array_filter( array( $a4['googleTagID'] ?? '', $a4['measurementID'] ?? '' ) ) );
+        if ( $sk_on && in_array( 'analytics-4', $modules, true ) && ! empty( $a4['propertyID'] ) ) {
+            $place = ! empty( $a4['useSnippet'] );
+            $expect = $place ? array( $ga_ids[0] ) : array();
+            $add( 'ga4', 'Google Analytics 4 (Site Kit)', 'ok', 'Property ' . $a4['propertyID'] . ', stream ' . ( $a4['measurementID'] ?? '?' ) . ( ! empty( $a4['googleTagID'] ) ? ', Google tag ' . $a4['googleTagID'] : '' ) . ( $place ? '. Site Kit places the tag.' : '. Site Kit does NOT place the tag (another plugin must).' ), $expect );
+        } elseif ( $sk_on ) {
+            $add( 'ga4', 'Google Analytics 4 (Site Kit)', 'off', 'Analytics module not connected.' );
+        }
+
+        // Google Tag Manager.
+        if ( $sk_on && in_array( 'tagmanager', $modules, true ) && ! empty( $tm['containerID'] ) ) {
+            $add( 'gtm', 'Google Tag Manager (Site Kit)', 'ok', 'Container ' . $tm['containerID'] . ', account ' . ( $tm['accountID'] ?? '?' ) . ( ! empty( $tm['useSnippet'] ) ? '. Site Kit places the snippet.' : '. Snippet placement off.' ), ! empty( $tm['useSnippet'] ) ? array( $tm['containerID'] ) : array() );
+        } elseif ( self::plugin_on( 'duracelltomi-google-tag-manager/duracelltomi-google-tag-manager-for-wordpress.php' ) ) {
+            $o = (array) get_option( 'gtm4wp-options', array() );
+            $add( 'gtm', 'Google Tag Manager (GTM4WP)', 'ok', 'Container ' . ( $o['gtm-code'] ?? '?' ), array_filter( array( $o['gtm-code'] ?? '' ) ) );
+        }
+
+        // Google Ads.
+        if ( $sk_on && in_array( 'ads', $modules, true ) ) {
+            $cid = (string) ( $ads['conversionID'] ?? '' );
+            $add( 'ads', 'Google Ads (Site Kit)', $cid ? 'ok' : 'warn', $cid ? 'Conversion ID ' . $cid : 'Ads module is on but has no conversion ID saved, so it places nothing.', array_filter( array( $cid ) ) );
+        }
+        if ( self::plugin_on( 'google-listings-and-ads/google-listings-and-ads.php' ) ) {
+            $gla = (string) get_option( 'gla_ads_id', '' );
+            $add( 'gla', 'Google for WooCommerce', 'ok', $gla ? 'Ads account ' . $gla . '; its AW- conversion tag prints on the page.' : 'Active; no Ads account linked yet.' );
+        }
+
+        // Consent.
+        if ( $sk_on ) {
+            $on = ! empty( $consent['enabled'] );
+            $add( 'consent', 'Consent mode (Site Kit)', $on ? 'ok' : 'warn', $on ? count( (array) ( $consent['regions'] ?? array() ) ) . ' regions default to denied until the banner answers.' : 'Off. Visitors in the EEA and UK are tracked before they answer the banner, and Site Kit will nag about it.' );
+        }
+        $add( 'wp_consent_api', 'WP Consent API', function_exists( 'wp_has_consent' ) ? 'ok' : 'off', function_exists( 'wp_has_consent' ) ? 'Present: cookie banners can hand their answer to Site Kit and other plugins.' : 'Not installed. Site Kit consent mode then relies on the banner updating Google itself.' );
+        $banners = array(
+            'cookie-law-info/cookie-law-info.php'      => 'CookieYes',
+            'complianz-gdpr/complianz-gpdr.php'        => 'Complianz',
+            'cookiebot/cookiebot.php'                  => 'Cookiebot',
+            'beautiful-and-responsive-cookie-consent/nsc_bar-cookie-consent.php' => 'Beautiful Cookie Consent',
+            'gdpr-cookie-compliance/moove-gdpr.php'    => 'GDPR Cookie Compliance',
+        );
+        $banner = '';
+        foreach ( $banners as $file => $name ) {
+            if ( self::plugin_on( $file ) ) {
+                $banner = $name;
+                break;
+            }
+        }
+        if ( 'CookieYes' === $banner ) {
+            $gcm = (array) get_option( 'cky_gcm_settings', array() );
+            $add( 'banner', 'Cookie banner: CookieYes', 'ok', ! empty( $gcm['status'] ) ? 'Google Consent Mode integration on (its own default: ' . ( $gcm['default_settings'][0]['analytics'] ?? '?' ) . ' for ' . ( $gcm['default_settings'][0]['regions'] ?? '?' ) . ' regions).' : 'Google Consent Mode integration is OFF in CookieYes.' );
+        } elseif ( $banner ) {
+            $add( 'banner', 'Cookie banner: ' . $banner, 'ok', 'Active.' );
+        } else {
+            $add( 'banner', 'Cookie banner', 'off', 'No known consent banner plugin is active.' );
+        }
+
+        // Microsoft Clarity.
+        if ( self::plugin_on( 'microsoft-clarity/clarity.php' ) ) {
+            $pid = (string) get_option( 'clarity_project_id', '' );
+            $add( 'clarity', 'Microsoft Clarity', $pid ? 'ok' : 'warn', $pid ? 'Project ' . $pid : 'Plugin active but no project ID saved.', array_filter( array( $pid ) ) );
+        }
+
+        // Jetpack Stats.
+        $jp_stats = class_exists( 'Jetpack' ) && method_exists( 'Jetpack', 'is_module_active' ) && Jetpack::is_module_active( 'stats' );
+        $add( 'jetpack', 'Jetpack Stats', $jp_stats ? 'ok' : 'off', $jp_stats ? 'Counting on WordPress.com; used here as the independent check on Analytics.' : 'Not active, so there is no second counter to compare Analytics against.' );
+
+        // WooCommerce and its tags.
+        if ( class_exists( 'WooCommerce' ) ) {
+            $add( 'woo', 'WooCommerce', 'ok', 'Version ' . ( defined( 'WC_VERSION' ) ? WC_VERSION : '?' ) . '. Orders and revenue are recorded regardless of any tag.' );
+            if ( self::plugin_on( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
+                $w = (array) get_option( 'woocommerce_google_analytics_settings', array() );
+                $gid = (string) ( $w['ga_id'] ?? '' );
+                $add( 'woo_ga', 'WooCommerce Google Analytics', $gid ? 'ok' : 'warn', $gid ? 'Measurement ID ' . $gid . '. This is a second GA4 tag: fine if it is the same property as Site Kit, double counting if not.' : 'Active with no measurement ID.', array_filter( array( $gid ) ) );
+            }
+            if ( self::plugin_on( 'facebook-for-woocommerce/facebook-for-woocommerce.php' ) ) {
+                $px = (string) get_option( 'wc_facebook_pixel_id', '' );
+                $add( 'fb', 'Facebook for WooCommerce', $px ? 'ok' : 'warn', $px ? 'Pixel ' . $px : 'Active with no pixel ID.', array_filter( array( $px ) ) );
+            }
+        }
+
+        // Other analytics plugins that place their own tag.
+        $others = array(
+            'google-analytics-for-wordpress/googleanalytics.php' => 'MonsterInsights',
+            'ga-google-analytics/ga-google-analytics.php'        => 'GA Google Analytics',
+            'pixelyoursite/pixelyoursite.php'                    => 'PixelYourSite',
+            'matomo/matomo.php'                                  => 'Matomo',
+            'plausible-analytics/plausible-analytics.php'        => 'Plausible',
+            'hotjar/hotjar.php'                                  => 'Hotjar',
+            'independent-analytics/iawp.php'                     => 'Independent Analytics',
+            'burst-statistics/burst.php'                         => 'Burst Statistics',
+            'koko-analytics/koko-analytics.php'                  => 'Koko Analytics',
+            'wp-statistics/wp-statistics.php'                    => 'WP Statistics',
+        );
+        foreach ( $others as $file => $name ) {
+            if ( self::plugin_on( $file ) ) {
+                $add( 'other_' . sanitize_key( $name ), $name, 'ok', 'Active. Places its own tracking; check it is not a second copy of a tag above.' );
+            }
+        }
+
+        return $rows;
+    }
+
+    // ------------------------------------------------------------ page probe
+
+    /**
+     * Fetch the home page as a browser would and scan it. Cached for an hour.
+     */
+    public static function probe_page( $force = false ) {
+        if ( ! $force ) {
+            $c = get_transient( self::T_PAGE );
+            if ( is_array( $c ) ) {
+                return $c;
+            }
+        }
+        $url = add_query_arg( 'ace_nocache', (string) time(), home_url( '/' ) );
+        $r = wp_remote_get( $url, array(
+            'timeout'    => 20,
+            'user-agent' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 AceSEO-tracking-check',
+            'sslverify'  => ! ( defined( 'WP_LOCAL_DEV' ) && WP_LOCAL_DEV ),
+            'headers'    => array( 'Cache-Control' => 'no-cache' ),
+        ) );
+        if ( is_wp_error( $r ) ) {
+            $out = array( 'ok' => false, 'error' => $r->get_error_message(), 'at' => time() );
+        } else {
+            $code = wp_remote_retrieve_response_code( $r );
+            $out = self::scan_html( (string) wp_remote_retrieve_body( $r ) );
+            $out['ok'] = ( $code >= 200 && $code < 300 );
+            $out['http'] = $code;
+            $out['at'] = time();
+        }
+        set_transient( self::T_PAGE, $out, HOUR_IN_SECONDS );
+        return $out;
+    }
+
+    /**
+     * Pure: what tracking is actually in a page's HTML.
+     */
+    public static function scan_html( $html ) {
+        $o = array( 'loaders' => array(), 'configs' => array(), 'gtm' => array(), 'clarity' => '', 'fb_pixel' => '', 'consent_default' => false, 'consent_regions' => 0, 'banner' => '', 'wp_consent_api' => false, 'others' => array() );
+        $html = (string) $html;
+        if ( preg_match_all( '#googletagmanager\.com(?:\\\\?/)gtag(?:\\\\?/)js\?id=([A-Z]{1,3}-[A-Z0-9]+)#', $html, $m ) ) {
+            $o['loaders'] = array_values( array_unique( $m[1] ) );
+        }
+        if ( preg_match_all( '#gtag\(\s*[\'"]config[\'"]\s*,\s*[\'"]([A-Z]{1,3}-[A-Z0-9]+)[\'"]#', $html, $m ) ) {
+            $o['configs'] = array_values( array_unique( $m[1] ) );
+        }
+        if ( preg_match_all( '#(GTM-[A-Z0-9]+)#', $html, $m ) ) {
+            $o['gtm'] = array_values( array_unique( $m[1] ) );
+        }
+        if ( preg_match( '#clarity\.ms/tag/([a-z0-9]+)#i', $html, $m ) || preg_match( '#"clarity"\s*,\s*"script"\s*,\s*"([a-z0-9]+)"#i', $html, $m ) ) {
+            $o['clarity'] = $m[1];
+        }
+        if ( preg_match( '#fbq\(\s*[\'"]init[\'"]\s*,\s*[\'"](\d+)[\'"]#', $html, $m ) ) {
+            $o['fb_pixel'] = $m[1];
+        }
+        if ( preg_match_all( '#gtag\(\s*[\'"]consent[\'"]\s*,\s*[\'"]default[\'"]\s*,\s*(\{.{0,2000}?\})\s*\)#s', $html, $m ) ) {
+            $o['consent_default'] = true;
+            foreach ( $m[1] as $json ) {
+                if ( preg_match( '#"region"\s*:\s*\[([^\]]*)\]#', $json, $rm ) ) {
+                    $o['consent_regions'] = max( $o['consent_regions'], substr_count( $rm[1], '"' ) / 2 );
+                }
+            }
+        }
+        $o['wp_consent_api'] = false !== strpos( $html, 'wp-consent-api' );
+        foreach ( array( 'cookieyes' => 'CookieYes', 'cmplz' => 'Complianz', 'Cookiebot' => 'Cookiebot', 'moove_gdpr' => 'GDPR Cookie Compliance' ) as $needle => $name ) {
+            if ( false !== strpos( $html, $needle ) ) {
+                $o['banner'] = $name;
+                break;
+            }
+        }
+        foreach ( array( 'static.hotjar.com' => 'Hotjar', 'plausible.io' => 'Plausible', 'matomo.js' => 'Matomo', 'stats.wp.com' => 'Jetpack Stats', 'connect.facebook.net' => 'Meta Pixel', 'snap.licdn.com' => 'LinkedIn Insight', 'analytics.tiktok.com' => 'TikTok Pixel', 'static.ads-twitter.com' => 'X Pixel', 'bat.bing.com' => 'Microsoft Ads UET' ) as $needle => $name ) {
+            if ( false !== strpos( $html, $needle ) ) {
+                $o['others'][] = $name;
+            }
+        }
+        return $o;
+    }
+
+    // ------------------------------------------------------------ series
+
+    public static function series( $force = false ) {
+        if ( ! $force ) {
+            $c = get_transient( self::T_SERIES );
+            if ( is_array( $c ) ) {
+                return $c;
+            }
+        }
+        $tz = wp_timezone();
+        $end = new DateTime( 'today', $tz );
+        $start = ( clone $end )->modify( '-' . ( self::DAYS - 1 ) . ' days' );
+        $days = array();
+        for ( $d = clone $start; $d <= $end; $d->modify( '+1 day' ) ) {
+            $days[ $d->format( 'Y-m-d' ) ] = array( 'date' => $d->format( 'Y-m-d' ), 'ga_users' => null, 'ga_views' => null, 'jp_visitors' => null, 'jp_views' => null );
+        }
+        $out = array( 'days' => $days, 'ga' => array( 'ok' => false, 'error' => '' ), 'jp' => array( 'ok' => false, 'error' => '' ), 'at' => time() );
+
+        // GA4 via the Site Kit token bridge.
+        $a4 = self::sitekit_option( 'analytics-4_settings' );
+        if ( class_exists( 'AceSEOSiteKit' ) && AceSEOSiteKit::is_active() && ! empty( $a4['propertyID'] ) ) {
+            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+            if ( is_wp_error( $token ) ) {
+                $out['ga']['error'] = $token->get_error_message();
+            } else {
+                $body = array(
+                    'dateRanges' => array( array( 'startDate' => $start->format( 'Y-m-d' ), 'endDate' => $end->format( 'Y-m-d' ) ) ),
+                    'dimensions' => array( array( 'name' => 'date' ) ),
+                    'metrics'    => array( array( 'name' => 'activeUsers' ), array( 'name' => 'screenPageViews' ) ),
+                    'limit'      => 400,
+                );
+                $r = wp_remote_post( 'https://analyticsdata.googleapis.com/v1beta/properties/' . rawurlencode( $a4['propertyID'] ) . ':runReport', array(
+                    'timeout' => 20,
+                    'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+                    'body'    => wp_json_encode( $body ),
+                ) );
+                if ( is_wp_error( $r ) ) {
+                    $out['ga']['error'] = $r->get_error_message();
+                } else {
+                    $j = json_decode( wp_remote_retrieve_body( $r ), true );
+                    if ( 200 !== (int) wp_remote_retrieve_response_code( $r ) ) {
+                        $out['ga']['error'] = $j['error']['message'] ?? ( 'HTTP ' . wp_remote_retrieve_response_code( $r ) );
+                    } else {
+                        foreach ( $days as $k => $row ) {
+                            $out['days'][ $k ]['ga_users'] = 0;
+                            $out['days'][ $k ]['ga_views'] = 0;
+                        }
+                        foreach ( (array) ( $j['rows'] ?? array() ) as $row ) {
+                            $d = $row['dimensionValues'][0]['value'] ?? '';
+                            $k = substr( $d, 0, 4 ) . '-' . substr( $d, 4, 2 ) . '-' . substr( $d, 6, 2 );
+                            if ( isset( $out['days'][ $k ] ) ) {
+                                $out['days'][ $k ]['ga_users'] = (int) ( $row['metricValues'][0]['value'] ?? 0 );
+                                $out['days'][ $k ]['ga_views'] = (int) ( $row['metricValues'][1]['value'] ?? 0 );
+                            }
+                        }
+                        $out['ga']['ok'] = true;
+                    }
+                }
+            }
+        } else {
+            $out['ga']['error'] = 'Site Kit Analytics is not connected.';
+        }
+
+        // Jetpack Stats.
+        if ( class_exists( 'Automattic\\Jetpack\\Stats\\WPCOM_Stats' ) && class_exists( 'Jetpack' ) && Jetpack::is_module_active( 'stats' ) ) {
+            $r = ( new Automattic\Jetpack\Stats\WPCOM_Stats() )->get_visits( array( 'unit' => 'day', 'quantity' => self::DAYS ) );
+            if ( is_wp_error( $r ) ) {
+                $out['jp']['error'] = $r->get_error_message();
+            } else {
+                $r = json_decode( wp_json_encode( $r ), true );
+                $fields = array_flip( (array) ( $r['fields'] ?? array() ) );
+                foreach ( (array) ( $r['data'] ?? array() ) as $row ) {
+                    $k = (string) ( $row[ $fields['period'] ?? 0 ] ?? '' );
+                    if ( isset( $out['days'][ $k ] ) ) {
+                        $out['days'][ $k ]['jp_visitors'] = (int) ( $row[ $fields['visitors'] ?? 2 ] ?? 0 );
+                        $out['days'][ $k ]['jp_views'] = (int) ( $row[ $fields['views'] ?? 1 ] ?? 0 );
+                    }
+                }
+                $out['jp']['ok'] = true;
+            }
+        } else {
+            $out['jp']['error'] = 'Jetpack Stats is not active.';
+        }
+
+        set_transient( self::T_SERIES, $out, HOUR_IN_SECONDS );
+        return $out;
+    }
+
+    /**
+     * Pure: compare the two counters. A gap day is one where the independent
+     * counter saw real traffic and Analytics saw nothing; without Jetpack, a day
+     * where Analytics reports zero after a healthy fortnight.
+     */
+    public static function analyse( array $days, $today = null ) {
+        $today = $today ?: wp_date( 'Y-m-d' );
+        $has_jp = false;
+        foreach ( $days as $d ) {
+            if ( null !== $d['jp_visitors'] ) {
+                $has_jp = true;
+                break;
+            }
+        }
+        $gap = array();
+        $ga_sum = $jp_sum = 0;
+        $ratio_ga = $ratio_jp = 0;
+        $recent = array();
+        foreach ( $days as $d ) {
+            if ( $d['date'] >= $today ) {
+                continue; // today is incomplete
+            }
+            $gu = $d['ga_users'];
+            if ( null === $gu ) {
+                continue;
+            }
+            if ( $has_jp ) {
+                $jv = (int) $d['jp_visitors'];
+                $ga_sum += $gu;
+                $jp_sum += $jv;
+                if ( $jv >= self::MIN_TRAFFIC && $gu < max( 1, $jv * 0.1 ) ) {
+                    $gap[] = $d['date'];
+                } elseif ( $jv > 0 && $gu > 0 ) {
+                    $ratio_ga += $gu;
+                    $ratio_jp += $jv;
+                }
+            } else {
+                $recent[] = $gu;
+                $n = count( $recent );
+                if ( $n > 14 ) {
+                    $avg = array_sum( array_slice( $recent, $n - 15, 14 ) ) / 14;
+                    if ( 0 === $gu && $avg >= self::MIN_TRAFFIC ) {
+                        $gap[] = $d['date'];
+                    }
+                }
+            }
+        }
+        $ratio = $ratio_jp > 0 ? $ratio_ga / $ratio_jp : null;
+        $missing = 0;
+        if ( $has_jp && null !== $ratio ) {
+            foreach ( $days as $d ) {
+                if ( in_array( $d['date'], $gap, true ) ) {
+                    $missing += (int) round( (int) $d['jp_visitors'] * $ratio );
+                }
+            }
+        }
+        $yesterday = ( new DateTime( $today ) )->modify( '-1 day' )->format( 'Y-m-d' );
+        $day_before = ( new DateTime( $today ) )->modify( '-2 days' )->format( 'Y-m-d' );
+        return array(
+            'has_jp'        => $has_jp,
+            'gap_days'      => $gap,
+            'ongoing'       => in_array( $yesterday, $gap, true ) && in_array( $day_before, $gap, true ),
+            'ga_total'      => $ga_sum,
+            'jp_total'      => $jp_sum,
+            'ratio'         => $ratio,
+            'missing_users' => $missing,
+        );
+    }
+
+    /**
+     * What is wrong right now. Each problem: [level, text]. Levels: bad, warn.
+     */
+    public static function problems( array $detect, array $page, array $series ) {
+        $p = array();
+        if ( ! empty( $page['ok'] ) ) {
+            foreach ( $page['loaders'] as $id ) {
+                if ( ! in_array( $id, $page['configs'], true ) && 0 !== strpos( $id, 'GTM-' ) ) {
+                    $p[] = array( 'bad', 'The Google tag ' . $id . ' loads on the home page but is never configured, so it reports nothing. A plugin or theme is rewriting the tag and dropping its inline script.' );
+                }
+            }
+            foreach ( $detect as $row ) {
+                foreach ( $row['ids'] as $id ) {
+                    $on_page = in_array( $id, $page['loaders'], true ) || in_array( $id, $page['configs'], true ) || in_array( $id, $page['gtm'], true ) || $id === $page['clarity'] || $id === $page['fb_pixel'];
+                    if ( ! $on_page ) {
+                        $p[] = array( 'bad', $row['label'] . ' expects ' . $id . ' on the page, and the home page does not carry it.' );
+                    }
+                }
+            }
+            $ga_tags = array_values( array_filter( $page['configs'], function ( $id ) {
+                return 0 === strpos( $id, 'G-' ) || 0 === strpos( $id, 'GT-' );
+            } ) );
+            if ( count( $ga_tags ) > 1 ) {
+                $p[] = array( 'warn', 'Two Google Analytics tags are configured on the page (' . implode( ', ', $ga_tags ) . '). If they belong to different properties, each page view is reported twice.' );
+            }
+            if ( ! empty( $detect['consent'] ) && 'ok' === $detect['consent']['status'] && empty( $page['consent_default'] ) ) {
+                $p[] = array( 'warn', 'Consent mode is on in Site Kit but no consent default was found on the home page.' );
+            }
+        } elseif ( isset( $page['ok'] ) ) {
+            $p[] = array( 'warn', 'Could not fetch the home page to check its tags: ' . ( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) );
+        }
+        if ( ! empty( $series['ga']['ok'] ) ) {
+            $a = self::analyse( $series['days'] );
+            if ( $a['ongoing'] ) {
+                $p[] = array( 'bad', $a['has_jp'] ? 'Google Analytics has reported almost nothing for the last two days while Jetpack counted visitors.' : 'Google Analytics has reported nothing for the last two days after a normal fortnight.' );
+            } elseif ( $a['gap_days'] ) {
+                $p[] = array( 'warn', 'Google Analytics missed ' . count( $a['gap_days'] ) . ' day' . ( 1 === count( $a['gap_days'] ) ? '' : 's' ) . ' in the last ' . self::DAYS . ' (last: ' . end( $a['gap_days'] ) . ').' );
+            }
+        } elseif ( ! empty( $detect['ga4'] ) && 'ok' === $detect['ga4']['status'] ) {
+            $p[] = array( 'warn', 'Analytics is connected but its report could not be read: ' . $series['ga']['error'] );
+        }
+        foreach ( $detect as $row ) {
+            if ( 'warn' === $row['status'] ) {
+                $p[] = array( 'warn', $row['label'] . ': ' . $row['detail'] );
+            }
+        }
+        return $p;
+    }
+
+    // ------------------------------------------------------------ cron
+
+    public static function run() {
+        $detect = self::detect();
+        $page = self::probe_page( true );
+        $series = self::series( true );
+        $problems = self::problems( $detect, $page, $series );
+        $bad = array_filter( $problems, function ( $x ) {
+            return 'bad' === $x[0];
+        } );
+        $prev = (array) get_option( self::OPT_ALERTS, array() );
+        update_option( self::OPT_ALERTS, array( 'at' => time(), 'problems' => $problems ), false );
+        $key = md5( wp_json_encode( array_values( $bad ) ) );
+        if ( $bad && get_option( self::OPT_EMAIL, 1 ) && ( $prev['emailed'] ?? '' ) !== $key ) {
+            $lines = array_map( function ( $x ) {
+                return '- ' . $x[1];
+            }, $bad );
+            $sent = wp_mail(
+                get_option( 'admin_email' ),
+                sprintf( '[%s] Tracking problem: %d issue%s need attention', wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), count( $bad ), 1 === count( $bad ) ? '' : 's' ),
+                "Ace SEO found these on its daily tracking check:\n\n" . implode( "\n", $lines ) . "\n\nDetails: " . admin_url( 'admin.php?page=' . self::SLUG ) . "\n"
+            );
+            if ( $sent ) {
+                update_option( self::OPT_ALERTS, array( 'at' => time(), 'problems' => $problems, 'emailed' => $key ), false );
+            }
+        }
+        return $problems;
+    }
+
+    public static function notice() {
+        if ( ! current_user_can( 'manage_options' ) || ( isset( $_GET['page'] ) && self::SLUG === $_GET['page'] ) ) {
+            return;
+        }
+        $a = (array) get_option( self::OPT_ALERTS, array() );
+        $bad = array_filter( (array) ( $a['problems'] ?? array() ), function ( $x ) {
+            return 'bad' === $x[0];
+        } );
+        if ( ! $bad ) {
+            return;
+        }
+        echo '<div class="notice notice-error"><p><strong>Tracking problem.</strong> ' . esc_html( reset( $bad )[1] ) . ' <a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">Open Tracking</a></p></div>';
+    }
+
+    // ------------------------------------------------------------ admin actions
+
+    public static function menu() {
+        add_submenu_page( 'ace-seo', 'Tracking', 'Tracking', 'manage_options', self::SLUG, array( __CLASS__, 'render_admin' ) );
+    }
+
+    public static function admin_refresh() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'No.' );
+        }
+        check_admin_referer( 'ace_seo_tracking_refresh' );
+        delete_transient( self::T_PAGE );
+        delete_transient( self::T_SERIES );
+        if ( class_exists( 'AceSEOSiteKit' ) ) {
+            AceSEOSiteKit::clear_token_cache();
+        }
+        self::run();
+        wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&refreshed=1' ) );
+        exit;
+    }
+
+    public static function admin_email_toggle() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'No.' );
+        }
+        check_admin_referer( 'ace_seo_tracking_email' );
+        update_option( self::OPT_EMAIL, empty( $_POST['on'] ) ? 0 : 1, false );
+        wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG ) );
+        exit;
+    }
+
+    public static function admin_csv() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'No.' );
+        }
+        check_admin_referer( 'ace_seo_tracking_csv' );
+        $s = self::series();
+        $host = wp_parse_url( home_url(), PHP_URL_HOST );
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="tracking-' . sanitize_file_name( $host ) . '-' . wp_date( 'Y-m-d' ) . '.csv"' );
+        $fh = fopen( 'php://output', 'w' );
+        fputcsv( $fh, array( 'date', 'ga4_active_users', 'ga4_page_views', 'jetpack_visitors', 'jetpack_views' ) );
+        foreach ( $s['days'] as $d ) {
+            fputcsv( $fh, array( $d['date'], $d['ga_users'] ?? '', $d['ga_views'] ?? '', $d['jp_visitors'] ?? '', $d['jp_views'] ?? '' ) );
+        }
+        fclose( $fh );
+        exit;
+    }
+
+    // ------------------------------------------------------------ page
+
+    public static function render_admin() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        $e = 'esc_html';
+        $metric = ( isset( $_GET['metric'] ) && 'views' === $_GET['metric'] ) ? 'views' : 'visitors';
+        $detect = self::detect();
+        $page = self::probe_page();
+        $series = self::series();
+        $problems = self::problems( $detect, $page, $series );
+        $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
+        $email_on = (bool) get_option( self::OPT_EMAIL, 1 );
+        $next = wp_next_scheduled( self::CRON );
+
+        echo '<style>.ace-trk .pill{display:inline-block;font:600 11px/1 sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px;border-radius:999px;white-space:nowrap}.ace-trk .pill-ok{background:#e6f4ea;color:#137333}.ace-trk .pill-warn{background:#fef3e0;color:#9a5b00}.ace-trk .pill-bad{background:#fde8e6;color:#b3261e}.ace-trk .pill-off{background:#eceff1;color:#5f6b73}.ace-trk .box{background:#fff;border:1px solid #c3c4c7;border-left-width:4px;padding:12px 16px;margin:12px 0;max-width:1100px}.ace-trk .box-bad{border-left-color:#d63638}.ace-trk .box-warn{border-left-color:#dba617}.ace-trk .box-ok{border-left-color:#00a32a}.ace-trk .box ul{margin:6px 0 0 18px}.ace-trk .tiles{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.ace-trk .tile{background:#fff;border:1px solid #c3c4c7;padding:10px 14px;min-width:160px}.ace-trk .tile b{display:block;font-size:22px;line-height:1.2}.ace-trk .tile span{color:#50575e;font-size:12px}.ace-trk svg{max-width:1100px;width:100%;height:auto;display:block;background:#fff;border:1px solid #c3c4c7}.ace-trk .legend{font-size:13px;color:#50575e;margin:6px 0}.ace-trk .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}.ace-trk table.widefat{max-width:1100px}.ace-trk td.n{text-align:right;font-variant-numeric:tabular-nums}.ace-trk code{font-size:12px}</style>';
+        echo '<div class="wrap ace-trk"><h1>Tracking</h1>';
+        if ( ! empty( $_GET['refreshed'] ) ) {
+            echo '<div class="notice notice-success"><p>Checks re-run.</p></div>';
+        }
+        echo '<p>What this site is set up to track, what the home page actually carries, and whether Google Analytics agrees with an independent counter. Checked daily at 05:10; next run ' . $e( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . $e( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
+
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
+        wp_nonce_field( 'ace_seo_tracking_refresh' );
+        echo '<input type="hidden" name="action" value="ace_seo_tracking_refresh"><button class="button">Re-run checks now</button></form>';
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
+        wp_nonce_field( 'ace_seo_tracking_email' );
+        echo '<input type="hidden" name="action" value="ace_seo_tracking_email"><input type="hidden" name="on" value="' . ( $email_on ? '0' : '1' ) . '"><button class="button">' . ( $email_on ? 'Email alerts: on (turn off)' : 'Email alerts: off (turn on)' ) . '</button></form>';
+        echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block">';
+        wp_nonce_field( 'ace_seo_tracking_csv' );
+        echo '<input type="hidden" name="action" value="ace_seo_tracking_csv"><button class="button">Download daily numbers (CSV)</button></form>';
+
+        // Problems.
+        $bad = array_filter( $problems, function ( $x ) {
+            return 'bad' === $x[0];
+        } );
+        $warn = array_filter( $problems, function ( $x ) {
+            return 'warn' === $x[0];
+        } );
+        if ( $bad ) {
+            echo '<div class="box box-bad"><strong>Tracking is broken.</strong><ul>';
+            foreach ( $bad as $x ) {
+                echo '<li>' . $e( $x[1] ) . '</li>';
+            }
+            echo '</ul></div>';
+        } elseif ( ! empty( $page['ok'] ) ) {
+            echo '<div class="box box-ok"><strong>Every tag the site expects is on the page and configured.</strong></div>';
+        }
+        if ( $warn ) {
+            echo '<div class="box box-warn"><strong>Worth a look.</strong><ul>';
+            foreach ( $warn as $x ) {
+                echo '<li>' . $e( $x[1] ) . '</li>';
+            }
+            echo '</ul></div>';
+        }
+
+        // Chart.
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) ) {
+            $jp_on = ! empty( $series['jp']['ok'] );
+            echo '<h2>Last ' . self::DAYS . ' days: Google Analytics' . ( $jp_on ? ' against Jetpack Stats' : '' ) . '</h2>';
+            if ( $a ) {
+                echo '<div class="tiles">';
+                echo '<div class="tile"><b>' . $e( number_format_i18n( $a['ga_total'] ) ) . '</b><span>GA4 active users' . ( $jp_on ? ', complete days' : '' ) . '</span></div>';
+                if ( $jp_on ) {
+                    echo '<div class="tile"><b>' . $e( number_format_i18n( $a['jp_total'] ) ) . '</b><span>Jetpack visitors, same days</span></div>';
+                    if ( null !== $a['ratio'] ) {
+                        echo '<div class="tile"><b>' . $e( number_format( $a['ratio'], 2 ) ) . '</b><span>GA4 users per Jetpack visitor on healthy days</span></div>';
+                    }
+                }
+                echo '<div class="tile"><b>' . $e( count( $a['gap_days'] ) ) . '</b><span>days Analytics missed' . ( $a['missing_users'] ? ', about ' . number_format_i18n( $a['missing_users'] ) . ' users unrecorded' : '' ) . '</span></div>';
+                echo '</div>';
+            }
+            $base = admin_url( 'admin.php?page=' . self::SLUG );
+            echo '<p class="legend"><i style="background:#2a78d6"></i>Google Analytics 4 ' . ( 'views' === $metric ? 'page views' : 'active users' ) . ( $jp_on ? ' &nbsp; <i style="background:#eb6834"></i>Jetpack ' . ( 'views' === $metric ? 'views' : 'visitors' ) : '' ) . ' &nbsp; <i style="background:#fde8e6;height:10px;border:1px dashed #d63638"></i>Analytics missed &nbsp;|&nbsp; ' . ( 'views' === $metric ? '<a href="' . esc_url( $base ) . '">Visitors</a> · <b>Page views</b>' : '<b>Visitors</b> · <a href="' . esc_url( $base . '&metric=views' ) . '">Page views</a>' ) . '</p>';
+            echo self::svg_chart( $series['days'], $metric, $a ? $a['gap_days'] : array() );
+            if ( ! empty( $series['ga']['error'] ) ) {
+                echo '<p>Analytics: ' . $e( $series['ga']['error'] ) . '</p>';
+            }
+            if ( ! empty( $series['jp']['error'] ) ) {
+                echo '<p>Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
+            }
+        } else {
+            echo '<h2>Daily numbers</h2><p>No counter is readable yet. Analytics: ' . $e( $series['ga']['error'] ) . ' Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
+        }
+
+        // Integrations.
+        echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>State</th><th>Details</th></tr></thead><tbody>';
+        foreach ( $detect as $row ) {
+            echo '<tr><td><strong>' . $e( $row['label'] ) . '</strong></td><td><span class="pill pill-' . $e( $row['status'] ) . '">' . $e( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . $e( $row['detail'] ) . '</td></tr>';
+        }
+        echo '</tbody></table>';
+
+        // On the page.
+        echo '<h2>Found on the home page</h2>';
+        if ( empty( $page['ok'] ) ) {
+            echo '<p>The home page could not be fetched: ' . $e( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . '</p>';
+        } else {
+            $found = array();
+            foreach ( $page['loaders'] as $id ) {
+                $found[] = array( 'Google tag loader', $id, in_array( $id, $page['configs'], true ) ? 'ok' : 'bad', in_array( $id, $page['configs'], true ) ? 'Loaded and configured' : 'Loaded but never configured: reports nothing' );
+            }
+            foreach ( $page['configs'] as $id ) {
+                if ( ! in_array( $id, $page['loaders'], true ) ) {
+                    $found[] = array( 'Google tag config', $id, 'ok', 'Configured; loads through another tag on the page' );
+                }
+            }
+            foreach ( $page['gtm'] as $id ) {
+                $found[] = array( 'Tag Manager container', $id, 'ok', 'Container script present' );
+            }
+            if ( $page['clarity'] ) {
+                $found[] = array( 'Microsoft Clarity', $page['clarity'], 'ok', 'Clarity script present' );
+            }
+            if ( $page['fb_pixel'] ) {
+                $found[] = array( 'Meta Pixel', $page['fb_pixel'], 'ok', 'fbq init present' );
+            }
+            $found[] = array( 'Consent default', $page['consent_default'] ? ( $page['consent_regions'] . ' regions' ) : 'none', $page['consent_default'] ? 'ok' : 'off', $page['consent_default'] ? 'gtag consent default is set before the tag loads' : 'No consent default; Google stores cookies before the banner answers' );
+            $found[] = array( 'Cookie banner', $page['banner'] ?: 'none', $page['banner'] ? 'ok' : 'off', $page['wp_consent_api'] ? 'WP Consent API script present' : 'No WP Consent API script' );
+            foreach ( $page['others'] as $name ) {
+                $found[] = array( 'Third-party script', $name, 'ok', 'Present' );
+            }
+            echo '<table class="widefat striped"><thead><tr><th>Item</th><th>ID</th><th>State</th><th>Note</th></tr></thead><tbody>';
+            foreach ( $found as $f ) {
+                echo '<tr><td>' . $e( $f[0] ) . '</td><td><code>' . $e( $f[1] ) . '</code></td><td><span class="pill pill-' . $e( $f[2] ) . '">' . $e( array( 'ok' => 'On', 'bad' => 'Broken', 'off' => 'Off' )[ $f[2] ] ) . '</span></td><td>' . $e( $f[3] ) . '</td></tr>';
+            }
+            echo '</tbody></table>';
+        }
+
+        // Daily table.
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) ) {
+            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th></tr></thead><tbody>';
+            $gap = $a ? $a['gap_days'] : array();
+            foreach ( array_reverse( $series['days'] ) as $d ) {
+                $mark = in_array( $d['date'], $gap, true ) ? ' style="background:#fde8e6"' : '';
+                echo '<tr' . $mark . '><td>' . $e( $d['date'] ) . '</td><td class="n">' . $e( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . $e( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . $e( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . $e( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td></tr>';
+            }
+            echo '</tbody></table></details>';
+        }
+        echo '</div>';
+    }
+
+    /**
+     * Inline SVG line chart, one scale, gap days shaded, a native tooltip per day.
+     */
+    public static function svg_chart( array $days, $metric, array $gap ) {
+        $days = array_values( $days );
+        $n = count( $days );
+        if ( $n < 2 ) {
+            return '';
+        }
+        $ka = 'views' === $metric ? 'ga_views' : 'ga_users';
+        $kj = 'views' === $metric ? 'jp_views' : 'jp_visitors';
+        $W = 1000;
+        $H = 300;
+        $pl = 48;
+        $pr = 16;
+        $pt = 16;
+        $pb = 34;
+        $max = 1;
+        foreach ( $days as $d ) {
+            $max = max( $max, (int) $d[ $ka ], (int) $d[ $kj ] );
+        }
+        $step = $max > 2000 ? 500 : ( $max > 800 ? 200 : ( $max > 300 ? 100 : ( $max > 120 ? 50 : ( $max > 50 ? 20 : 10 ) ) ) );
+        $top = (int) ceil( $max / $step ) * $step;
+        $x = function ( $i ) use ( $n, $pl, $pr, $W ) {
+            return round( $pl + ( $i / ( $n - 1 ) ) * ( $W - $pl - $pr ), 1 );
+        };
+        $y = function ( $v ) use ( $top, $pt, $pb, $H ) {
+            return round( $pt + ( 1 - $v / $top ) * ( $H - $pt - $pb ), 1 );
+        };
+        $s = '<svg viewBox="0 0 ' . $W . ' ' . $H . '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Daily ' . esc_attr( $metric ) . '">';
+        $cw = ( $W - $pl - $pr ) / ( $n - 1 );
+        foreach ( $days as $i => $d ) {
+            if ( in_array( $d['date'], $gap, true ) ) {
+                $s .= '<rect x="' . ( $x( $i ) - $cw / 2 ) . '" y="' . $pt . '" width="' . round( $cw, 1 ) . '" height="' . ( $H - $pt - $pb ) . '" fill="#fde8e6"/>';
+            }
+        }
+        for ( $v = 0; $v <= $top; $v += $step ) {
+            $s .= '<line x1="' . $pl . '" x2="' . ( $W - $pr ) . '" y1="' . $y( $v ) . '" y2="' . $y( $v ) . '" stroke="#e0e0e0"/><text x="' . ( $pl - 6 ) . '" y="' . ( $y( $v ) + 4 ) . '" text-anchor="end" font-size="11" fill="#50575e">' . $v . '</text>';
+        }
+        foreach ( $days as $i => $d ) {
+            if ( 0 === $i % 7 || $i === $n - 1 ) {
+                $s .= '<text x="' . $x( $i ) . '" y="' . ( $H - $pb + 16 ) . '" text-anchor="' . ( $i === $n - 1 ? 'end' : 'middle' ) . '" font-size="11" fill="#50575e">' . esc_html( wp_date( 'j M', strtotime( $d['date'] . ' 12:00:00' ) ) ) . '</text>';
+            }
+        }
+        foreach ( array( array( $kj, '#eb6834' ), array( $ka, '#2a78d6' ) ) as $line ) {
+            $pts = array();
+            foreach ( $days as $i => $d ) {
+                if ( null !== $d[ $line[0] ] ) {
+                    $pts[] = $x( $i ) . ',' . $y( (int) $d[ $line[0] ] );
+                }
+            }
+            if ( count( $pts ) > 1 ) {
+                $s .= '<polyline fill="none" stroke="' . $line[1] . '" stroke-width="2" stroke-linejoin="round" points="' . implode( ' ', $pts ) . '"/>';
+            }
+        }
+        foreach ( $days as $i => $d ) {
+            $tip = wp_date( 'D j M Y', strtotime( $d['date'] . ' 12:00:00' ) ) . ': GA4 ' . ( null === $d[ $ka ] ? 'n/a' : number_format_i18n( $d[ $ka ] ) ) . ( null === $d[ $kj ] ? '' : ', Jetpack ' . number_format_i18n( $d[ $kj ] ) ) . ( in_array( $d['date'], $gap, true ) ? ' (Analytics missed this day)' : '' );
+            $s .= '<rect x="' . ( $x( $i ) - $cw / 2 ) . '" y="' . $pt . '" width="' . round( $cw, 1 ) . '" height="' . ( $H - $pt - $pb ) . '" fill="transparent"><title>' . esc_html( $tip ) . '</title></rect>';
+        }
+        return $s . '</svg>';
+    }
+}

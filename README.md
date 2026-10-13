@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.78-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.79-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.78
+**Stable tag:** 1.0.79
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.79 (2026-10-13)
+- New Tracking page under Ace SEO. It lists every analytics and marketing integration the site is set up with (Site Kit modules, Tag Manager, Ads, consent mode, WP Consent API, cookie banners, Microsoft Clarity, Jetpack Stats, WooCommerce and its Google, Meta and other tags, and the common analytics plugins), fetches the home page as a browser would and reports which tags are actually there, and draws the last 60 days of Google Analytics users or page views against Jetpack Stats on one scale, with the days Analytics missed shaded and a CSV of the daily numbers.
+- A daily check raises an admin notice, and by default an email, when a Google tag loads without ever being configured, when a tag Site Kit expects is missing from the page, or when Analytics has reported nothing for two days while visitors were counted. This is the fault that silenced Analytics on a consumer site for three weeks in September 2026: a theme filter rewrote the gtag loader and dropped Site Kit's inline config with it.
 
 ### 1.0.78 (2026-10-08)
 - Dashboard: the groups and options cross-reference is back on the dashboard, merged with the counts. Every potential option (keep, improve, get ready for the next event, combine, keep off search, check again later) against every readership group, each cell saying whether it fits and why, how many posts the last check suggested it for, and which options have a manual tool.
