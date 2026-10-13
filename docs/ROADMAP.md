@@ -267,3 +267,7 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 ### Tracking 1.0.86 — public counter compatibility
 
 - Narrow exemption for the aggregate-view POST endpoint when a community plugin blocks all guest REST requests. Does not open other routes or suppress authentication errors other than the guest-only restriction; same-origin, fetch metadata, size and payload checks still run. Four additional regression checks cover the exception boundary.
+
+### Tracking 1.0.87 — explicit CookieYes rejection
+
+- Recognise CookieYes Reject all (`action:yes,consent:no`) as an explicit opt-out; distinguish it from undecided category defaults. Two additional JavaScript checks cover these states.

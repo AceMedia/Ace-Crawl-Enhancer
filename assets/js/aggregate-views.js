@@ -16,7 +16,8 @@
         if (window.aceConsent?.answered && !window.aceConsent.has('analytics')) return true;
         if (cookie('viewed_cookie_policy') && cookie('cookielawinfo-checkbox-analytics') === 'no') return true;
         const cy = cookie('cookieyes-consent');
-        if (/(?:^|,)consent:yes(?:,|$)/.test(cy) && /(?:^|,)analytics:no(?:,|$)/.test(cy)) return true;
+        const answered = /(?:^|,)action:yes(?:,|$)/.test(cy) || (!/(?:^|,)action:/.test(cy) && /(?:^|,)consent:(?:yes|no)(?:,|$)/.test(cy));
+        if (answered && /(?:^|,)analytics:no(?:,|$)/.test(cy)) return true;
         return cookie('cmplz_banner-status') === 'dismissed' && cookie('cmplz_statistics') === 'deny';
     }
     function send(force) {
