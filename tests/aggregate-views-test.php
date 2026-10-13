@@ -9,7 +9,8 @@ function home_url() { return 'https://example.test'; }
 function wp_parse_url( $url ) { return parse_url( $url ); }
 function untrailingslashit( $s ) { return rtrim( $s, '/' ); }
 function wp_date( $f ) { return '2026-10-14'; }
-class WP_Error { public function __construct( public $code, $message, $data = null ) {} }
+class WP_Error { public function __construct( public $code, $message, $data = null ) {} public function get_error_code() { return $this->code; } }
+function is_wp_error($v) { return $v instanceof WP_Error; }
 class WP_REST_Response { public function __construct( $body, public $status ) {} public function header( $k, $v ) {} }
 class AceSeoViewTracker { public static function is_bot( $ua ) { return ! $ua || preg_match( '/bot|headless|curl/i', $ua ); } }
 class Request {
@@ -41,4 +42,9 @@ $out=AceSeoAggregateViews::enrich(array('definitions'=>array(),'days'=>array()),
 check('New baseline has a chart definition',isset($out['definitions']['baseline_views']));
 check('Unrecorded days remain null',null===$out['days']['2026-10-13']['baseline_views']);
 check('Recorded daily total is numeric',12===$out['days']['2026-10-14']['baseline_views']);
+$wp=(object)['query_vars'=>['rest_route'=>'/ace-seo/v1/aggregate-view']];$_SERVER['REQUEST_METHOD']='POST';$error=new WP_Error('rest_not_logged_in','Closed');
+check('Only the public counter is exempt from a guest-only blanket restriction',null===AceSeoAggregateViews::public_counter_auth($error));
+$wp->query_vars['rest_route']='/wp/v2/users';check('Private routes remain protected',AceSeoAggregateViews::public_counter_auth($error)===$error);
+$wp->query_vars['rest_route']='/ace-seo/v1/aggregate-view';$invalid=new WP_Error('rest_cookie_invalid_nonce','Bad nonce');check('Other authentication failures remain protected',AceSeoAggregateViews::public_counter_auth($invalid)===$invalid);
+$_SERVER['REQUEST_METHOD']='GET';check('Only POST is exempt',AceSeoAggregateViews::public_counter_auth($error)===$error);
 echo $n.' checks passed'.PHP_EOL;

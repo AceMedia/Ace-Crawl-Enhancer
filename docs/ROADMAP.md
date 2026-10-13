@@ -263,3 +263,7 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 - Optional Google/Clarity enrichment keeps its existing consent controls. Explicit analytics refusal, basic-count opt-out, DNT and GPC stop the baseline. Known bots are excluded; disguised bots, blocking, disabled JavaScript and excluded signed-in page renders mean this is not an exact human-audience count.
 - New Basic page views chart series, contextual explanation, CSV and daily-table column. Missing coverage stays null, not zero. Aggregate rows retained for 400 days; enablement creates only the current site's table.
 - Validation: 93 existing PHP checks, 14 counter PHP checks and 16 JavaScript checks; real local WordPress/MariaDB atomic increments; browser requests verified without Cookie/Referer headers, React/Back counts and opt-out; chart selection and guidance verified.
+
+### Tracking 1.0.86 — public counter compatibility
+
+- Narrow exemption for the aggregate-view POST endpoint when a community plugin blocks all guest REST requests. Does not open other routes or suppress authentication errors other than the guest-only restriction; same-origin, fetch metadata, size and payload checks still run. Four additional regression checks cover the exception boundary.

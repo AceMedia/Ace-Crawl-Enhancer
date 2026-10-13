@@ -9,6 +9,7 @@ class AceSeoAggregateViews {
 
     public static function init() {
         add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
+        add_filter( 'rest_authentication_errors', array( __CLASS__, 'public_counter_auth' ), 1000 );
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
         add_action( 'wp_footer', array( __CLASS__, 'privacy' ), 5 );
         add_action( 'admin_post_ace_seo_aggregate_views', array( __CLASS__, 'save' ) );
@@ -39,6 +40,16 @@ class AceSeoAggregateViews {
             'methods' => 'POST', 'permission_callback' => array( __CLASS__, 'permission' ),
             'callback' => array( __CLASS__, 'hit' ),
         ) );
+    }
+    /** Community sites can close REST globally. Only exempt this deliberately public counter. */
+    public static function public_counter_auth( $result ) {
+        $route = $GLOBALS['wp']->query_vars['rest_route'] ?? '';
+        if ( self::enabled() && 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' )
+            && '/ace-seo/v1/aggregate-view' === rtrim( $route, '/' )
+            && is_wp_error( $result ) && 'rest_not_logged_in' === $result->get_error_code() ) {
+            return null; // Route permission_callback still verifies origin, fetch metadata and size.
+        }
+        return $result;
     }
     public static function permission( $request ) {
         // A cached public beacon cannot carry a per-user nonce. Require same-origin browser
