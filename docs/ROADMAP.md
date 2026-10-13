@@ -242,3 +242,16 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 - Save up to 60 project-specific rolling 24-hour snapshots, one immutable point per capture date; existing daily tracking cron collects without requiring an admin visit. Missing days stay missing, and project changes isolate history.
 - Optional Clarity count selector on the main chart (sessions, unique visitors, dead/rage/error clicks, quick backs and script errors when supplied). Dashed lines and tooltips distinguish rolling windows from calendar-day Analytics/sales. No unsupported historical backfill or total-click estimate.
 - Verified against the connected IEG Clarity response; 73 PHP assertions cover tracking, cron and data handling, including zero/missing metrics, segmented users, history isolation and retention. Browser checks cover chart selection, missing-day gaps, exact window tooltips and responsive cards.
+
+### Tracking 1.0.84 — selectable series and Google reporting
+
+- Multiple Clarity metrics can be plotted together using the same checkbox controls as traffic and sales. Active series move into the left-hand legend; inactive series are grouped in an Add series dropdown. Distinct colours and dashed Clarity swatches identify each line.
+- Per-site browser preferences preserve each series selection, including an intentionally empty chart. Keyboard focus follows moved controls; Escape/outside click close the dropdown.
+- Clarify automatic daily Clarity history collection, its next scheduled check and 60-window retention. The API provides rolling 24/48/72-hour aggregates, not historical date buckets; existing exact-window labels and missing-day gaps remain.
+- Validation: existing 73 PHP assertions, PHP/JS syntax checks, desktop/mobile browser checks for simultaneous metrics, distinct colours, movement, persistence, focus, dropdown position and empty state.
+
+- Add hourly cached GA4 session-source reports, native AI Assistant channels and recognised AI referral hosts, engaged sessions and key events. Each source row is assigned once; source bands stack sessions rather than unique users. Toggle between filled bands and lines or select individual channels.
+- Add advertising clicks/impressions via GA4’s linked/imported data, requesting campaign dimensions for compatibility, and final daily Google Search Console clicks/impressions. Missing permissions, failed reports and delayed search days remain explicitly unavailable. Reporting timezones and sampling/threshold caveats are visible.
+- CSV includes all available Google series and saved Clarity metrics with exact UTC windows. Google reporting cache clears with Re-run checks.
+- Live IEG probes confirmed all four report types. Validation now includes 93 PHP assertions plus browser checks for summed-area scaling, overlays, source-line mode, multi-selection, persistence and mobile layout.
+- Active labels use a responsive grid with accessible hover/focus metric help. Unified toolbar styling covers the traffic-mix button, selectors and Add series picker. Guidance follows the selected metrics and filled/line source mode; inactive controls and explanations are hidden. Desktop/mobile checks verify overflow, tooltip bounds, keyboard operation and search-only/empty context.

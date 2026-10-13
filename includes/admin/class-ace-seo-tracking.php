@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/class-ace-seo-tracking-commerce.php';
 require_once __DIR__ . '/class-ace-seo-tracking-clarity.php';
 require_once __DIR__ . '/class-ace-seo-tracking-ui.php';
+require_once __DIR__ . '/class-ace-seo-tracking-google.php';
 
 class AceSeoTracking {
     const SLUG       = 'ace-seo-tracking';
@@ -579,6 +580,7 @@ class AceSeoTracking {
         delete_transient( self::T_PAGE );
         delete_transient( self::T_SERIES );
         delete_transient( AceSeoTrackingCommerce::CACHE );
+        delete_transient( AceSeoTrackingGoogle::CACHE );
         if ( class_exists( 'AceSEOSiteKit' ) ) {
             AceSEOSiteKit::clear_token_cache();
         }
@@ -604,16 +606,26 @@ class AceSeoTracking {
         check_admin_referer( 'ace_seo_tracking_csv' );
         $s = self::series();
         $commerce = AceSeoTrackingCommerce::series( array_keys( $s['days'] ) );
+        $google = AceSeoTrackingGoogle::series( array_keys( $s['days'] ) );
+        $clarity = AceSeoTrackingClarity::history();
         $host = wp_parse_url( home_url(), PHP_URL_HOST );
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="tracking-' . sanitize_file_name( $host ) . '-' . wp_date( 'Y-m-d' ) . '.csv"' );
         $fh = fopen( 'php://output', 'w' );
         $columns = array( 'date', 'ga4_active_users', 'ga4_page_views', 'jetpack_visitors', 'jetpack_views' );
         if ( $commerce['ok'] ) { $columns = array_merge( $columns, array( 'orders', 'order_value_after_refunds', 'currency' ) ); }
+        foreach ( $google['definitions'] as $definition ) { $columns[] = $definition['label']; }
+        foreach ( AceSeoTrackingClarity::definitions() as $definition ) { $columns[] = 'Clarity ' . $definition[0] . ' (24h)'; }
+        $columns[] = 'Clarity window start UTC'; $columns[] = 'Clarity window end UTC';
         fputcsv( $fh, $columns );
         foreach ( $s['days'] as $d ) {
             $row = array( $d['date'], $d['ga_users'] ?? '', $d['ga_views'] ?? '', $d['jp_visitors'] ?? '', $d['jp_views'] ?? '' );
             if ( $commerce['ok'] ) { $row = array_merge( $row, array( $commerce['days'][ $d['date'] ]['wc_orders'], $commerce['days'][ $d['date'] ]['wc_value'], $commerce['currency'] ) ); }
+            foreach ( $google['definitions'] as $key => $definition ) { $row[] = $google['days'][ $d['date'] ][ $key ] ?? ''; }
+            $saved = $clarity[ $d['date'] ] ?? array();
+            foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) { $row[] = $saved['values'][ $key ] ?? ''; }
+            $row[] = isset( $saved['at'] ) ? gmdate( 'c', $saved['at'] - 86400 ) : '';
+            $row[] = isset( $saved['at'] ) ? gmdate( 'c', $saved['at'] ) : '';
             fputcsv( $fh, $row );
         }
         fclose( $fh );
@@ -640,6 +652,7 @@ class AceSeoTracking {
         }
         $series = self::series();
         $commerce = AceSeoTrackingCommerce::series( array_keys( $series['days'] ) );
+        $google = AceSeoTrackingGoogle::series( array_keys( $series['days'] ) );
         if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::snapshot(); }
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
@@ -688,7 +701,7 @@ class AceSeoTracking {
         }
 
         // Chart.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() ) {
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() || $google['definitions'] ) {
             $jp_on = ! empty( $series['jp']['ok'] );
             echo '<h2>Last ' . self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
             if ( $a ) {
@@ -704,7 +717,7 @@ class AceSeoTracking {
                 echo '</div>';
             }
             echo '<p class="legend"><i style="background:#fde8e6;height:10px;border:1px dashed #d63638"></i>Possible Analytics gap</p>';
-            self::render_chart( $series, $commerce, $metric, $a ? $a['gap_days'] : array() );
+            self::render_chart( $series, $commerce, $metric, $a ? $a['gap_days'] : array(), $google );
             if ( ! empty( $series['ga']['error'] ) ) {
                 echo '<p>Analytics: ' . $e( $series['ga']['error'] ) . '</p>';
             }
@@ -715,6 +728,12 @@ class AceSeoTracking {
             echo '<h2>Daily numbers</h2><p>No counter is readable yet. Analytics: ' . $e( $series['ga']['error'] ) . ' Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
         }
         if ( $commerce['enabled'] && ! $commerce['ok'] && ! empty( $commerce['error'] ) ) { echo '<p>WooCommerce: ' . $e( $commerce['error'] ) . '</p>'; }
+
+        if ( $google['status'] ) {
+            echo '<details class="ace-trk-google-status"><summary>Google reporting connections</summary><ul>';
+            foreach ( $google['status'] as $name => $status ) { echo '<li><strong>' . $e( $name ) . ':</strong> ' . $e( $status ) . '</li>'; }
+            echo '</ul><a href="' . esc_url( admin_url( 'admin.php?page=googlesitekit-settings' ) ) . '">Site Kit settings</a></details>';
+        }
 
         // Integrations.
         echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>State</th><th>Details</th></tr></thead><tbody>';
@@ -785,7 +804,7 @@ class AceSeoTracking {
     /**
      * Interactive chart with an SVG fallback and optional WooCommerce series.
      */
-    public static function render_chart( $series, $commerce, $metric, $gap ) {
+    public static function render_chart( $series, $commerce, $metric, $gap, $google = array() ) {
         $days = $series['days'];
         $clarity_history = AceSeoTrackingClarity::history();
         $clarity_available = array();
@@ -796,30 +815,42 @@ class AceSeoTracking {
             $day['clarity_window'] = wp_date( 'j M H:i T', $saved['at'] - 86400 ) . ' – ' . wp_date( 'j M H:i T', $saved['at'] );
         }
         unset( $day );
-        foreach ( $days as $date => &$day ) { $day = array_merge( $day, $commerce['days'][ $date ] ?? array() ); }
+        foreach ( $days as $date => &$day ) { $day = array_merge( $day, $commerce['days'][ $date ] ?? array(), $google['days'][ $date ] ?? array() ); }
         unset( $day );
         $ga = ! empty( $series['ga']['ok'] );
         $jp = ! empty( $series['jp']['ok'] );
-        echo '<div class="ace-trk-chart"><div class="ace-trk-chart-controls" hidden><label>Traffic <select name="traffic_metric"><option value="visitors"' . ( 'views' !== $metric ? ' selected' : '' ) . '>Visitors</option><option value="views"' . ( 'views' === $metric ? ' selected' : '' ) . '>Page views</option></select></label>';
+        echo '<div class="ace-trk-chart"><div class="ace-trk-chart-controls" hidden><label class="ace-trk-traffic-control">Traffic <select name="traffic_metric"><option value="visitors"' . ( 'views' !== $metric ? ' selected' : '' ) . '>Visitors</option><option value="views"' . ( 'views' === $metric ? ' selected' : '' ) . '>Page views</option></select></label>';
         if ( $ga ) { echo '<label><input type="checkbox" name="ga" checked> Google Analytics</label>'; }
         if ( $jp ) { echo '<label><input type="checkbox" name="jp" checked> Jetpack</label>'; }
         if ( $commerce['ok'] ) {
             echo '<label><input type="checkbox" name="orders"' . ( ! $ga && ! $jp ? ' checked' : '' ) . '> Orders</label><label><input type="checkbox" name="value"> Order value (' . esc_html( $commerce['currency'] ) . ')</label>';
         }
-        if ( $clarity_available ) {
-            echo '<label class="ace-trk-clarity-select">Clarity <select name="clarity_metric"><option value="">Not shown</option>';
-            foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) {
-                if ( isset( $clarity_available[ $key ] ) ) { echo '<option value="' . esc_attr( $key ) . '"' . ( 'sessions' === $key ? ' selected' : '' ) . '>' . esc_html( $definition[0] ) . ' · 24h snapshot</option>'; }
-            }
-            echo '</select></label>';
+        foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) {
+            if ( ! isset( $clarity_available[ $key ] ) ) { continue; }
+            echo '<label><input type="checkbox" name="clarity_' . esc_attr( $key ) . '" data-clarity-label="' . esc_attr( $definition[0] ) . '" data-description="' . esc_attr( $definition[3] ) . '"' . ( 'sessions' === $key ? ' checked' : '' ) . '> Clarity ' . esc_html( strtolower( $definition[0] ) ) . '</label>';
         }
-        echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><p class="ace-trk-chart-note">Hover or touch to inspect a day. Focus the chart and use the arrow keys to move between dates. Missing data is shown as unavailable, not zero.</p>';
-        if ( $clarity_available ) { echo '<p class="ace-trk-chart-note">Clarity: one saved 24-hour window per capture date, drawn as a dashed line. Hover for the exact window. Missing days are unavailable; these snapshots are not daily totals and may overlap.</p>'; }
+        $has_sources = false;
+        foreach ( $google['definitions'] ?? array() as $key => $definition ) {
+            $has_sources = $has_sources || ! empty( $definition['area'] );
+            echo '<label><input type="checkbox" name="' . esc_attr( $key ) . '" data-google-label="' . esc_attr( $definition['label'] ) . '" data-group="' . esc_attr( $definition['group'] ) . '"' . ( ! empty( $definition['area'] ) ? ' data-area="1"' : '' ) . '> ' . esc_html( $definition['label'] ) . '</label>';
+        }
+        if ( $has_sources ) { echo '<button type="button" class="button ace-trk-show-sources">Show traffic mix</button><label class="ace-trk-source-style">Sources <select name="source_style"><option value="area">Filled</option><option value="lines">Lines</option></select></label>'; }
+        echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><div class="ace-trk-chart-guides" aria-label="About the selected chart data"><p class="ace-trk-chart-hint">Hover or touch to inspect a date. Use the arrow keys when the chart is focused. Missing data stays blank.</p>';
+        echo '<p data-guide="ga"><strong>Google Analytics</strong> Dates use ' . esc_html( $google['timezone'] ?? 'the property timezone' ) . '. Today’s figures may still be processing.</p>';
+        if ( ! empty( $google['definitions'] ) ) {
+            echo '<p data-guide="sources"><strong>Traffic sources</strong> <span class="ace-trk-source-explanation">The coloured bands stack session counts. Their combined height is the total for the selected sources, not unique visitors.</span></p>';
+            echo '<p data-guide="ai"><strong>AI traffic</strong> Google’s AI Assistant channel plus recognised AI referral hosts. Visits without an identifiable AI source remain in other channels.</p>';
+            echo '<p data-guide="advertising"><strong>Advertising</strong> Clicks and impressions reported through GA4’s linked or imported ad data. An ad click is not the same as a site visit.</p>';
+            echo '<p data-guide="search"><strong>Google Search</strong> Final web-search figures, using Pacific dates. Recent or unreported days may be unavailable.</p>';
+        }
+        if ( $clarity_available ) { echo '<p data-guide="clarity"><strong>Clarity</strong> Dashed lines show saved rolling 24-hour windows, not calendar-day totals. Hover for the exact window; adjacent windows can overlap.</p>'; }
         if ( $commerce['ok'] ) {
-            echo '<p class="ace-trk-chart-note">Orders in processing, completed or refunded status, grouped by creation date in the site timezone. Order value is the total less refunds, including tax and delivery; refunds reduce the original order day. Counts use the left axis; ' . esc_html( $commerce['currency'] ) . ' uses the right. Refreshed hourly.</p>';
-            if ( $commerce['skipped_currency'] ) { echo '<p class="ace-trk-chart-note">' . esc_html( number_format_i18n( $commerce['skipped_currency'] ) ) . ' orders in other currencies are excluded.</p>'; }
+            echo '<p data-guide="commerce"><strong>Orders</strong> Processing, completed and refunded orders, grouped by creation date in the site timezone.</p>';
+            echo '<p data-guide="value"><strong>Order value</strong> Total less refunds, including tax and delivery. Refunds reduce the original order day. ' . esc_html( $commerce['currency'] ) . ' uses the right axis.</p>';
+            if ( $commerce['skipped_currency'] ) { echo '<p data-guide="commerce"><strong>Other currencies</strong> ' . esc_html( number_format_i18n( $commerce['skipped_currency'] ) ) . ' orders are excluded.</p>'; }
         }
-        $data = array( 'days' => array_values( $days ), 'gaps' => array_values( $gap ), 'today' => wp_date( 'Y-m-d' ), 'currency' => $commerce['currency'] ?? '' );
+        echo '</div>';
+        $data = array( 'days' => array_values( $days ), 'gaps' => array_values( $gap ), 'today' => wp_date( 'Y-m-d' ), 'currency' => $commerce['currency'] ?? '', 'preferences' => home_url( '/' ) );
         echo '<script type="application/json">' . wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ) . '</script></div>';
     }
 

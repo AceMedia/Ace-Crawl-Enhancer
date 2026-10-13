@@ -167,6 +167,8 @@ class AceSeoTrackingClarity {
             }
             echo '</div>';
             if ( ! $data['metrics'] ) { echo '<p>No metrics were returned for this window.</p>'; }
+            $next = wp_next_scheduled( AceSeoTracking::CRON );
+            echo '<p class="ace-trk-history-note"><strong>Daily history logging</strong> · ' . ( $next ? 'Next check ' . esc_html( wp_date( 'j M H:i T', $next ) ) : 'Daily check is not scheduled' ) . '. We keep up to 60 saved windows, even when nobody opens this page.</p>';
             echo '<p class="ace-trk-history-note">' . esc_html( count( self::history() ) ) . ' saved reporting windows. The main chart can show sessions, visitors and available interaction counts. Each point covers the 24 hours before its capture time; it is not a calendar-day total.</p>';
             echo '<details class="ace-trk-clarity-detail"><summary>All reported metrics</summary><div class="ace-trk-clarity-grid">';
             foreach ( $data['metrics'] as $row ) {
