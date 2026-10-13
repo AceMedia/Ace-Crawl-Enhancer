@@ -27,7 +27,13 @@ class AceSeoTracking {
     const MIN_TRAFFIC = 10;
 
     public static function init() {
-        add_action( 'init', array( __CLASS__, 'schedule' ) );
+        // This component is loaded from the plugin's init callback. A callback
+        // added at the same priority there will not run on the current request.
+        if ( did_action( 'init' ) ) {
+            self::schedule();
+        } else {
+            add_action( 'init', array( __CLASS__, 'schedule' ) );
+        }
         add_action( self::CRON, array( __CLASS__, 'run' ) );
         add_action( 'admin_menu', array( __CLASS__, 'menu' ), 20 );
         add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
@@ -165,7 +171,7 @@ class AceSeoTracking {
             if ( self::plugin_on( 'woocommerce-google-analytics-integration/woocommerce-google-analytics-integration.php' ) ) {
                 $w = (array) get_option( 'woocommerce_google_analytics_settings', array() );
                 $gid = (string) ( $w['ga_id'] ?? '' );
-                $add( 'woo_ga', 'WooCommerce Google Analytics', $gid ? 'ok' : 'warn', $gid ? 'Measurement ID ' . $gid . '. This is a second GA4 tag: fine if it is the same property as Site Kit, double counting if not.' : 'Active with no measurement ID.', array_filter( array( $gid ) ) );
+                $add( 'woo_ga', 'WooCommerce Google Analytics', $gid ? 'ok' : 'warn', $gid ? 'Measurement ID ' . $gid . '. Check its destination against Site Kit: multiple page-view events reaching the same property can double count page views.' : 'Active with no measurement ID.', array_filter( array( $gid ) ) );
             }
             if ( self::plugin_on( 'facebook-for-woocommerce/facebook-for-woocommerce.php' ) ) {
                 $px = (string) get_option( 'wc_facebook_pixel_id', '' );
@@ -451,7 +457,7 @@ class AceSeoTracking {
                 return 0 === strpos( $id, 'G-' ) || 0 === strpos( $id, 'GT-' );
             } ) );
             if ( count( $ga_tags ) > 1 ) {
-                $p[] = array( 'warn', 'Two Google Analytics tags are configured on the page (' . implode( ', ', $ga_tags ) . '). If they belong to different properties, each page view is reported twice.' );
+                $p[] = array( 'warn', 'Multiple Google Analytics tags are configured on the page (' . implode( ', ', $ga_tags ) . '). Check their destinations and page-view events: the same property may receive duplicate events; different properties report separately.' );
             }
             if ( ! empty( $detect['consent'] ) && 'ok' === $detect['consent']['status'] && empty( $page['consent_default'] ) ) {
                 $p[] = array( 'warn', 'Consent mode is on in Site Kit but no consent default was found on the home page.' );
@@ -488,8 +494,14 @@ class AceSeoTracking {
             return 'bad' === $x[0];
         } );
         $prev = (array) get_option( self::OPT_ALERTS, array() );
-        update_option( self::OPT_ALERTS, array( 'at' => time(), 'problems' => $problems ), false );
         $key = md5( wp_json_encode( array_values( $bad ) ) );
+        $alerts = array( 'at' => time(), 'problems' => $problems );
+        // Keep the delivery marker while this fault persists; clear it on
+        // recovery or a changed fault so a recurrence can notify again.
+        if ( $bad && ( $prev['emailed'] ?? '' ) === $key ) {
+            $alerts['emailed'] = $key;
+        }
+        update_option( self::OPT_ALERTS, $alerts, false );
         if ( $bad && get_option( self::OPT_EMAIL, 1 ) && ( $prev['emailed'] ?? '' ) !== $key ) {
             $lines = array_map( function ( $x ) {
                 return '- ' . $x[1];

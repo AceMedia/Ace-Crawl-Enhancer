@@ -55,7 +55,11 @@ $texts = array_map( function ( $p ) { return $p[0] . ':' . $p[1]; }, $problems )
 expect( 1 === count( preg_grep( '/^bad:The Google tag GT-TBBCP35Z loads/', $texts ) ), 'unconfigured loader flagged: ' . json_encode( $texts ) );
 expect( 1 === count( preg_grep( '/^bad:GTM expects GTM-OTHER1/', $texts ) ), 'missing expected id flagged' );
 expect( 0 === count( preg_grep( '/Clarity expects/', $texts ) ), 'clarity present, not flagged' );
-expect( 0 === count( preg_grep( '/Two Google Analytics/', $texts ) ), 'one configured GA tag: no double-count warning' );
+expect( 0 === count( preg_grep( '/Multiple Google Analytics/', $texts ) ), 'one configured GA tag: no double-count warning' );
+$multi = AceSeoTracking::scan_html( $ok . '<script>gtag("config", "G-OTHER");</script>' ) + array( 'ok' => true );
+$multi_problems = AceSeoTracking::problems( array(), $multi, array() );
+expect( 1 === count( $multi_problems ) && 'warn' === $multi_problems[0][0], 'multiple configured tags require destination review' );
+expect( false !== strpos( $multi_problems[0][1], 'different properties report separately' ), 'separate properties are not described as automatic duplicate reporting' );
 
 // --- analyse(): a 60-day series with Jetpack, Analytics dead from day 40.
 $days = array();
