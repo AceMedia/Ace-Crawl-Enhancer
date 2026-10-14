@@ -19,6 +19,12 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Tracking verification — shipped in 1.0.88 (14 October)
+
+- Classify security challenges and non-page responses as unverified, including HTTP 202. Scan only complete HTML, with no assumption that static markup proves browser execution.
+- Missing static tags or matching inline configuration need browser verification, including consent and Tag Manager delivery. Recognise known Google tag aliases, show recent positive Analytics reporting separately, and retain alerts for sustained reporting gaps.
+- Version cached probes and saved alert classifications. Regression checks cover response validation, aliases, reporting freshness, unknown data, notifications and unchanged basic view counting.
+
 ### Tracking report — shipped in 1.0.82 (13 October)
 
 - Daily checks now schedule when the component loads during `init`; unchanged faults retain their email-delivery marker.

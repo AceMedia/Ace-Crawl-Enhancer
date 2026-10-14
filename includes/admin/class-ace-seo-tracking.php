@@ -6,11 +6,10 @@
  *
  * Everything here is read-only against the site. Detection reads plugin state
  * and options; the page probe fetches the site's own home page as a browser
- * would and scans the HTML; the series come from the GA4 Data API (through the
- * Site Kit token bridge) and Jetpack's stats endpoint. A daily cron tick repeats
- * the checks and raises an admin notice (and optionally an email) when a tag
- * loads without being configured, a tag Site Kit expects is missing, or Analytics
- * has reported nothing for two days while visitors were counted elsewhere.
+ * would and scans static HTML without executing JavaScript. The series come from
+ * the GA4 Data API (through the Site Kit token bridge) and Jetpack's stats endpoint. A daily cron tick repeats
+ * the checks. Inconclusive page checks need browser verification; an admin notice
+ * (and optionally an email) is reserved for a sustained reporting gap.
  */
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -26,6 +25,7 @@ class AceSeoTracking {
     const OPT_ALERTS = 'ace_seo_tracking_alerts';
     const OPT_EMAIL  = 'ace_seo_tracking_email';
     const T_PAGE     = 'ace_seo_tracking_page';
+    const PROBE_VERSION = 2;
     const T_SERIES   = 'ace_seo_tracking_series';
     const DAYS       = 60;
     const MIN_TRAFFIC = 10;
@@ -110,6 +110,7 @@ class AceSeoTracking {
             $place = ! empty( $a4['useSnippet'] );
             $expect = $place ? array( $ga_ids[0] ) : array();
             $add( 'ga4', 'Google Analytics 4 (Site Kit)', 'ok', 'Property ' . $a4['propertyID'] . ', stream ' . ( $a4['measurementID'] ?? '?' ) . ( ! empty( $a4['googleTagID'] ) ? ', Google tag ' . $a4['googleTagID'] : '' ) . ( $place ? '. Site Kit places the tag.' : '. Site Kit does NOT place the tag (another plugin must).' ), $expect );
+            $rows['ga4']['alternative_ids'] = $place ? $ga_ids : array();
         } elseif ( $sk_on ) {
             $add( 'ga4', 'Google Analytics 4 (Site Kit)', 'off', 'Analytics module not connected.' );
         }
@@ -210,12 +211,12 @@ class AceSeoTracking {
     // ------------------------------------------------------------ page probe
 
     /**
-     * Fetch the home page as a browser would and scan it. Cached for an hour.
+     * Fetch static home-page HTML. This cannot verify JavaScript or consent behaviour.
      */
     public static function probe_page( $force = false ) {
         if ( ! $force ) {
             $c = get_transient( self::T_PAGE );
-            if ( is_array( $c ) ) {
+            if ( is_array( $c ) && self::PROBE_VERSION === ( $c['probe_version'] ?? null ) ) {
                 return $c;
             }
         }
@@ -224,19 +225,77 @@ class AceSeoTracking {
             'timeout'    => 20,
             'user-agent' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 AceSEO-tracking-check',
             'sslverify'  => ! ( defined( 'WP_LOCAL_DEV' ) && WP_LOCAL_DEV ),
-            'headers'    => array( 'Cache-Control' => 'no-cache' ),
+            'headers'    => array( 'Cache-Control' => 'no-cache', 'Accept' => 'text/html,application/xhtml+xml' ),
         ) );
         if ( is_wp_error( $r ) ) {
-            $out = array( 'ok' => false, 'error' => $r->get_error_message(), 'at' => time() );
+            $out = array( 'ok' => false, 'state' => 'unverified', 'error' => $r->get_error_message() );
         } else {
             $code = wp_remote_retrieve_response_code( $r );
-            $out = self::scan_html( (string) wp_remote_retrieve_body( $r ) );
-            $out['ok'] = ( $code >= 200 && $code < 300 );
-            $out['http'] = $code;
-            $out['at'] = time();
+            $out = self::page_response( $code, (string) wp_remote_retrieve_body( $r ), array(
+                'content-type' => wp_remote_retrieve_header( $r, 'content-type' ),
+                'x-amzn-waf-action' => wp_remote_retrieve_header( $r, 'x-amzn-waf-action' ),
+                'cf-mitigated' => wp_remote_retrieve_header( $r, 'cf-mitigated' ),
+            ) );
         }
+        $out['probe_version'] = self::PROBE_VERSION;
+        $out['at'] = time();
         set_transient( self::T_PAGE, $out, HOUR_IN_SECONDS );
         return $out;
+    }
+
+    /** Pure: a successful HTTP status alone does not mean we received the site. */
+    public static function page_response( $code, $html, array $headers = array() ) {
+        $headers = array_change_key_case( $headers, CASE_LOWER );
+        $code = (int) $code;
+        $error = '';
+        if ( in_array( strtolower( (string) ( $headers['x-amzn-waf-action'] ?? '' ) ), array( 'challenge', 'captcha' ), true )
+            || 'challenge' === strtolower( (string) ( $headers['cf-mitigated'] ?? '' ) )
+            || preg_match( '~(?:<title>\s*(?:Just a moment|Attention Required!\s*\|\s*Cloudflare)|id=[\'"]challenge-form[\'"])~i', $html ) ) {
+            $error = 'The site security protection challenged the check (HTTP ' . $code . ').';
+        } elseif ( 200 !== $code ) {
+            $error = 'The check did not receive a complete home page (HTTP ' . $code . ').';
+        } elseif ( '' === trim( $html ) ) {
+            $error = 'The check received an empty response.';
+        } elseif ( ! empty( $headers['content-type'] ) && ! preg_match( '~^(?:text/html|application/xhtml\+xml)(?:\s*;|\s*$)~i', (string) $headers['content-type'] ) ) {
+            $error = 'The check received a non-HTML response.';
+        } elseif ( ! preg_match( '~<html(?:\s|>)~i', $html ) || ! preg_match( '~<body(?:\s|>)~i', $html )
+            || false === stripos( $html, '</body>' ) || false === stripos( $html, '</html>' ) ) {
+            $error = 'The check did not receive a complete HTML document.';
+        }
+        // Do not scan a challenge or partial response for missing or present tags.
+        $out = self::scan_html( '' === $error ? $html : '' );
+        return $out + array( 'ok' => '' === $error, 'state' => '' === $error ? 'html' : 'unverified', 'error' => $error, 'http' => $code );
+    }
+
+    public static function tag_found( $id, array $page ) {
+        return in_array( $id, array_merge( $page['loaders'] ?? array(), $page['configs'] ?? array(), $page['gtm'] ?? array(), array( $page['clarity'] ?? '', $page['fb_pixel'] ?? '' ) ), true );
+    }
+
+    /** Recent positive reporting is separate evidence, never proof of every tag or visit. */
+    public static function recent_reporting( array $series ) {
+        if ( empty( $series['ga']['ok'] ) || ( isset( $series['at'] ) && $series['at'] < time() - 2 * 86400 ) ) { return null; }
+        $today = wp_date( 'Y-m-d' );
+        $since = ( new DateTimeImmutable( $today ) )->modify( '-2 days' )->format( 'Y-m-d' );
+        $latest = null;
+        foreach ( $series['days'] ?? array() as $day ) {
+            $date = $day['date'] ?? '';
+            if ( $date >= $since && $date <= $today && ( ( $day['ga_views'] ?? 0 ) > 0 || ( $day['ga_users'] ?? 0 ) > 0 ) && ( null === $latest || $date > $latest ) ) { $latest = $date; }
+        }
+        return $latest;
+    }
+
+    /** The page and reporting checks must not make claims about each other's coverage. */
+    public static function summary( array $page, array $series, array $problems ) {
+        $levels = array_column( $problems, 0 );
+        if ( in_array( 'bad', $levels, true ) ) { return array( 'bad', 'Tracking needs attention.' ); }
+        if ( self::recent_reporting( $series ) ) {
+            return array( empty( $page['ok'] ) || in_array( 'warn', $levels, true ) ? 'warn' : 'ok', empty( $page['ok'] )
+                ? 'Analytics data is arriving. Automatic tag verification is unavailable.'
+                : 'Analytics data is arriving. HTML tag checks do not verify every tag or visit.' );
+        }
+        if ( empty( $page['ok'] ) ) { return array( 'warn', 'Automatic tag verification is unavailable.' ); }
+        if ( in_array( 'warn', $levels, true ) ) { return array( 'warn', 'Some tracking checks need browser verification.' ); }
+        return array( 'ok', 'Static HTML check completed. Browser execution has not been verified.' );
     }
 
     /**
@@ -380,7 +439,7 @@ class AceSeoTracking {
         $today = $today ?: wp_date( 'Y-m-d' );
         $has_jp = false;
         foreach ( $days as $d ) {
-            if ( null !== $d['jp_visitors'] ) {
+            if ( null !== ( $d['jp_visitors'] ?? null ) ) {
                 $has_jp = true;
                 break;
             }
@@ -393,7 +452,7 @@ class AceSeoTracking {
             if ( $d['date'] >= $today ) {
                 continue; // today is incomplete
             }
-            $gu = $d['ga_users'];
+            $gu = $d['ga_users'] ?? null;
             if ( null === $gu ) {
                 continue;
             }
@@ -448,14 +507,17 @@ class AceSeoTracking {
         if ( ! empty( $page['ok'] ) ) {
             foreach ( $page['loaders'] as $id ) {
                 if ( ! in_array( $id, $page['configs'], true ) && 0 !== strpos( $id, 'GTM-' ) ) {
-                    $p[] = array( 'bad', 'The Google tag ' . $id . ' loads on the home page but is never configured, so it reports nothing. A plugin or theme is rewriting the tag and dropping its inline script.' );
+                    $p[] = array( 'warn', 'The Google tag ' . $id . ' has a loader in the home-page HTML, but no matching inline configuration was found. It may be configured by JavaScript, Tag Manager or after consent. Verify it in a browser.' );
                 }
             }
             foreach ( $detect as $row ) {
                 foreach ( $row['ids'] as $id ) {
-                    $on_page = in_array( $id, $page['loaders'], true ) || in_array( $id, $page['configs'], true ) || in_array( $id, $page['gtm'], true ) || $id === $page['clarity'] || $id === $page['fb_pixel'];
+                    $on_page = self::tag_found( $id, $page );
+                    foreach ( $row['alternative_ids'] ?? array() as $alternative ) {
+                        $on_page = $on_page || self::tag_found( $alternative, $page );
+                    }
                     if ( ! $on_page ) {
-                        $p[] = array( 'bad', $row['label'] . ' expects ' . $id . ' on the page, and the home page does not carry it.' );
+                        $p[] = array( 'warn', $row['label'] . ' is configured for ' . $id . ', but it was not found in the home-page HTML. JavaScript, Tag Manager or consent may load it later. Browser verification is needed.' );
                     }
                 }
             }
@@ -469,7 +531,7 @@ class AceSeoTracking {
                 $p[] = array( 'warn', 'Consent mode is on in Site Kit but no consent default was found on the home page.' );
             }
         } elseif ( isset( $page['ok'] ) ) {
-            $p[] = array( 'warn', 'Could not fetch the home page to check its tags: ' . ( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) );
+            $p[] = array( 'warn', 'Automatic tag verification is unavailable: ' . ( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . ' This does not establish a tracking failure.' );
         }
         if ( ! empty( $series['ga']['ok'] ) ) {
             $a = self::analyse( $series['days'] );
@@ -479,7 +541,7 @@ class AceSeoTracking {
                 $p[] = array( 'warn', 'Google Analytics missed ' . count( $a['gap_days'] ) . ' day' . ( 1 === count( $a['gap_days'] ) ? '' : 's' ) . ' in the last ' . self::DAYS . ' (last: ' . end( $a['gap_days'] ) . ').' );
             }
         } elseif ( ! empty( $detect['ga4'] ) && 'ok' === $detect['ga4']['status'] ) {
-            $p[] = array( 'warn', 'Analytics is connected but its report could not be read: ' . $series['ga']['error'] );
+            $p[] = array( 'warn', 'Analytics is connected but its report could not be read: ' . ( $series['ga']['error'] ?? 'report unavailable' ) );
         }
         $ads = self::google_ads( $detect, $page );
         if ( $ads && ! empty( $page['ok'] ) && $ads['configured'] && ! $ads['tag_found'] ) {
@@ -523,7 +585,7 @@ class AceSeoTracking {
         } );
         $prev = (array) get_option( self::OPT_ALERTS, array() );
         $key = md5( wp_json_encode( array_values( $bad ) ) );
-        $alerts = array( 'at' => time(), 'problems' => $problems );
+        $alerts = array( 'at' => time(), 'problems' => $problems, 'check_version' => self::PROBE_VERSION );
         // Keep the delivery marker while this fault persists; clear it on
         // recovery or a changed fault so a recurrence can notify again.
         if ( $bad && ( $prev['emailed'] ?? '' ) === $key ) {
@@ -540,7 +602,7 @@ class AceSeoTracking {
                 "Ace SEO found these on its daily tracking check:\n\n" . implode( "\n", $lines ) . "\n\nDetails: " . admin_url( 'admin.php?page=' . self::SLUG ) . "\n"
             );
             if ( $sent ) {
-                update_option( self::OPT_ALERTS, array( 'at' => time(), 'problems' => $problems, 'emailed' => $key ), false );
+                update_option( self::OPT_ALERTS, array( 'at' => time(), 'problems' => $problems, 'emailed' => $key, 'check_version' => self::PROBE_VERSION ), false );
             }
         }
         return $problems;
@@ -551,6 +613,10 @@ class AceSeoTracking {
             return;
         }
         $a = (array) get_option( self::OPT_ALERTS, array() );
+        if ( $a && self::PROBE_VERSION !== ( $a['check_version'] ?? null ) ) {
+            echo '<div class="notice notice-info"><p>Tracking checks have changed. Previous results need verification. <a href="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '">Open Tracking</a></p></div>';
+            return;
+        }
         $bad = array_filter( (array) ( $a['problems'] ?? array() ), function ( $x ) {
             return 'bad' === $x[0];
         } );
@@ -666,7 +732,7 @@ class AceSeoTracking {
         if ( ! empty( $_GET['refreshed'] ) ) {
             echo '<div class="notice notice-success"><p>Checks re-run.</p></div>';
         }
-        echo '<p>What this site is set up to track, what the home page actually carries, and whether Google Analytics agrees with an independent counter. Checked daily at 05:10; next run ' . $e( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . $e( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
+        echo '<p>Tracking configuration, evidence in home-page HTML, and reported traffic are separate checks. This server check does not execute JavaScript or accept consent. Checked daily at 05:10; next run ' . $e( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . $e( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
 
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
         wp_nonce_field( 'ace_seo_tracking_refresh' );
@@ -685,14 +751,21 @@ class AceSeoTracking {
         $warn = array_filter( $problems, function ( $x ) {
             return 'warn' === $x[0];
         } );
+        $summary = self::summary( $page, $series, $problems );
+        echo '<div class="box box-' . $e( $summary[0] ) . '"><strong>' . $e( $summary[1] ) . '</strong>';
         if ( $bad ) {
-            echo '<div class="box box-bad"><strong>Tracking is broken.</strong><ul>';
+            echo '<ul>';
             foreach ( $bad as $x ) {
                 echo '<li>' . $e( $x[1] ) . '</li>';
             }
-            echo '</ul></div>';
-        } elseif ( ! empty( $page['ok'] ) ) {
-            echo '<div class="box box-ok"><strong>Every tag the site expects is on the page and configured.</strong></div>';
+            echo '</ul>';
+        }
+        echo '</div>';
+        $report_date = self::recent_reporting( $series );
+        if ( $report_date ) {
+            echo '<p>Google Analytics reports traffic for ' . $e( $report_date ) . '. This is evidence for the connected property; it does not verify every tag, page, consent choice or visit.</p>';
+        } else {
+            echo '<p>Recent Google Analytics traffic has not been established by this report. Missing or unavailable data is not proof of zero visitors.</p>';
         }
         if ( $warn ) {
             echo '<div class="box box-warn"><strong>Worth a look.</strong><ul>';
@@ -740,7 +813,7 @@ class AceSeoTracking {
         }
 
         // Integrations.
-        echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>State</th><th>Details</th></tr></thead><tbody>';
+        echo '<h2>Set up on this site</h2><table class="widefat striped"><thead><tr><th>Integration</th><th>Setup state</th><th>Details</th></tr></thead><tbody>';
         $ads = self::google_ads( $detect, $page );
         $ads_shown = false;
         foreach ( $detect as $row ) {
@@ -756,24 +829,24 @@ class AceSeoTracking {
         if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::render(); }
 
         // On the page.
-        echo '<h2>Found on the home page</h2>';
+        echo '<h2>Found in home-page HTML</h2>';
         if ( empty( $page['ok'] ) ) {
-            echo '<p>The home page could not be fetched: ' . $e( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . '</p>';
+            echo '<p>The home-page HTML could not be verified: ' . $e( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . '</p>';
         } else {
             $found = array();
             foreach ( $page['loaders'] as $id ) {
-                $found[] = array( 'Google tag loader', $id, in_array( $id, $page['configs'], true ) ? 'ok' : 'bad', in_array( $id, $page['configs'], true ) ? 'Loaded and configured' : 'Loaded but never configured: reports nothing' );
+                $found[] = array( 'Google tag loader', $id, in_array( $id, $page['configs'], true ) ? 'ok' : 'warn', in_array( $id, $page['configs'], true ) ? 'Loader and configuration found in HTML' : 'No matching inline configuration found; verify JavaScript, Tag Manager and consent in a browser' );
             }
             foreach ( $page['configs'] as $id ) {
                 if ( ! in_array( $id, $page['loaders'], true ) ) {
-                    $found[] = array( 'Google tag config', $id, 'ok', 'Configured; loads through another tag on the page' );
+                    $found[] = array( 'Google tag config', $id, 'ok', 'Configuration found in HTML; loader and browser execution need verification' );
                 }
             }
             foreach ( $page['gtm'] as $id ) {
-                $found[] = array( 'Tag Manager container', $id, 'ok', 'Container script present' );
+                $found[] = array( 'Tag Manager container', $id, 'ok', 'Container reference found in HTML; contained tags need browser verification' );
             }
             if ( $page['clarity'] ) {
-                $found[] = array( 'Microsoft Clarity', $page['clarity'], 'ok', 'Clarity script present' );
+                $found[] = array( 'Microsoft Clarity', $page['clarity'], 'ok', 'Clarity reference found in HTML; browser execution has not been verified' );
             }
             if ( $page['fb_pixel'] ) {
                 $found[] = array( 'Meta Pixel', $page['fb_pixel'], 'ok', 'fbq init present' );
@@ -785,7 +858,7 @@ class AceSeoTracking {
             }
             echo '<table class="widefat striped"><thead><tr><th>Item</th><th>ID</th><th>State</th><th>Note</th></tr></thead><tbody>';
             foreach ( $found as $f ) {
-                echo '<tr><td>' . $e( $f[0] ) . '</td><td><code>' . $e( $f[1] ) . '</code></td><td><span class="pill pill-' . $e( $f[2] ) . '">' . $e( array( 'ok' => 'On', 'bad' => 'Broken', 'off' => 'Off' )[ $f[2] ] ) . '</span></td><td>' . $e( $f[3] ) . '</td></tr>';
+                echo '<tr><td>' . $e( $f[0] ) . '</td><td><code>' . $e( $f[1] ) . '</code></td><td><span class="pill pill-' . $e( $f[2] ) . '">' . $e( array( 'ok' => 'Found', 'warn' => 'Verify', 'bad' => 'Check', 'off' => 'Not found' )[ $f[2] ] ) . '</span></td><td>' . $e( $f[3] ) . '</td></tr>';
             }
             echo '</tbody></table>';
         }

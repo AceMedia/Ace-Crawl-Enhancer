@@ -52,8 +52,8 @@ $detect = array(
 $page = $s + array( 'ok' => true );
 $problems = AceSeoTracking::problems( $detect, $page, array( 'ga' => array( 'ok' => false, 'error' => 'x' ), 'days' => array() ) );
 $texts = array_map( function ( $p ) { return $p[0] . ':' . $p[1]; }, $problems );
-expect( 1 === count( preg_grep( '/^bad:The Google tag GT-TBBCP35Z loads/', $texts ) ), 'unconfigured loader flagged: ' . json_encode( $texts ) );
-expect( 1 === count( preg_grep( '/^bad:GTM expects GTM-OTHER1/', $texts ) ), 'missing expected id flagged' );
+expect( 1 === count( preg_grep( '/^warn:The Google tag GT-TBBCP35Z has a loader/', $texts ) ), 'unconfigured loader needs browser verification: ' . json_encode( $texts ) );
+expect( 1 === count( preg_grep( '/^warn:GTM is configured for GTM-OTHER1/', $texts ) ), 'missing expected id needs browser verification' );
 expect( 0 === count( preg_grep( '/Clarity expects/', $texts ) ), 'clarity present, not flagged' );
 expect( 0 === count( preg_grep( '/Multiple Google Analytics/', $texts ) ), 'one configured GA tag: no double-count warning' );
 $multi = AceSeoTracking::scan_html( $ok . '<script>gtag("config", "G-OTHER");</script>' ) + array( 'ok' => true );
@@ -124,5 +124,69 @@ $svg = AceSeoTracking::svg_chart( array_slice( $days, 0, 14 ), 'visitors', array
 expect( 2 === substr_count( $svg, '<polyline' ), 'two polylines' );
 expect( false !== strpos( $svg, 'fill="#fde8e6"' ), 'gap shading' );
 expect( 14 === substr_count( $svg, '<title>' ), 'one tooltip per day' );
+
+// A server fetch cannot decide whether JavaScript executes or consent is granted.
+$document = '<!doctype html><html><head><title>Home</title></head><body>' . $ok . '</body></html>';
+$response = AceSeoTracking::page_response( 200, $document, array( 'Content-Type' => 'text/html; charset=UTF-8' ) );
+expect( $response['ok'] && 'html' === $response['state'] && $response['configs'] === array( 'GT-TBBCP35Z' ), 'complete HTML can be scanned' );
+$xhtml = AceSeoTracking::page_response( 200, $document, array( 'content-type' => 'application/xhtml+xml' ) );
+expect( $xhtml['ok'], 'XHTML is supported' );
+$fixtures = array(
+    array( 202, '', array( 'x-amzn-waf-action' => 'challenge' ) ),
+    array( 200, $document, array( 'X-Amzn-Waf-Action' => 'captcha' ) ),
+    array( 200, $document, array( 'CF-Mitigated' => 'challenge' ) ),
+    array( 200, '<html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>', array() ),
+    array( 200, '<html><body><form id="challenge-form"></form></body></html>', array() ),
+    array( 202, $document, array() ), array( 204, '', array() ), array( 206, $document, array() ),
+    array( 301, $document, array() ), array( 403, $document, array() ), array( 429, $document, array() ), array( 503, $document, array() ),
+    array( 200, '', array() ), array( 200, '{"ok":true}', array( 'content-type' => 'application/json' ) ),
+    array( 200, $document, array( 'content-type' => 'text/plain' ) ), array( 200, substr( $document, 0, -14 ), array() ),
+);
+$available = array( 'ga' => array( 'ok' => true ), 'days' => array() );
+foreach ( $fixtures as $fixture ) {
+    $unverified = AceSeoTracking::page_response( $fixture[0], $fixture[1], $fixture[2] );
+    expect( ! $unverified['ok'] && 'unverified' === $unverified['state'] && $unverified['error'], 'inaccessible/incomplete page is unverified: ' . json_encode( $fixture ) );
+    expect( ! $unverified['loaders'] && ! $unverified['configs'], 'an unverified response is not scanned for tags' );
+    $issues = AceSeoTracking::problems( $detect, $unverified, $available );
+    expect( 1 === count( $issues ) && 'warn' === $issues[0][0], 'blocked check does not invent missing-tag failures' );
+}
+$injected = AceSeoTracking::page_response( 200, '<html><body><script src="/consent-loader.js"></script></body></html>' );
+$issues = AceSeoTracking::problems( $detect, $injected, $available );
+expect( 3 === count( $issues ) && ! in_array( 'bad', array_column( $issues, 0 ), true ), 'unknown dynamic/consent loaders need verification, not red alerts' );
+$aliases = array( 'ga4' => array( 'key' => 'ga4', 'label' => 'GA4', 'status' => 'ok', 'ids' => array( 'GT-ALIAS' ), 'alternative_ids' => array( 'GT-ALIAS', 'G-MEASUREMENT' ) ) );
+$aliased_page = AceSeoTracking::scan_html( '<script>gtag("config","G-MEASUREMENT");</script>' ) + array( 'ok' => true );
+expect( ! AceSeoTracking::problems( $aliases, $aliased_page, $available ), 'a known measurement ID can stand in for its Google tag alias' );
+$aliases['ga4']['alternative_ids'] = array( 'GT-ALIAS', 'G-DIFFERENT' );
+expect( count( AceSeoTracking::problems( $aliases, $aliased_page, $available ) ) === 1, 'an unrelated destination does not satisfy an expected tag' );
+
+$today = wp_date( 'Y-m-d' );
+$report = array( 'ga' => array( 'ok' => true ), 'days' => array( array( 'date' => $today, 'ga_views' => 42, 'ga_users' => 20 ) ), 'at' => time() );
+$blocked = AceSeoTracking::page_response( 202, '' );
+expect( $today === AceSeoTracking::recent_reporting( $report ), 'recent positive reporting is recognised' );
+$summary = AceSeoTracking::summary( $blocked, $report, AceSeoTracking::problems( $detect, $blocked, $report ) );
+expect( 'warn' === $summary[0] && strpos( $summary[1], 'Analytics data is arriving.' ) === 0 && strpos( $summary[1], 'unavailable' ) !== false, 'reporting and blocked verification remain separate' );
+$old = $report; $old['days'][0]['date'] = '2020-01-01';
+expect( null === AceSeoTracking::recent_reporting( $old ), 'historical data cannot claim current reporting' );
+$old = $report; $old['at'] = time() - 3 * 86400;
+expect( null === AceSeoTracking::recent_reporting( $old ), 'stale cached data cannot claim current reporting' );
+$unknown = $report; $unknown['ga']['ok'] = false;
+expect( null === AceSeoTracking::recent_reporting( $unknown ), 'unavailable reporting cannot prove traffic' );
+$unknown = $report; $unknown['days'][0]['ga_views'] = null; $unknown['days'][0]['ga_users'] = null;
+expect( null === AceSeoTracking::recent_reporting( $unknown ), 'unknown coverage is not positive traffic' );
+$unknown['days'][0]['ga_views'] = 0; $unknown['days'][0]['ga_users'] = 0;
+expect( null === AceSeoTracking::recent_reporting( $unknown ), 'zero traffic cannot produce an arriving-data claim' );
+$summary = AceSeoTracking::summary( $response, array(), array() );
+expect( strpos( $summary[1], 'Browser execution has not been verified' ) !== false, 'HTML presence does not claim browser execution' );
+
+// The security challenge must not suppress independent evidence of a real outage.
+// Use current site-local dates for the outage check, independent of when this test runs.
+$outage = array( 'ga' => array( 'ok' => true ), 'days' => array() );
+for ( $i = 2; $i >= 1; --$i ) {
+    $date = ( new DateTimeImmutable( $today ) )->modify( '-' . $i . ' days' )->format( 'Y-m-d' );
+    $outage['days'][$date] = array( 'date' => $date, 'ga_users' => 0, 'ga_views' => 0, 'jp_visitors' => 100, 'jp_views' => 200 );
+}
+$issues = AceSeoTracking::problems( $detect, $blocked, $outage );
+expect( in_array( 'bad', array_column( $issues, 0 ), true ), 'a genuine reporting outage is still bad during a blocked fetch' );
+expect( 'bad' === AceSeoTracking::summary( $blocked, $outage, $issues )[0], 'reporting outage takes precedence over an inconclusive probe' );
 
 echo "$checks tracking checks passed.\n";

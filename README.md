@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.79-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.88-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.79
+**Stable tag:** 1.0.88
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,10 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.88 (2026-10-14)
+- Tracking checks now distinguish a verified HTML response from security challenges, empty responses and incomplete pages. These checks cannot execute JavaScript or accept consent, so missing tags or inline configuration need browser verification rather than a broken-tracking alert. Known Site Kit Google tag and measurement IDs are treated as alternatives.
+- Recent Analytics reporting is shown separately from tag evidence. Real reporting gaps still raise alerts; old cached page checks and alert classifications are invalidated.
 
 ### 1.0.79 (2026-10-13)
 - New Tracking page under Ace SEO. It lists every analytics and marketing integration the site is set up with (Site Kit modules, Tag Manager, Ads, consent mode, WP Consent API, cookie banners, Microsoft Clarity, Jetpack Stats, WooCommerce and its Google, Meta and other tags, and the common analytics plugins), fetches the home page as a browser would and reports which tags are actually there, and draws the last 60 days of Google Analytics users or page views against Jetpack Stats on one scale, with the days Analytics missed shaded and a CSV of the daily numbers.
