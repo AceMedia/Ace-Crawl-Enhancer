@@ -1,5 +1,5 @@
 <?php
-/** Bounded authoritative reads for the dev retention queue; object caches are not locks. */
+/** Bounded authoritative reads for the retention queue; object caches are not locks. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 final class AceSeoRetentionFresh {

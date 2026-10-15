@@ -1,18 +1,16 @@
 <?php
-/** Dev-only evidence capture and guarded review queue. */
+/** Retention evidence capture and guarded review queue. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 require_once __DIR__ . '/class-ace-seo-retention-fresh.php';
 
 final class AceSeoRetentionPrototype {
     const TYPE = 'ace_retention_plan';
     const KEEP = '_ace_seo_retention_automation_keep';
-    const VERSION = 'review-2';
+    const VERSION = 'review-3';
 
     public static function enabled() {
-        // Explicitly bind the opt-in to one discouraged site. A copied dev flag cannot enable live.
-        return defined( 'ACE_SEO_RETENTION_PROTOTYPE_SITE' )
-            && untrailingslashit( AceSeoRetentionFresh::option( 'home', '' ) ) === ACE_SEO_RETENTION_PROTOTYPE_SITE
-            && '0' === (string) AceSeoRetentionFresh::option( 'blog_public', '1' );
+        // Review is available on every site. Queue execution is separately opt-in.
+        return true;
     }
 
     public static function init() {
@@ -94,7 +92,7 @@ final class AceSeoRetentionPrototype {
         $holds = $s['target_holds'];
         if ( empty( $s['generation'] ) ) { $holds[] = 'A completed report generation containing this article is required. Rebuild legacy reports first.'; }
         if ( $s['building'] ) { $holds[] = 'Retention report is being rebuilt.'; }
-        if ( $s['site_discouraged'] ) { $holds[] = 'Site-wide noindex is enabled. Dev remains a simulation.'; }
+        if ( $s['site_discouraged'] ) { $holds[] = 'Site-wide noindex is enabled. Review is available, but automatic application is held.'; }
         if ( ! $s['review']['confirmed'] || strlen( $s['review']['reason'] ) < 30 ) { $holds[] = 'Confirm the replacement covers the same subject and reader intent, with a review reason.'; }
         if ( $s['source']['id'] === $s['target']['id'] ) { $holds[] = 'Source and destination are the same article.'; }
         foreach ( array( 'source', 'target' ) as $side ) {
@@ -135,14 +133,14 @@ final class AceSeoRetentionPrototype {
         return array_values( array_unique( $holds ) );
     }
 
-    public static function capture( $source, $url, $start, $end, $confirmed, $reason ) {
-        return AceSeoRetentionFresh::run( array( (int) $source, (int) url_to_postid( $url ) ), static function() use ( $source, $url, $start, $end, $confirmed, $reason ) {
-            return self::capture_fresh( $source, $url, $start, $end, $confirmed, $reason );
+    public static function capture( $source, $url, $start, $end, $confirmed, $reason, array $links = array() ) {
+        return AceSeoRetentionFresh::run( array( (int) $source, (int) url_to_postid( $url ) ), static function() use ( $source, $url, $start, $end, $confirmed, $reason, $links ) {
+            return self::capture_fresh( $source, $url, $start, $end, $confirmed, $reason, $links );
         } );
     }
 
-    private static function capture_fresh( $source, $url, $start, $end, $confirmed, $reason ) {
-        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) || ! current_user_can( 'edit_post', $source ) ) { return new WP_Error( 'permission', 'Dev preview permission required.' ); }
+    private static function capture_fresh( $source, $url, $start, $end, $confirmed, $reason, array $links ) {
+        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) || ! current_user_can( 'edit_post', $source ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
         if ( ! Ace_SEO_Retention_Evidence::date( $start ) || ! Ace_SEO_Retention_Evidence::date( $end )
             || $start > $end || $end >= wp_date( 'Y-m-d' ) || strtotime( $end ) - strtotime( $start ) > 366 * DAY_IN_SECONDS ) { return new WP_Error( 'dates', 'Use a finished observation period of at most 367 days.' ); }
         $url = AceSeoRetentionActions::normalise_target( $url );
@@ -150,7 +148,7 @@ final class AceSeoRetentionPrototype {
         if ( ! $url || wp_parse_url( home_url(), PHP_URL_HOST ) !== ( $parts['host'] ?? '' ) || isset( $parts['user'] ) || isset( $parts['pass'] )
             || isset( $parts['query'] ) || isset( $parts['fragment'] ) || ! in_array( $parts['scheme'] ?? '', array( 'http', 'https' ), true ) ) { return new WP_Error( 'target', 'Choose a post or page on this site without query parameters or fragments.' ); }
         $target = url_to_postid( $url );
-        if ( ! $target || ! current_user_can( 'edit_post', $target ) || AceSeoRedirects::url_key( $url ) !== AceSeoRedirects::url_key( get_permalink( $target ) ) ) { return new WP_Error( 'target', 'Choose the canonical URL of an editable post or page. Archive and external destinations are outside this prototype.' ); }
+        if ( ! $target || ! current_user_can( 'edit_post', $target ) || AceSeoRedirects::url_key( $url ) !== AceSeoRedirects::url_key( get_permalink( $target ) ) ) { return new WP_Error( 'target', 'Choose the canonical URL of an editable post or page. Use Existing redirects for archive or external destinations.' ); }
         $before = self::fingerprint( $source, $target );
         $was_building = AceSeoRetentionReport::is_building();
         $row = get_post_meta( $source, AceSeoRetentionReport::META, true );
@@ -161,12 +159,22 @@ final class AceSeoRetentionPrototype {
         $context['overlap_verified'] = (bool) $confirmed && strlen( $reason ) >= 30;
         // A provider must attest provenance and freshness; an absent backlink row is never zero.
         $context['link_evidence'] = (array) apply_filters( 'ace_seo_retention_link_evidence', array(), (int) $source, $row );
+        // An explicit, attributed review can supply missing link evidence. Provider data wins.
+        foreach ( array( 'backlinks', 'internal' ) as $kind ) {
+            if ( ! isset( $context['link_evidence'][ $kind ] ) && ! empty( $links['confirmed'] ) && strlen( $links['source'] ?? '' ) >= 10
+                && (int) ( $links['by'] ?? 0 ) === get_current_user_id() && ! empty( $links['checked_at'] ) ) {
+                $context['link_evidence'][ $kind ] = array( 'count' => 0, 'complete' => true, 'capped' => false,
+                    'source' => 'Administrator link review: ' . $links['source'], 'checked_at' => $links['checked_at'], 'by' => $links['by'] );
+            }
+            $field = 'internal' === $kind ? 'links_in' : 'backlinks';
+            if ( isset( $context['link_evidence'][ $kind ]['count'] ) && empty( $row[ $field ] ) ) { $row[ $field ] = $context['link_evidence'][ $kind ]['count']; }
+        }
         $prepared = Ace_SEO_Retention_Evidence_View::prepare( $row, $context );
         $response = wp_safe_remote_get( get_permalink( $target ), array( 'timeout' => 8, 'redirection' => 0, 'limit_response_size' => 1048576, 'cookies' => array() ) );
         $s = array( 'version' => self::VERSION, 'created' => time(), 'by' => get_current_user_id(), 'fingerprint' => $before,
             'source' => self::facts( $source ), 'target' => self::facts( $target ), 'settings' => $settings, 'generation' => AceSeoRetentionFresh::generation( $source ),
             'site_discouraged' => '0' === (string) get_option( 'blog_public' ), 'building' => $was_building || AceSeoRetentionReport::is_building(),
-            'review' => array( 'confirmed' => (bool) $confirmed, 'reason' => $reason ), 'row' => $prepared, 'context' => $context,
+            'review' => array( 'confirmed' => (bool) $confirmed, 'reason' => $reason, 'links' => $links ), 'row' => $prepared, 'context' => $context,
             'assessment' => Ace_SEO_Retention_Evidence::assess( $prepared, $context, $settings ),
             'target_holds' => self::inspect_response( $response, get_permalink( $target ) ) );
         $s['holds'] = self::holds( $s, time() );
@@ -175,7 +183,7 @@ final class AceSeoRetentionPrototype {
     }
 
     public static function store( array $snapshot ) {
-        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Dev preview permission required.' ); }
+        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
         // Each capture is a new immutable record. Existing captures are never edited by this tool.
         return wp_insert_post( array( 'post_type' => self::TYPE, 'post_status' => 'private', 'post_title' => 'Retention preview ' . gmdate( 'Y-m-d H:i:s' ),
             'post_content' => wp_slash( wp_json_encode( array( 'snapshot' => $snapshot, 'sha256' => self::hash( $snapshot ) ) ) ), 'post_author' => get_current_user_id() ), true );
@@ -188,10 +196,10 @@ final class AceSeoRetentionPrototype {
     }
 
     public static function handle() {
-        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Dev preview permission required.', '', array( 'response' => 403 ) ); }
+        if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_retention_preview' );
         $input = wp_unslash( $_POST );
-        foreach ( array( 'source', 'target', 'start', 'end', 'reason', 'operation', 'confirmed' ) as $key ) {
+        foreach ( array( 'source', 'target', 'start', 'end', 'reason', 'operation', 'confirmed', 'links_confirmed', 'links_source' ) as $key ) {
             if ( isset( $input[ $key ] ) && ! is_scalar( $input[ $key ] ) ) { wp_die( 'Invalid form data.' ); }
         }
         $id = absint( $input['source'] ?? 0 );
@@ -204,7 +212,8 @@ final class AceSeoRetentionPrototype {
             $notice = 'keep' === $operation ? 'kept' : 'cleared';
         } elseif ( 'preview' === $operation ) {
             try {
-                $result = self::capture( $id, trim( $input['target'] ?? '' ), $input['start'] ?? '', $input['end'] ?? '', ! empty( $input['confirmed'] ), substr( sanitize_textarea_field( $input['reason'] ?? '' ), 0, 2000 ) );
+                $links = array( 'confirmed' => ! empty( $input['links_confirmed'] ), 'source' => substr( sanitize_textarea_field( $input['links_source'] ?? '' ), 0, 1000 ), 'by' => get_current_user_id(), 'checked_at' => time() );
+                $result = self::capture( $id, trim( $input['target'] ?? '' ), $input['start'] ?? '', $input['end'] ?? '', ! empty( $input['confirmed'] ), substr( sanitize_textarea_field( $input['reason'] ?? '' ), 0, 2000 ), $links );
                 if ( ! is_wp_error( $result ) ) { $result = self::store( $result ); }
             } catch ( Throwable $e ) { $result = new WP_Error( 'capture', 'Assessment could not be completed. No redirect was applied; try a new preview.' ); }
             $notice = 'saved';

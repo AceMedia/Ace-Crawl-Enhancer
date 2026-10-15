@@ -9,12 +9,11 @@ $checks = 0; $ids = array(); $saved_public = get_option( 'blog_public' );
 $saved_progress = get_option( AceSeoRetentionReport::PROGRESS_OPTION, array() );
 $check = static function( $ok, $label ) use ( &$checks ) { if ( ! $ok ) { throw new RuntimeException( $label ); } $checks++; echo "PASS $label\n"; };
 try {
-    $check( ! AceSeoRetentionPrototype::enabled(), 'Prototype off without explicit site binding' );
-    define( 'ACE_SEO_RETENTION_PROTOTYPE_SITE', untrailingslashit( home_url() ) );
+    $check( AceSeoRetentionPrototype::enabled(), 'Review available without site-specific configuration' );
     update_option( 'blog_public', 1 );
-    $check( ! AceSeoRetentionPrototype::enabled(), 'Public site cannot activate prototype' );
+    $check( AceSeoRetentionPrototype::enabled(), 'Review available on an indexable site' );
     update_option( 'blog_public', 0 ); AceSeoRetentionPrototype::init();
-    $check( AceSeoRetentionPrototype::enabled(), 'Explicitly bound discouraged test site can activate preview' );
+    $check( AceSeoRetentionPrototype::enabled(), 'Discouraged site can still review assessments' );
     wp_set_current_user( get_users( array( 'role'=>'administrator','number'=>1 ) )[0]->ID );
     $url = 'https://example.test/replacement/';
     $response = array( 'response'=>array('code'=>200), 'headers'=>array('content-type'=>'text/html'), 'body'=>'<html><head><link rel="canonical" href="'.$url.'"></head><body>Replacement</body></html>' );
@@ -88,6 +87,22 @@ try {
         update_post_meta($source,AceSeoRetentionReport::META,array('generation'=>'fixture','backlinks'=>0,'links_in'=>0,'words'=>500));
         $captured=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.');
         $check(is_array($captured) && count($captured['holds'])===1 && false!==strpos($captured['holds'][0],'Site-wide noindex'),'Integrated capture retains dev noindex as its only hold for complete fixtures');
+        update_option('blog_public',1);
+        remove_filter('ace_seo_retention_link_evidence',$links);
+        $review=array('confirmed'=>true,'source'=>'Reviewed external backlink report and internal crawl export','by'=>get_current_user_id(),'checked_at'=>time());
+        $reviewed=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.',$review);
+        $check(!$reviewed['holds'] && $reviewed['context']['link_evidence']['backlinks']['by']===get_current_user_id(),'Indexable site can pass with explicit attributed link review');
+        $expired=$review; $expired['checked_at']=time()-2*DAY_IN_SECONDS;
+        $expired_capture=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.',$expired);
+        $check((bool)$expired_capture['holds'],'Expired link attestation cannot authorise automation');
+        $unknown=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.');
+        $check((bool)$unknown['holds'],'No provider and no explicit link review stays unknown');
+        $positive=static function(){return array('backlinks'=>array('count'=>2,'complete'=>true,'source'=>'Provider','checked_at'=>time()));};
+        add_filter('ace_seo_retention_link_evidence',$positive);
+        $protected=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.',$review);
+        $check((bool)$protected['holds'] && 2===$protected['row']['backlinks'],'Manual review cannot override positive provider evidence');
+        remove_filter('ace_seo_retention_link_evidence',$positive);
+        update_option('blog_public',0);
         $plan=AceSeoRetentionPrototype::store($captured); $ids[]=$plan;
         $check(!is_wp_error($plan) && AceSeoRetentionPrototype::read(get_post($plan))===$captured,'Real capture stores and verifies the complete evidence snapshot');
     } finally {

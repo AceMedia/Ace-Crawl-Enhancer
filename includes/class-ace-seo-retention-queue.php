@@ -1,5 +1,5 @@
 <?php
-/** Dev-only, explicitly approved redirect queue. Durable state never depends on transients. */
+/** Explicitly approved redirect queue. Durable state never depends on transients. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class AceSeoRetentionQueue {
@@ -50,8 +50,13 @@ class AceSeoRetentionQueue {
 
     public static function control() {
         $c = AceSeoRetentionFresh::option( self::CONTROL );
-        return array_merge( array( 'enabled' => false, 'scope' => array(), 'daily_cap' => 3, 'revision' => '', 'by' => 0 ), is_array( $c ) ? $c : array() );
+        $c = array_merge( array( 'enabled' => false, 'scope' => array(), 'daily_cap' => 3, 'revision' => '', 'by' => 0, 'site' => '' ), is_array( $c ) ? $c : array() );
+        // A restored or cloned database cannot carry active approvals into another site.
+        if ( $c['site'] !== self::site() ) { $c['enabled'] = false; $c['scope'] = array(); }
+        return $c;
     }
+
+    public static function site() { return hash( 'sha256', AceSeoRetentionFresh::option( 'home', '' ) . '|' . get_current_blog_id() ); }
 
     public static function configure( $enabled, array $scope, $cap ) {
         if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
@@ -61,7 +66,7 @@ class AceSeoRetentionQueue {
         if ( count( $scope ) > 10 || $cap < 1 || $cap > 3 || ( $enabled && ! $scope ) ) { return new WP_Error( 'scope', 'Use up to 10 explicit source IDs and a daily cap of 1 to 3.' ); }
         foreach ( $scope as $id ) { if ( ! current_user_can( 'edit_post', $id ) ) { return new WP_Error( 'permission', 'Every scoped source must be editable.' ); } }
         // One atomic DB update: a kill switch is visible to other processes immediately.
-        $next = array( 'enabled' => (bool) $enabled, 'scope' => $scope, 'daily_cap' => (int) $cap, 'revision' => wp_generate_uuid4(), 'by' => get_current_user_id() );
+        $next = array( 'enabled' => (bool) $enabled, 'scope' => $scope, 'daily_cap' => (int) $cap, 'revision' => wp_generate_uuid4(), 'by' => get_current_user_id(), 'site' => self::site() );
         global $wpdb;
         $raw = maybe_serialize( $next );
         $ok = $wpdb->query( $wpdb->prepare( "INSERT INTO {$wpdb->options} (option_name,option_value,autoload) VALUES (%s,%s,'no') ON DUPLICATE KEY UPDATE option_value=VALUES(option_value)", self::CONTROL, $raw ) );
@@ -106,7 +111,7 @@ class AceSeoRetentionQueue {
     }
 
     protected static function preflight( array $s ) {
-        return AceSeoRetentionPrototype::capture( $s['source']['id'], $s['target']['url'], $s['context']['period']['start'], $s['context']['period']['end'], $s['review']['confirmed'], $s['review']['reason'] );
+        return AceSeoRetentionPrototype::capture( $s['source']['id'], $s['target']['url'], $s['context']['period']['start'], $s['context']['period']['end'], $s['review']['confirmed'], $s['review']['reason'], $s['review']['links'] ?? array() );
     }
 
     private static function evidence_key( array $s ) {

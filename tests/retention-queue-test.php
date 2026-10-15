@@ -3,24 +3,21 @@
 if ( PHP_SAPI !== 'cli' || '1' !== getenv( 'ACE_SEO_REDIRECT_TESTS' ) || empty( $argv[1] ) ) { exit( "Disposable WordPress opt-in required.\n" ); }
 require $argv[1];
 if ( 'Ace Redirect Tests' !== get_option( 'blogname' ) ) { exit( "Disposable Ace Redirect Tests site required.\n" ); }
-define( 'ACE_SEO_RETENTION_PROTOTYPE_SITE', untrailingslashit( home_url() ) );
 $public = get_option( 'blog_public' ); $progress = get_option( AceSeoRetentionReport::PROGRESS_OPTION, array() );
 $control = get_option( 'ace_seo_retention_queue_control', null ); $ids = array(); $users = array(); $checks = 0;
 $check = static function( $ok, $label ) use ( &$checks ) { if ( ! $ok ) { throw new RuntimeException( $label ); } $checks++; echo "PASS $label\n"; };
 $admin = get_users( array( 'role' => 'administrator', 'number' => 1 ) )[0]->ID;
 $original_provider = $GLOBALS['wp_filter']['ace_seo_retention_evidence_context'] ?? null;
 $original_links = $GLOBALS['wp_filter']['ace_seo_retention_link_evidence'] ?? null;
-update_option( 'blog_public', 0 ); wp_set_current_user( $admin ); AceSeoRetentionPrototype::init(); AceSeoRetentionQueue::install();
+update_option( 'blog_public', 1 ); wp_set_current_user( $admin ); AceSeoRetentionPrototype::init(); AceSeoRetentionQueue::install();
 $events_start = (int) $wpdb->get_var( 'SELECT MAX(id) FROM ' . AceSeoRetentionQueue::table( 'events' ) );
 
-// Test-only adapter: only the fixture IDs created below may pass the dev noindex hold.
-// Production always uses AceSeoRetentionQueue and retains that hold without any bypass filter.
+// Fixture-only race injector. All policy checks use the real implementation without bypasses.
 class RetentionFixtureQueue extends AceSeoRetentionQueue {
     public static $owned = array(); public static $mutator = null;
     protected static function preflight( array $s ) {
         foreach ( array( $s['source']['id'], $s['target']['id'] ) as $id ) { if ( ! in_array( $id, self::$owned, true ) ) { return new WP_Error( 'fixture', 'Not an owned fixture.' ); } }
         $r = parent::preflight( $s );
-        if ( ! is_wp_error( $r ) ) { $r['holds'] = array_values( array_filter( $r['holds'], static function( $hold ) { return false === strpos( $hold, 'Site-wide noindex' ); } ) ); }
         if ( self::$mutator ) { call_user_func( self::$mutator ); }
         return $r;
     }
@@ -58,7 +55,7 @@ try {
     $check( true === AceSeoRetentionQueue::configure( true, array( $source, $second ), 3 ), 'Explicit scope and hourly schedule enabled' );
     $check( (bool) wp_next_scheduled( AceSeoRetentionQueue::HOOK ), 'Worker scheduled only after explicit enable' );
     $plan = $make( $source );
-    $check( is_wp_error( AceSeoRetentionQueue::approve( $plan ) ), 'Real executor refuses noindex even for complete fixture evidence' );
+    $check( true === AceSeoRetentionQueue::approve( $plan ), 'Real queue approves complete evidence on an indexable site without a dev flag' );
     $check( true === RetentionFixtureQueue::approve( $plan ), 'Test-only fixture approval persisted' );
     $check( true === RetentionFixtureQueue::approve( $plan ), 'Duplicate approval is idempotent' );
     $lease = RetentionFixtureQueue::lock();
@@ -71,17 +68,29 @@ try {
         return $sql;
     };
     add_filter( 'query', $fail_cache_receipt );
-    try { RetentionFixtureQueue::tick(); } finally { remove_filter( 'query', $fail_cache_receipt ); }
+    try { AceSeoRetentionQueue::tick(); } finally { remove_filter( 'query', $fail_cache_receipt ); }
     $j = AceSeoRetentionQueue::job( $plan );
     $check( 'applied' === $j['state'], 'Approved fixture applies through transaction and shared lifecycle: ' . ( $j['payload']['reason'] ?? '' ) );
     $check( true === $j['payload']['cache_pending'], 'Post-commit cache failure preserves applied state and durable retry' );
     $check( get_permalink( $target ) === AceSeoRedirects::settings( $source )['target'], 'Applied redirect points to verified fixture' );
+    if ( '1' === getenv( 'ACE_SEO_REDIRECT_HTTP_TESTS' ) ) {
+        remove_filter( 'pre_http_request', $http, 10 );
+        try {
+            $response = wp_remote_get( get_permalink( $source ), array( 'redirection' => 0, 'timeout' => 15 ) );
+            $check( 301 === wp_remote_retrieve_response_code( $response ) && get_permalink( $target ) === wp_remote_retrieve_header( $response, 'location' ) && false !== strpos( wp_remote_retrieve_header( $response, 'cache-control' ), 'no-store' ), 'Real public-site queue serves the intended HTTP 301 with no-store' );
+        } finally { add_filter( 'pre_http_request', $http, 10, 3 ); }
+    }
     $count = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . AceSeoRetentionQueue::table( 'events' ) . " WHERE kind='apply-intent'" );
     RetentionFixtureQueue::tick();
     $check( false === AceSeoRetentionQueue::job( $plan )['payload']['cache_pending'], 'Next worker retries cache invalidation before considering new applications' );
     $check( $count === (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . AceSeoRetentionQueue::table( 'events' ) . " WHERE kind='apply-intent'" ), 'Repeated worker does not reapply the same job' );
     $check( true === AceSeoRetentionQueue::undo( $plan ) && '' === AceSeoRedirects::settings( $source )['target'], 'Guarded undo restores empty original rule' );
     $check( 'undone' === AceSeoRetentionQueue::job( $plan )['state'], 'Undo retained in durable ledger' );
+    if ( '1' === getenv( 'ACE_SEO_REDIRECT_HTTP_TESTS' ) ) {
+        remove_filter( 'pre_http_request', $http, 10 );
+        try { $response = wp_remote_get( get_permalink( $source ), array( 'redirection' => 0, 'timeout' => 15 ) ); $check( 200 === wp_remote_retrieve_response_code( $response ), 'Undo restores the source HTTP 200' ); }
+        finally { add_filter( 'pre_http_request', $http, 10, 3 ); }
+    }
 
     $plan2 = $make( $source ); RetentionFixtureQueue::approve( $plan2 ); RetentionFixtureQueue::tick();
     AceSeoRedirects::save( $source, array( 'operation' => 'pause' ) );
@@ -147,6 +156,9 @@ try {
     RetentionFixtureQueue::tick(); RetentionFixtureQueue::$mutator = null;
     $check( ! AceSeoRedirects::settings( $source )['target'] && ! wp_next_scheduled( AceSeoRetentionQueue::HOOK ), 'Kill switch during preflight stops application and removes schedule' );
     $check( ! AceSeoRetentionQueue::control()['enabled'], 'Queue remains paused after kill switch' );
+    $copied=AceSeoRetentionQueue::control(); $copied['enabled']=true; $copied['site']='different-site'; $copied['scope']=array($source);
+    update_option(AceSeoRetentionQueue::CONTROL,$copied);
+    $check(!AceSeoRetentionQueue::control()['enabled'] && !AceSeoRetentionQueue::control()['scope'],'Cloned site settings cannot carry enabled processing or source scope');
     wp_set_current_user( 0 );
     $check( is_wp_error( AceSeoRetentionQueue::approve( $p ) ) && is_wp_error( AceSeoRetentionQueue::undo( $plan ) ), 'Anonymous callers cannot approve or undo' );
     echo "$checks queue checks passed.\n";

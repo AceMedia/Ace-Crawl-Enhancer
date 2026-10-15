@@ -5,21 +5,22 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
     'offset' => ( $page - 1 ) * 20, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true ) );
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
-    <h2>Retention automation: dev review</h2>
+    <h2>Review a retention redirect</h2>
     <?php $notices = array(
         'saved' => 'Dry-run snapshot saved. No redirect was applied.',
         'kept' => 'Manual keep exclusion saved. Previous previews must be reassessed.',
         'cleared' => 'Manual keep exclusion removed. Previous previews must be reassessed.',
         'dates' => 'Use a finished observation period of at most 367 days.',
         'target' => 'Choose the canonical URL of an editable post or page on this site, without query parameters or fragments.',
-        'permission' => 'Dev preview permission required.',
+        'permission' => 'Administrator permission required.',
     );
     $notice = isset( $_GET['preview_notice'] ) && is_string( $_GET['preview_notice'] ) ? sanitize_key( $_GET['preview_notice'] ) : '';
     if ( $notice ) : ?>
         <p role="status"><strong><?php echo esc_html( $notices[ $notice ] ?? 'Assessment could not be saved. No redirect was applied; try a new preview.' ); ?></strong></p>
     <?php endif; ?>
-    <p><strong>Dev only. The guarded queue starts paused and needs explicit approval for each pair.</strong> Review a specific replacement, then save a frozen assessment. Missing evidence stays on hold. Each new preview preserves earlier snapshots.</p>
-    <p>This first prototype accepts posts and pages on this site. Archive and external replacements need separate editorial handling. Dev’s site-wide noindex remains a hold; it is never silently ignored.</p>
+    <p><strong>Automatic processing is off by default and requires approval for each pair.</strong> Review a replacement, then save an assessment. Missing data is shown as unknown; verified zero traffic is assessed using the site's retention rules. Each assessment preserves its evidence.</p>
+    <p>Choose a replacement post or page on this site. Use Existing redirects for manual archive or external destinations. Saving an assessment does not change a redirect.</p>
+    <p>Traffic comes from this site's connected Analytics, Search Console or own tracking for the selected dates. <a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>">Review data coverage and rebuild the retention report</a>.</p>
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
         <?php wp_nonce_field( 'ace_retention_preview' ); ?>
         <input type="hidden" name="action" value="ace_retention_preview">
@@ -38,7 +39,12 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
             <label for="retention-end">Ends</label> <input type="date" id="retention-end" name="end" value="<?php echo esc_attr( wp_date( 'Y-m-d', strtotime( '-1 day' ) ) ); ?>"></p>
         <p><label><input type="checkbox" name="confirmed" value="1"> I have compared both articles: the replacement preserves the subject, reader intent and relevant event edition or historical information.</label></p>
         <p><label for="retention-reason">Why this is a suitable replacement (at least 30 characters)</label><br><textarea class="large-text" rows="3" id="retention-reason" name="reason" maxlength="2000"></textarea></p>
-        <p><button class="button button-primary" name="operation" value="preview">Save dry-run assessment</button></p>
+        <details><summary>Link review when no link-data provider is connected</summary>
+            <p>Check external backlinks and internal links to the source. Complete this only if both checks confirm zero links. Existing positive link counts cannot be overridden here. This recorded review is valid for 24 hours.</p>
+            <p><label><input type="checkbox" name="links_confirmed" value="1"> I checked both external backlinks and internal links and confirmed zero links to this source.</label></p>
+            <p><label for="retention-links-source">Where and how you checked the links</label><br><textarea class="large-text" id="retention-links-source" name="links_source" rows="2" maxlength="1000"></textarea></p>
+        </details>
+        <p><button class="button button-primary" name="operation" value="preview">Save assessment</button></p>
         <p>Protect this source from future automation. These controls only change its manual keep exclusion; they never change a redirect.</p>
         <p><button class="button" name="operation" value="keep" formnovalidate>Pin source: keep</button> <button class="button" name="operation" value="clear-keep" formnovalidate>Remove keep exclusion</button></p>
     </form>
@@ -50,10 +56,11 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
         <?php if ( $s ) :
             $stale = $s['fingerprint'] !== AceSeoRetentionPrototype::fingerprint( $s['source']['id'], $s['target']['id'] );
             $old = empty( $s['context']['collected_at'] ) || time() - $s['context']['collected_at'] > DAY_IN_SECONDS; ?>
-            <p><strong><?php echo $stale ? 'Changed since capture — reassess' : ( $old ? 'Traffic freshness needs reassessment' : ( $s['holds'] ? 'On hold' : 'Passes evidence checks — simulation only' ) ); ?></strong><br>
+            <p><strong><?php echo $stale ? 'Changed since capture — reassess' : ( $old ? 'Traffic freshness needs reassessment' : ( $s['holds'] ? 'On hold' : 'Ready for approval' ) ); ?></strong><br>
                 Captured <?php echo esc_html( wp_date( 'j M Y, H:i T', $s['created'] ) ); ?> by user #<?php echo (int) $s['by']; ?> · Rule <?php echo esc_html( $s['version'] ); ?></p>
             <p><a href="<?php echo esc_url( get_edit_post_link( $s['source']['id'] ) ); ?>">Review source</a> · <a href="<?php echo esc_url( get_edit_post_link( $s['target']['id'] ) ); ?>">Review replacement</a></p>
             <p><?php echo esc_html( $s['review']['reason'] ?: 'No editorial reason supplied.' ); ?></p>
+            <?php if ( ! empty( $s['review']['links']['confirmed'] ) ) : ?><p>Link review by user #<?php echo (int) $s['review']['links']['by']; ?> on <?php echo esc_html( wp_date( 'j M Y H:i T', $s['review']['links']['checked_at'] ) ); ?>: <?php echo esc_html( $s['review']['links']['source'] ); ?></p><?php endif; ?>
             <p>Traffic period: <?php echo esc_html( $s['context']['period']['start'] . ' to ' . $s['context']['period']['end'] ); ?>.<br>
                 Views: <?php echo esc_html( isset( $s['context']['metrics']['views'] ) ? $s['context']['metrics']['views'] : 'unknown' ); ?> · Search clicks: <?php echo esc_html( isset( $s['context']['metrics']['clicks'] ) ? $s['context']['metrics']['clicks'] : 'unknown' ); ?> · Backlinks: <?php echo esc_html( isset( $s['row']['backlinks'] ) ? $s['row']['backlinks'] : 'unknown' ); ?></p>
             <p>Sources: <?php echo esc_html( implode( ', ', $s['context']['sources'] ?? array() ) ?: 'None confirmed' ); ?>.<br>

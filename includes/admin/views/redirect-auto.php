@@ -10,9 +10,9 @@ $resolver = new ACE_SEO_Term_Redirect();
 <section class="ace-redirect-card ace-redirect-tab-panel">
     <h2>Auto redirects</h2>
     <?php if ( class_exists( 'AceSeoRetentionPrototype' ) && AceSeoRetentionPrototype::enabled() ) : ?>
-    <p><strong>The dev-only approved queue is available below.</strong> A report recommendation cannot authorise a redirect. Every pair needs a fresh assessment, explicit approval and all safeguards to pass.</p>
+    <p><strong>Review and schedule approved retention redirects below.</strong> A report recommendation cannot authorise a redirect. Every pair needs a fresh assessment, explicit approval and all safeguards to pass.</p>
     <?php else : ?>
-    <p><strong>Automatic redirects from retention recommendations are not implemented yet.</strong> There is no retention auto-redirect switch to enable. Recommendations require an administrator to choose a suitable destination and save a redirect.</p>
+    <p>Retention review is unavailable. Check that the plugin installation is complete.</p>
     <?php endif; ?>
     <p>Weekly retention checks are <strong><?php echo empty( $options['auto_build'] ) ? 'off' : 'on'; ?></strong>. These refresh the report only. Age-based search expiry, notices and the lighter archive view do not apply 301 redirects.</p>
     <p><a class="button" href="<?php echo esc_url( $settings_url ); ?>">Manage retention settings</a> <a href="<?php echo esc_url( $report_url ); ?>">Review retention report</a></p>
