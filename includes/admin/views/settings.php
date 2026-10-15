@@ -990,7 +990,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                 <li>🔄 Bulk SEO optimization (coming soon)</li>
                                 <li>🔄 Content analysis reports (coming soon)</li>
                                 <li>🔄 Broken link checker (coming soon)</li>
-                                <li>🔄 Redirect manager (coming soon)</li>
+                                <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Redirect Manager</a> - add redirects, set expiry dates and manage existing rules.</li>
                                 <li>🔄 SEO audit tool (coming soon)</li>
                             </ul>
                         </fieldset>

@@ -286,6 +286,8 @@ class AceSEOMetabox {
         // Save each meta field using plugin-specific keys
         foreach ( $meta_fields as $group => $fields ) {
             foreach ( $fields as $field_key => $field_config ) {
+                // Redirects have shared validation/lifecycle controls in the Advanced tab.
+                if ( 'redirect_to' === $field_key && isset( $_POST['ace_redirect_present'] ) && class_exists( 'AceSeoRedirects' ) ) { continue; }
                 $input_name = 'yoast_wpseo_' . $field_key;
                 
                 if ( isset( $_POST[ $input_name ] ) ) {
@@ -327,6 +329,16 @@ class AceSEOMetabox {
         
         // Handle special cases
         $this->handle_special_fields( $post_id );
+        if ( isset( $_POST['ace_redirect_present'] ) && current_user_can( 'manage_options' ) && class_exists( 'AceSeoRedirects' ) ) {
+            $input = array();
+            foreach ( array( 'target', 'code', 'expires', 'trash', 'paused' ) as $key ) {
+                $input[ $key ] = isset( $_POST[ 'ace_redirect_' . $key ] ) ? wp_unslash( $_POST[ 'ace_redirect_' . $key ] ) : '';
+            }
+            $result = AceSeoRedirects::save( $post_id, $input );
+            if ( is_wp_error( $result ) ) {
+                set_transient( 'ace_seo_redirect_notice_' . get_current_user_id(), array( 'error' => true, 'text' => 'Post saved, but redirect unchanged: ' . $result->get_error_message() ), 120 );
+            }
+        }
     }
     
     /**

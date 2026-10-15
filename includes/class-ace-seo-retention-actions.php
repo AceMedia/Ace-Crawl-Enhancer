@@ -441,7 +441,7 @@ class AceSeoRetentionActions {
         return array( 'applied' => $applied, 'skipped' => $skipped, 'error' => '' );
     }
 
-    private static function log( $id, $action, $value, $source ) {
+    public static function log( $id, $action, $value, $source ) {
         $entry = array( 'time' => time(), 'action' => $action, 'value' => $value, 'by' => $source . ( get_current_user_id() ? ':' . get_current_user_id() : '' ) );
 
         $post_log   = get_post_meta( $id, self::META_LOG, true );
@@ -647,13 +647,18 @@ class AceSeoRetentionActions {
         return $robots;
     }
 
-    /** A post with a redirect target sends visitors there with a 301. */
+    /** Serve active post redirects, retaining 301 for legacy target-only rules. */
     public static function maybe_redirect() {
         if ( ! is_singular() || is_preview() || is_admin() ) {
             return;
         }
         $id  = get_queried_object_id();
+        if ( 'publish' !== get_post_status( $id ) ) { return; }
         $url = (string) get_post_meta( $id, self::META_REDIRECT, true );
+        $redirect = class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::settings( $id ) : null;
+        if ( $redirect && ! AceSeoRedirects::active( $redirect ) ) {
+            return;
+        }
         if ( '' === $url ) {
             return;
         }
@@ -666,12 +671,14 @@ class AceSeoRetentionActions {
             $message = apply_filters( 'ace_seo_retention_gone_message', '<p>This page has been retired and is no longer available.</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></p>', $id );
             wp_die( $message, esc_html__( 'Gone', 'ace-crawl-enhancer' ), array( 'response' => 410 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- filtered markup
         }
-        if ( self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
+        if ( class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::url_key( $url ) === AceSeoRedirects::url_key( get_permalink( $id ) ) : self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
             return;
         }
         $url = apply_filters( 'ace_seo_retention_redirect_url', $url, $id );
         if ( $url ) {
-            wp_redirect( esc_url_raw( $url ), 301, 'Ace SEO retention' ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- consolidation target may be off-site
+            // A browser/CDN must not retain a redirect beyond its stop date or after a pause.
+            if ( $redirect && $redirect['created'] ) { nocache_headers(); }
+            wp_redirect( esc_url_raw( $url ), $redirect ? (int) $redirect['code'] : 301, 'Ace SEO retention' ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- consolidation target may be off-site
             exit;
         }
     }

@@ -19,6 +19,14 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Redirect management — implemented in 1.0.89 (15 October)
+
+- Central administrator manager and per-post Advanced controls: search/select source posts, bulk destinations, 301/302/307/308, pause/resume/clear, age and optional site-timezone expiry with a 90-day shortcut.
+- Existing target-only redirects keep their 301/no-expiry behaviour. Expired rules remain visible for review. No expiry or deletion is enabled by default; expiry ordinarily makes a published source readable again.
+- Optional move to WordPress Trash at expiry, using cron with fresh deletion-permission/status checks. No permanent-delete job. Request-time expiry works even if cron runs late; pause and legacy target changes cancel pending destructive work. Managed responses send no-store and changes purge the source URL.
+- Validation: isolated real-WordPress integration and HTTP tests in `tests/redirects-test.php`; browser checks for source search, bulk saves, pause/edit and editor controls. Consumer deployment still needs its normal cache and PHP checks.
+
+
 ### Tracking verification — shipped in 1.0.88 (14 October)
 
 - Classify security challenges and non-page responses as unverified, including HTTP 202. Scan only complete HTML, with no assumption that static markup proves browser execution.
