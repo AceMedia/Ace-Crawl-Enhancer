@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.89-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.90-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.89
+**Stable tag:** 1.0.90
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,13 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.90 (2026-10-15)
+
+- Search redirect destinations by title/name across public posts, pages, custom content types, categories, tags and custom taxonomies. Checkboxes narrow queries; searches are explicit and capped, and manual URLs remain available in both the manager and post editor.
+- Add read-only Auto redirects and Suggested redirects tabs. Archive rules link to their editor; retention candidates use the saved report, assessment dates, reasons, current redirect state and completed-check movement history. Changing a recommendation never changes an applied redirect.
+- Clarify that retention auto-redirect execution is not implemented. Weekly report rebuilds, age notices and search expiry do not apply suggested 301s. The evidence preview is separate from saved recommendations and can have stricter evidence requirements.
+- Add `tests/redirect-discovery-test.php` using the same disposable installation and opt-in as the redirect lifecycle tests.
 
 ### 1.0.89 (2026-10-15)
 

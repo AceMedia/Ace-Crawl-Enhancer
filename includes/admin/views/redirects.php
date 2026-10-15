@@ -1,5 +1,16 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+$tab = is_string( $_GET['tab'] ?? null ) ? sanitize_key( $_GET['tab'] ) : 'existing';
+if ( ! in_array( $tab, array( 'existing', 'auto', 'suggestions' ), true ) ) { $tab = 'existing'; }
+?>
+<div class="wrap ace-redirect-manager">
+    <h1>Redirect Manager</h1>
+    <nav class="nav-tab-wrapper" aria-label="Redirect sections">
+    <?php foreach ( array( 'existing' => 'Existing redirects', 'auto' => 'Auto redirects', 'suggestions' => 'Suggested redirects' ) as $key => $label ) : ?>
+        <a class="nav-tab <?php echo $tab === $key ? 'nav-tab-active' : ''; ?>" <?php echo $tab === $key ? 'aria-current="page"' : ''; ?> href="<?php echo esc_url( add_query_arg( array( 'page' => 'ace-seo-redirects', 'tab' => $key ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $label ); ?></a>
+    <?php endforeach; ?>
+    </nav>
+<?php if ( 'existing' !== $tab ) { AceSeoRedirectDiscovery::render( $tab ); echo '</div>'; return; }
 $edit = absint( $_GET['post'] ?? 0 );
 $search = sanitize_text_field( wp_unslash( $_GET['source_search'] ?? '' ) );
 $filter = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
@@ -8,8 +19,6 @@ $types = array_values( array_diff( get_post_types( array( 'public' => true ) ), 
 $query = new WP_Query( array( 'post_type' => $types, 'post_status' => array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' ), 'posts_per_page' => 30, 'paged' => $page, 's' => $filter,
     'meta_query' => array( array( 'key' => AceSeoRetentionActions::META_REDIRECT, 'value' => '', 'compare' => '!=' ) ), 'orderby' => 'ID', 'order' => 'DESC' ) );
 ?>
-<div class="wrap ace-redirect-manager">
-    <h1>Redirect Manager</h1>
     <p>Send readers from an old post to a relevant replacement. Choose a permanent move or a temporary redirect, with an optional stop date.</p>
     <div class="ace-redirect-layout">
     <section class="ace-redirect-card" aria-labelledby="ace-redirect-editor-title">
