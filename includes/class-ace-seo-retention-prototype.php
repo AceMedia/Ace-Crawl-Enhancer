@@ -180,16 +180,17 @@ final class AceSeoRetentionPrototype {
             if ( 'keep' === $operation ) { update_post_meta( $id, self::KEEP, array( 'by' => get_current_user_id(), 'at' => time() ) ); }
             else { delete_post_meta( $id, self::KEEP ); }
             $result = true;
-            $message = 'Manual keep exclusion ' . ( 'keep' === $operation ? 'saved' : 'removed' ) . '. Previous previews must be reassessed.';
+            $notice = 'keep' === $operation ? 'kept' : 'cleared';
         } elseif ( 'preview' === $operation ) {
             try {
                 $result = self::capture( $id, trim( $input['target'] ?? '' ), $input['start'] ?? '', $input['end'] ?? '', ! empty( $input['confirmed'] ), substr( sanitize_textarea_field( $input['reason'] ?? '' ), 0, 2000 ) );
                 if ( ! is_wp_error( $result ) ) { $result = self::store( $result ); }
             } catch ( Throwable $e ) { $result = new WP_Error( 'capture', 'Assessment could not be completed. No redirect was applied; try a new preview.' ); }
-            $message = 'Dry-run snapshot saved. No redirect was applied.';
+            $notice = 'saved';
         } else { $result = new WP_Error( 'operation', 'Unknown preview action.' ); }
-        set_transient( 'ace_retention_preview_notice_' . get_current_user_id(), array( 'error' => is_wp_error( $result ), 'text' => is_wp_error( $result ) ? $result->get_error_message() : $message ), 120 );
-        wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-redirects&tab=auto' ) ); exit;
+        // Bounded status code survives deployments with inconsistent transient caches across workers.
+        if ( is_wp_error( $result ) ) { $notice = $result->get_error_code(); }
+        wp_safe_redirect( add_query_arg( 'preview_notice', $notice, admin_url( 'admin.php?page=ace-seo-redirects&tab=auto' ) ) ); exit;
     }
 
     public static function render() {

@@ -6,9 +6,17 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
     <h2>Retention automation: dev preview</h2>
-    <?php $notice_key = 'ace_retention_preview_notice_' . get_current_user_id(); $notice = get_transient( $notice_key );
-    if ( is_array( $notice ) ) : delete_transient( $notice_key ); ?>
-        <p role="status"><strong><?php echo esc_html( $notice['text'] ); ?></strong></p>
+    <?php $notices = array(
+        'saved' => 'Dry-run snapshot saved. No redirect was applied.',
+        'kept' => 'Manual keep exclusion saved. Previous previews must be reassessed.',
+        'cleared' => 'Manual keep exclusion removed. Previous previews must be reassessed.',
+        'dates' => 'Use a finished observation period of at most 367 days.',
+        'target' => 'Choose the canonical URL of an editable post or page on this site, without query parameters or fragments.',
+        'permission' => 'Dev preview permission required.',
+    );
+    $notice = isset( $_GET['preview_notice'] ) && is_string( $_GET['preview_notice'] ) ? sanitize_key( $_GET['preview_notice'] ) : '';
+    if ( $notice ) : ?>
+        <p role="status"><strong><?php echo esc_html( $notices[ $notice ] ?? 'Assessment could not be saved. No redirect was applied; try a new preview.' ); ?></strong></p>
     <?php endif; ?>
     <p><strong>Simulation only. No redirect application or scheduling is available.</strong> Review a specific replacement, then save a frozen assessment. Missing evidence stays on hold. Each new preview preserves earlier snapshots.</p>
     <p>This first prototype accepts posts and pages on this site. Archive and external replacements need separate editorial handling. Dev’s site-wide noindex remains a hold; it is never silently ignored.</p>
