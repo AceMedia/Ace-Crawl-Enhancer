@@ -72,6 +72,7 @@ class Ace_SEO_Retention_Dated_Traffic {
         $context['metric_period'] = $period;
         $context['coverage']      = $feed['coverage'];
         $context['sources']       = $feed['sources'];
+        $context['collected_at']  = $feed['fetched_at'] ?? 0;
         return $context;
     }
 

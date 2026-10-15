@@ -19,6 +19,14 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Automatic retention redirects — dev shadow prototype (15 October, issue #34)
+
+- Opt-in preview in Redirects → Auto, bound to an exact site URL via `ACE_SEO_RETENTION_PROTOTYPE_SITE` and requiring WordPress's discouraged-site setting. No apply endpoint, cron worker or automatic source selection. Public sites cannot activate it.
+- Review a specific post/page replacement using the destination finder or its URL, confirm editorial overlap and record a reason. Each assessment creates a separate private record with frozen evidence, reviewer, rule version and integrity hash. Changed source, replacement, report or settings invalidate the snapshot; stale collection times require reassessment. Manual keep exclusions are available.
+- Additional holds protect any readership, unknown or positive backlinks/internal links, existing redirects (including paused/expired rules), protected home/index sources, insufficient age, incomplete/capped/stale evidence, periods shorter than 90 days or the configured report window, unconfirmed timing/overlap, rebuilding reports and unverified destinations. Both search and visitor sources are required. Destination checks require complete canonical HTML, a direct 200 response and no noindex/challenge/refresh. Dev noindex is deliberately retained as a visible hold.
+- Verification: `tests/retention-prototype-test.php` requires the disposable integration site and exercises policy holds, capture, persistence, permissions, integrity and isolated shared-lifecycle apply/undo. It does not prove an automated executor exists.
+- Before real automatic application: publish a stable completed evidence generation (issue #30), add durable action ledger and approval expiry, fresh preflight with atomic locks/idempotence, small explicit scope and batch/daily caps, a kill switch, shared lifecycle/cache invalidation, and guarded undo that refuses to overwrite later edits. Verify backlink freshness/provenance and recent plus relevant-season evidence. Keep permanent redirects stable when subsequent scores or seasons change. Matching can propose destinations but cannot authorise them.
+
 ### Redirect discovery and retention views — implemented in 1.0.90 (15 October)
 
 - Destination finder shared by the manager and post editor: public content types and taxonomy archives, type checkboxes, bounded title/name queries, manual URL fallback and nonce/capability protection.

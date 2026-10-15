@@ -32,3 +32,4 @@ $resolver = new ACE_SEO_Term_Redirect();
     <?php endif; ?>
     <p class="description">Post redirects approved through the retention report are listed under Existing redirects. This view lists saved Ace SEO archive rules; redirects supplied only by custom code or the web server are not inventoried here.</p>
 </section>
+<?php if ( class_exists( 'AceSeoRetentionPrototype' ) ) { AceSeoRetentionPrototype::render(); } ?>
