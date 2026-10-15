@@ -23,6 +23,13 @@ try {
     $find = static function ( $types ) { return AceSeoRedirectDiscovery::destinations( array( 'search' => 'Discoveryneedle', 'types' => $types ) ); };
     $result = $find( array( 'post:post' ) );
     discovery_check( 1 === count( $result['items'] ) && get_permalink( $ids[0] ) === $result['items'][0]['url'], 'Title-only post search excludes draft, private, content-only matches and other types' );
+    $front_search = static function() { return ' AND 1=0 '; };
+    add_filter( 'posts_search', $front_search, 99 );
+    $literal = AceSeoRedirectDiscovery::destinations( array( 'search' => 'Discoveryneedle article', 'types' => array( 'post:post' ) ) );
+    discovery_check( 1 === count( $literal['items'] ) && get_permalink( $ids[0] ) === $literal['items'][0]['url'], 'Multiword destination title bypasses front-end fulltext filters' );
+    $normal_search = new WP_Query( array( 's' => 'Discoveryneedle', 'post_type' => 'post' ) );
+    discovery_check( ! $normal_search->posts, 'Ordinary search still uses the site search filter' );
+    remove_filter( 'posts_search', $front_search, 99 );
     discovery_check( 1 === count( $find( array( 'post:page' ) )['items'] ), 'Page-only search honours type filter' );
     discovery_check( 3 === count( $find( array( 'term:category', 'term:post_tag', 'term:discovery_topic' ) )['items'] ), 'Categories, tags and custom taxonomy return archive URLs' );
     discovery_check( 6 === count( $find( array_keys( $types ) )['items'] ), 'Mixed search returns all requested content kinds' );
@@ -51,7 +58,8 @@ try {
     discovery_check( false === strpos( discovery_render( 'suggestions' ), 'Discoveryneedle book' ), 'Article leaves suggestion list when its saved recommendation changes' );
     $o = AceSeoRetentionActions::options(); $o['auto_build'] = 1; update_option( AceSeoRetentionActions::OPTION, $o );
     $html = discovery_render( 'auto' );
-    discovery_check( false !== strpos( $html, 'not implemented yet' ) && false !== strpos( $html, 'Manage archive' ) && false === strpos( $html, '<form' ), 'Auto view is read-only and distinguishes archive rules from unimplemented retention automation' );
+    discovery_check( false !== strpos( $html, 'Approved redirect queue' ) && false !== strpos( $html, 'Manage archive' ) && false === strpos( $html, 'dev review' ) && false === strpos( $html, 'not implemented yet' ), 'Auto view exposes the released review workflow alongside archive management' );
+    discovery_check( ! AceSeoRetentionQueue::control()['enabled'] && ! wp_next_scheduled( AceSeoRetentionQueue::HOOK ), 'Opening released Auto view never enables or schedules processing' );
     discovery_check( ! get_post_meta( $ids[2], AceSeoRetentionActions::META_REDIRECT, true ), 'Weekly report option and viewing auto tab never create a redirect' );
     $_GET = array(); ob_start(); AceSeoRedirects::fields( 0, 'editor_' ); $fields = ob_get_clean();
     discovery_check( false === strpos( $fields, '<form' ) && false !== strpos( $fields, 'manual URL' ) && false !== strpos( $fields, 'editor_destination-search' ), 'Shared editor search retains manual input without nesting forms' );

@@ -43,6 +43,9 @@ class AceSeoRedirectDiscovery {
         if ( $posts ) {
             $query = new WP_Query( array( 'post_type' => array_unique( $posts ), 'post_status' => 'publish', 'has_password' => false,
                 's' => $search, 'search_columns' => array( 'post_title' ), 'posts_per_page' => self::LIMIT + 1,
+                // This bounded admin picker needs literal titles, not front-end full-text ranking.
+                // Site search adapters can otherwise ignore search_columns or their index can lag.
+                'suppress_filters' => true,
                 'orderby' => array( 'title' => 'ASC', 'ID' => 'ASC' ), 'no_found_rows' => true, 'ignore_sticky_posts' => true,
                 'update_post_term_cache' => false ) );
             $more = count( $query->posts ) > self::LIMIT;

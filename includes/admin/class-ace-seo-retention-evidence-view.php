@@ -188,7 +188,7 @@ final class Ace_SEO_Retention_Evidence_View {
         </tr></thead><tbody>
         <?php foreach ( $labels as $key => $label ) : ?><tr><th scope="row"><?php echo esc_html( $label ); ?>
             <?php if ( isset( $action_tools[$key], AceSeoRetentionActions::ACTIONS[$action_tools[$key]] ) ) : ?><span class="ace-evidence-badge">Action tool available after review</span><?php endif; ?>
-            <?php if ( 'consolidate' === $key ) : ?><span class="ace-evidence-planned">Automatic option — coming later</span><?php endif; ?>
+            <?php if ( 'consolidate' === $key ) : ?><a class="ace-evidence-badge" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects&tab=auto' ) ); ?>">Review and approve a redirect</a><?php endif; ?>
             </th>
             <?php foreach ( $tiers as $tier => $group_label ) : $cell = Ace_SEO_Retention_Evidence::reference_cell( $tier, $key ); ?>
                 <td class="ace-evidence-<?php echo esc_attr( $cell['status'] ); ?>"><strong><?php echo esc_html( $cell['label'] ); ?></strong><small><?php echo esc_html( $cell['why'] ); ?></small></td>
@@ -198,7 +198,7 @@ final class Ace_SEO_Retention_Evidence_View {
         <details><summary>More detail: how the rules and action tools work</summary>
             <p>Groups describe readership; recommendations and management choices are separate. Missing or capped data, an unfinished period, uncertain event dates or an off-season snapshot hold back negative recommendations. A publication anniversary is only an estimate until the timing is confirmed.</p>
             <p>The existing administrator tools can apply a permanent 301 redirect to a chosen URL or set noindex while keeping the page available. Their presence does not mean they are enabled or applied. The reference guide does not automatically run either tool.</p>
-            <p>Planned management choices are review only, approve once, or automatic action under explicitly configured rules. Automatic redirects will require complete relevant evidence, a verified suitable replacement, exclusions, a dry run, a recorded reason and rollback. A redirect will not switch on and off with the season. This automatic option is not implemented here.</p>
+            <p>Review and approve individual replacement pairs under Redirects → Auto. Scheduled processing is off by default and requires an explicit source scope, complete relevant evidence and a verified replacement. Approvals expire, every action is recorded and guarded undo is available. Redirects do not switch on and off with the season.</p>
             <p>Separate age-based notices, search-expiry rules and weekly report rebuilds already work when configured. They do not automatically act on the suggestions in this table.</p>
             <p>Stronger orange is reserved for a specific confirmed problem. No cell here claims a real article is urgent. “No activity measured in a complete relevant period” is different from missing information, and does not prove the article has no value.</p>
         </details>

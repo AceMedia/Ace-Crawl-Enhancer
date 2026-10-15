@@ -17,6 +17,8 @@ class AceSeoRedirects {
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
         require_once __DIR__ . '/admin/class-ace-seo-redirect-discovery.php';
         add_action( 'wp_ajax_ace_seo_redirect_destinations', array( 'AceSeoRedirectDiscovery', 'ajax_destinations' ) );
+        require_once __DIR__ . '/class-ace-seo-retention-prototype.php';
+        AceSeoRetentionPrototype::init();
     }
 
     public static function settings( $id ) {

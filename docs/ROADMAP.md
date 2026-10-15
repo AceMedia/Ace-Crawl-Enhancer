@@ -19,10 +19,20 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Retention redirect review and approved queue — 1.0.91
+
+- Available on all consuming sites under Redirects → Auto, without a site flag or developer configuration. Scheduled application defaults off with an empty scope. Review and evidence capture work on indexable and discouraged sites; WordPress noindex remains an application hold. A staging site's absent analytics says nothing about live traffic.
+- Review a specific post/page replacement and reason, save an immutable assessment, then approve a qualifying pair for up to 24 hours. Explicit source scope (maximum 10), one pair per run and at most three applications per UTC day limit processing. Queue controls are bound to the current site URL/blog; cloned databases require fresh configuration and approval.
+- Traffic uses the site's existing dated Analytics/Search Console/own-tracking adapters and their coverage attestations. Verified zero, missing, capped and stale data remain distinct. The chosen period and relevant season must be complete. No traffic or provider is fabricated to make a test pass.
+- Link-data providers can supply complete, fresh provenance via `ace_seo_retention_link_evidence`. Without a provider, an administrator can explicitly attest a zero-link review with a source/method, identity and timestamp. It expires after 24 hours, is preserved in the assessment and cannot override positive saved/provider counts. No custom integration is required for this reviewed path.
+- Current DB facts and permissions, completed report generations, HTTP/canonical/indexability checks, keeps and existing redirects are rechecked before application. InnoDB transactions, locks and a durable audit ledger protect writes; cache completion retries and guarded undo handle failures. A 301 has no automatic expiry, Trash or deletion and is not toggled by future scores/seasons.
+- Destination picker queries exclude frontend full-text SQL filters while preserving type choices and manual URLs. Cross-process cache verification is part of consumer release checks; deployments must keep their active cache drop-ins aligned with their installed source.
+- Read [RETENTION-REDIRECTS.md](RETENTION-REDIRECTS.md) for setup, first live testing and rollback. The initial release schedules explicitly approved pairs. Broader category/event rule selection, proposed replacement matching and post-change review signals remain tracked in #34; they are not required to test this approved-pair workflow.
+
 ### Redirect discovery and retention views — implemented in 1.0.90 (15 October)
 
 - Destination finder shared by the manager and post editor: public content types and taxonomy archives, type checkboxes, bounded title/name queries, manual URL fallback and nonce/capability protection.
-- Existing, Auto and Suggested redirects tabs. Auto is a read-only inventory of configured archive rules, using the front-end target resolver. Retention auto-redirect execution remains unimplemented; do not infer it from weekly report rebuilds or age-based settings.
+- Existing, Auto and Suggested redirects tabs. Auto is a read-only inventory of configured archive rules, using the front-end target resolver. Production retention auto-redirect execution remains disabled; the separate dev queue is described above. Do not infer execution from weekly report rebuilds or age-based settings.
 - Suggestions read the saved retention report in batches of 30, default to `consolidate`, link to article review and the manual redirect editor, and expose the existing 26-check movement history. Viewing tabs does not rebuild reports or change redirect metadata/settings.
 - Retention audit: saved report `bucket()` can suggest combining from impressions without clicks/visits, subject to its timing holds. The separate evidence preview requires verified overlap for consolidation and complete relevant traffic coverage. These are different assessments, not a ready-to-run automation queue. Keep editorial destination review explicit.
 - Follow-up: automatic retention actions still need verified replacement selection, complete evidence, exclusions, dry-run approval, recorded reasons and rollback. Do not make permanent redirects fluctuate with report scores or season changes. Existing history is report-wide, not a per-article audit trail.

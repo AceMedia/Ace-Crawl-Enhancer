@@ -8,7 +8,7 @@ if ( PHP_SAPI !== 'cli' ) {
     exit;
 }
 
-define('ABSPATH',__DIR__.'/'); define('HOUR_IN_SECONDS',3600);
+define('ABSPATH',__DIR__.'/'); define('HOUR_IN_SECONDS',3600); define('DAY_IN_SECONDS',86400);
 $root=$argv[1]??dirname(__DIR__);
 $GLOBALS['options']=array(); $GLOBALS['transients']=array(); $GLOBALS['cron']=array(); $GLOBALS['admin']=true; $GLOBALS['nonce_ok']=true;
 class WorkerRedirect extends Exception {public $url;function __construct($url){$this->url=$url;}}
@@ -19,6 +19,7 @@ function get_transient($key){return $GLOBALS['transients'][$key]??false;}
 function set_transient($key,$value,$ttl){$GLOBALS['transients'][$key]=$value;}
 function delete_transient($key){unset($GLOBALS['transients'][$key]);}
 function apply_filters($key,$value){return $value;}
+function do_action($key,...$args){if('ace_seo_retention_built'===$key){$GLOBALS['completion_seen']=get_option(AceSeoRetentionReport::PROGRESS_OPTION);}}
 function current_user_can($cap){return $GLOBALS['admin'];}
 function check_admin_referer($action){return $GLOBALS['nonce_ok'];}
 function wp_die($message){throw new RuntimeException($message);}
@@ -28,6 +29,7 @@ function get_current_user_id(){return 1;}
 function wp_unslash($value){return $value;}
 function sanitize_text_field($value){return trim(strip_tags($value));}
 function sanitize_key($value){return preg_replace('/[^a-z0-9_-]/','',strtolower($value));}
+function esc_sql($value){return addslashes($value);}
 function __($value,$domain=null){return $value;}
 function number_format_i18n($value){return number_format($value);}
 function get_post_types($args=array(),$output='names'){return $output==='objects'?array('post'=>(object)array('name'=>'post','labels'=>(object)array('name'=>'Posts'))):array('post');}
@@ -40,7 +42,7 @@ function wp_next_scheduled($hook){return $GLOBALS['cron'][$hook]['when']??false;
 function wp_schedule_single_event($when,$hook){$GLOBALS['cron'][$hook]=array('when'=>$when,'recurrence'=>null);}
 function wp_schedule_event($when,$recurrence,$hook){$GLOBALS['cron'][$hook]=array('when'=>$when,'recurrence'=>$recurrence);}
 function wp_clear_scheduled_hook($hook){unset($GLOBALS['cron'][$hook]);}
-$wpdb=new class{public $posts='wp_posts';public $options='wp_options';public $postmeta='wp_postmeta';function prepare($query,...$args){return $query;}function get_row($query){return(object)array('total'=>0,'expired'=>0);}function get_var($q){return null;}function query($q){return 0;}function esc_like($s){return $s;}function delete($t,$w){return 0;}};
+$wpdb=new class{public $posts='wp_posts';public $options='wp_options';public $postmeta='wp_postmeta';function prepare($query,...$args){return $query;}function get_row($query){return(object)array('total'=>0,'expired'=>0);}function get_col($q){return array();}function get_var($q){return null;}function query($q){return 0;}function esc_like($s){return $s;}function delete($t,$w){return 0;}};
 require $root.'/includes/class-ace-seo-retention-actions.php';
 require $root.'/includes/admin/class-ace-seo-retention-report.php';
 
@@ -220,6 +222,15 @@ $p = $progress(); $p['phase'] = 'score'; $p['total'] = 3000; update_option( Work
 $out = WorkerStub::run_all();
 $check( 'run_all drives the build to completion', 'done' === $out['phase'] && 10 === WorkerStub::$steps );
 $check( 'run_all leaves no lease or tick behind', null === WorkerStub::$lock && false === wp_next_scheduled( WorkerStub::CRON_HOOK ) );
+
+/* The actual final scoring path publishes durable completion before notifying consumers. */
+$reset(); WorkerStub::start(); $p = $progress(); $p['phase'] = 'score';
+$generation = $p['generation'];
+$method = new ReflectionMethod( AceSeoRetentionReport::class, 'phase_score' ); $method->setAccessible( true ); $method->invoke( null, $p );
+$seen = $GLOBALS['completion_seen'] ?? array();
+$check( 'completion hook observes saved done generation', 'done' === ( $seen['phase'] ?? '' ) && $generation === ( $seen['generation'] ?? '' ) && ! empty( $seen['finished'] ) );
+WorkerStub::start();
+$check( 'each report receives a distinct generation even within the same second', $generation !== $progress()['generation'] );
 
 echo "\n", $checks - $failures, ' of ', $checks, " worker recovery checks passed.\n";
 exit( $failures ? 1 : 0 );

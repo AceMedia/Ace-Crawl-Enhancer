@@ -152,6 +152,7 @@ class AceSeoRetentionReport {
             'offset'   => 0,
             'total'    => 0,
             'started'  => time(),
+            'generation' => bin2hex( random_bytes( 16 ) ),
             'counts'   => array_fill_keys( self::BUCKETS, 0 ),
             'tiers'    => array_fill_keys( self::TIERS, 0 ),
             'notes'    => array(),
@@ -786,6 +787,7 @@ class AceSeoRetentionReport {
             $row['reason'] = $reason;
             $row['tier']   = self::tier( $row, $settings );
             $row['built']  = time();
+            $row['generation'] = $p['generation'] ?? '';
             $row['window'] = (int) $settings['days'];
 
             // Timing: an article is only judged on a period that contained the dates it is about.
@@ -866,8 +868,11 @@ class AceSeoRetentionReport {
             self::forget_periods();
             self::forget_stale( (int) $p['started'] );
             self::record_history( $p );
+            // Publish completion only after all rows and final progress are durable.
+            self::save_progress( $p );
             /** A build has finished and every row is saved; exports that follow the report hook here. */
             do_action( 'ace_seo_retention_built', $p );
+            return;
         }
         self::save_progress( $p );
     }
