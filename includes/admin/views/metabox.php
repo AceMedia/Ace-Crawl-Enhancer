@@ -504,6 +504,15 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             </p>
         </div>
 
+        <?php if ( current_user_can( 'manage_options' ) && class_exists( 'AceSeoRedirects' ) ) : ?>
+        <div class="ace-seo-field">
+            <h3>Redirect this post</h3>
+            <input type="hidden" name="ace_redirect_present" value="1">
+            <?php AceSeoRedirects::fields( $post_id, 'ace_redirect_' ); ?>
+            <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Manage all redirects</a></p>
+        </div>
+        <?php endif; ?>
+
         <!-- FAQ Schema -->
         <div class="ace-seo-field">
             <label class="ace-seo-label">

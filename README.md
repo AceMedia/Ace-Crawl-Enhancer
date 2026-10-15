@@ -3,7 +3,7 @@
 [![WordPress Plugin](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPLv2%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-1.0.88-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
+[![Version](https://img.shields.io/badge/Version-1.0.89-orange.svg)](https://github.com/acemedia/ace-crawl-enhancer)
 
 **Advanced SEO plugin with Yoast compatibility, modern interface, real-time analysis, and powerful optimization features.**
 
@@ -12,7 +12,7 @@
 **Requires at least:** WordPress 6.0  
 **Tested up to:** WordPress 6.8  
 **Requires PHP:** 7.4+  
-**Stable tag:** 1.0.88
+**Stable tag:** 1.0.89
 **License:** GPLv2 or later
 
 ## 🚀 Key Features
@@ -248,6 +248,14 @@ Yes! With an OpenAI API key, you can use AI-powered features for generating SEO 
 Yes! With a Google PageSpeed API key, Ace SEO monitors Core Web Vitals and page performance, showing how it impacts your SEO rankings.
 
 ## 📝 Changelog
+
+### 1.0.89 (2026-10-15)
+
+- Replace the Redirect Manager placeholder with source-post search, bulk creation, editing, pause/resume, removal, age and expiry review. The same controls are available in the post editor's Ace SEO Advanced tab.
+- Support 301/302/307/308 and optional site-local expiry, with a 90-day shortcut. Existing target-only rules remain 301 with no expiry and an unknown start date.
+- Expiry stops redirects on the request itself, even when cron is late. An explicit opt-in can also move the source to WordPress Trash; permission and Trash settings are checked again when the job runs. Pausing cancels scheduled work. WordPress controls eventual Trash deletion.
+- Validate destinations, self-redirects and known post redirect chains; protect changes with administrator permissions and nonces; log lifecycle actions and purge the source cache. Managed redirect responses send no-store headers.
+- Run `ACE_SEO_REDIRECT_TESTS=1 php tests/redirects-test.php /path/to/wp-load.php` only on a disposable WordPress installation named `Ace Redirect Tests` with this plugin active, pretty permalinks, Europe/London timezone and Trash enabled. Add `ACE_SEO_REDIRECT_HTTP_TESTS=1` with that installation served on localhost to check actual HTTP responses (PHP cURL required). Fixture posts/users are removed afterwards.
 
 ### 1.0.88 (2026-10-14)
 - Tracking checks now distinguish a verified HTML response from security challenges, empty responses and incomplete pages. These checks cannot execute JavaScript or accept consent, so missing tags or inline configuration need browser verification rather than a broken-tracking alert. Known Site Kit Google tag and measurement IDs are treated as alternatives.

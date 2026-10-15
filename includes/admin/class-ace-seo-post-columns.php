@@ -679,7 +679,7 @@ class AceSeoPostColumns {
         $flags = array_filter( array(
             $st['noindex'] ? __( 'noindex', 'ace-crawl-enhancer' ) : '',
             $st['unavailable'] ? sprintf( __( 'until %s', 'ace-crawl-enhancer' ), $st['unavailable'] ) : '',
-            'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ),
+            class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::label( $post_id ) : ( 'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ) ),
             $st['news_excl'] ? __( 'no news sitemap', 'ace-crawl-enhancer' ) : '',
             $st['notice'] ? sprintf( __( 'notice: %s', 'ace-crawl-enhancer' ), $st['notice'] ) : '',
         ) );

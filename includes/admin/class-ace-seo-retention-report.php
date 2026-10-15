@@ -1908,7 +1908,7 @@ class AceSeoRetentionReport {
                     <?php if ( ! $rows ) : ?>
                         <tr><td colspan="11">No posts match this recommendation.</td></tr>
                     <?php endif; ?>
-                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '', $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
+                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', AceSeoRedirects::label( $r['id'] ), $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
                         <tr>
                             <th scope="row" class="check-column"><input type="checkbox" name="post_ids[]" value="<?php echo esc_attr( $r['id'] ); ?>"></th>
                             <td><a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><?php echo esc_html( $r['title'] ?: '(no title)' ); ?></a><br><a href="<?php echo esc_url( $r['url'] ); ?>" target="_blank" rel="noopener" style="font-size:11px;color:#666"><?php echo esc_html( wp_make_link_relative( $r['url'] ) ); ?></a></td>
@@ -2223,7 +2223,7 @@ class AceSeoRetentionReport {
 
             <section class="ace-retention-section" id="redirects">
             <h2>Redirects and unavailable pages <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) AceSeoRetentionActions::redirects( 500 ) ) ) ); ?></span></h2>
-            <p>Posts that answer with a 301 to a stronger page, or with 410 Gone. All of these are still in the database: clearing the entry (bulk action above, or the post's Advanced SEO tab) brings the page straight back.</p>
+            <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Open Redirect Manager</a> to search posts, choose redirect types, set expiry dates, pause rules and review their age. The legacy tools below create permanent redirects; the manager shows their current lifecycle state.</p>
             <details class="ace-retention-detail"><summary>Administrator tools: redirects and unavailable pages</summary>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin-bottom:1em">
                 <?php wp_nonce_field( 'ace_seo_retention_redirect' ); ?>
@@ -2237,8 +2237,8 @@ class AceSeoRetentionReport {
                 <table class="widefat striped" style="max-width:1100px">
                     <thead><tr><th>From</th><th>To</th><th>Post</th></tr></thead>
                     <tbody>
-                    <?php foreach ( $map as $m ) : ?>
-                        <tr><td><a href="<?php echo esc_url( $m['from'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_make_link_relative( $m['from'] ) ); ?></a></td><td><?php echo $m['gone'] ? '<strong>410 Gone</strong>' : '301 → ' . esc_html( $m['to'] ); ?></td><td><a href="<?php echo esc_url( get_edit_post_link( $m['id'] ) ); ?>"><?php echo esc_html( $m['title'] ?: '#' . $m['id'] ); ?></a> <span style="color:#666">(<?php echo esc_html( $m['type'] ); ?> <?php echo (int) $m['id']; ?>)</span></td></tr>
+                    <?php foreach ( $map as $m ) : $redirect = AceSeoRedirects::settings( $m['id'] ); ?>
+                        <tr><td><a href="<?php echo esc_url( $m['from'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_make_link_relative( $m['from'] ) ); ?></a></td><td><?php echo $m['gone'] ? '<strong>410 Gone</strong>' : (int) $redirect['code'] . ' → ' . esc_html( $m['to'] ); ?><br><?php echo esc_html( AceSeoRedirects::state( $redirect ) ); ?></td><td><a href="<?php echo esc_url( get_edit_post_link( $m['id'] ) ); ?>"><?php echo esc_html( $m['title'] ?: '#' . $m['id'] ); ?></a> <span style="color:#666">(<?php echo esc_html( $m['type'] ); ?> <?php echo (int) $m['id']; ?>)</span></td></tr>
                     <?php endforeach; ?>
                     </tbody>
                 </table>
