@@ -109,7 +109,7 @@ class ACE_SEO_Term_Redirect {
      * Returns an empty string when nothing is configured, when the target
      * cannot be resolved, or when it would redirect the term to itself.
      */
-    private function resolve_target( WP_Term $term ) {
+    public function resolve_target( WP_Term $term ) {
         $raw = get_term_meta( $term->term_id, self::META_KEY, true );
         $raw = is_string( $raw ) ? trim( $raw ) : '';
 

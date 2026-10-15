@@ -1,8 +1,20 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
 <div class="ace-redirect-fields">
+    <details class="ace-destination-search" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'ace_seo_redirect_destinations' ) ); ?>" data-target="<?php echo esc_attr( $prefix ); ?>target">
+        <summary>Search for a destination</summary>
+        <p class="description">Find published content or an archive by title or name. Tick only the types you need for a quicker search.</p>
+        <fieldset class="ace-destination-types"><legend>Search these types</legend>
+        <?php foreach ( AceSeoRedirectDiscovery::types() as $key => $label ) : ?>
+            <label><input type="checkbox" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, array( 'post:post', 'post:page', 'term:category' ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
+        <?php endforeach; ?>
+        </fieldset>
+        <p><label for="<?php echo esc_attr( $prefix ); ?>destination-search">Title or name</label><br><input type="search" id="<?php echo esc_attr( $prefix ); ?>destination-search" class="ace-destination-query regular-text" maxlength="100"> <button type="button" class="button ace-destination-find">Search destinations</button></p>
+        <p class="ace-destination-status" role="status" aria-live="polite"></p>
+        <ul class="ace-destination-results"></ul>
+    </details>
     <p><label for="<?php echo esc_attr( $prefix ); ?>target"><strong>Destination URL</strong></label><br>
     <input class="large-text" id="<?php echo esc_attr( $prefix ); ?>target" name="<?php echo esc_attr( $prefix ); ?>target" type="text" value="<?php echo esc_attr( $s['target'] ); ?>" placeholder="/category/bingo/ or https://example.com/new-page/">
-    <span class="description">Use a relevant replacement page. Leave blank to clear the redirect. Enter <code>gone</code> for 410 Gone.</span></p>
+    <span class="description">Choose a search result above or enter a manual URL here. Leave blank to clear the redirect. Enter <code>gone</code> for 410 Gone.</span></p>
     <p><label for="<?php echo esc_attr( $prefix ); ?>code"><strong>Redirect type</strong></label><br>
     <select id="<?php echo esc_attr( $prefix ); ?>code" name="<?php echo esc_attr( $prefix ); ?>code">
     <?php foreach ( array( 301 => '301 - Permanent move', 302 => '302 - Temporary redirect', 307 => '307 - Temporary, preserve request method', 308 => '308 - Permanent, preserve request method' ) as $code => $label ) : ?>

@@ -19,6 +19,15 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 ## October 2026 call follow-ups
 
+### Redirect discovery and retention views — implemented in 1.0.90 (15 October)
+
+- Destination finder shared by the manager and post editor: public content types and taxonomy archives, type checkboxes, bounded title/name queries, manual URL fallback and nonce/capability protection.
+- Existing, Auto and Suggested redirects tabs. Auto is a read-only inventory of configured archive rules, using the front-end target resolver. Retention auto-redirect execution remains unimplemented; do not infer it from weekly report rebuilds or age-based settings.
+- Suggestions read the saved retention report in batches of 30, default to `consolidate`, link to article review and the manual redirect editor, and expose the existing 26-check movement history. Viewing tabs does not rebuild reports or change redirect metadata/settings.
+- Retention audit: saved report `bucket()` can suggest combining from impressions without clicks/visits, subject to its timing holds. The separate evidence preview requires verified overlap for consolidation and complete relevant traffic coverage. These are different assessments, not a ready-to-run automation queue. Keep editorial destination review explicit.
+- Follow-up: automatic retention actions still need verified replacement selection, complete evidence, exclusions, dry-run approval, recorded reasons and rollback. Do not make permanent redirects fluctuate with report scores or season changes. Existing history is report-wide, not a per-article audit trail.
+- Verification: `tests/redirect-discovery-test.php` and existing lifecycle/evidence tests; browser destination selection and read-only tabs; consuming-site PHP 8.1 canary.
+
 ### Redirect management — implemented in 1.0.89 (15 October)
 
 - Central administrator manager and per-post Advanced controls: search/select source posts, bulk destinations, 301/302/307/308, pause/resume/clear, age and optional site-timezone expiry with a 90-day shortcut.
