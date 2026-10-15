@@ -1,17 +1,18 @@
 <?php
-/** Dev-only shadow queue. There is deliberately no apply endpoint or scheduled worker. */
+/** Dev-only evidence capture and guarded review queue. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/class-ace-seo-retention-fresh.php';
 
 final class AceSeoRetentionPrototype {
     const TYPE = 'ace_retention_plan';
     const KEEP = '_ace_seo_retention_automation_keep';
-    const VERSION = 'shadow-1';
+    const VERSION = 'review-2';
 
     public static function enabled() {
         // Explicitly bind the opt-in to one discouraged site. A copied dev flag cannot enable live.
         return defined( 'ACE_SEO_RETENTION_PROTOTYPE_SITE' )
-            && untrailingslashit( home_url() ) === ACE_SEO_RETENTION_PROTOTYPE_SITE
-            && '0' === (string) get_option( 'blog_public' );
+            && untrailingslashit( AceSeoRetentionFresh::option( 'home', '' ) ) === ACE_SEO_RETENTION_PROTOTYPE_SITE
+            && '0' === (string) AceSeoRetentionFresh::option( 'blog_public', '1' );
     }
 
     public static function init() {
@@ -20,15 +21,18 @@ final class AceSeoRetentionPrototype {
         register_post_type( self::TYPE, array( 'public' => false, 'show_ui' => false, 'show_in_rest' => false,
             'rewrite' => false, 'query_var' => false, 'supports' => array() ) );
         add_action( 'admin_post_ace_retention_preview', array( __CLASS__, 'handle' ) );
+        require_once __DIR__ . '/class-ace-seo-retention-queue.php';
+        AceSeoRetentionQueue::init();
     }
 
     private static function hash( $value ) { return hash( 'sha256', wp_json_encode( $value ) ); }
 
     public static function facts( $id ) {
-        $post = get_post( $id );
+        $post = AceSeoRetentionFresh::post( $id );
         if ( ! $post ) { return array( 'id' => (int) $id, 'missing' => true ); }
-        $terms = wp_get_object_terms( $id, get_object_taxonomies( $post->post_type ), array( 'fields' => 'tt_ids' ) );
-        if ( is_wp_error( $terms ) ) { throw new RuntimeException( 'Could not read article terms.' ); }
+        global $wpdb;
+        $terms = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( "SELECT term_taxonomy_id FROM {$wpdb->term_relationships} WHERE object_id=%d", $id ) ) );
+        if ( $wpdb->last_error ) { throw new RuntimeException( 'Could not read article terms.' ); }
         sort( $terms );
         $meta = array();
         foreach ( array( self::KEEP, AceSeoRetentionActions::META_NOINDEX, AceSeoRetentionActions::META_UNAVAILABLE,
@@ -44,9 +48,9 @@ final class AceSeoRetentionPrototype {
     }
 
     public static function fingerprint( $source, $target ) {
-        return self::hash( array( self::facts( $source ), self::facts( $target ),
+        return AceSeoRetentionFresh::run( array( (int) $source, (int) $target ), static function() use ( $source, $target ) { return self::hash( array( self::facts( $source ), self::facts( $target ),
             get_post_meta( $source, AceSeoRetentionReport::META, true ), AceSeoRetentionActions::options(),
-            AceSeoRetentionReport::settings(), get_option( 'blog_public' ), self::VERSION ) );
+            AceSeoRetentionReport::settings(), get_option( 'blog_public' ), AceSeoRetentionFresh::generation( $source ), self::VERSION ) ); } );
     }
 
     /** Pure response checks; a challenge page or a redirect is not a verified replacement. */
@@ -88,6 +92,7 @@ final class AceSeoRetentionPrototype {
     /** Additional action gates, intentionally stricter than the report's editorial suggestions. */
     public static function holds( array $s, $now ) {
         $holds = $s['target_holds'];
+        if ( empty( $s['generation'] ) ) { $holds[] = 'A completed report generation containing this article is required. Rebuild legacy reports first.'; }
         if ( $s['building'] ) { $holds[] = 'Retention report is being rebuilt.'; }
         if ( $s['site_discouraged'] ) { $holds[] = 'Site-wide noindex is enabled. Dev remains a simulation.'; }
         if ( ! $s['review']['confirmed'] || strlen( $s['review']['reason'] ) < 30 ) { $holds[] = 'Confirm the replacement covers the same subject and reader intent, with a review reason.'; }
@@ -105,6 +110,14 @@ final class AceSeoRetentionPrototype {
         $published = strtotime( ( $s['source']['published'] ?? '' ) . ' UTC' );
         if ( ! $published || $published > strtotime( '-' . max( 1, (int) $s['settings']['older_than_years'] ) . ' years', $now ) ) { $holds[] = 'Source is younger than the configured retention age.'; }
         $c = $s['context']; $r = $s['row'];
+        foreach ( array( 'backlinks', 'internal' ) as $kind ) {
+            $e = $c['link_evidence'][ $kind ] ?? array();
+            if ( true !== ( $e['complete'] ?? false ) || ! empty( $e['capped'] ) || empty( $e['source'] )
+                || empty( $e['checked_at'] ) || $e['checked_at'] > $now || $now - $e['checked_at'] > DAY_IN_SECONDS
+                || ! isset( $e['count'] ) || ! is_numeric( $e['count'] ) || 0.0 !== (float) $e['count'] ) {
+                $holds[] = ucfirst( $kind ) . ' need complete, uncapped, zero-count evidence with a named source checked within 24 hours.';
+            }
+        }
         if ( empty( $c['period']['start'] ) || empty( $c['period']['end'] ) || ( strtotime( $c['period']['end'] ) - strtotime( $c['period']['start'] ) ) / DAY_IN_SECONDS + 1 < max( 90, (int) ( $s['settings']['days'] ?? 90 ) ) ) { $holds[] = 'Observe at least 90 days, or the longer configured report period.'; }
         if ( empty( $c['period']['end'] ) || strtotime( $c['period']['end'] . ' UTC' ) < $now - 7 * DAY_IN_SECONDS ) { $holds[] = 'A recent observation period is also required before moving an article.'; }
         if ( empty( $c['collected_at'] ) || $c['collected_at'] > $now || $now - $c['collected_at'] > DAY_IN_SECONDS ) { $holds[] = 'Traffic collection time is missing or older than 24 hours.'; }
@@ -123,6 +136,12 @@ final class AceSeoRetentionPrototype {
     }
 
     public static function capture( $source, $url, $start, $end, $confirmed, $reason ) {
+        return AceSeoRetentionFresh::run( array( (int) $source, (int) url_to_postid( $url ) ), static function() use ( $source, $url, $start, $end, $confirmed, $reason ) {
+            return self::capture_fresh( $source, $url, $start, $end, $confirmed, $reason );
+        } );
+    }
+
+    private static function capture_fresh( $source, $url, $start, $end, $confirmed, $reason ) {
         if ( ! self::enabled() || ! current_user_can( 'manage_options' ) || ! current_user_can( 'edit_post', $source ) ) { return new WP_Error( 'permission', 'Dev preview permission required.' ); }
         if ( ! Ace_SEO_Retention_Evidence::date( $start ) || ! Ace_SEO_Retention_Evidence::date( $end )
             || $start > $end || $end >= wp_date( 'Y-m-d' ) || strtotime( $end ) - strtotime( $start ) > 366 * DAY_IN_SECONDS ) { return new WP_Error( 'dates', 'Use a finished observation period of at most 367 days.' ); }
@@ -140,10 +159,12 @@ final class AceSeoRetentionPrototype {
         $settings = AceSeoRetentionReport::settings();
         $context = Ace_SEO_Retention_Evidence_View::context( $source, $row, array( 'start' => $start, 'end' => $end ), wp_date( 'Y-m-d' ) );
         $context['overlap_verified'] = (bool) $confirmed && strlen( $reason ) >= 30;
+        // A provider must attest provenance and freshness; an absent backlink row is never zero.
+        $context['link_evidence'] = (array) apply_filters( 'ace_seo_retention_link_evidence', array(), (int) $source, $row );
         $prepared = Ace_SEO_Retention_Evidence_View::prepare( $row, $context );
         $response = wp_safe_remote_get( get_permalink( $target ), array( 'timeout' => 8, 'redirection' => 0, 'limit_response_size' => 1048576, 'cookies' => array() ) );
         $s = array( 'version' => self::VERSION, 'created' => time(), 'by' => get_current_user_id(), 'fingerprint' => $before,
-            'source' => self::facts( $source ), 'target' => self::facts( $target ), 'settings' => $settings,
+            'source' => self::facts( $source ), 'target' => self::facts( $target ), 'settings' => $settings, 'generation' => AceSeoRetentionFresh::generation( $source ),
             'site_discouraged' => '0' === (string) get_option( 'blog_public' ), 'building' => $was_building || AceSeoRetentionReport::is_building(),
             'review' => array( 'confirmed' => (bool) $confirmed, 'reason' => $reason ), 'row' => $prepared, 'context' => $context,
             'assessment' => Ace_SEO_Retention_Evidence::assess( $prepared, $context, $settings ),

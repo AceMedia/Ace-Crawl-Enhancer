@@ -5,7 +5,7 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
     'offset' => ( $page - 1 ) * 20, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true ) );
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
-    <h2>Retention automation: dev preview</h2>
+    <h2>Retention automation: dev review</h2>
     <?php $notices = array(
         'saved' => 'Dry-run snapshot saved. No redirect was applied.',
         'kept' => 'Manual keep exclusion saved. Previous previews must be reassessed.',
@@ -18,7 +18,7 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
     if ( $notice ) : ?>
         <p role="status"><strong><?php echo esc_html( $notices[ $notice ] ?? 'Assessment could not be saved. No redirect was applied; try a new preview.' ); ?></strong></p>
     <?php endif; ?>
-    <p><strong>Simulation only. No redirect application or scheduling is available.</strong> Review a specific replacement, then save a frozen assessment. Missing evidence stays on hold. Each new preview preserves earlier snapshots.</p>
+    <p><strong>Dev only. The guarded queue starts paused and needs explicit approval for each pair.</strong> Review a specific replacement, then save a frozen assessment. Missing evidence stays on hold. Each new preview preserves earlier snapshots.</p>
     <p>This first prototype accepts posts and pages on this site. Archive and external replacements need separate editorial handling. Dev’s site-wide noindex remains a hold; it is never silently ignored.</p>
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
         <?php wp_nonce_field( 'ace_retention_preview' ); ?>
@@ -59,6 +59,12 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
             <p>Sources: <?php echo esc_html( implode( ', ', $s['context']['sources'] ?? array() ) ?: 'None confirmed' ); ?>.<br>
                 <?php echo empty( $s['assessment']['ready'] ) ? 'Coverage or timing is incomplete. Zero counts do not establish inactivity.' : 'Relevant coverage established; the additional action safeguards still apply.'; ?></p>
             <ul><?php foreach ( $s['holds'] as $hold ) : ?><li><?php echo esc_html( $hold ); ?></li><?php endforeach; ?></ul>
+            <?php if ( ! $stale && ! $old && ! $s['holds'] ) : ?>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <?php wp_nonce_field( 'ace_retention_queue' ); ?><input type="hidden" name="action" value="ace_retention_queue"><input type="hidden" name="plan" value="<?php echo (int) $plan->ID; ?>">
+                    <button class="button" name="operation" value="approve">Approve this pair for 24 hours</button>
+                </form>
+            <?php else : ?><p>Approval is unavailable until a new assessment passes every hold.</p><?php endif; ?>
         <?php endif; ?></details>
     <?php endforeach; ?>
     <?php if ( ! $plans->posts ) : ?><p>No dry-run assessments saved yet.</p><?php endif; ?>
@@ -67,3 +73,4 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
         <a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'ace-seo-redirects', 'tab' => 'auto', 'preview_page' => $page + $step ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $label ); ?></a>
     <?php endforeach; ?></p>
 </section>
+<?php include __DIR__ . '/retention-queue.php'; ?>

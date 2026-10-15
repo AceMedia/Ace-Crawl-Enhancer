@@ -23,6 +23,13 @@ try {
     $find = static function ( $types ) { return AceSeoRedirectDiscovery::destinations( array( 'search' => 'Discoveryneedle', 'types' => $types ) ); };
     $result = $find( array( 'post:post' ) );
     discovery_check( 1 === count( $result['items'] ) && get_permalink( $ids[0] ) === $result['items'][0]['url'], 'Title-only post search excludes draft, private, content-only matches and other types' );
+    $front_search = static function() { return ' AND 1=0 '; };
+    add_filter( 'posts_search', $front_search, 99 );
+    $literal = AceSeoRedirectDiscovery::destinations( array( 'search' => 'Discoveryneedle article', 'types' => array( 'post:post' ) ) );
+    discovery_check( 1 === count( $literal['items'] ) && get_permalink( $ids[0] ) === $literal['items'][0]['url'], 'Multiword destination title bypasses front-end fulltext filters' );
+    $normal_search = new WP_Query( array( 's' => 'Discoveryneedle', 'post_type' => 'post' ) );
+    discovery_check( ! $normal_search->posts, 'Ordinary search still uses the site search filter' );
+    remove_filter( 'posts_search', $front_search, 99 );
     discovery_check( 1 === count( $find( array( 'post:page' ) )['items'] ), 'Page-only search honours type filter' );
     discovery_check( 3 === count( $find( array( 'term:category', 'term:post_tag', 'term:discovery_topic' ) )['items'] ), 'Categories, tags and custom taxonomy return archive URLs' );
     discovery_check( 6 === count( $find( array_keys( $types ) )['items'] ), 'Mixed search returns all requested content kinds' );

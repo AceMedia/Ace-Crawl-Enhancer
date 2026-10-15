@@ -6,6 +6,7 @@ if ( 'Ace Redirect Tests' !== get_option( 'blogname' ) ) { exit( "Disposable Ace
 if ( ! class_exists( 'AceSeoRetentionPrototype' ) ) { require_once dirname( __DIR__ ) . '/includes/class-ace-seo-retention-prototype.php'; }
 if ( ! class_exists( 'Ace_SEO_Retention_Evidence' ) ) { require_once dirname( __DIR__ ) . '/includes/class-ace-seo-retention-evidence.php'; }
 $checks = 0; $ids = array(); $saved_public = get_option( 'blog_public' );
+$saved_progress = get_option( AceSeoRetentionReport::PROGRESS_OPTION, array() );
 $check = static function( $ok, $label ) use ( &$checks ) { if ( ! $ok ) { throw new RuntimeException( $label ); } $checks++; echo "PASS $label\n"; };
 try {
     $check( ! AceSeoRetentionPrototype::enabled(), 'Prototype off without explicit site binding' );
@@ -35,14 +36,17 @@ try {
     $check( (bool) AceSeoRetentionPrototype::inspect_response( new WP_Error('network'), $url ), 'Network failure holds candidate' );
     $now = time();
     $fact = array('id'=>1,'status'=>'publish','type'=>'post','password'=>false,'published'=>'2018-01-01 00:00:00','meta'=>array(),'redirect'=>array('target'=>''));
-    $s = array('source'=>$fact,'target'=>array_merge($fact,array('id'=>2)),'building'=>false,'site_discouraged'=>false,
+    $s = array('generation'=>array('id'=>'fixture'),'source'=>$fact,'target'=>array_merge($fact,array('id'=>2)),'building'=>false,'site_discouraged'=>false,
         'target_holds'=>array(),'review'=>array('confirmed'=>true,'reason'=>'Reviewed the original subject and relevant historical coverage.'),
         'settings'=>array('older_than_years'=>3),'row'=>array('backlinks'=>0,'links_in'=>0),
         'context'=>array('collected_at'=>$now,'period'=>array('start'=>gmdate('Y-m-d',$now-90*DAY_IN_SECONDS),'end'=>gmdate('Y-m-d',$now-DAY_IN_SECONDS)),'sources'=>array('Google Analytics','Search Console'),'metrics'=>array('views'=>0,'clicks'=>0)),
         'assessment'=>array('ready'=>true,'suggestions'=>array('consolidate'),'reasons'=>array()));
+    $s['context']['link_evidence']=array_fill_keys(array('backlinks','internal'),array('count'=>0,'complete'=>true,'source'=>'Fixture provider','checked_at'=>$now));
     $check( ! AceSeoRetentionPrototype::holds($s,$now), 'Complete synthetic evidence can pass shadow policy' );
     foreach (array('backlinks','links_in') as $key) { $bad=$s; $bad['row'][$key]=1; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),$key.' protects source'); }
     $bad=$s; $bad['row']['backlinks']=null; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'Unknown backlinks hold');
+    $bad=$s; $bad['generation']=null; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'Legacy or unfinished report generation holds');
+    $bad=$s; $bad['context']['link_evidence']['backlinks']['checked_at']=$now-2*DAY_IN_SECONDS; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'Stale backlink evidence holds');
     $bad=$s; $bad['row']['links_in']=null; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'Unknown internal links hold');
     $bad=$s; $bad['context']['period']['start']=$bad['context']['period']['end']; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'One quiet day cannot authorise moving an article');
     foreach(array('views','clicks') as $key) { foreach(array(1,null) as $value) { $bad=$s; $bad['context']['metrics'][$key]=$value; $check((bool)AceSeoRetentionPrototype::holds($bad,$now),'Positive or missing '.$key.' holds regardless of report threshold'); } }
@@ -74,17 +78,21 @@ try {
     add_filter('ace_seo_retention_evidence_context',$provider);
     $http=static function($pre,$args,$url) { return array('response'=>array('code'=>200),'headers'=>array('content-type'=>'text/html'),'body'=>'<html><head><link rel="canonical" href="'.esc_attr($url).'"></head><body>Fixture</body></html>'); };
     add_filter('pre_http_request',$http,10,3);
+    $links=static function() use($s) { return $s['context']['link_evidence']; };
+    add_filter('ace_seo_retention_link_evidence',$links);
     try {
         $period=$s['context']['period'];
         $check(is_wp_error(AceSeoRetentionPrototype::capture($source,'https://outside.invalid/',$period['start'],$period['end'],true,'Reviewed replacement and all historical context.')),'External replacement rejected before provider access');
         $check(is_wp_error(AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],gmdate('Y-m-d'),true,'Reviewed replacement and all historical context.')),'Unfinished period rejected');
-        update_post_meta($source,AceSeoRetentionReport::META,array('backlinks'=>0,'links_in'=>0,'words'=>500));
+        update_option(AceSeoRetentionReport::PROGRESS_OPTION,array('phase'=>'done','generation'=>'fixture','started'=>$now-10,'finished'=>$now,'settings'=>AceSeoRetentionReport::settings()));
+        update_post_meta($source,AceSeoRetentionReport::META,array('generation'=>'fixture','backlinks'=>0,'links_in'=>0,'words'=>500));
         $captured=AceSeoRetentionPrototype::capture($source,get_permalink($target),$period['start'],$period['end'],true,'Reviewed replacement and all historical context.');
         $check(is_array($captured) && count($captured['holds'])===1 && false!==strpos($captured['holds'][0],'Site-wide noindex'),'Integrated capture retains dev noindex as its only hold for complete fixtures');
         $plan=AceSeoRetentionPrototype::store($captured); $ids[]=$plan;
         $check(!is_wp_error($plan) && AceSeoRetentionPrototype::read(get_post($plan))===$captured,'Real capture stores and verifies the complete evidence snapshot');
     } finally {
         remove_filter('pre_http_request',$http,10);
+        remove_filter('ace_seo_retention_link_evidence',$links);
         remove_all_filters('ace_seo_retention_evidence_context');
         if($saved_provider) { $GLOBALS['wp_filter']['ace_seo_retention_evidence_context']=$saved_provider; }
     }
@@ -111,9 +119,10 @@ try {
     $applied=AceSeoRedirects::settings($source);
     $check(true===AceSeoRedirects::save($source,array('target'=>get_permalink($target),'code'=>301)) && $applied===AceSeoRedirects::settings($source),'Identical apply leaves lifecycle unchanged');
     $check(true===AceSeoRedirects::save($source,array('operation'=>'clear')) && $baseline===AceSeoRedirects::settings($source),'Fixture-only undo restores prior empty rule');
-    $check(false===has_action('ace_seo_retention_auto_apply'),'No scheduled automatic application hook registered');
+    $check(!AceSeoRetentionQueue::control()['enabled'] && false===wp_next_scheduled(AceSeoRetentionQueue::HOOK),'Dev queue defaults to paused without a scheduled worker');
     echo "$checks prototype checks passed.\n";
 } finally {
     foreach($ids as $id) { if(is_int($id) && $id>0) { wp_delete_post($id,true); } }
     update_option('blog_public',$saved_public);
+    update_option(AceSeoRetentionReport::PROGRESS_OPTION,$saved_progress);
 }
