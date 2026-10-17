@@ -60,7 +60,7 @@
     if (control) { control.checked = optedOut(); control.addEventListener('change', () => window.aceAggregateViews.setOptOut(control.checked)); }
     function start() {
         const banner = document.querySelector?.('.tf-consent__text, .iga-consent__text, .cky-notice-des');
-        if (banner && !banner.querySelector('[data-ace-basic-notice]')) {
+        if (window.aceAggregateViewsConfig?.showPrivacy && banner && !banner.querySelector('[data-ace-basic-notice]')) {
             const note = document.createElement('span');
             note.dataset.aceBasicNotice = '1'; note.style.display = 'block';
             note.textContent = 'We also count basic page views without cookies or visitor IDs before you choose. Rejecting analytics stops this count too. ';

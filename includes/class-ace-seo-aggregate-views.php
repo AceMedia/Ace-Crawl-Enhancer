@@ -85,10 +85,14 @@ class AceSeoAggregateViews {
     public static function enqueue() {
         if ( ! self::frontend() ) { return; }
         wp_enqueue_script( 'ace-aggregate-views', ACE_SEO_URL . 'assets/js/aggregate-views.js', array(), ACE_SEO_VERSION, true );
-        wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ) ) ) . ';', 'before' );
+        wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ) ) . ';', 'before' );
+    }
+    /** Optional visitor UI; counting and existing privacy signals are independent. */
+    public static function show_privacy() {
+        return (bool) apply_filters( 'ace_seo_aggregate_views_show_privacy', false );
     }
     public static function privacy() {
-        if ( ! self::frontend() ) { return; }
+        if ( ! self::show_privacy() || ! self::frontend() ) { return; }
         echo '<details id="ace-view-privacy" style="margin:12px auto;padding:8px 16px;max-width:70rem;font:inherit;font-size:13px"><summary style="cursor:pointer">Cookie-free view counts · Privacy choices</summary><p>We count page views to improve this website, including before you choose optional analytics. This counter keeps only a daily total: no visitor IDs, page addresses or browsing histories. It uses no tracking cookies and sends no data to Google or Microsoft. Optional analytics add richer reports if you accept them.</p><p><label><input type="checkbox" id="ace-view-optout"> Stop this basic view count on this browser</label></p><p>Your choice is remembered using a preference cookie. Rejecting analytics, Do Not Track and Global Privacy Control also stop this counter. Ordinary server access logs are separate.</p></details>';
     }
     public static function series( array $dates ) {

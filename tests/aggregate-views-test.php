@@ -4,6 +4,7 @@ define( 'ABSPATH', __DIR__ . '/' );
 define( 'ARRAY_A', 'ARRAY_A' );
 require dirname( __DIR__ ) . '/includes/class-ace-seo-aggregate-views.php';
 $options = array( AceSeoAggregateViews::OPTION => 1, AceSeoAggregateViews::SCHEMA => 1 );
+function apply_filters($tag, $value) { return $GLOBALS['show_privacy'] ?? $value; }
 function get_option( $key, $default = false ) { return $GLOBALS['options'][ $key ] ?? $default; }
 function home_url() { return 'https://example.test'; }
 function wp_parse_url( $url ) { return parse_url( $url ); }
@@ -47,4 +48,9 @@ check('Only the public counter is exempt from a guest-only blanket restriction',
 $wp->query_vars['rest_route']='/wp/v2/users';check('Private routes remain protected',AceSeoAggregateViews::public_counter_auth($error)===$error);
 $wp->query_vars['rest_route']='/ace-seo/v1/aggregate-view';$invalid=new WP_Error('rest_cookie_invalid_nonce','Bad nonce');check('Other authentication failures remain protected',AceSeoAggregateViews::public_counter_auth($invalid)===$invalid);
 $_SERVER['REQUEST_METHOD']='GET';check('Only POST is exempt',AceSeoAggregateViews::public_counter_auth($error)===$error);
+
+ob_start(); AceSeoAggregateViews::privacy(); $html=ob_get_clean();
+check('Visitor UI hidden by default', '' === $html && !AceSeoAggregateViews::show_privacy());
+$GLOBALS['show_privacy']=true;
+check('Sites can explicitly restore visitor UI', AceSeoAggregateViews::show_privacy());
 echo $n.' checks passed'.PHP_EOL;

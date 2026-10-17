@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.91
+Stable tag: 1.0.92
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,6 +29,9 @@ It respects WordPress's own crawl settings (Discourage search engines, core site
 Open an issue on the plugin's GitHub repository.
 
 == Changelog ==
+
+= 1.0.92 =
+* Hide the aggregate view-count footer panel and consent-banner note by default, with an opt-in filter. Keep counting and existing privacy signals unchanged.
 
 = 1.0.91 =
 * Retention redirect review and an opt-in approved queue on every site, with expiring approvals, bounded scheduling, audit history and guarded undo.

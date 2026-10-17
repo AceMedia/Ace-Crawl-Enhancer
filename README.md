@@ -742,3 +742,7 @@ This project is licensed under the GPLv2 or later - see the [LICENSE](LICENSE) f
 ---
 
 **Made with ❤️ by [AceMedia](https://acemedia.ninja)**
+
+### Aggregate view-count visitor UI
+
+The optional footer panel and consent-banner note are hidden by default. Sites can restore both with `add_filter( 'ace_seo_aggregate_views_show_privacy', '__return_true' );`. This does not enable or disable counting: the site setting, existing opt-out preference, rejected analytics consent, DNT and GPC continue to apply.

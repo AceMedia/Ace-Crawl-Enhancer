@@ -8,7 +8,7 @@ function setup(options = {}) {
     const requests = [], events = {}, timers = new Map(); let serial = 0;
     const location = new URL('https://example.test/');
     const document = {cookie: options.cookie || '', visibilityState: options.hidden ? 'hidden' : 'visible', prerendering: false,
-        addEventListener(name, fn) { events[name] = fn; }, getElementById() { return null; }};
+        addEventListener(name, fn) { events[name] = fn; }, getElementById() { return null; }, ...options.document};
     const window = {aceAggregateViewsConfig: {endpoint: 'https://example.test/wp-json/ace-seo/v1/aggregate-view'}, ...options.window};
     const history = {};
     for (const name of ['pushState', 'replaceState']) history[name] = function(state, title, url) { if (url) location.href = new URL(url, location).href; return 'original result'; };
@@ -33,4 +33,6 @@ check('Explicit baseline opt-out stores only preference and stops subsequent vie
 check('Back-forward cache restoration is a new view',()=>{const x=setup();x.flush();x.events.pageshow({persisted:true});assert.equal(x.requests.length,2);});
 check('Double-loaded script does not install a second tracker',()=>{const x=setup();vm.runInNewContext(source,x.sandbox);x.flush();assert.equal(x.requests.length,1);});
 check('CookieYes undecided defaults do not block the minimal counter',()=>{const x=setup({cookie:'cookieyes-consent=consent:no,action:,analytics:no'});x.flush();assert.equal(x.requests.length,1);});
+
+for (const shown of [false,true]) check('Consent notice follows explicit UI flag '+shown,()=>{let appended=0; const element=()=>({dataset:{},style:{},appendChild(){},addEventListener(){}}); const x=setup({window:{aceAggregateViewsConfig:{endpoint:'/counter',showPrivacy:shown}},document:{querySelector:()=>({querySelector:()=>null,appendChild(){appended++;}}),createElement:element}}); x.flush();assert.equal(appended,shown?1:0);assert.equal(x.requests.length,1);});
 console.log(checks+' checks passed');
