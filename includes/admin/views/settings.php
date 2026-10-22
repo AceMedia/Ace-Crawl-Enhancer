@@ -901,7 +901,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
 
                                 $last_optimized = get_option('ace_seo_db_optimized', false);
                                 if ($last_optimized) {
-                                    echo '<li>Last Optimized: ' . human_time_diff(strtotime($last_optimized), current_time('timestamp')) . ' ago</li>';
+                                    echo '<li>Last Optimized: ' . esc_html( human_time_diff(strtotime($last_optimized), current_time('timestamp')) ) . ' ago</li>';
                                 }
                                 echo '</ul>';
 
@@ -948,7 +948,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             <ul class="ace-cache-status-list">
                                 <li>Statistics Cache:
                                     <?php if ($cache_status['stats_cached']): ?>
-                                        ✅ Active (<?php echo human_time_diff(time() - $cache_status['stats_age']); ?> old)
+                                        ✅ Active (<?php echo esc_html( human_time_diff( time() - $cache_status['stats_age'] ) ); ?> old)
                                     <?php else: ?>
                                         ⏳ Not generated yet - click "Refresh Dashboard Cache" to generate
                                     <?php endif; ?>
@@ -960,7 +960,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                         ⏳ Not generated yet - will be created with statistics cache
                                     <?php endif; ?>
                                 </li>
-                                <li>Cache Duration: <?php echo human_time_diff(0, $cache_status['cache_duration']); ?></li>
+                                <li>Cache Duration: <?php echo esc_html( human_time_diff( 0, $cache_status['cache_duration'] ) ); ?></li>
                             </ul>
 
                             <p><strong>What this does:</strong></p>
@@ -1323,12 +1323,12 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
 <script>
 jQuery(document).ready(function($) {
     var ajaxurl = window.ajaxurl || (window.ace_seo_admin && ace_seo_admin.ajax_url) || "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
-    var yoastNonce = '<?php echo wp_create_nonce('ace_seo_yoast_tools'); ?>';
-    var migrationStatsNonce = '<?php echo wp_create_nonce('ace_seo_migration_stats'); ?>';
-    var migrationBatchNonce = '<?php echo wp_create_nonce('ace_seo_batch_migrate'); ?>';
-    var optimizeDbNonce = '<?php echo wp_create_nonce('ace_seo_optimize_db_manual'); ?>';
-    var adminNonce = '<?php echo wp_create_nonce('ace_seo_admin'); ?>';
-    var sitemapPurgeNonce = '<?php echo wp_create_nonce('ace_sitemap_purge_cache'); ?>';
+    var yoastNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_yoast_tools') ); ?>';
+    var migrationStatsNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_migration_stats') ); ?>';
+    var migrationBatchNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_batch_migrate') ); ?>';
+    var optimizeDbNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_optimize_db_manual') ); ?>';
+    var adminNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_admin') ); ?>';
+    var sitemapPurgeNonce = '<?php echo esc_js( wp_create_nonce('ace_sitemap_purge_cache') ); ?>';
 
     var migrationState = {
         isRunning: false,

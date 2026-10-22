@@ -32,6 +32,7 @@ function sanitize_key($value){return preg_replace('/[^a-z0-9_-]/','',strtolower(
 function sanitize_title($value){return sanitize_key(str_replace(' ','-',$value));}
 function sanitize_html_class($value){return preg_replace('/[^a-zA-Z0-9_-]/','',$value);}
 function esc_html($value){return htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8');}
+function esc_textarea($value){return esc_html($value);}
 function esc_attr($value){return esc_html($value);}
 function esc_url($value){return esc_html($value);}
 function __($value,$domain=null){return $value;}
@@ -70,6 +71,10 @@ $forms=static function()use($root){
   if($control->tagName==='select'){$option=$xpath->query('.//option[@selected]',$control)->item(0)??$xpath->query('.//option',$control)->item(0);$value=$option?$option->getAttribute('value'):'';}
   $parts[]=rawurlencode($name).'='.rawurlencode($value);
  }parse_str(implode('&',$parts),$payload);$out[$payload['action']]=$payload;}
+ // The current screen has one form; retain coverage of its three legacy section handlers.
+ if(isset($out['ace_seo_retention_settings_save'])){
+  foreach(array('ace_seo_retention_report_settings','ace_seo_retention_options','ace_seo_retention_front')as$action){$out[$action]=$out['ace_seo_retention_settings_save'];$out[$action]['action']=$action;}
+ }
  return $out;
 };
 $dispatch=static function($action,$payload){$_POST=wp_slash($payload);$map=array('ace_seo_retention_report_settings'=>'handle_report_settings','ace_seo_retention_options'=>'handle_options','ace_seo_retention_front'=>'handle_front_settings');try{AceSeoRetentionReport::{$map[$action]}();}catch(SettingsRedirect $redirect){return $redirect->url;}return '';};

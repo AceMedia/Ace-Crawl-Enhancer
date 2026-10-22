@@ -89,7 +89,7 @@ class AceSeoOrphanReport {
      * @return void
      */
     public static function ajax_report() {
-        if ( ! wp_verify_nonce( $_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce' ) ) {
             wp_send_json( array( 'status' => 'error', 'message' => __( 'Invalid nonce', 'ace-crawl-enhancer' ) ) );
         }
 
@@ -196,7 +196,7 @@ class AceSeoOrphanReport {
             printf(
                 /* translators: %d: archive page number. */
                 esc_html__( 'Orphaned means the post is in no public archive, so only a sitemap can reach it. Posts sitting deep in an archive are NOT counted — they are reachable, just far back, which is why external crawlers report far higher numbers. The deepest archive here runs to page %d.', 'ace-crawl-enhancer' ),
-                $deepest
+                absint( $deepest )
             );
             ?>
         </p>

@@ -10,9 +10,9 @@ function home_url() { return 'https://example.test'; }
 function wp_parse_url( $url ) { return parse_url( $url ); }
 function untrailingslashit( $s ) { return rtrim( $s, '/' ); }
 function wp_date( $f ) { return '2026-10-14'; }
-class WP_Error { public function __construct( public $code, $message, $data = null ) {} public function get_error_code() { return $this->code; } }
+class WP_Error { public $code; public function __construct( $code, $message, $data = null ) { $this->code = $code; } public function get_error_code() { return $this->code; } }
 function is_wp_error($v) { return $v instanceof WP_Error; }
-class WP_REST_Response { public function __construct( $body, public $status ) {} public function header( $k, $v ) {} }
+class WP_REST_Response { public $status; public function __construct( $body, $status ) { $this->status = $status; } public function header( $k, $v ) {} }
 class AceSeoViewTracker { public static function is_bot( $ua ) { return ! $ua || preg_match( '/bot|headless|curl/i', $ua ); } }
 class Request {
     public $headers = array( 'origin'=>'https://example.test', 'sec-fetch-site'=>'same-origin', 'user-agent'=>'Mozilla/5.0 Chrome/140.0 Safari/537.36' );
@@ -35,7 +35,7 @@ $r->headers['origin']='https://example.test';unset($r->headers['sec-fetch-site']
 $r=new Request();$r->body=str_repeat('a',33);check('Oversized request denied',!AceSeoAggregateViews::permission($r));
 $r=new Request();$options[AceSeoAggregateViews::OPTION]=0;check('Disabled counter rejects stale cached beacons',!AceSeoAggregateViews::permission($r));$options[AceSeoAggregateViews::OPTION]=1;
 $r->body='{"v":1,"url":"/private"}';check('Extra fields refused',AceSeoAggregateViews::hit($r) instanceof WP_Error && !$wpdb->queries);
-$r=new Request();$response=AceSeoAggregateViews::hit($r);check('Valid request atomically increments only a date and counter',204===$response->status && count($wpdb->queries)===1 && $wpdb->queries[0][1]===array('2026-10-14') && str_contains($wpdb->queries[0][0],'ON DUPLICATE KEY UPDATE views = views + 1'));
+$r=new Request();$response=AceSeoAggregateViews::hit($r);check('Valid request atomically increments only a date and counter',204===$response->status && count($wpdb->queries)===1 && $wpdb->queries[0][1]===array('2026-10-14') && false!==strpos($wpdb->queries[0][0],'ON DUPLICATE KEY UPDATE views = views + 1'));
 foreach(array('dnt'=>'1','sec-gpc'=>'1','user-agent'=>'Googlebot') as $key=>$value){$r=new Request();$r->headers[$key]=$value;AceSeoAggregateViews::hit($r);check('Excluded '.$key.' does not write',count($wpdb->queries)===1);}
 $r=new Request();$wpdb->fail=true;check('Database failure is not reported as success',AceSeoAggregateViews::hit($r) instanceof WP_Error);$wpdb->fail=false;
 $wpdb->rows=array(array('day'=>'2026-10-14','views'=>'12'));

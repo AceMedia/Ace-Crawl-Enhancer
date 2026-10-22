@@ -51,12 +51,18 @@ class AceSEOPageSpeed {
         }
 
         if ( function_exists( 'set_time_limit' ) ) {
-            @set_time_limit( 120 );
+            @set_time_limit( 120 ); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- a PageSpeed analysis can legitimately run long; guarded by function_exists().
         }
         
+        if ( ! isset( $_POST['url'] ) || ! is_string( $_POST['url'] ) || ( isset( $_POST['strategy'] ) && ! is_string( $_POST['strategy'] ) ) || ( isset( $_POST['post_id'] ) && ! is_scalar( $_POST['post_id'] ) ) ) {
+            wp_send_json_error( array( 'message' => 'Invalid performance request.' ), 400 );
+        }
         $url = esc_url_raw( wp_unslash( $_POST['url'] ) );
         $strategy = sanitize_text_field( wp_unslash( $_POST['strategy'] ?? 'mobile' ) );
-        $post_id = absint( $_POST['post_id'] ?? 0 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) {
+            wp_send_json_error( array( 'message' => 'You cannot edit this post.' ), 403 );
+        }
         
         if ( empty( $url ) ) {
             wp_send_json_error( array( 'message' => 'URL is required' ) );
@@ -85,7 +91,7 @@ class AceSEOPageSpeed {
     public function get_pagespeed_report() {
         check_ajax_referer( 'ace_seo_performance_test', 'nonce' );
         
-        $post_id = intval( $_POST['post_id'] ?? 0 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         if ( ! $post_id ) {
             wp_send_json_error( array( 'message' => 'Post ID is required' ) );
@@ -450,8 +456,8 @@ class AceSEOPageSpeed {
         $color = $mobile_score >= 70 ? 'green' : ( $mobile_score >= 50 ? 'orange' : 'red' );
         $icon = $mobile_score >= 70 ? '⚡' : ( $mobile_score >= 50 ? '⚠️' : '🐌' );
         
-        echo '<span style="color: ' . $color . '; font-weight: bold;" title="Mobile Performance Score">';
-        echo $icon . ' ' . $mobile_score . '%';
+        echo '<span style="color: ' . esc_attr( $color ) . '; font-weight: bold;" title="Mobile Performance Score">';
+        echo esc_html( $icon . ' ' . $mobile_score ) . '%';
         echo '</span>';
     }
     
@@ -462,8 +468,8 @@ class AceSEOPageSpeed {
         register_rest_route( 'ace-seo/v1', '/performance/(?P<id>\d+)', array(
             'methods' => 'GET',
             'callback' => array( $this, 'rest_get_performance_data' ),
-            'permission_callback' => function() {
-                return current_user_can( 'edit_posts' );
+            'permission_callback' => function( $request ) {
+                return current_user_can( 'edit_post', absint( $request['id'] ) );
             },
         ) );
         
@@ -478,8 +484,8 @@ class AceSEOPageSpeed {
         register_rest_route( 'ace-seo/v1', '/performance/history/(?P<id>\d+)', array(
             'methods' => 'GET',
             'callback' => array( $this, 'rest_get_performance_history' ),
-            'permission_callback' => function() {
-                return current_user_can( 'edit_posts' );
+            'permission_callback' => function( $request ) {
+                return current_user_can( 'edit_post', absint( $request['id'] ) );
             },
         ) );
     }
@@ -503,9 +509,15 @@ class AceSEOPageSpeed {
      */
     public function rest_test_performance( $request ) {
         $params = $request->get_json_params();
+        if ( ! is_array( $params ) || ! isset( $params['url'] ) || ! is_string( $params['url'] ) || ( isset( $params['strategy'] ) && ! is_string( $params['strategy'] ) ) || ( isset( $params['post_id'] ) && ! is_scalar( $params['post_id'] ) ) ) {
+            return new WP_Error( 'invalid_request', 'Invalid performance request.', array( 'status' => 400 ) );
+        }
         $url = esc_url_raw( $params['url'] ?? '' );
         $strategy = sanitize_text_field( $params['strategy'] ?? 'mobile' );
         $post_id = absint( $params['post_id'] ?? 0 );
+        if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) {
+            return new WP_Error( 'cannot_edit_post', 'You cannot edit this post.', array( 'status' => 403 ) );
+        }
         
         if ( empty( $url ) ) {
             return new WP_Error( 'missing_url', 'URL is required', array( 'status' => 400 ) );
@@ -763,7 +775,7 @@ class AceSEOPageSpeed {
      * Check if URL is local/development environment
      */
     private function is_local_url( $url ) {
-        $parsed_url = parse_url( $url );
+        $parsed_url = wp_parse_url( $url );
         $host = $parsed_url['host'] ?? '';
         
         // Common local development indicators
