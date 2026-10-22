@@ -23,40 +23,47 @@ class AceSeoIntegrations {
     }
 
     public static function run_adapters() {
-        self::ace_community_events();
+        self::directory_adapter();
     }
 
     /**
-     * Ace-Community-Events: events / businesses / job_listings /
-     * locations CPTs.
+     * Optional directory/listings adapter (off by default).
      *
-     * Its own ACE_SEO class already emits Event JSON-LD on single events —
-     * that stays (it knows its recurrence/offers/performers meta best). Its
-     * BreadcrumbList emitter is removed because the graph now emits
-     * breadcrumbs on every page (one trail, not two). Businesses, jobs and
-     * locations have no schema of their own, so providers are added here.
+     * A theme, plugin or MU plugin opts in by mapping roles to its post types:
+     *
+     *     add_filter( 'ace_seo_directory_post_types', fn() => array(
+     *         'business' => 'businesses',     // LocalBusiness
+     *         'job'      => 'job_listings',   // JobPosting
+     *         'location' => 'locations',      // Place
+     *         'event'    => 'events',         // owns its own Event schema
+     *     ) );
+     *
+     * Every role is optional. Mapped post types stop being marked up as Article
+     * and, for business/job/location, get a schema provider. Address and
+     * coordinates are read from the `address` (string) and `geo_location`
+     * ({lat,lng}) post meta; a job's hiring organisation from `business_id`.
      */
-    private static function ace_community_events() {
-        if (!post_type_exists('events') || !post_type_exists('job_listings')) {
+    private static function directory_adapter() {
+        $types = apply_filters('ace_seo_directory_post_types', array());
+        if (!is_array($types) || empty($types)) {
+            return;
+        }
+        $types = array_filter(array_map('sanitize_key', array_intersect_key($types, array_flip(array('business', 'job', 'location', 'event')))), 'post_type_exists');
+        if (empty($types)) {
             return;
         }
 
-        // Drop the duplicate BreadcrumbList (ours covers every page).
-        if (class_exists('ACE_SEO') && method_exists('ACE_SEO', 'breadcrumb_schema')) {
-            remove_action('wp_head', ['ACE_SEO', 'breadcrumb_schema'], 21);
-        }
-
-        // These CPTs have their own primary schema type (Event / LocalBusiness /
-        // JobPosting / Place), so don't also mark them up as Article.
-        add_filter('ace_seo_emit_article', function ($emit, $post) {
-            if (in_array($post->post_type, ['events', 'businesses', 'job_listings', 'locations'], true)) {
+        // These post types have their own primary schema type, so don't also
+        // mark them up as Article.
+        add_filter('ace_seo_emit_article', function ($emit, $post) use ($types) {
+            if (in_array($post->post_type, $types, true)) {
                 return false;
             }
             return $emit;
         }, 10, 2);
 
-        ace_seo_register_schema_provider('ace-community-events/business', function ($context) {
-            if (!is_singular('businesses')) {
+        ace_seo_register_schema_provider('directory/business', function ($context) use ($types) {
+            if (empty($types['business']) || !is_singular($types['business'])) {
                 return null;
             }
             $post_id = get_the_ID();
@@ -76,8 +83,8 @@ class AceSeoIntegrations {
             return self::add_location_details($node, $post_id);
         });
 
-        ace_seo_register_schema_provider('ace-community-events/job', function ($context) {
-            if (!is_singular('job_listings')) {
+        ace_seo_register_schema_provider('directory/job', function ($context) use ($types) {
+            if (empty($types['job']) || !is_singular($types['job'])) {
                 return null;
             }
             $post_id = get_the_ID();
@@ -107,8 +114,8 @@ class AceSeoIntegrations {
             return $node;
         });
 
-        ace_seo_register_schema_provider('ace-community-events/location', function ($context) {
-            if (!is_singular('locations')) {
+        ace_seo_register_schema_provider('directory/location', function ($context) use ($types) {
+            if (empty($types['location']) || !is_singular($types['location'])) {
                 return null;
             }
             $post_id = get_the_ID();
@@ -126,7 +133,7 @@ class AceSeoIntegrations {
     }
 
     /**
-     * Attach address/geo from the ACE-CE meta convention (string `address`,
+     * Attach address/geo from the directory meta convention (string `address`,
      * object `geo_location` {lat,lng}) to a node.
      */
     private static function add_location_details(array $node, $post_id) {

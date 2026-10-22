@@ -43,7 +43,7 @@ class Ace_SEO_Retention_Insights {
         $sql  = "SELECT t.meta_value AS tier, CASE " . implode( ' ', $case ) . " ELSE 'other' END AS bucket, COUNT(*) AS n
                  FROM {$wpdb->postmeta} t JOIN {$wpdb->postmeta} r ON r.post_id = t.post_id AND r.meta_key = %s
                  WHERE t.meta_key = %s GROUP BY tier, bucket";
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META, AceSeoRetentionReport::META_TIER ), ARRAY_A );
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $r ) {
             $out[ $r['tier'] ][ $r['bucket'] ] = (int) $r['n'];
@@ -69,7 +69,7 @@ class Ace_SEO_Retention_Insights {
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE t.meta_key = %s AND (" . implode( ' OR ', $pairs ) . ')
                  GROUP BY tt.taxonomy, tm.slug, tm.name, t.meta_value';
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A );
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $r ) {
             $k = $r['taxonomy'] . ':' . $r['slug'];
@@ -108,7 +108,7 @@ class Ace_SEO_Retention_Insights {
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE t.meta_key = %s AND (" . implode( ' OR ', $pairs ) . ')
                  GROUP BY tr.object_id HAVING c > 1';
-        $rows   = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A );
+        $rows   = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $combos = array();
         foreach ( (array) $rows as $r ) {
             $combos[ $r['combo'] ] = ( $combos[ $r['combo'] ] ?? 0 ) + 1;

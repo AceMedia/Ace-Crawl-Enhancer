@@ -69,6 +69,8 @@ class AceSeoAggregateViews {
         $ua = (string) $request->get_header( 'user-agent' );
         if ( '1' !== $request->get_header( 'dnt' ) && '1' !== $request->get_header( 'sec-gpc' ) && ! AceSeoViewTracker::is_bot( $ua ) ) {
             global $wpdb;
+        // The identifier is the trusted WordPress site prefix plus a fixed plugin table suffix; values are prepared. WP 6.0 has no %i placeholder.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
             $ok = $wpdb->query( $wpdb->prepare( 'INSERT INTO ' . self::table() . ' (day, views) VALUES (%s, 1) ON DUPLICATE KEY UPDATE views = views + 1', wp_date( 'Y-m-d' ) ) );
             if ( false === $ok ) { return new WP_Error( 'counter_unavailable', 'Counter unavailable.', array( 'status' => 503 ) ); }
         }
@@ -98,6 +100,8 @@ class AceSeoAggregateViews {
     public static function series( array $dates ) {
         global $wpdb;
         if ( ! $dates || 1 !== (int) get_option( self::SCHEMA, 0 ) ) { return array(); }
+        // The identifier is the trusted WordPress site prefix plus a fixed plugin table suffix; values are prepared. WP 6.0 has no %i placeholder.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
         $rows = $wpdb->get_results( $wpdb->prepare( 'SELECT day, views FROM ' . self::table() . ' WHERE day >= %s AND day <= %s ORDER BY day', min( $dates ), max( $dates ) ), ARRAY_A );
         $out = array();
         foreach ( (array) $rows as $row ) { $out[ $row['day'] ] = (int) $row['views']; }
@@ -115,6 +119,8 @@ class AceSeoAggregateViews {
     public static function prune() {
         if ( 1 !== (int) get_option( self::SCHEMA, 0 ) ) { return; }
         global $wpdb;
+        // The identifier is the trusted WordPress site prefix plus a fixed plugin table suffix; values are prepared. WP 6.0 has no %i placeholder.
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
         $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table() . ' WHERE day < %s', wp_date( 'Y-m-d', time() - 400 * DAY_IN_SECONDS ) ) );
     }
     public static function save() {
@@ -127,7 +133,7 @@ class AceSeoAggregateViews {
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-tracking' ) ); exit;
     }
     public static function settings() {
-        echo '<details class="box" id="basic-view-count"><summary><strong>Basic page views: ' . ( self::enabled() ? 'on' : 'off' ) . '</strong></summary><p>A first-party daily total, independent of GA4 consented reporting. Counts visible page loads and React history navigation. No tracking cookies, persistent IDs, URLs, IP addresses or user agents are stored in this counter. Known bots, signed-in users on uncached pages and explicit opt-outs are excluded; disguised bots and blocking affect accuracy. Blank dates mean no recorded coverage.</p><p>Use only for aggregate site-improvement statistics under the rules applicable to your visitors. A public privacy control explains the counter and provides an opt-out. Purge cached pages after changing this setting.</p><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="ace_seo_aggregate_views">';
+        echo '<details class="box" id="basic-view-count"><summary><strong>Basic page views: ' . ( self::enabled() ? 'on' : 'off' ) . '</strong></summary><p>A first-party daily total, independent of GA4 consented reporting. Counts visible page loads and React history navigation. No tracking cookies, persistent IDs, URLs, IP addresses or user agents are stored in this counter. Known bots, signed-in users on uncached pages and explicit opt-outs are excluded; disguised bots and blocking affect accuracy. Blank dates mean no recorded coverage.</p><p>Use only for aggregate site-improvement statistics under the rules applicable to your visitors. An optional public privacy control can explain the counter and provide an opt-out when enabled through the privacy-display filter. Purge cached pages after changing this setting.</p><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="ace_seo_aggregate_views">';
         wp_nonce_field( 'ace_seo_aggregate_views' );
         echo '<label><input type="checkbox" name="enabled" value="1"' . checked( self::enabled(), true, false ) . '> Enable basic aggregate view counting</label> ';
         submit_button( 'Save view counting', 'secondary', 'submit', false ); echo '</form></details>';

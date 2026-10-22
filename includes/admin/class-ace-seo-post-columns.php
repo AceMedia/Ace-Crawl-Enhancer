@@ -510,7 +510,7 @@ class AceSeoPostColumns {
 
             case 'ace_seo_ret_views':
                 $views = get_post_meta( $post_id, '_ace_seo_ret_views', true );
-                echo '' === $views ? self::dash() : esc_html( number_format_i18n( (int) $views ) );
+                echo wp_kses_post( '' === $views ? self::dash() : esc_html( number_format_i18n( (int) $views ) ) );
                 break;
 
             case 'ace_seo_people':
@@ -541,7 +541,7 @@ class AceSeoPostColumns {
 
             case 'ace_seo_last_viewed':
                 $last = (string) get_post_meta( $post_id, '_ace_seo_last_viewed', true );
-                echo '' === $last ? self::dash() : esc_html( mysql2date( get_option( 'date_format' ), $last ) );
+                echo wp_kses_post( '' === $last ? self::dash() : esc_html( mysql2date( get_option( 'date_format' ), $last ) ) );
                 break;
 
             case 'ace_seo_ret_links':
@@ -678,10 +678,10 @@ class AceSeoPostColumns {
         $st    = AceSeoRetentionActions::state( $post_id );
         $flags = array_filter( array(
             $st['noindex'] ? __( 'noindex', 'ace-crawl-enhancer' ) : '',
-            $st['unavailable'] ? sprintf( __( 'until %s', 'ace-crawl-enhancer' ), $st['unavailable'] ) : '',
+            $st['unavailable'] ? sprintf( /* translators: %s: name or value. */ __( 'until %s', 'ace-crawl-enhancer' ), $st['unavailable'] ) : '',
             class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::label( $post_id ) : ( 'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ) ),
             $st['news_excl'] ? __( 'no news sitemap', 'ace-crawl-enhancer' ) : '',
-            $st['notice'] ? sprintf( __( 'notice: %s', 'ace-crawl-enhancer' ), $st['notice'] ) : '',
+            $st['notice'] ? sprintf( /* translators: %s: name or value. */ __( 'notice: %s', 'ace-crawl-enhancer' ), $st['notice'] ) : '',
         ) );
 
         if ( $flags ) {
@@ -726,7 +726,7 @@ class AceSeoPostColumns {
         // One indexed meta key narrows these to the scored posts before the LIKE runs, so they cost
         // a fraction of the absence filters below.
         foreach ( self::retention_buckets() as $bucket => $label ) {
-            $filters[ 'retention_' . $bucket ] = sprintf( __( 'Recommendation: %s', 'ace-crawl-enhancer' ), $label );
+            $filters[ 'retention_' . $bucket ] = sprintf( /* translators: %s: name or value. */ __( 'Recommendation: %s', 'ace-crawl-enhancer' ), $label );
         }
         $filters['retention_acted'] = __( 'Already has a redirect or 410', 'ace-crawl-enhancer' );
 

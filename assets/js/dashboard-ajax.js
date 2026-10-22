@@ -207,8 +207,8 @@
                         $progressBar.css('width', data.progress_percentage + '%');
                         $progressText.text(
                             aceSEODashboard.strings.processingBatch
-                                .replace('%d', data.batch_number)
-                                .replace('%d', data.total_batches)
+                                .replace('%1$d', data.batch_number)
+                                .replace('%2$d', data.total_batches)
                         );
                         
                         // Continue or finish

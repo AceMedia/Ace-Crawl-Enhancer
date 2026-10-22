@@ -689,7 +689,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'titles', $post_content, $focus_keyword, $post_title );
@@ -710,7 +710,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Title: " . $post_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         if ( $enable_search ) {
             $prompt .= "Based on current search trends and best practices, create titles that:\n";
@@ -823,7 +823,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'descriptions', $post_content, $focus_keyword, $post_title );
@@ -844,7 +844,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Title: " . $post_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         if ( $enable_search ) {
             $prompt .= "Based on current trends and high-performing meta descriptions, create descriptions that:\n";
@@ -900,7 +900,7 @@ class AceSEOApiHelper {
             }
             
             // Final fallback: generate simple descriptions
-            $base_desc = wp_trim_words( strip_tags( $post_content ), 20 );
+            $base_desc = wp_trim_words( wp_strip_all_tags( $post_content ), 20 );
             return array(
                 array( 'description' => $base_desc . ' Learn more about ' . $focus_keyword . '.', 'reason' => 'Content based' ),
                 array( 'description' => 'Discover everything about ' . $focus_keyword . ' in this comprehensive guide.', 'reason' => 'Discovery focused' ),
@@ -966,7 +966,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Title: " . $post_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 500 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 500 ) . "\n\n";
         
         if ( $enable_search ) {
             $prompt .= "Based on current SEO trends and best practices, provide analysis in these categories with specific actionable suggestions:\n";
@@ -1025,7 +1025,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Title: " . $post_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Based on current search trends and market demand, generate:\n";
         $prompt .= "1. 5 related topic ideas for future content that are currently trending\n";
@@ -1064,7 +1064,7 @@ class AceSEOApiHelper {
         $prompt = "Analyze this article content and provide specific writing and content SEO improvement suggestions." . $search_context . "\n\n";
         $prompt .= "Content Details:\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 400 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 400 ) . "\n\n";
         
         $prompt .= "Provide 8-10 specific, actionable suggestions for improving this article's content and writing. Focus ONLY on:\n";
         $prompt .= "- Natural keyword placement and usage within the article text\n";
@@ -1242,7 +1242,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : ( $_POST['post_id'] ?? 0 );
+        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'keywords', $post_content, '', $post_title );
@@ -1255,7 +1255,7 @@ class AceSEOApiHelper {
         if ( ! empty( $post_title ) ) {
             $prompt .= "Title: " . $post_title . "\n";
         }
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Analyze the content and suggest keywords that:\n";
         $prompt .= "- Match the content's main topic and intent\n";
@@ -1371,7 +1371,7 @@ class AceSEOApiHelper {
         $keywords = array();
         
         // Extract potential keywords from title and content
-        $text = $post_title . ' ' . strip_tags( $post_content );
+        $text = $post_title . ' ' . wp_strip_all_tags( $post_content );
         $words = str_word_count( strtolower( $text ), 1 );
         
         // Filter out common words
@@ -1426,7 +1426,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Base Title: " . $base_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Create Facebook titles that:\n";
         $prompt .= "- Are optimized for social media engagement and sharing\n";
@@ -1468,7 +1468,7 @@ class AceSEOApiHelper {
         $prompt .= "Title: " . $base_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
         $prompt .= "Meta Description: " . $meta_description . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Create Facebook descriptions that:\n";
         $prompt .= "- Are optimized for social media engagement\n";
@@ -1509,7 +1509,7 @@ class AceSEOApiHelper {
         $prompt .= "Content Details:\n";
         $prompt .= "Base Title: " . $base_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Create Twitter titles that:\n";
         $prompt .= "- Are optimized for Twitter engagement and retweets\n";
@@ -1551,7 +1551,7 @@ class AceSEOApiHelper {
         $prompt .= "Title: " . $base_title . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
         $prompt .= "Base Description: " . $base_description . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 300 ) . "\n\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 300 ) . "\n\n";
         
         $prompt .= "Create Twitter descriptions that:\n";
         $prompt .= "- Are optimized for Twitter engagement and retweets\n";
@@ -1668,7 +1668,7 @@ class AceSEOApiHelper {
         $prompt .= "Title: " . $title . "\n";
         $prompt .= "Description: " . $description . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 200 ) . "\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 200 ) . "\n";
         if ( ! empty( $featured_image_url ) ) {
             $prompt .= "Current Featured Image: " . $featured_image_url . " (use as reference for style/branding)\n";
         }
@@ -1743,7 +1743,7 @@ class AceSEOApiHelper {
         $prompt .= "Title: " . $title . "\n";
         $prompt .= "Description: " . $description . "\n";
         $prompt .= "Focus Keyword: " . $focus_keyword . "\n";
-        $prompt .= "Content: " . wp_trim_words( strip_tags( $post_content ), 200 ) . "\n";
+        $prompt .= "Content: " . wp_trim_words( wp_strip_all_tags( $post_content ), 200 ) . "\n";
         if ( ! empty( $featured_image_url ) ) {
             $prompt .= "Current Featured Image: " . $featured_image_url . " (use as reference for style/branding)\n";
         }

@@ -152,7 +152,7 @@ final class Ace_SEO_Retention_Evidence_View {
             if ( Ace_SEO_Retention_Evidence::date( $value ) ) { ${$key} = $value; }
         }
         if ( $start > $end ) { echo '<p role="alert">Choose an end date on or after the start date.</p>'; return; }
-        $page = max( 1, (int) ( $_GET['evidence_page'] ?? 1 ) );
+        $page = max( 1, absint( wp_unslash( $_GET['evidence_page'] ?? 1 ) ) );
         $rows = AceSeoRetentionReport::rows( '', self::LIMIT, ( $page - 1 ) * self::LIMIT );
         _prime_post_caches( array_column( $rows, 'id' ), true, true );
         $records = array();

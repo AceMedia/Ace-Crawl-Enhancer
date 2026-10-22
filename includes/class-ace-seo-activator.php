@@ -18,7 +18,11 @@ class AceSEOActivator {
     /**
      * Run on plugin activation
      */
-    public static function activate() {
+    public static function activate( $network_wide = false ) {
+        if ( is_multisite() && $network_wide ) {
+            self::for_each_site( array( __CLASS__, 'activate' ) );
+            return;
+        }
         // Check WordPress version
         if ( ! self::check_requirements() ) {
             return;
@@ -49,6 +53,37 @@ class AceSEOActivator {
         update_option( 'ace_seo_version', ACE_SEO_VERSION, false );
     }
     
+    /** Run a lifecycle operation for every site, restoring the caller's site. */
+    public static function for_each_site( $callback ) {
+        $offset = 0;
+        do {
+            $ids = get_sites( array( 'fields' => 'ids', 'number' => 100, 'offset' => $offset, 'orderby' => 'id', 'order' => 'ASC' ) );
+            foreach ( $ids as $id ) {
+                switch_to_blog( (int) $id );
+                try {
+                    call_user_func( $callback, false );
+                } finally {
+                    restore_current_blog();
+                }
+            }
+            $offset += count( $ids );
+        } while ( count( $ids ) === 100 );
+    }
+
+    /** Initialise a new site only when this plugin is network active. */
+    public static function initialize_site( $site ) {
+        $active = (array) get_site_option( 'active_sitewide_plugins', array() );
+        if ( ! isset( $active[ ACE_SEO_BASENAME ] ) ) {
+            return;
+        }
+        switch_to_blog( (int) $site->blog_id );
+        try {
+            self::activate();
+        } finally {
+            restore_current_blog();
+        }
+    }
+
     /**
      * Check if requirements are met
      */
@@ -57,10 +92,10 @@ class AceSEOActivator {
         
         // Check WordPress version
         if ( version_compare( $wp_version, '6.0', '<' ) ) {
-            deactivate_plugins( plugin_basename( __FILE__ ) );
+            deactivate_plugins( ACE_SEO_BASENAME );
             wp_die( 
-                __( 'Ace SEO requires WordPress 6.0 or higher.', 'ace-crawl-enhancer' ),
-                __( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
+                esc_html__( 'Ace SEO requires WordPress 6.0 or higher.', 'ace-crawl-enhancer' ),
+                esc_html__( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
                 array( 'back_link' => true )
             );
             return false;
@@ -68,10 +103,10 @@ class AceSEOActivator {
         
         // Check PHP version
         if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
-            deactivate_plugins( plugin_basename( __FILE__ ) );
+            deactivate_plugins( ACE_SEO_BASENAME );
             wp_die( 
-                __( 'Ace SEO requires PHP 7.4 or higher.', 'ace-crawl-enhancer' ),
-                __( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
+                esc_html__( 'Ace SEO requires PHP 7.4 or higher.', 'ace-crawl-enhancer' ),
+                esc_html__( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
                 array( 'back_link' => true )
             );
             return false;
@@ -244,7 +279,9 @@ class AceSEOActivator {
                 $results = $optimizer->create_indexes();
                 
                 // Log the optimization results
-                error_log( 'ACE SEO Background: Database optimization completed - ' . print_r( $results, true ) );
+                if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+                    error_log( 'ACE SEO Background: Database optimization completed - ' . print_r( $results, true ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+                }
                 
                 // Clear pending flag and store completion status
                 delete_option( 'ace_seo_db_optimization_pending' );
@@ -262,8 +299,7 @@ class AceSEOActivator {
         wp_clear_scheduled_hook( 'ace_seo_generate_sitemap' );
         wp_clear_scheduled_hook( 'ace_seo_cleanup_analytics' );
 
-        // Hook the background database optimization task
-        add_action( 'ace_seo_optimize_database', array( __CLASS__, 'optimize_database' ) );
+        // The runtime owns the public background optimisation callback.
     }
 }
 
@@ -275,26 +311,34 @@ class AceSEODeactivator {
     /**
      * Run on plugin deactivation
      */
-    public static function deactivate() {
+    public static function deactivate( $network_wide = false ) {
+        if ( is_multisite() && $network_wide ) {
+            AceSEOActivator::for_each_site( array( __CLASS__, 'deactivate' ) );
+            return;
+        }
         // Clear scheduled events
         self::clear_scheduled_events();
         
         // Flush rewrite rules
-        flush_rewrite_rules();
-        
-        // Clear cache
-        wp_cache_flush();
+        // Soft flush only this site's rewrite rules; shared caches belong to their owners.
+        flush_rewrite_rules( false );
     }
     
     /**
      * Clear scheduled cron events
      */
     private static function clear_scheduled_events() {
-        wp_clear_scheduled_hook( 'ace_seo_optimize_database' );
-        wp_clear_scheduled_hook( 'ace_seo_sheets_schedule_start' );
-        wp_clear_scheduled_hook( 'ace_seo_sheets_schedule_tick' );
+        foreach ( (array) _get_cron_array() as $events ) {
+            foreach ( $events as $hook => $instances ) {
+                if ( preg_match( '/^ace_(?:seo|sitemap|retention)_/', $hook ) ) {
+                    wp_unschedule_hook( $hook );
+                }
+            }
+        }
         
         // Clear optimization flags
         delete_option( 'ace_seo_db_optimization_pending' );
     }
 }
+
+add_action( 'wp_initialize_site', array( 'AceSEOActivator', 'initialize_site' ), 200 );

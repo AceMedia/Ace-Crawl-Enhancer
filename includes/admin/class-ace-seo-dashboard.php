@@ -41,7 +41,7 @@ class AceSEODashboard {
      */
     public function render_performance_widget() {
         if ( ! class_exists( 'AceSEOApiHelper' ) || ! AceSEOApiHelper::is_performance_monitoring_enabled() ) {
-            echo '<p>PageSpeed monitoring is not enabled. <a href="' . admin_url( 'admin.php?page=ace-seo-settings' ) . '">Configure it here</a>.</p>';
+            echo '<p>PageSpeed monitoring is not enabled. <a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-settings' ) ) . '">Configure it here</a>.</p>';
             return;
         }
         
@@ -71,14 +71,14 @@ class AceSEODashboard {
         echo '<div class="ace-performance-summary">';
         echo '<h4>Site Performance Overview</h4>';
         echo '<div class="ace-score-display">';
-        echo '<div class="ace-score-circle ' . $performance_status['class'] . '">';
-        echo '<span class="ace-score-number">' . $average_score . '</span>';
+        echo '<div class="ace-score-circle ' . esc_attr( $performance_status['class'] ) . '">';
+        echo '<span class="ace-score-number">' . esc_html( $average_score ) . '</span>';
         echo '<span class="ace-score-label">Average Score</span>';
         echo '</div>';
         echo '<div class="ace-score-details">';
-        echo '<p><strong>Status:</strong> ' . $performance_status['label'] . '</p>';
+        echo '<p><strong>Status:</strong> ' . esc_html( $performance_status['label'] ) . '</p>';
         echo '<p><strong>Pages Monitored:</strong> ' . count( $monitoring_data ) . '</p>';
-        echo '<p><strong>Last Check:</strong> ' . human_time_diff( strtotime( $monitoring_data[0]['timestamp'] ?? '' ) ) . ' ago</p>';
+        echo '<p><strong>Last Check:</strong> ' . esc_html( human_time_diff( strtotime( $monitoring_data[0]['timestamp'] ?? '' ) ) ) . ' ago</p>';
         echo '</div>';
         echo '</div>';
         echo '</div>';
@@ -98,7 +98,7 @@ class AceSEODashboard {
             
             echo '<tr>';
             echo '<td><a href="' . esc_url( $url ) . '" target="_blank">' . esc_html( $url_display ) . '</a></td>';
-            echo '<td><span class="ace-score-badge ' . $score_class . '">' . $score . '%</span></td>';
+            echo '<td><span class="ace-score-badge ' . esc_attr( $score_class ) . '">' . esc_html( $score ) . '%</span></td>';
             
             // Core Web Vitals summary
             $cwv = $data['core_web_vitals'] ?? array();
@@ -114,7 +114,7 @@ class AceSEODashboard {
                 if ( $cwv_issues === 0 ) {
                     echo '<span class="ace-cwv-status good">✓ All Good</span>';
                 } else {
-                    echo '<span class="ace-cwv-status warning">' . $cwv_issues . ' Issue' . ( $cwv_issues > 1 ? 's' : '' ) . '</span>';
+                    echo '<span class="ace-cwv-status warning">' . esc_html( $cwv_issues ) . ' Issue' . ( $cwv_issues > 1 ? 's' : '' ) . '</span>';
                 }
             } else {
                 echo '<span class="ace-cwv-status unknown">—</span>';
@@ -129,7 +129,7 @@ class AceSEODashboard {
         
         // Quick actions
         echo '<div class="ace-dashboard-actions">';
-        echo '<a href="' . admin_url( 'admin.php?page=ace-seo-settings' ) . '" class="button">Settings</a>';
+        echo '<a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-settings' ) ) . '" class="button">Settings</a>';
         echo '<button type="button" class="button button-primary" onclick="triggerPerformanceCheck()">Run Check Now</button>';
         echo '</div>';
         
@@ -159,7 +159,7 @@ class AceSEODashboard {
      * Get simplified URL display
      */
     private function get_url_display( $url ) {
-        $path = parse_url( $url, PHP_URL_PATH );
+        $path = wp_parse_url( $url, PHP_URL_PATH );
         
         if ( $path === '/' || empty( $path ) ) {
             return 'Homepage';
@@ -271,7 +271,7 @@ class AceSEODashboard {
                 method: "POST",
                 data: {
                     action: "ace_seo_monitor_performance",
-                    nonce: "' . wp_create_nonce( 'ace_seo_performance_test' ) . '"
+                    nonce: "' . esc_js( wp_create_nonce( 'ace_seo_performance_test' ) ) . '"
                 },
                 success: function(response) {
                     if (response.success) {

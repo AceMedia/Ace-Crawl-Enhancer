@@ -319,9 +319,9 @@ class AceSeoFrontend {
                         $description = $yoast;
                     } elseif (!empty($post->post_excerpt)) {
                         // Fallback to excerpt/content snippet.
-                        $description = wp_trim_words(strip_tags($post->post_excerpt), 25);
+                        $description = wp_trim_words(wp_strip_all_tags($post->post_excerpt), 25);
                     } else {
-                        $description = wp_trim_words(strip_tags($post->post_content), 25);
+                        $description = wp_trim_words(wp_strip_all_tags($post->post_content), 25);
                     }
                 }
                 return apply_filters('ace_seo_singular_meta_description', $description, $post);
@@ -349,7 +349,7 @@ class AceSeoFrontend {
                 // last resort: content snippet of the static page
                 $page = get_post($page_on_front);
                 if ($page) {
-                    return wp_trim_words(strip_tags($page->post_content), 25);
+                    return wp_trim_words(wp_strip_all_tags($page->post_content), 25);
                 }
             } else {
                 if (!empty($settings_desc)) {
@@ -371,7 +371,7 @@ class AceSeoFrontend {
         if (is_search()) {
             $query = get_search_query();
             if ($query) {
-                return sprintf(__('Search results for "%s"', 'ace-crawl-enhancer'), $query);
+                return sprintf(/* translators: %s: name or value. */ __('Search results for "%s"', 'ace-crawl-enhancer'), $query);
             }
         }
 
@@ -461,7 +461,7 @@ class AceSeoFrontend {
         } elseif (is_search()) {
             $query = get_search_query();
             $schema['@type'] = 'SearchResultsPage';
-            $description = sprintf(__('Search results for "%s"', 'ace-crawl-enhancer'), $query);
+            $description = sprintf(/* translators: %s: name or value. */ __('Search results for "%s"', 'ace-crawl-enhancer'), $query);
             $schema['mainEntity'] = [
                 '@type' => 'ItemList',
                 'name' => $description,
@@ -476,7 +476,7 @@ class AceSeoFrontend {
                 $schema['@type'] = 'ProfilePage';
                 $description = get_the_author_meta('description', $author->ID);
                 if (empty($description)) {
-                    $description = sprintf(__('Articles written by %s', 'ace-crawl-enhancer'), $author->display_name);
+                    $description = sprintf(/* translators: %s: name or value. */ __('Articles written by %s', 'ace-crawl-enhancer'), $author->display_name);
                 }
                 $author_data = [
                     '@type' => 'Person',
@@ -497,8 +497,8 @@ class AceSeoFrontend {
                     $schema['url'] = $term_link;
                 }
                 $term_description = term_description($term);
-                $description = $term_description ? wp_strip_all_tags($term_description) : sprintf(__('Latest articles about %s', 'ace-crawl-enhancer'), $term->name);
-                $schema['name'] = sprintf(__('%s Archives', 'ace-crawl-enhancer'), $term->name);
+                $description = $term_description ? wp_strip_all_tags($term_description) : sprintf(/* translators: %s: name or value. */ __('Latest articles about %s', 'ace-crawl-enhancer'), $term->name);
+                $schema['name'] = sprintf(/* translators: %s: name or value. */ __('%s Archives', 'ace-crawl-enhancer'), $term->name);
                 $schema['mainEntity'] = [
                     '@type' => 'Thing',
                     'name' => $term->name,
@@ -513,7 +513,7 @@ class AceSeoFrontend {
             if (!empty($post_type)) {
                 $obj = get_post_type_object($post_type);
                 $label = $obj && isset($obj->labels->name) ? $obj->labels->name : ucfirst($post_type);
-                $schema['name'] = sprintf(__('%s Archive', 'ace-crawl-enhancer'), $label);
+                $schema['name'] = sprintf(/* translators: %s: name or value. */ __('%s Archive', 'ace-crawl-enhancer'), $label);
                 
                 // Try to use custom archive meta description template
                 $options = $this->get_seo_options();
@@ -525,7 +525,7 @@ class AceSeoFrontend {
                     $description = $this->replace_archive_template_variables($templates[$archive_meta_key], $post_type, $obj);
                 } else {
                     // Fallback to default description
-                    $description = sprintf(__('Latest %s entries from %s', 'ace-crawl-enhancer'), strtolower($label), get_bloginfo('name'));
+                    $description = sprintf(/* translators: 1: content type label, 2: site name. */ __('Latest %1$s entries from %2$s', 'ace-crawl-enhancer'), strtolower($label), get_bloginfo('name'));
                 }
                 
                 $schema['mainEntity'] = [
@@ -535,7 +535,7 @@ class AceSeoFrontend {
             }
         } elseif (is_date()) {
             $schema['name'] = wp_strip_all_tags(wp_get_document_title());
-            $description = sprintf(__('Articles published on %s', 'ace-crawl-enhancer'), wp_strip_all_tags(wp_get_document_title()));
+            $description = sprintf(/* translators: %s: name or value. */ __('Articles published on %s', 'ace-crawl-enhancer'), wp_strip_all_tags(wp_get_document_title()));
             $schema['mainEntity'] = [
                 '@type' => 'ItemList',
                 'name' => $schema['name'],
@@ -885,7 +885,7 @@ class AceSeoFrontend {
                 return wp_trim_words($post->post_excerpt, 25);
             }
 
-            return wp_trim_words(strip_tags($post->post_content), 25);
+            return wp_trim_words(wp_strip_all_tags($post->post_content), 25);
         }
 
         return $meta_desc;
@@ -893,7 +893,7 @@ class AceSeoFrontend {
 
     public function output_additional_meta() {
         // Add generator meta
-        echo '<meta name="generator" content="Ace SEO ' . ACE_SEO_VERSION . '">' . "\n";
+        echo '<meta name="generator" content="Ace SEO ' . esc_attr( ACE_SEO_VERSION ) . '">' . "\n";
 
         // Add site verification meta if set
         $options = $this->get_seo_options();

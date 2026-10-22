@@ -58,3 +58,8 @@ Desktop.ini
 # Private agent notes (never commit)
 CLAUDE.local.md
 .codex/
+
+# Local release artifacts and private working instructions
+/dist/
+AGENTS.md
+CLAUDE.md
