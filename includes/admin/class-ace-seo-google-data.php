@@ -122,7 +122,7 @@ class AceSEOGoogleData {
      * AJAX: Render compact dashboard Google status and metrics.
      */
     public function ajax_load_google_signals() {
-        if ( ! wp_verify_nonce( $_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce' ) ) {
             wp_die( 'Invalid nonce' );
         }
 

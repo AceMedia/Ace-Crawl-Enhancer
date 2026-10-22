@@ -348,7 +348,7 @@ class Ace_SEO_Timing_Suggestions {
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE tier.meta_key = %s";
         $args = array_merge( array( AceSeoRetentionReport::META_RANK ), $taxonomies, array( AceSeoRetentionReport::META_TIER ) );
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A );
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed template with generated %s placeholders; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $row ) {
             $out[] = array( 'key' => $row['taxonomy'] . ':' . $row['slug'], 'label' => $row['name'], 'date' => $row['post_date'], 'rank' => (string) $row['rank_value'], 'tier' => (string) $row['tier'] );

@@ -40,19 +40,19 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="ace-seo-card-body">
                     <div class="ace-seo-quick-actions">
-                        <a href="<?php echo admin_url('edit.php?post_type=post'); ?>" class="ace-seo-action-button">
+                        <a href="<?php echo esc_url( admin_url('edit.php?post_type=post') ); ?>" class="ace-seo-action-button">
                             <span class="dashicons dashicons-edit"></span>
                             Optimize Posts
                         </a>
-                        <a href="<?php echo admin_url('edit.php?post_type=page'); ?>" class="ace-seo-action-button">
+                        <a href="<?php echo esc_url( admin_url('edit.php?post_type=page') ); ?>" class="ace-seo-action-button">
                             <span class="dashicons dashicons-admin-page"></span>
                             Optimize Pages
                         </a>
-                        <a href="<?php echo admin_url('admin.php?page=ace-seo-settings'); ?>" class="ace-seo-action-button">
+                        <a href="<?php echo esc_url( admin_url('admin.php?page=ace-seo-settings') ); ?>" class="ace-seo-action-button">
                             <span class="dashicons dashicons-admin-settings"></span>
                             Plugin Settings
                         </a>
-                        <a href="<?php echo site_url(); ?>" target="_blank" class="ace-seo-action-button">
+                        <a href="<?php echo esc_url( site_url() ); ?>" target="_blank" class="ace-seo-action-button">
                             <span class="dashicons dashicons-external"></span>
                             View Site
                         </a>
@@ -652,7 +652,7 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'ace_seo_optimize_database',
-                nonce: '<?php echo wp_create_nonce('ace_seo_optimize_db'); ?>'
+                nonce: '<?php echo esc_js( wp_create_nonce('ace_seo_optimize_db') ); ?>'
             },
             success: function(response) {
                 if (response.success) {

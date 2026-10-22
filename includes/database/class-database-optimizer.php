@@ -33,7 +33,9 @@ class ACE_SEO_Database_Optimizer {
         $results = $this->create_indexes_with_progress();
         
         // Log results
-        error_log('ACE SEO: Database indexes created - ' . print_r($results, true));
+        if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+            error_log('ACE SEO: Database indexes created - ' . print_r($results, true)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+        }
         
         return $results;
     }
@@ -103,7 +105,7 @@ class ACE_SEO_Database_Optimizer {
             $sql = "CREATE {$index_data['type']} `{$index_name}` ON `{$table}` ({$columns_str})";
             
             // Execute the query
-            $result = $wpdb->query($sql);
+            $result = $wpdb->query($sql); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- index DDL cannot use placeholders; identifiers come from a fixed internal list.
             
             if ($result !== false) {
                 return array('status' => 'created', 'message' => "Index {$index_name} created successfully");
@@ -121,8 +123,8 @@ class ACE_SEO_Database_Optimizer {
      */
     public function ajax_optimize_database() {
         // Verify nonce and permissions - accept both dashboard and tools nonces
-        $nonce_valid = wp_verify_nonce($_POST['nonce'], 'ace_seo_optimize_db') || 
-                      wp_verify_nonce($_POST['nonce'], 'ace_seo_dashboard_nonce');
+        $nonce_valid = wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_optimize_db') || 
+                      wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce');
         
         if (!$nonce_valid || !current_user_can('manage_options')) {
             wp_die('Unauthorized');
@@ -141,7 +143,7 @@ class ACE_SEO_Database_Optimizer {
      */
     public function ajax_get_optimization_progress() {
         // Verify nonce and permissions
-        if (!wp_verify_nonce($_POST['nonce'], 'ace_seo_dashboard_nonce') || !current_user_can('manage_options')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce') || !current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
         
@@ -214,7 +216,9 @@ class ACE_SEO_Database_Optimizer {
         delete_option('ace_seo_db_optimization_pending');
         
         // Log results
-        error_log('ACE SEO: Database indexes created with progress - ' . print_r($results, true));
+        if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+            error_log('ACE SEO: Database indexes created with progress - ' . print_r($results, true)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+        }
         
         return $results;
     }
@@ -269,7 +273,7 @@ class ACE_SEO_Database_Optimizer {
             foreach ($table_indexes as $index_name => $index_data) {
                 try {
                     $sql = "DROP INDEX `{$index_name}` ON `{$table}`";
-                    $result = $wpdb->query($sql);
+                    $result = $wpdb->query($sql); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- index DDL cannot use placeholders; identifiers come from a fixed internal list.
                     $results[$table][$index_name] = $result !== false ? 'removed' : 'error';
                 } catch (Exception $e) {
                     $results[$table][$index_name] = 'not_found';

@@ -69,14 +69,38 @@ class AceSEOSettings {
     }
     
     /**
+     * Sanitise a settings array: booleans and numbers keep their type, strings lose markup.
+     *
+     * @param mixed $value Submitted value.
+     * @return array
+     */
+    public function sanitize_settings_array( $value ) {
+        if ( ! is_array( $value ) ) {
+            return array();
+        }
+        $clean = array();
+        foreach ( $value as $key => $item ) {
+            $key = is_string( $key ) ? sanitize_key( $key ) : (int) $key;
+            if ( is_array( $item ) ) {
+                $clean[ $key ] = $this->sanitize_settings_array( $item );
+            } elseif ( is_bool( $item ) || is_int( $item ) || is_float( $item ) ) {
+                $clean[ $key ] = $item;
+            } else {
+                $clean[ $key ] = sanitize_textarea_field( (string) $item );
+            }
+        }
+        return $clean;
+    }
+
+    /**
      * Register plugin settings
      */
     public function register_settings() {
         // General settings
-        register_setting( 'ace_seo_general', 'ace_seo_settings' );
-        register_setting( 'ace_seo_social', 'ace_seo_social_settings' );
-        register_setting( 'ace_seo_advanced', 'ace_seo_advanced_settings' );
-        register_setting( 'ace_seo_compatibility', 'ace_seo_compatibility_settings' );
+        register_setting( 'ace_seo_general', 'ace_seo_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'ace_seo_social', 'ace_seo_social_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'ace_seo_advanced', 'ace_seo_advanced_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'ace_seo_compatibility', 'ace_seo_compatibility_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
         
         // General settings section
         add_settings_section(
@@ -228,7 +252,7 @@ class AceSEOSettings {
      */
     public function ajax_migrate_yoast_data() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_migrate_yoast')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_migrate_yoast')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }
@@ -344,7 +368,7 @@ class AceSEOSettings {
      */
     public function ajax_save_settings() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_admin_nonce')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
         }
 
@@ -555,7 +579,7 @@ class AceSEOSettings {
      */
     public function ajax_optimize_database_manual() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce($_POST['nonce'], 'ace_seo_optimize_db_manual')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_optimize_db_manual')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }
@@ -575,7 +599,9 @@ class AceSEOSettings {
             $results = $optimizer->create_indexes();
             
             // Log the optimization results
-            error_log('ACE SEO Manual Optimization: Database indexes updated - ' . print_r($results, true));
+            if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+                error_log('ACE SEO Manual Optimization: Database indexes updated - ' . print_r($results, true)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+            }
             
             // Update optimization status
             update_option('ace_seo_db_optimized', current_time('mysql'), false);
@@ -585,7 +611,7 @@ class AceSEOSettings {
             wp_send_json_success($results);
             
         } catch (Exception $e) {
-            error_log('ACE SEO Manual Optimization Error: ' . $e->getMessage());
+            error_log('ACE SEO Manual Optimization Error: ' . $e->getMessage()); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
             wp_send_json_error('Database optimization failed: ' . $e->getMessage());
         }
     }
@@ -621,7 +647,7 @@ class AceSEOSettings {
                     'total_posts' => $result['stats']['total_posts']
                 ),
                 'recent_posts_count' => count($result['recent_posts']),
-                'regenerated_at' => date('Y-m-d H:i:s', $result['regenerated_at']),
+                'regenerated_at' => gmdate('Y-m-d H:i:s', $result['regenerated_at']),
                 'cache_status' => $cache_status
             ));
             
@@ -695,12 +721,12 @@ class AceSEOSettings {
             FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
             LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
-            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            WHERE pm.meta_key LIKE %s
             AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
             AND p.post_status IN ('publish', 'draft', 'private', 'future')
             ORDER BY p.ID ASC
             LIMIT %d
-        ", time() - (7 * DAY_IN_SECONDS), $batch_size));
+        ", $wpdb->esc_like('_yoast_wpseo_') . '%', time() - (7 * DAY_IN_SECONDS), $batch_size));
         
         $processed = 0;
         $migrated = 0;
@@ -785,10 +811,10 @@ class AceSEOSettings {
             FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
             LEFT JOIN {$wpdb->postmeta} ace_check ON (p.ID = ace_check.post_id AND ace_check.meta_key = '_ace_seo_migration_check')
-            WHERE pm.meta_key LIKE '_yoast_wpseo_%'
+            WHERE pm.meta_key LIKE %s
             AND (ace_check.meta_value IS NULL OR ace_check.meta_value < %d)
             AND p.post_status IN ('publish', 'draft', 'private', 'future')
-        ", time() - (7 * DAY_IN_SECONDS)));
+        ", $wpdb->esc_like('_yoast_wpseo_') . '%', time() - (7 * DAY_IN_SECONDS)));
         
         // Check remaining taxonomies
         $yoast_tax_meta = get_option('wpseo_taxonomy_meta', []);

@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 $labels = AceSeoRetentionReport::recommendation_labels();
-$bucket = is_string( $_GET['recommendation'] ?? null ) ? sanitize_key( $_GET['recommendation'] ) : 'consolidate';
+$bucket = is_string( $_GET['recommendation'] ?? null ) ? sanitize_key( wp_unslash( $_GET['recommendation'] ) ) : 'consolidate';
 if ( ! isset( $labels[ $bucket ] ) && 'all' !== $bucket ) { $bucket = 'consolidate'; }
 $rows = AceSeoRetentionReport::rows( 'all' === $bucket ? '' : $bucket, 31, ( $page - 1 ) * 30 );
 _prime_post_caches( array_column( $rows, 'id' ), false, true );
@@ -47,7 +47,7 @@ $next = wp_next_scheduled( AceSeoRetentionReport::WEEKLY_HOOK );
                 if ( 'consolidate' === ( $parts[1] ?? '' ) ) { $entered += (int) $count; }
                 if ( 'consolidate' === $parts[0] ) { $left += (int) $count; }
             } ?>
-            <tr><td><?php echo esc_html( wp_date( 'j M Y, H:i T', $check['finished'] ) ); ?></td><td><?php echo (int) $check['days']; ?> days / <?php echo (int) $check['years']; ?> years</td><td><?php echo (int) ( $check['counts']['consolidate'] ?? 0 ); ?></td><td><?php echo $entered; ?></td><td><?php echo $left; ?></td></tr>
+            <tr><td><?php echo esc_html( wp_date( 'j M Y, H:i T', $check['finished'] ) ); ?></td><td><?php echo (int) $check['days']; ?> days / <?php echo (int) $check['years']; ?> years</td><td><?php echo (int) ( $check['counts']['consolidate'] ?? 0 ); ?></td><td><?php echo (int) $entered; ?></td><td><?php echo (int) $left; ?></td></tr>
         <?php endforeach; ?>
         <?php if ( ! $history ) : ?><tr><td colspan="5">No completed check history yet.</td></tr><?php endif; ?>
         </tbody></table>

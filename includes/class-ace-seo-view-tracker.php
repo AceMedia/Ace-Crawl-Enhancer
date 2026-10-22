@@ -141,7 +141,7 @@ class AceSeoViewTracker {
         $url = rest_url( 'ace-seo/v1/hit' );
         printf(
             '<script id="ace-seo-hit">(function(){try{var d=new FormData();d.append("p","%d");d.append("r",document.referrer||"");if(navigator.sendBeacon){navigator.sendBeacon(%s,d);}}catch(e){}})();</script>' . "\n",
-            $id,
+            absint( $id ),
             wp_json_encode( esc_url_raw( $url ) )
         );
     }
@@ -160,7 +160,7 @@ class AceSeoViewTracker {
 
     public static function rest_hit( WP_REST_Request $request ) {
         $id = absint( $request->get_param( 'p' ) );
-        $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) : '';
+        $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
         // A bot running the beacon was already counted on the server when the page rendered.
         if ( $id && ! self::is_bot( $ua ) && self::trackable( $id ) ) {
             $ref = (string) $request->get_param( 'r' );
@@ -178,7 +178,7 @@ class AceSeoViewTracker {
         if ( ! is_singular() || is_preview() || 'GET' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             return;
         }
-        $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? (string) wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) : '';
+        $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
         if ( ! self::is_bot( $ua ) ) {
             return;
         }
@@ -219,9 +219,10 @@ class AceSeoViewTracker {
 
     public static function record_referrer( $post_id, $ref ) {
         global $wpdb;
+        $ref_table = self::ref_table();
         list( $source, $host ) = self::classify_referrer( $ref );
         $wpdb->query( $wpdb->prepare(
-            'INSERT INTO ' . self::ref_table() . ' (post_id, day, source, host, hits) VALUES (%d, %s, %s, %s, 1) ON DUPLICATE KEY UPDATE hits = hits + 1',
+            "INSERT INTO {$ref_table} (post_id, day, source, host, hits) VALUES (%d, %s, %s, %s, 1) ON DUPLICATE KEY UPDATE hits = hits + 1",
             (int) $post_id,
             current_time( 'Y-m-d', true ),
             $source,
@@ -236,10 +237,11 @@ class AceSeoViewTracker {
      */
     public static function series( $post_id, $days = 30 ) {
         global $wpdb;
+        $table = self::table();
         $days  = max( 1, min( 400, (int) $days ) );
         $start = gmdate( 'Y-m-d', strtotime( '-' . ( $days - 1 ) . ' days' ) );
         $rows  = self::enabled() ? $wpdb->get_results( $wpdb->prepare(
-            'SELECT day, humans, bots FROM ' . self::table() . ' WHERE post_id = %d AND day >= %s',
+            "SELECT day, humans, bots FROM {$table} WHERE post_id = %d AND day >= %s",
             (int) $post_id,
             $start
         ), OBJECT_K ) : array();
@@ -262,11 +264,12 @@ class AceSeoViewTracker {
      */
     public static function referrers( $post_id, $days = 30, $limit = 50 ) {
         global $wpdb;
+        $ref_table = self::ref_table();
         if ( ! self::enabled() ) {
             return array();
         }
         $rows = $wpdb->get_results( $wpdb->prepare(
-            'SELECT source, host, SUM(hits) AS hits, MAX(day) AS last FROM ' . self::ref_table() . ' WHERE post_id = %d AND day >= %s GROUP BY source, host ORDER BY hits DESC LIMIT %d',
+            "SELECT source, host, SUM(hits) AS hits, MAX(day) AS last FROM {$ref_table} WHERE post_id = %d AND day >= %s GROUP BY source, host ORDER BY hits DESC LIMIT %d",
             (int) $post_id,
             gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $days ) . ' days' ) ),
             max( 1, (int) $limit )
@@ -280,8 +283,9 @@ class AceSeoViewTracker {
     /** One upsert per hit. */
     public static function record( $post_id, $is_bot ) {
         global $wpdb;
+        $table = self::table();
         $wpdb->query( $wpdb->prepare(
-            'INSERT INTO ' . self::table() . ' (post_id, day, humans, bots) VALUES (%d, %s, %d, %d) ON DUPLICATE KEY UPDATE humans = humans + VALUES(humans), bots = bots + VALUES(bots)',
+            "INSERT INTO {$table} (post_id, day, humans, bots) VALUES (%d, %s, %d, %d) ON DUPLICATE KEY UPDATE humans = humans + VALUES(humans), bots = bots + VALUES(bots)",
             (int) $post_id,
             current_time( 'Y-m-d', true ),
             $is_bot ? 0 : 1,
@@ -310,13 +314,16 @@ class AceSeoViewTracker {
      */
     public static function views_for( array $ids, $days ) {
         global $wpdb;
+        $table = self::table();
         $ids = array_filter( array_map( 'intval', $ids ) );
         if ( ! $ids || ! self::enabled() ) {
             return array();
         }
-        $rows = $wpdb->get_results( $wpdb->prepare(
-            'SELECT post_id, SUM(humans) AS n FROM ' . self::table() . ' WHERE post_id IN (' . implode( ',', $ids ) . ') AND day >= %s GROUP BY post_id',
-            gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $days ) . ' days' ) )
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $since        = gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $days ) . ' days' ) );
+        $rows         = $wpdb->get_results( $wpdb->prepare(
+            "SELECT post_id, SUM(humans) AS n FROM {$table} WHERE post_id IN ({$placeholders}) AND day >= %s GROUP BY post_id",
+            array_merge( array_values( $ids ), array( $since ) )
         ) );
         $out = array();
         foreach ( $rows as $row ) {
@@ -333,11 +340,12 @@ class AceSeoViewTracker {
      */
     public static function views_between( $start, $end ) {
         global $wpdb;
+        $table = self::table();
         if ( ! self::enabled() ) {
             return array();
         }
         $rows = $wpdb->get_results( $wpdb->prepare(
-            'SELECT post_id, SUM(humans) AS n FROM ' . self::table() . ' WHERE day >= %s AND day <= %s GROUP BY post_id',
+            "SELECT post_id, SUM(humans) AS n FROM {$table} WHERE day >= %s AND day <= %s GROUP BY post_id",
             $start,
             $end
         ) );
@@ -351,21 +359,24 @@ class AceSeoViewTracker {
     /** The first day tracking has rows for ('' when none): coverage cannot start earlier. */
     public static function coverage_start() {
         global $wpdb;
+        $table = self::table();
         if ( ! self::enabled() ) {
             return '';
         }
-        $day = $wpdb->get_var( 'SELECT MIN(day) FROM ' . self::table() );
+        $day = $wpdb->get_var( "SELECT MIN(day) FROM {$table}" );
         return is_string( $day ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $day ) ? $day : '';
     }
 
     /** Daily: last viewed day into post meta for posts read since the last run; prune old rows. */
     public static function rollup() {
         global $wpdb;
+        $table = self::table();
+        $ref_table = self::ref_table();
         if ( ! self::enabled() ) {
             return;
         }
         $rows = $wpdb->get_results( $wpdb->prepare(
-            'SELECT post_id, MAX(day) AS last FROM ' . self::table() . ' WHERE day >= %s AND humans > 0 GROUP BY post_id',
+            "SELECT post_id, MAX(day) AS last FROM {$table} WHERE day >= %s AND humans > 0 GROUP BY post_id",
             gmdate( 'Y-m-d', strtotime( '-2 days' ) )
         ) );
         foreach ( $rows as $row ) {
@@ -378,7 +389,7 @@ class AceSeoViewTracker {
         // with nothing in the window lose theirs, so a sort never ranks on a stale figure.
         $window = gmdate( 'Y-m-d', strtotime( '-' . self::WINDOW_DAYS . ' days' ) );
         $totals = $wpdb->get_results( $wpdb->prepare(
-            'SELECT post_id, SUM(humans) AS humans, SUM(bots) AS bots FROM ' . self::table() . ' WHERE day >= %s GROUP BY post_id',
+            "SELECT post_id, SUM(humans) AS humans, SUM(bots) AS bots FROM {$table} WHERE day >= %s GROUP BY post_id",
             $window
         ), OBJECT_K );
         foreach ( $totals as $post_id => $t ) {
@@ -395,8 +406,8 @@ class AceSeoViewTracker {
         }
 
         $keep = gmdate( 'Y-m-d', strtotime( '-' . (int) apply_filters( 'ace_seo_track_keep_days', self::KEEP_DAYS ) . ' days' ) );
-        $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::table() . ' WHERE day < %s', $keep ) );
-        $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . self::ref_table() . ' WHERE day < %s', $keep ) );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE day < %s", $keep ) );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM {$ref_table} WHERE day < %s", $keep ) );
         do_action( 'ace_seo_hits_rolled_up' );
     }
 }

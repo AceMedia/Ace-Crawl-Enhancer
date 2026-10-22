@@ -7,8 +7,6 @@ require_once __DIR__ . '/responses.php';
 require_once __DIR__ . '/session.php';
 final class Service {
 	const OPTION = 'ace_ai_connection_v1';
-	const BRIDGE_OPTION = 'ace_ai_codex_bridge_v1';
-	const BRIDGE_DEFAULT = '/usr/local/bin/ace-codex-bridge';
 	const PROVIDERS = array( 'api_key', 'chatgpt', 'codex' );
 	private $force_network;
 	public function __construct( bool $force_network = false ) { $this->force_network = $force_network; }
@@ -172,43 +170,26 @@ final class Service {
 
 	/* ---- Codex CLI bridge: a second, isolated Codex instance on this server signed in from wp-admin. ---- */
 
-	/** The bridge command, e.g. `sudo -H -u ace-ai /usr/local/bin/ace-codex-bridge`. Constant > option > default install path. */
-	public function codex_bridge(): string {
-		if ( defined( 'ACE_AI_CODEX_BRIDGE' ) && is_string( ACE_AI_CODEX_BRIDGE ) ) { return trim( ACE_AI_CODEX_BRIDGE ); }
-		$cmd = is_multisite() ? get_network_option( get_current_network_id(), self::BRIDGE_OPTION, '' ) : get_option( self::BRIDGE_OPTION, '' );
-		if ( is_string( $cmd ) && '' !== trim( $cmd ) ) { return trim( $cmd ); }
-		return is_executable( self::BRIDGE_DEFAULT ) ? self::BRIDGE_DEFAULT : '';
-	}
+	/** Whether a host-provided Codex runner is registered on the `ace_ai_codex_runner` filter. This plugin never runs programs itself. */
 	public function codex_available(): bool {
-		return '' !== $this->codex_bridge() && function_exists( 'proc_open' );
-	}
-	public function save_codex_bridge( string $cmd, bool $network = false ) {
-		if ( ! current_user_can( $network ? 'manage_network_options' : 'manage_options' ) || ( is_multisite() && ! $network ) ) { return new \WP_Error( 'ace_ai_forbidden', 'Only a network administrator can change the bridge command.' ); }
-		$cmd = trim( $cmd );
-		if ( '' !== $cmd && ! preg_match( '#^[A-Za-z0-9_./=:@ -]+$#D', $cmd ) ) { return new \WP_Error( 'ace_ai_bridge_invalid', 'The bridge command may only contain a path, a sudo prefix and plain arguments.' ); }
-		if ( $network ) { update_network_option( get_current_network_id(), self::BRIDGE_OPTION, $cmd ); } else { update_option( self::BRIDGE_OPTION, $cmd, false ); }
-		return true;
+		return (bool) has_filter( 'ace_ai_codex_runner' );
 	}
 	/** One Codex home per WordPress scope, so a site's own connection never shares the network's account. */
 	public function codex_scope( bool $network ): string {
 		return $network ? 'network-' . (int) get_current_network_id() : 'site-' . (int) get_current_blog_id();
 	}
+	/**
+	 * Hand a Codex request to the host-provided runner.
+	 *
+	 * Filter `ace_ai_codex_runner( null, $sub, $scope, $stdin, $timeout )` returns the decoded
+	 * reply array or a WP_Error. A site that wants Codex sign-in supplies the runner; nothing
+	 * is executed from this plugin.
+	 */
 	private function codex_run( string $sub, string $scope, string $stdin = '', int $timeout = 60 ) {
-		$bridge = $this->codex_bridge();
-		if ( '' === $bridge || ! function_exists( 'proc_open' ) ) { return new \WP_Error( 'ace_ai_codex_unavailable', 'The Codex bridge is not installed on this server.' ); }
-		$cmd = 'timeout ' . (int) $timeout . ' ' . $bridge . ' ' . escapeshellarg( $sub ) . ' ' . escapeshellarg( $scope );
-		$proc = proc_open( $cmd, array( 0 => array( 'pipe', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
-		if ( ! is_resource( $proc ) ) { return new \WP_Error( 'ace_ai_codex_unavailable', 'The Codex bridge could not be started.' ); }
-		fwrite( $pipes[0], $stdin ); fclose( $pipes[0] );
-		$out = stream_get_contents( $pipes[1] ); fclose( $pipes[1] );
-		$err = stream_get_contents( $pipes[2] ); fclose( $pipes[2] );
-		$code = proc_close( $proc );
-		$data = json_decode( (string) $out, true );
-		if ( 0 !== $code && is_array( $data ) && ! empty( $data['error'] ) && is_string( $data['error'] ) ) { return new \WP_Error( 'ace_ai_codex_error', $data['error'] ); }
-		if ( ! is_array( $data ) || 0 !== $code ) {
-			$detail = trim( (string) preg_replace( '/\s+/', ' ', substr( (string) $err, -300 ) ) );
-			return new \WP_Error( 'ace_ai_codex_error', 124 === $code ? 'The Codex bridge timed out.' : 'The Codex bridge gave no usable reply' . ( $detail ? ': ' . $detail : '.' ) );
-		}
+		if ( ! $this->codex_available() ) { return new \WP_Error( 'ace_ai_codex_unavailable', 'No Codex runner is registered on this site.' ); }
+		$data = apply_filters( 'ace_ai_codex_runner', null, $sub, $scope, $stdin, $timeout );
+		if ( is_wp_error( $data ) ) { return $data; }
+		if ( ! is_array( $data ) ) { return new \WP_Error( 'ace_ai_codex_error', 'The Codex runner gave no usable reply.' ); }
 		return $data;
 	}
 	public function codex_login_start( bool $network = false ) {
@@ -334,14 +315,14 @@ final class Service {
 		$column = $network ? 'meta_value' : 'option_value';
 		$load = function () use ( $wpdb, $network, $id, $table, $column ) {
 			$sql = $network ? $wpdb->prepare( "SELECT meta_value FROM {$table} WHERE site_id=%d AND meta_key=%s LIMIT 1", $id, self::OPTION ) : $wpdb->prepare( "SELECT option_value FROM {$table} WHERE option_name=%s LIMIT 1", self::OPTION );
-			$record = maybe_unserialize( $wpdb->get_var( $sql ) );
+			$record = maybe_unserialize( $wpdb->get_var( $sql ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared immediately above.
 			if ( ! is_array( $record ) || 'own' !== ( $record['mode'] ?? '' ) || 'chatgpt' !== ( $record['provider'] ?? '' ) ) { return new \WP_Error( 'ace_ai_connection_changed', 'The connection changed.' ); }
 			$plain = $this->decrypt( $record['secret'] );
 			return is_wp_error( $plain ) ? $plain : json_decode( $plain, true );
 		};
 		$cas = function ( $old, $next ) use ( $wpdb, $table, $column, $where, $network, $id ) {
 			$sql = $network ? $wpdb->prepare( "SELECT meta_value FROM {$table} WHERE site_id=%d AND meta_key=%s LIMIT 1", $id, self::OPTION ) : $wpdb->prepare( "SELECT option_value FROM {$table} WHERE option_name=%s LIMIT 1", self::OPTION );
-			$raw = $wpdb->get_var( $sql ); $record = maybe_unserialize( $raw );
+			$raw = $wpdb->get_var( $sql ); $record = maybe_unserialize( $raw ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared immediately above.
 			if ( ! is_array( $record ) || 'chatgpt' !== ( $record['provider'] ?? '' ) ) { return false; }
 			$plain = $this->decrypt( $record['secret'] ); if ( is_wp_error( $plain ) || json_decode( $plain, true ) !== $old ) { return false; }
 			$secret = $this->encrypt( wp_json_encode( $next ) ); if ( is_wp_error( $secret ) ) { return false; }

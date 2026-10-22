@@ -98,7 +98,7 @@ class AceSeoRetentionQueue {
 
     public static function job( $plan ) {
         global $wpdb;
-        $r = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table( 'jobs' ) . ' WHERE plan_id=%d', $plan ), ARRAY_A );
+        $r = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table( 'jobs' ) . ' WHERE plan_id=%d', $plan ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
         if ( $wpdb->last_error ) { throw new RuntimeException( 'Cannot read queue state.' ); }
         if ( $r ) { $r['payload'] = json_decode( $r['payload'], true ); }
         return $r;
@@ -169,11 +169,11 @@ class AceSeoRetentionQueue {
         if ( false === stripos( get_class( $wpdb ), 'sqlite' ) ) {
             foreach ( $ids as $id ) {
                 foreach ( array( "SELECT ID FROM {$wpdb->posts} WHERE ID=%d FOR UPDATE", "SELECT meta_id FROM {$wpdb->postmeta} WHERE post_id=%d FOR UPDATE", "SELECT term_taxonomy_id FROM {$wpdb->term_relationships} WHERE object_id=%d FOR UPDATE" ) as $sql ) {
-                    if ( false === $wpdb->query( $wpdb->prepare( $sql, $id ) ) ) { throw new RuntimeException( 'Article locks unavailable.' ); }
+                    if ( false === $wpdb->query( $wpdb->prepare( $sql, $id ) ) ) { throw new RuntimeException( 'Article locks unavailable.' ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
                 }
             }
             foreach ( array( "SELECT ID FROM {$wpdb->users} WHERE ID=%d FOR UPDATE", "SELECT umeta_id FROM {$wpdb->usermeta} WHERE user_id=%d FOR UPDATE" ) as $sql ) {
-                if ( false === $wpdb->query( $wpdb->prepare( $sql, get_current_user_id() ) ) ) { throw new RuntimeException( 'Permission locks unavailable.' ); }
+                if ( false === $wpdb->query( $wpdb->prepare( $sql, get_current_user_id() ) ) ) { throw new RuntimeException( 'Permission locks unavailable.' ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             }
             $names = array( self::CONTROL, self::LOCK, AceSeoRetentionReport::PROGRESS_OPTION, AceSeoRetentionActions::OPTION, 'blog_public', 'home', 'siteurl', 'page_on_front', 'page_for_posts', 'permalink_structure', $wpdb->prefix . 'user_roles' );
             foreach ( $names as $key ) { if ( false === $wpdb->query( $wpdb->prepare( "SELECT option_id FROM {$wpdb->options} WHERE option_name=%s FOR UPDATE", $key ) ) ) { throw new RuntimeException( 'Settings locks unavailable.' ); } }
@@ -186,14 +186,14 @@ class AceSeoRetentionQueue {
         $old_user = get_current_user_id();
         try {
             global $wpdb;
-            $pending = $wpdb->get_results( 'SELECT * FROM ' . self::table( 'jobs' ) . " WHERE state IN ('applied','undone') AND payload LIKE '%\"cache_pending\":true%' ORDER BY updated LIMIT 3", ARRAY_A );
+            $pending = $wpdb->get_results( 'SELECT * FROM ' . self::table( 'jobs' ) . " WHERE state IN ('applied','undone') AND payload LIKE '%\"cache_pending\":true%' ORDER BY updated LIMIT 3", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             foreach ( $pending as $j ) { self::finish_purge( $j['plan_id'], $j['source_id'], json_decode( $j['payload'], true ) ); }
             // A crash cannot silently retry a possibly half-finished action. Its intent remains auditable.
-            $stuck = $wpdb->get_results( "SELECT * FROM " . self::table( 'jobs' ) . " WHERE state='applying' ORDER BY updated LIMIT 10", ARRAY_A );
+            $stuck = $wpdb->get_results( "SELECT * FROM " . self::table( 'jobs' ) . " WHERE state='applying' ORDER BY updated LIMIT 10", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             foreach ( $stuck as $j ) { self::state( $j['plan_id'], 'review', array_merge( json_decode( $j['payload'], true ), array( 'reason' => 'Interrupted application: inspect the source and create a new assessment.' ) ) ); }
             $c = self::control(); if ( ! $c['enabled'] ) { return; }
             // Exactly one approved pair per run. The hourly schedule cannot sweep an archive.
-            $plan = $wpdb->get_var( "SELECT plan_id FROM " . self::table( 'jobs' ) . " WHERE state='approved' ORDER BY updated,plan_id LIMIT 1" );
+            $plan = $wpdb->get_var( "SELECT plan_id FROM " . self::table( 'jobs' ) . " WHERE state='approved' ORDER BY updated,plan_id LIMIT 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             if ( $plan ) { static::execute( (int) $plan, $lease ); }
         } finally { wp_set_current_user( $old_user ); static::release( $lease ); }
     }
@@ -220,7 +220,7 @@ class AceSeoRetentionQueue {
             if ( ! AceSeoRetentionFresh::authorised( $j['actor'], $ids ) ) { throw new RuntimeException( 'Permissions changed during preflight.' ); }
             $saved = AceSeoRetentionFresh::post( $plan );
             if ( ! $saved || $p['digest'] !== hash( 'sha256', wp_json_encode( AceSeoRetentionPrototype::read( $saved ) ) ) ) { throw new RuntimeException( 'Assessment changed during preflight.' ); }
-            $attempts = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::table( 'events' ) . ' WHERE kind=%s AND recorded >= %d', 'apply-intent', strtotime( 'today UTC' ) ) );
+            $attempts = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::table( 'events' ) . ' WHERE kind=%s AND recorded >= %d', 'apply-intent', strtotime( 'today UTC' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             if ( $wpdb->last_error ) { throw new RuntimeException( 'Cannot verify the daily cap.' ); }
             if ( $attempts >= $c['daily_cap'] ) { $wpdb->query( 'ROLLBACK' ); return; }
             AceSeoRetentionFresh::run( $ids, static function() use ( $ids, $plan, $s, &$p, $fresh ) {
@@ -229,7 +229,7 @@ class AceSeoRetentionQueue {
                 if ( $p['before']['target'] ) { throw new RuntimeException( 'Source already has a rule.' ); }
                 self::state( $plan, 'applying', $p ); self::event( $plan, 'apply-intent', $p );
                 $ok = AceSeoRedirects::save( $ids[0], array( 'target' => $s['target']['url'], 'code' => 301 ) );
-                if ( is_wp_error( $ok ) ) { throw new RuntimeException( $ok->get_error_message() ); }
+                if ( is_wp_error( $ok ) ) { throw new RuntimeException( esc_html( $ok->get_error_message() ) ); }
                 $p['after'] = AceSeoRedirects::settings( $ids[0] );
                 if ( $p['after']['target'] !== $s['target']['url'] || 301 !== $p['after']['code'] || $p['after']['paused'] || $p['after']['expires'] || $p['after']['trash'] ) { throw new RuntimeException( 'Redirect write could not be verified.' ); }
                 $p['after_fingerprint'] = AceSeoRetentionPrototype::fingerprint( $ids[0], $ids[1] );
@@ -292,9 +292,9 @@ class AceSeoRetentionQueue {
         if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_retention_queue' );
         foreach ( array( 'operation', 'plan', 'scope', 'cap', 'enabled' ) as $k ) { if ( isset( $_POST[ $k ] ) && ! is_scalar( $_POST[ $k ] ) ) { wp_die( 'Invalid form.' ); } }
-        $op = sanitize_key( $_POST['operation'] ?? '' ); $plan = absint( $_POST['plan'] ?? 0 );
+        $op = sanitize_key( wp_unslash( $_POST['operation'] ?? '' ) ); $plan = absint( $_POST['plan'] ?? 0 );
         try {
-            if ( 'configure' === $op ) { $r = self::configure( ! empty( $_POST['enabled'] ), preg_split( '/[\s,]+/', wp_unslash( $_POST['scope'] ?? '' ) ), (int) ( $_POST['cap'] ?? 3 ) ); }
+            if ( 'configure' === $op ) { $r = self::configure( ! empty( $_POST['enabled'] ), preg_split( '/[\s,]+/', wp_unslash( $_POST['scope'] ?? '' ) ), absint( wp_unslash( $_POST['cap'] ?? 3 ) ) ); }
             elseif ( 'pause' === $op ) { $c = self::control(); $r = self::configure( false, $c['scope'], $c['daily_cap'] ); }
             elseif ( 'approve' === $op ) { $r = self::approve( $plan ); }
             elseif ( 'undo' === $op ) { $r = self::undo( $plan ); }

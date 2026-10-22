@@ -160,7 +160,7 @@ function ace_seo_disable_robots_file() {
 
     if ( '' !== $path ) {
         $target = dirname( $path ) . '/robots.txt.disabled-' . gmdate( 'Ymd-His' );
-        $result = @rename( $path, $target ) ? 'renamed' : 'failed';
+        $result = @rename( $path, $target ) ? 'renamed' : 'failed'; // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- renaming the robots file on the server is the feature; WP_Filesystem is not needed for a same-directory rename.
     }
 
     wp_safe_redirect(

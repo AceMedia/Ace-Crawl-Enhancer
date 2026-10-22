@@ -126,7 +126,7 @@ class ACE_SEO_Frontend_Performance {
             AND meta_key IN ({$placeholders})
         ", array_merge(array($post_id), $meta_keys));
         
-        $results = $wpdb->get_results($query);
+        $results = $wpdb->get_results($query); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared immediately above.
         
         $this->cached_meta[$post_id] = array();
         foreach ($results as $row) {

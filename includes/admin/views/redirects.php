@@ -1,6 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-$tab = is_string( $_GET['tab'] ?? null ) ? sanitize_key( $_GET['tab'] ) : 'existing';
+$tab = is_string( $_GET['tab'] ?? null ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'existing';
 if ( ! in_array( $tab, array( 'existing', 'auto', 'suggestions' ), true ) ) { $tab = 'existing'; }
 ?>
 <div class="wrap ace-redirect-manager">

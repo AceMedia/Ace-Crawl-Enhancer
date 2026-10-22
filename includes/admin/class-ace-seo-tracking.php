@@ -633,7 +633,7 @@ class AceSeoTracking {
     }
 
     public static function assets() {
-        if ( ( $_GET['page'] ?? '' ) !== self::SLUG ) { return; }
+        if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== self::SLUG ) { return; }
         wp_enqueue_style( 'ace-seo-tracking', ACE_SEO_URL . 'assets/css/tracking.css', array(), ACE_SEO_VERSION );
         wp_enqueue_script( 'ace-seo-tracking', ACE_SEO_URL . 'assets/js/tracking.js', array(), ACE_SEO_VERSION, true );
     }
@@ -695,7 +695,7 @@ class AceSeoTracking {
             $row[] = isset( $saved['at'] ) ? gmdate( 'c', $saved['at'] ) : '';
             fputcsv( $fh, $row );
         }
-        fclose( $fh );
+        fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closing the php://output CSV stream, not a filesystem path.
         exit;
     }
 
@@ -705,7 +705,6 @@ class AceSeoTracking {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        $e = 'esc_html';
         $metric = ( isset( $_GET['metric'] ) && 'views' === $_GET['metric'] ) ? 'views' : 'visitors';
         $detect = self::detect();
         $page = self::probe_page();
@@ -732,7 +731,7 @@ class AceSeoTracking {
         if ( ! empty( $_GET['refreshed'] ) ) {
             echo '<div class="notice notice-success"><p>Checks re-run.</p></div>';
         }
-        echo '<p>Tracking configuration, evidence in home-page HTML, and reported traffic are separate checks. This server check does not execute JavaScript or accept consent. Checked daily at 05:10; next run ' . $e( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . $e( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
+        echo '<p>Tracking configuration, evidence in home-page HTML, and reported traffic are separate checks. This server check does not execute JavaScript or accept consent. Checked daily at 05:10; next run ' . esc_html( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . esc_html( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
 
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
         wp_nonce_field( 'ace_seo_tracking_refresh' );
@@ -752,25 +751,25 @@ class AceSeoTracking {
             return 'warn' === $x[0];
         } );
         $summary = self::summary( $page, $series, $problems );
-        echo '<div class="box box-' . $e( $summary[0] ) . '"><strong>' . $e( $summary[1] ) . '</strong>';
+        echo '<div class="box box-' . esc_html( $summary[0] ) . '"><strong>' . esc_html( $summary[1] ) . '</strong>';
         if ( $bad ) {
             echo '<ul>';
             foreach ( $bad as $x ) {
-                echo '<li>' . $e( $x[1] ) . '</li>';
+                echo '<li>' . esc_html( $x[1] ) . '</li>';
             }
             echo '</ul>';
         }
         echo '</div>';
         $report_date = self::recent_reporting( $series );
         if ( $report_date ) {
-            echo '<p>Google Analytics reports traffic for ' . $e( $report_date ) . '. This is evidence for the connected property; it does not verify every tag, page, consent choice or visit.</p>';
+            echo '<p>Google Analytics reports traffic for ' . esc_html( $report_date ) . '. This is evidence for the connected property; it does not verify every tag, page, consent choice or visit.</p>';
         } else {
             echo '<p>Recent Google Analytics traffic has not been established by this report. Missing or unavailable data is not proof of zero visitors.</p>';
         }
         if ( $warn ) {
             echo '<div class="box box-warn"><strong>Worth a look.</strong><ul>';
             foreach ( $warn as $x ) {
-                echo '<li>' . $e( $x[1] ) . '</li>';
+                echo '<li>' . esc_html( $x[1] ) . '</li>';
             }
             echo '</ul></div>';
         }
@@ -780,35 +779,35 @@ class AceSeoTracking {
         // Chart.
         if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() || $google['definitions'] ) {
             $jp_on = ! empty( $series['jp']['ok'] );
-            echo '<h2>Last ' . self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
+            echo '<h2>Last ' . (int) self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
             if ( $a ) {
                 echo '<div class="tiles">';
-                echo '<div class="tile"><b>' . $e( number_format_i18n( $a['ga_total'] ) ) . '</b><span>GA4 active users' . ( $jp_on ? ', complete days' : '' ) . '</span></div>';
+                echo '<div class="tile"><b>' . esc_html( number_format_i18n( $a['ga_total'] ) ) . '</b><span>GA4 active users' . ( $jp_on ? ', complete days' : '' ) . '</span></div>';
                 if ( $jp_on ) {
-                    echo '<div class="tile"><b>' . $e( number_format_i18n( $a['jp_total'] ) ) . '</b><span>Jetpack visitors, same days</span></div>';
+                    echo '<div class="tile"><b>' . esc_html( number_format_i18n( $a['jp_total'] ) ) . '</b><span>Jetpack visitors, same days</span></div>';
                     if ( null !== $a['ratio'] ) {
-                        echo '<div class="tile"><b>' . $e( number_format( $a['ratio'], 2 ) ) . '</b><span>GA4 users per Jetpack visitor on healthy days</span></div>';
+                        echo '<div class="tile"><b>' . esc_html( number_format( $a['ratio'], 2 ) ) . '</b><span>GA4 users per Jetpack visitor on healthy days</span></div>';
                     }
                 }
-                echo '<div class="tile"><b>' . $e( count( $a['gap_days'] ) ) . '</b><span>days Analytics missed' . ( $a['missing_users'] ? ', about ' . number_format_i18n( $a['missing_users'] ) . ' users unrecorded' : '' ) . '</span></div>';
+                echo '<div class="tile"><b>' . esc_html( count( $a['gap_days'] ) ) . '</b><span>days Analytics missed' . ( $a['missing_users'] ? ', about ' . esc_html( number_format_i18n( $a['missing_users'] ) ) . ' users unrecorded' : '' ) . '</span></div>';
                 echo '</div>';
             }
             echo '<p class="legend"><i style="background:#fde8e6;height:10px;border:1px dashed #d63638"></i>Possible Analytics gap</p>';
             self::render_chart( $series, $commerce, $metric, $a ? $a['gap_days'] : array(), $google );
             if ( ! empty( $series['ga']['error'] ) ) {
-                echo '<p>Analytics: ' . $e( $series['ga']['error'] ) . '</p>';
+                echo '<p>Analytics: ' . esc_html( $series['ga']['error'] ) . '</p>';
             }
             if ( ! empty( $series['jp']['error'] ) ) {
-                echo '<p>Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
+                echo '<p>Jetpack: ' . esc_html( $series['jp']['error'] ) . '</p>';
             }
         } else {
-            echo '<h2>Daily numbers</h2><p>No counter is readable yet. Analytics: ' . $e( $series['ga']['error'] ) . ' Jetpack: ' . $e( $series['jp']['error'] ) . '</p>';
+            echo '<h2>Daily numbers</h2><p>No counter is readable yet. Analytics: ' . esc_html( $series['ga']['error'] ) . ' Jetpack: ' . esc_html( $series['jp']['error'] ) . '</p>';
         }
-        if ( $commerce['enabled'] && ! $commerce['ok'] && ! empty( $commerce['error'] ) ) { echo '<p>WooCommerce: ' . $e( $commerce['error'] ) . '</p>'; }
+        if ( $commerce['enabled'] && ! $commerce['ok'] && ! empty( $commerce['error'] ) ) { echo '<p>WooCommerce: ' . esc_html( $commerce['error'] ) . '</p>'; }
 
         if ( $google['status'] ) {
             echo '<details class="ace-trk-google-status"><summary>Google reporting connections</summary><ul>';
-            foreach ( $google['status'] as $name => $status ) { echo '<li><strong>' . $e( $name ) . ':</strong> ' . $e( $status ) . '</li>'; }
+            foreach ( $google['status'] as $name => $status ) { echo '<li><strong>' . esc_html( $name ) . ':</strong> ' . esc_html( $status ) . '</li>'; }
             echo '</ul><a href="' . esc_url( admin_url( 'admin.php?page=googlesitekit-settings' ) ) . '">Site Kit settings</a></details>';
         }
 
@@ -823,7 +822,8 @@ class AceSeoTracking {
                 AceSeoTrackingUI::ads( $ads );
                 continue;
             }
-            echo '<tr><td><strong>' . $e( $row['label'] ) . '</strong></td><td><span class="pill pill-' . $e( $row['status'] ) . '">' . $e( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . AceSeoTrackingUI::detail( $row['detail'] ) . '<span class="ace-trk-row-links">' . AceSeoTrackingUI::links( $row['key'], $row ) . '</span></td></tr>';
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceSeoTrackingUI and svg_chart() escape every dynamic value as they build the markup.
+            echo '<tr><td><strong>' . esc_html( $row['label'] ) . '</strong></td><td><span class="pill pill-' . esc_html( $row['status'] ) . '">' . esc_html( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . AceSeoTrackingUI::detail( $row['detail'] ) . '<span class="ace-trk-row-links">' . AceSeoTrackingUI::links( $row['key'], $row ) . '</span></td></tr>';
         }
         echo '</tbody></table>';
         if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::render(); }
@@ -831,7 +831,7 @@ class AceSeoTracking {
         // On the page.
         echo '<h2>Found in home-page HTML</h2>';
         if ( empty( $page['ok'] ) ) {
-            echo '<p>The home-page HTML could not be verified: ' . $e( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . '</p>';
+            echo '<p>The home-page HTML could not be verified: ' . esc_html( $page['error'] ?? ( 'HTTP ' . ( $page['http'] ?? '?' ) ) ) . '</p>';
         } else {
             $found = array();
             foreach ( $page['loaders'] as $id ) {
@@ -858,7 +858,7 @@ class AceSeoTracking {
             }
             echo '<table class="widefat striped"><thead><tr><th>Item</th><th>ID</th><th>State</th><th>Note</th></tr></thead><tbody>';
             foreach ( $found as $f ) {
-                echo '<tr><td>' . $e( $f[0] ) . '</td><td><code>' . $e( $f[1] ) . '</code></td><td><span class="pill pill-' . $e( $f[2] ) . '">' . $e( array( 'ok' => 'Found', 'warn' => 'Verify', 'bad' => 'Check', 'off' => 'Not found' )[ $f[2] ] ) . '</span></td><td>' . $e( $f[3] ) . '</td></tr>';
+                echo '<tr><td>' . esc_html( $f[0] ) . '</td><td><code>' . esc_html( $f[1] ) . '</code></td><td><span class="pill pill-' . esc_html( $f[2] ) . '">' . esc_html( array( 'ok' => 'Found', 'warn' => 'Verify', 'bad' => 'Check', 'off' => 'Not found' )[ $f[2] ] ) . '</span></td><td>' . esc_html( $f[3] ) . '</td></tr>';
             }
             echo '</tbody></table>';
         }
@@ -866,13 +866,12 @@ class AceSeoTracking {
         // Daily table.
         $has_baseline = isset( $google['definitions']['baseline_views'] );
         if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || $has_baseline ) {
-            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th>' . ( $has_baseline ? '<th>Basic page views</th>' : '' ) . ( $commerce['ok'] ? '<th>Orders</th><th>Order value (' . $e( $commerce['currency'] ) . ')</th>' : '' ) . '</tr></thead><tbody>';
+            echo '<details style="margin-top:1.5em"><summary><strong>Daily numbers</strong></summary><table class="widefat striped" style="margin-top:8px"><thead><tr><th>Date</th><th style="text-align:right">GA4 users</th><th style="text-align:right">GA4 views</th><th style="text-align:right">Jetpack visitors</th><th style="text-align:right">Jetpack views</th>' . ( $has_baseline ? '<th>Basic page views</th>' : '' ) . ( $commerce['ok'] ? '<th>Orders</th><th>Order value (' . esc_html( $commerce['currency'] ) . ')</th>' : '' ) . '</tr></thead><tbody>';
             $gap = $a ? $a['gap_days'] : array();
             foreach ( array_reverse( $series['days'] ) as $d ) {
-                $mark = in_array( $d['date'], $gap, true ) ? ' style="background:#fde8e6"' : '';
-                echo '<tr' . $mark . '><td>' . $e( $d['date'] ) . '</td><td class="n">' . $e( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . $e( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . $e( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . $e( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td>';
-                if ( $has_baseline ) { $count = $google['days'][ $d['date'] ]['baseline_views'] ?? null; echo '<td class="n">' . $e( null === $count ? '–' : number_format_i18n( $count ) ) . '</td>'; }
-                if ( $commerce['ok'] ) { $sale = $commerce['days'][ $d['date'] ]; echo '<td class="n">' . $e( number_format_i18n( $sale['wc_orders'] ) ) . '</td><td class="n">' . $e( number_format_i18n( $sale['wc_value'], 2 ) ) . '</td>'; }
+                echo '<tr' . ( in_array( $d['date'], $gap, true ) ? ' style="background:#fde8e6"' : '' ) . '><td>' . esc_html( $d['date'] ) . '</td><td class="n">' . esc_html( null === $d['ga_users'] ? '–' : number_format_i18n( $d['ga_users'] ) ) . '</td><td class="n">' . esc_html( null === $d['ga_views'] ? '–' : number_format_i18n( $d['ga_views'] ) ) . '</td><td class="n">' . esc_html( null === $d['jp_visitors'] ? '–' : number_format_i18n( $d['jp_visitors'] ) ) . '</td><td class="n">' . esc_html( null === $d['jp_views'] ? '–' : number_format_i18n( $d['jp_views'] ) ) . '</td>';
+                if ( $has_baseline ) { $count = $google['days'][ $d['date'] ]['baseline_views'] ?? null; echo '<td class="n">' . esc_html( null === $count ? '–' : number_format_i18n( $count ) ) . '</td>'; }
+                if ( $commerce['ok'] ) { $sale = $commerce['days'][ $d['date'] ]; echo '<td class="n">' . esc_html( number_format_i18n( $sale['wc_orders'] ) ) . '</td><td class="n">' . esc_html( number_format_i18n( $sale['wc_value'], 2 ) ) . '</td>'; }
                 echo '</tr>';
             }
             echo '</tbody></table></details>';
@@ -914,6 +913,7 @@ class AceSeoTracking {
             echo '<label><input type="checkbox" name="' . esc_attr( $key ) . '" data-google-label="' . esc_attr( $definition['label'] ) . '" data-group="' . esc_attr( $definition['group'] ) . '"' . ( ! empty( $definition['area'] ) ? ' data-area="1"' : '' ) . ( 'baseline_views' === $key ? ' checked' : '' ) . '> ' . esc_html( $definition['label'] ) . '</label>';
         }
         if ( $has_sources ) { echo '<button type="button" class="button ace-trk-show-sources">Show traffic mix</button><label class="ace-trk-source-style">Sources <select name="source_style"><option value="area">Filled</option><option value="lines">Lines</option></select></label>'; }
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceSeoTrackingUI and svg_chart() escape every dynamic value as they build the markup.
         echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><div class="ace-trk-chart-guides" aria-label="About the selected chart data"><p class="ace-trk-chart-hint">Hover or touch to inspect a date. Use the arrow keys when the chart is focused. Missing data stays blank.</p>';
         echo '<p data-guide="ga"><strong>Google Analytics</strong> Dates use ' . esc_html( $google['timezone'] ?? 'the property timezone' ) . '. Today’s figures may still be processing.</p>';
         echo '<p data-guide="baseline"><strong>Basic page views</strong> Daily first-party counts in ' . esc_html( wp_timezone_string() ) . '. No visitor IDs or tracking cookies. Includes React history navigation; excludes known bots and opt-outs. These are views, not unique people. Unrecorded dates stay blank.</p>';

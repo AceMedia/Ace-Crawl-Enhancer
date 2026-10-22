@@ -1,5 +1,7 @@
 <?php
 if ( PHP_SAPI !== 'cli' ) { exit; }
+if ( ! function_exists( 'wp_delete_file' ) ) { function wp_delete_file( $file ) { @unlink( $file ); } }
+if ( ! function_exists( 'esc_html' ) ) { function esc_html( $text ) { return htmlspecialchars( (string) $text ); } }
 require_once dirname( __DIR__ ) . '/includes/class-ace-seo-retention-snapshot.php';
 $dir = sys_get_temp_dir() . '/ace-retention-snapshot-test-' . bin2hex( random_bytes( 6 ) );
 mkdir( $dir, 0700 );

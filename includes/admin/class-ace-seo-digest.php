@@ -226,18 +226,17 @@ class AceSeoDigest {
     }
 
     private static function table(array $rows, array $cols) {
-        $e = 'esc_html';
         echo '<table class="widefat striped" style="max-width:1100px;margin-bottom:1.5em"><thead><tr>';
-        foreach ($cols as $label) echo '<th>' . $e($label) . '</th>';
+        foreach ($cols as $label) echo '<th>' . esc_html($label) . '</th>';
         echo '</tr></thead><tbody>';
         foreach ($rows as $r) {
             echo '<tr>';
             foreach ($cols as $key => $label) {
                 $v = $r[$key] ?? '';
                 if (in_array($key, ['page', 'key'], true) && preg_match('#^https?://#', (string) $v)) {
-                    echo '<td><a href="' . esc_url($v) . '" target="_blank" rel="noopener">' . $e(preg_replace('#^https?://[^/]+#', '', $v) ?: '/') . '</a></td>';
+                    echo '<td><a href="' . esc_url($v) . '" target="_blank" rel="noopener">' . esc_html(preg_replace('#^https?://[^/]+#', '', $v) ?: '/') . '</a></td>';
                 } else {
-                    echo '<td>' . $e(is_float($v) ? number_format($v, 1) : (string) $v) . '</td>';
+                    echo '<td>' . esc_html(is_float($v) ? number_format($v, 1) : (string) $v) . '</td>';
                 }
             }
             echo '</tr>';
@@ -247,30 +246,29 @@ class AceSeoDigest {
 
     public static function render_admin() {
         if (!current_user_can('manage_options')) return;
-        $e = 'esc_html';
         $d = get_option(self::OPT_LATEST, []);
         $h = get_option(self::OPT_HISTORY, []);
         echo '<div class="wrap"><h1>Search digest</h1>';
         if (!empty($_GET['ran'])) echo '<div class="notice notice-success"><p>Digest rebuilt.</p></div>';
 
         $next = wp_next_scheduled(self::CRON);
-        echo '<p>Nightly at 04:20 from Search Console. Next run: ' . $e($next ? wp_date('D j M H:i', $next) : 'not scheduled') . '. ';
-        echo 'Built: ' . $e(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '.</p>';
+        echo '<p>Nightly at 04:20 from Search Console. Next run: ' . esc_html($next ? wp_date('D j M H:i', $next) : 'not scheduled') . '. ';
+        echo 'Built: ' . esc_html(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '.</p>';
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block;margin-right:1em">';
         wp_nonce_field('ace_seo_digest_run');
         echo '<input type="hidden" name="action" value="ace_seo_digest_run"><button class="button">Rebuild now</button></form>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block">';
         wp_nonce_field('ace_seo_digest_email');
-        echo '<input type="hidden" name="action" value="ace_seo_digest_email"><label><input type="checkbox" name="on" value="1"' . checked((bool) get_option(self::OPT_EMAIL), true, false) . '> Email this digest to ' . $e(get_option('admin_email')) . ' each night</label> <button class="button">Save</button></form>';
+        echo '<input type="hidden" name="action" value="ace_seo_digest_email"><label><input type="checkbox" name="on" value="1"' . checked((bool) get_option(self::OPT_EMAIL), true, false) . '> Email this digest to ' . esc_html(get_option('admin_email')) . ' each night</label> <button class="button">Save</button></form>';
 
         if (!$d) {
             echo '<p>No digest yet. The first one lands tonight, or press Rebuild now.</p>';
         } else {
-            if (!empty($d['error'])) echo '<div class="notice notice-error"><p>' . $e($d['error']) . '</p></div>';
+            if (!empty($d['error'])) echo '<div class="notice notice-error"><p>' . esc_html($d['error']) . '</p></div>';
             if (!empty($d['totals'])) {
                 $t = $d['totals']; $p = $d['totals_prev'];
-                echo '<h2>Week ' . $e($d['range'][0]) . ' to ' . $e($d['range'][1]) . '</h2>';
+                echo '<h2>Week ' . esc_html($d['range'][0]) . ' to ' . esc_html($d['range'][1]) . '</h2>';
                 self::table([
                     ['metric' => 'Clicks', 'now' => $t['clicks'], 'prev' => $p['clicks'], 'change' => self::pct($t['clicks'], $p['clicks'])],
                     ['metric' => 'Impressions', 'now' => $t['impressions'], 'prev' => $p['impressions'], 'change' => self::pct($t['impressions'], $p['impressions'])],

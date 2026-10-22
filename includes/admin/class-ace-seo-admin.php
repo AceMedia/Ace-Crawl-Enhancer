@@ -44,7 +44,7 @@ class AceSeoAdmin {
             <div class="notice notice-success is-dismissible">
                 <p>
                     <strong>Ace SEO</strong> has been activated! 
-                    <a href="<?php echo admin_url('admin.php?page=ace-seo'); ?>">Configure settings</a> 
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo' ) ); ?>">Configure settings</a> 
                     or start optimizing your content with our modern SEO interface.
                 </p>
             </div>
@@ -185,22 +185,22 @@ class AceSeoAdmin {
             $errors = intval($_REQUEST['ace_seo_bulk_errors'] ?? 0);
             
             $message = sprintf(
-                _n(
+                /* translators: %d: number. */ _n(
                     'PageSpeed analysis completed for %d post.',
                     'PageSpeed analysis completed for %d posts.',
                     $processed,
-                    'ace-seo'
+                    'ace-crawl-enhancer'
                 ),
                 $processed
             );
             
             if ($errors > 0) {
                 $message .= ' ' . sprintf(
-                    _n(
+                    /* translators: %d: number. */ _n(
                         '%d post failed to analyze.',
                         '%d posts failed to analyze.',
                         $errors,
-                        'ace-seo'
+                        'ace-crawl-enhancer'
                     ),
                     $errors
                 );

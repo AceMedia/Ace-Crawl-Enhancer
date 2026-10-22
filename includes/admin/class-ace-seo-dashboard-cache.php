@@ -124,7 +124,7 @@ class ACE_SEO_Dashboard_Cache {
             
         } catch (Exception $e) {
             // Fallback values in case of database errors
-            error_log('ACE SEO Dashboard Cache Error: ' . $e->getMessage());
+            error_log('ACE SEO Dashboard Cache Error: ' . $e->getMessage()); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
             $stats = array(
                 'focus_keywords_count' => 0,
                 'meta_desc_count' => 0,
@@ -199,7 +199,7 @@ class ACE_SEO_Dashboard_Cache {
             }
             
         } catch (Exception $e) {
-            error_log('ACE SEO Recent Posts Cache Error: ' . $e->getMessage());
+            error_log('ACE SEO Recent Posts Cache Error: ' . $e->getMessage()); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
             $recent_posts = array();
         }
         

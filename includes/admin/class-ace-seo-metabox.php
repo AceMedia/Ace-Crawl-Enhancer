@@ -188,7 +188,7 @@ class AceSEOMetabox {
         </div>
         
         <!-- AI Nonce for AJAX requests -->
-        <input type="hidden" id="ace_seo_ai_nonce" value="<?php echo wp_create_nonce('ace_seo_ai_nonce'); ?>">
+        <input type="hidden" id="ace_seo_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('ace_seo_ai_nonce') ); ?>">
         <?php
     }
 
@@ -268,7 +268,7 @@ class AceSEOMetabox {
     public function save_meta_fields( $post_id ) {
         // Security checks
         if ( ! isset( $_POST['ace_seo_meta_nonce'] ) || 
-             ! wp_verify_nonce( $_POST['ace_seo_meta_nonce'], 'ace_seo_save_meta' ) ) {
+             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_seo_meta_nonce'] ?? '' ) ), 'ace_seo_save_meta' ) ) {
             return;
         }
         
@@ -380,7 +380,7 @@ class AceSEOMetabox {
         
         // For taxonomy screens, check if it's a public taxonomy
         if ( in_array( $hook, array( 'edit-tags.php', 'term.php' ) ) ) {
-            $taxonomy = isset( $_GET['taxonomy'] ) ? $_GET['taxonomy'] : '';
+            $taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_key( wp_unslash( $_GET['taxonomy'] ) ) : '';
             $public_taxonomies = get_taxonomies( array( 'public' => true ), 'names' );
             
             if ( ! in_array( $taxonomy, $public_taxonomies ) ) {
@@ -470,7 +470,7 @@ class AceSEOMetabox {
             // Post data
             $current_id = $post->ID;
             $current_title = $post->post_title;
-            $current_content = wp_trim_words( strip_tags( $post->post_content ), 25 );
+            $current_content = wp_trim_words( wp_strip_all_tags( $post->post_content ), 25 );
             $current_type = $post->post_type;
             $current_url = get_permalink( $post );
             
@@ -479,13 +479,13 @@ class AceSEOMetabox {
         } elseif ( isset( $_GET['tag_ID'] ) && isset( $_GET['taxonomy'] ) ) {
             // Taxonomy term data
             $term_id = intval( $_GET['tag_ID'] );
-            $taxonomy = sanitize_text_field( $_GET['taxonomy'] );
+            $taxonomy = sanitize_text_field( wp_unslash( $_GET['taxonomy'] ) );
             $term = get_term( $term_id, $taxonomy );
             
             if ( $term && ! is_wp_error( $term ) ) {
                 $current_id = $term_id;
                 $current_title = $term->name;
-                $current_content = wp_trim_words( strip_tags( $term->description ), 25 );
+                $current_content = wp_trim_words( wp_strip_all_tags( $term->description ), 25 );
                 $current_type = 'taxonomy_' . $taxonomy;
                 $is_taxonomy = true;
             }
@@ -525,15 +525,15 @@ class AceSEOMetabox {
         wp_nonce_field( 'ace_seo_taxonomy_save', 'ace_seo_taxonomy_nonce' );
         ?>
         <div class="form-field ace-seo-taxonomy-fields">
-            <h3><?php _e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
+            <h3><?php esc_html_e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_title"><?php _e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_title"><?php esc_html_e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
                 <input type="text" name="ace_seo_title" id="ace_seo_title" value="" size="40" />
                 <p class="description">
-                    <?php _e( 'Custom title for this term. Leave blank to use template.', 'ace-crawl-enhancer' ); ?>
+                    <?php esc_html_e( 'Custom title for this term. Leave blank to use template.', 'ace-crawl-enhancer' ); ?>
                     <br>
-                    <strong><?php _e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
                     <span class="ace-template-variables">
                         <code class="ace-variable-tag" data-variable="{category_name}" data-target="ace_seo_title" title="Click to insert">{category_name}</code>
                         <code class="ace-variable-tag" data-variable="{tag_name}" data-target="ace_seo_title" title="Click to insert">{tag_name}</code>
@@ -551,12 +551,12 @@ class AceSEOMetabox {
             </div>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_desc"><?php _e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_desc"><?php esc_html_e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
                 <textarea name="ace_seo_desc" id="ace_seo_desc" rows="3" cols="40"></textarea>
                 <p class="description">
-                    <?php _e( 'Custom meta description for this term. Leave blank to use term description.', 'ace-crawl-enhancer' ); ?>
+                    <?php esc_html_e( 'Custom meta description for this term. Leave blank to use term description.', 'ace-crawl-enhancer' ); ?>
                     <br>
-                    <strong><?php _e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
                     <span class="ace-template-variables">
                         <code class="ace-variable-tag" data-variable="{category_name}" data-target="ace_seo_desc" title="Click to insert">{category_name}</code>
                         <code class="ace-variable-tag" data-variable="{tag_name}" data-target="ace_seo_desc" title="Click to insert">{tag_name}</code>
@@ -573,25 +573,25 @@ class AceSEOMetabox {
             </div>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_canonical"><?php _e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
                 <input type="url" name="ace_seo_canonical" id="ace_seo_canonical" value="" size="40" />
-                <p class="description"><?php _e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
             </div>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_focuskw"><?php _e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_focuskw"><?php esc_html_e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
                 <input type="text" name="ace_seo_focuskw" id="ace_seo_focuskw" value="" size="40" />
-                <p class="description"><?php _e( 'Primary keyword to optimize this term for.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Primary keyword to optimize this term for.', 'ace-crawl-enhancer' ); ?></p>
             </div>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_noindex"><?php _e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_noindex"><?php esc_html_e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
                 <select name="ace_seo_noindex" id="ace_seo_noindex">
-                    <option value="default"><?php _e( 'Default (follow site settings)', 'ace-crawl-enhancer' ); ?></option>
-                    <option value="index"><?php _e( 'Index (visible in search results)', 'ace-crawl-enhancer' ); ?></option>
-                    <option value="noindex"><?php _e( 'No Index (hidden from search results)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="default"><?php esc_html_e( 'Default (follow site settings)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="index"><?php esc_html_e( 'Index (visible in search results)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="noindex"><?php esc_html_e( 'No Index (hidden from search results)', 'ace-crawl-enhancer' ); ?></option>
                 </select>
-                <p class="description"><?php _e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
             </div>
         </div>
         <?php
@@ -641,11 +641,11 @@ class AceSEOMetabox {
         ?>
         <tr class="form-field ace-seo-taxonomy-section">
             <th colspan="2">
-                <h3><?php _e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
+                <h3><?php esc_html_e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
                 <?php if ( $show_yoast_notice ): ?>
                     <p class="description" style="color: #0073aa;">
-                        <strong><?php _e( 'Yoast Data Detected:', 'ace-crawl-enhancer' ); ?></strong> 
-                        <?php _e( 'Values below are inherited from Yoast SEO and will be migrated when saved.', 'ace-crawl-enhancer' ); ?>
+                        <strong><?php esc_html_e( 'Yoast Data Detected:', 'ace-crawl-enhancer' ); ?></strong> 
+                        <?php esc_html_e( 'Values below are inherited from Yoast SEO and will be migrated when saved.', 'ace-crawl-enhancer' ); ?>
                     </p>
                 <?php endif; ?>
             </th>
@@ -653,14 +653,14 @@ class AceSEOMetabox {
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_title"><?php _e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_title"><?php esc_html_e( 'SEO Title', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <input type="text" name="ace_seo_title" id="ace_seo_title" value="<?php echo esc_attr( $title ); ?>" class="regular-text" />
                 <p class="description">
-                    <?php _e( 'Custom title for this term. Leave blank to use template.', 'ace-crawl-enhancer' ); ?>
+                    <?php esc_html_e( 'Custom title for this term. Leave blank to use template.', 'ace-crawl-enhancer' ); ?>
                     <br>
-                    <strong><?php _e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
                     <span class="ace-template-variables">
                         <code class="ace-variable-tag" data-variable="{category_name}" data-target="ace_seo_title" title="Click to insert">{category_name}</code>
                         <code class="ace-variable-tag" data-variable="{tag_name}" data-target="ace_seo_title" title="Click to insert">{tag_name}</code>
@@ -670,7 +670,7 @@ class AceSEOMetabox {
                     </span>
                 </p>
                 <div class="ace-title-counter">
-                    <span class="ace-counter-text"><?php echo strlen( $title ); ?> characters</span>
+                    <span class="ace-counter-text"><?php echo absint( strlen( $title ) ); ?> characters</span>
                     <div class="ace-counter-bar">
                         <div class="ace-counter-progress"></div>
                     </div>
@@ -680,14 +680,14 @@ class AceSEOMetabox {
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_desc"><?php _e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_desc"><?php esc_html_e( 'Meta Description', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <textarea name="ace_seo_desc" id="ace_seo_desc" rows="3" class="large-text"><?php echo esc_textarea( $desc ); ?></textarea>
                 <p class="description">
-                    <?php _e( 'Custom meta description for this term. Leave blank to use term description.', 'ace-crawl-enhancer' ); ?>
+                    <?php esc_html_e( 'Custom meta description for this term. Leave blank to use term description.', 'ace-crawl-enhancer' ); ?>
                     <br>
-                    <strong><?php _e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
+                    <strong><?php esc_html_e( 'Available variables (click to insert):', 'ace-crawl-enhancer' ); ?></strong>
                     <span class="ace-template-variables">
                         <code class="ace-variable-tag" data-variable="{category_name}" data-target="ace_seo_desc" title="Click to insert">{category_name}</code>
                         <code class="ace-variable-tag" data-variable="{tag_name}" data-target="ace_seo_desc" title="Click to insert">{tag_name}</code>
@@ -696,7 +696,7 @@ class AceSEOMetabox {
                     </span>
                 </p>
                 <div class="ace-desc-counter">
-                    <span class="ace-counter-text"><?php echo strlen( $desc ); ?> characters</span>
+                    <span class="ace-counter-text"><?php echo absint( strlen( $desc ) ); ?> characters</span>
                     <div class="ace-counter-bar">
                         <div class="ace-counter-progress"></div>
                     </div>
@@ -706,45 +706,45 @@ class AceSEOMetabox {
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_canonical"><?php _e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <input type="url" name="ace_seo_canonical" id="ace_seo_canonical" value="<?php echo esc_attr( $canonical ); ?>" class="regular-text" />
-                <p class="description"><?php _e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_focuskw"><?php _e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_focuskw"><?php esc_html_e( 'Focus Keyword', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <input type="text" name="ace_seo_focuskw" id="ace_seo_focuskw" value="<?php echo esc_attr( $focuskw ); ?>" class="regular-text" />
-                <p class="description"><?php _e( 'Primary keyword to optimize this term for.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Primary keyword to optimize this term for.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_noindex"><?php _e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_noindex"><?php esc_html_e( 'Search Engine Visibility', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <select name="ace_seo_noindex" id="ace_seo_noindex">
-                    <option value="default" <?php selected( $noindex, 'default' ); ?>><?php _e( 'Default (follow site settings)', 'ace-crawl-enhancer' ); ?></option>
-                    <option value="index" <?php selected( $noindex, 'index' ); ?>><?php _e( 'Index (visible in search results)', 'ace-crawl-enhancer' ); ?></option>
-                    <option value="noindex" <?php selected( $noindex, 'noindex' ); ?>><?php _e( 'No Index (hidden from search results)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="default" <?php selected( $noindex, 'default' ); ?>><?php esc_html_e( 'Default (follow site settings)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="index" <?php selected( $noindex, 'index' ); ?>><?php esc_html_e( 'Index (visible in search results)', 'ace-crawl-enhancer' ); ?></option>
+                    <option value="noindex" <?php selected( $noindex, 'noindex' ); ?>><?php esc_html_e( 'No Index (hidden from search results)', 'ace-crawl-enhancer' ); ?></option>
                 </select>
-                <p class="description"><?php _e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Control how search engines handle this term.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
 
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_redirect"><?php _e( 'Redirect Archive To', 'ace-crawl-enhancer' ); ?></label>
+                <label for="ace_seo_redirect"><?php esc_html_e( 'Redirect Archive To', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
                 <input type="text" name="ace_seo_redirect" id="ace_seo_redirect" value="<?php echo esc_attr( $redirect ); ?>" class="regular-text" />
-                <p class="description"><?php _e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
+                <p class="description"><?php esc_html_e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
         <script>
@@ -790,7 +790,7 @@ class AceSEOMetabox {
     public function save_taxonomy_fields( $term_id ) {
         // Verify nonce
         if ( ! isset( $_POST['ace_seo_taxonomy_nonce'] ) || 
-             ! wp_verify_nonce( $_POST['ace_seo_taxonomy_nonce'], 'ace_seo_taxonomy_save' ) ) {
+             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_seo_taxonomy_nonce'] ?? '' ) ), 'ace_seo_taxonomy_save' ) ) {
             return;
         }
         

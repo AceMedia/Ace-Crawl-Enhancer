@@ -56,7 +56,7 @@ class ACE_SEO_Dashboard_Ajax {
                 'loadingAnalysis' => __('Analyzing content...', 'ace-crawl-enhancer'),
                 'error' => __('Error loading data. Please refresh the page.', 'ace-crawl-enhancer'),
                 'complete' => __('Analysis complete!', 'ace-crawl-enhancer'),
-                'processingBatch' => __('Processing batch %d of %d...', 'ace-crawl-enhancer')
+                'processingBatch' => /* translators: 1: current batch number, 2: total number of batches. */ __('Processing batch %1$d of %2$d...', 'ace-crawl-enhancer')
             )
         ));
     }
@@ -66,7 +66,7 @@ class ACE_SEO_Dashboard_Ajax {
      */
     public function ajax_load_dashboard_stats() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -159,7 +159,7 @@ class ACE_SEO_Dashboard_Ajax {
      */
     public function ajax_load_recent_activity() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -230,7 +230,7 @@ class ACE_SEO_Dashboard_Ajax {
      */
     public function ajax_load_content_analysis() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -327,7 +327,7 @@ class ACE_SEO_Dashboard_Ajax {
      */
     public function ajax_load_post_batch() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -421,7 +421,7 @@ class ACE_SEO_Dashboard_Ajax {
      */
     public function ajax_load_database_performance() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
             wp_send_json(array(
                 'status' => 'error',
                 'message' => 'Invalid nonce'
@@ -449,13 +449,17 @@ class ACE_SEO_Dashboard_Ajax {
             ));
             
             // Debug logging
-            error_log('ACE SEO: Loading database performance - pending: ' . ($optimization_pending ? 'yes' : 'no') . ', progress: ' . $progress['percent'] . '%, message: ' . $progress['message']);
+            if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+                error_log('ACE SEO: Loading database performance - pending: ' . ($optimization_pending ? 'yes' : 'no') . ', progress: ' . $progress['percent'] . '%, message: ' . $progress['message']); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+            }
             
             // Reset optimization pending if progress shows completed
             if ($optimization_pending && $progress['completed']) {
                 update_option('ace_seo_db_optimization_pending', false, false);
                 $optimization_pending = false;
-                error_log('ACE SEO: Reset optimization pending flag - optimization completed');
+                if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+                    error_log('ACE SEO: Reset optimization pending flag - optimization completed'); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.
+                }
             }
             
             $html = '';

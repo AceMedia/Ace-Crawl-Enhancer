@@ -229,7 +229,7 @@ class AceSeoSchema {
             $json = wp_json_encode($entity, JSON_UNESCAPED_UNICODE);
             // Replace </ with <\/ to prevent breaking out of script tag
             $json = str_replace('</', '<\/', $json);
-            echo $json;
+            echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
             echo "\n" . '</script>' . "\n";
         }
     }
@@ -253,7 +253,7 @@ class AceSeoSchema {
             $json = wp_json_encode($local_business, JSON_UNESCAPED_UNICODE);
             // Replace </ with <\/ to prevent breaking out of script tag
             $json = str_replace('</', '<\/', $json);
-            echo $json;
+            echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
             echo "\n" . '</script>' . "\n";
         }
     }
@@ -625,7 +625,7 @@ class AceSeoSchema {
         // Add additional article schema properties
         
         // Add word count
-        $content = strip_tags($post->post_content);
+        $content = wp_strip_all_tags($post->post_content);
         $word_count = str_word_count($content);
         
         if ($word_count > 0) {
@@ -672,7 +672,7 @@ class AceSeoSchema {
             if (!empty($post->post_excerpt)) {
                 return wp_trim_words($post->post_excerpt, 25);
             } else {
-                return wp_trim_words(strip_tags($post->post_content), 25);
+                return wp_trim_words(wp_strip_all_tags($post->post_content), 25);
             }
         }
         
@@ -698,7 +698,7 @@ class AceSeoSchema {
                 $block['attrs']['level'] >= 3) {
                 
                 // Look for question-like headings
-                $question = strip_tags($block['innerHTML']);
+                $question = wp_strip_all_tags($block['innerHTML']);
                 if (preg_match('/\?$/', $question)) {
                     // Find the next paragraph as the answer
                     $answer = $this->find_next_paragraph($blocks, $block);
@@ -733,7 +733,7 @@ class AceSeoSchema {
         
         foreach ($blocks as $block) {
             if ($found_current && $block['blockName'] === 'core/paragraph') {
-                return strip_tags($block['innerHTML']);
+                return wp_strip_all_tags($block['innerHTML']);
             }
             
             if ($block === $current_block) {
