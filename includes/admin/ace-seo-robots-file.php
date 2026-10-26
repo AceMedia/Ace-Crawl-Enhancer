@@ -96,6 +96,10 @@ function ace_seo_robots_file_notice() {
     // for. A static file holding deliberate rules on a public site is a normal way
     // to run things; the same file while the site is trying to hide is defeating it.
     $conflicts = ace_seo_site_is_discouraged();
+    $notice_hash = hash( 'sha256', $path . "\0" . $contents . "\0" . (string) get_option( 'blog_public' ) );
+    if ( ! $conflicts && $notice_hash === get_user_meta( get_current_user_id(), 'ace_seo_robots_file_info_dismissed', true ) ) {
+        return;
+    }
 
     echo '<div class="notice ' . ( $conflicts ? 'notice-warning' : 'notice-info' ) . '"><p><strong>'
         . esc_html(
@@ -116,6 +120,13 @@ function ace_seo_robots_file_notice() {
         . esc_html( $preview ) . '</pre>';
 
     if ( ! $conflicts ) {
+        $dismiss_url = wp_nonce_url(
+            admin_url( 'admin-post.php?action=ace_seo_dismiss_robots_file_info' ),
+            'ace_seo_dismiss_robots_file_info'
+        );
+        echo '<p><a href="' . esc_url( $dismiss_url ) . '" class="button button-secondary">'
+            . esc_html__( 'Dismiss this information', 'ace-crawl-enhancer' )
+            . '</a></p>';
         echo '</div>';
 
         return;
@@ -139,6 +150,26 @@ function ace_seo_robots_file_notice() {
         . '</span></p></div>';
 }
 add_action( 'admin_notices', 'ace_seo_robots_file_notice' );
+
+/** A deliberate static file is informational; keep a real visibility conflict prominent. */
+function ace_seo_dismiss_robots_file_info() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'You are not allowed to do this.', 'ace-crawl-enhancer' ), 403 );
+    }
+    check_admin_referer( 'ace_seo_dismiss_robots_file_info' );
+    $path = ace_seo_shadowing_robots_file();
+    if ( '' !== $path && ! ace_seo_site_is_discouraged() ) {
+        $contents = (string) file_get_contents( $path );
+        update_user_meta(
+            get_current_user_id(),
+            'ace_seo_robots_file_info_dismissed',
+            hash( 'sha256', $path . "\0" . $contents . "\0" . (string) get_option( 'blog_public' ) )
+        );
+    }
+    wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) );
+    exit;
+}
+add_action( 'admin_post_ace_seo_dismiss_robots_file_info', 'ace_seo_dismiss_robots_file_info' );
 
 /**
  * Rename the shadowing file so the web server stops serving it.
