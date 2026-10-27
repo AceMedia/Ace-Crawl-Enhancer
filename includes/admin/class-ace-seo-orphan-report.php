@@ -552,46 +552,29 @@ class AceSeoOrphanReport {
         // Block themes do not use nav_menu_item at all — navigation lives in
         // wp_navigation, templates and template parts. Missing this reports pages
         // linked from the site header as orphaned.
-        $blocks = $wpdb->get_col(
-            "SELECT post_content FROM {$wpdb->posts}
+        $blocks = $wpdb->get_results(
+            "SELECT ID, post_type, post_content FROM {$wpdb->posts}
              WHERE post_type IN ( 'wp_navigation', 'wp_template', 'wp_template_part', 'wp_block' )
-             AND post_status = 'publish' AND post_content <> ''"
+             AND post_status = 'publish' AND post_content <> ''",
+            ARRAY_A
         );
 
-        foreach ( (array) $blocks as $content ) {
-            // wp:page-list renders every published page, so its presence anywhere
-            // in the navigation means no page can be orphaned.
-            if ( 'page' === $post_type && false !== strpos( $content, 'wp:page-list' ) ) {
-                return array_map(
-                    'intval',
-                    (array) $wpdb->get_col(
-                        $wpdb->prepare(
-                            "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish'",
-                            $post_type
-                        )
+        $nav = self::navigation_reachable( (array) $blocks, $post_type );
+
+        if ( $nav['all'] ) {
+            return array_map(
+                'intval',
+                (array) $wpdb->get_col(
+                    $wpdb->prepare(
+                        "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish'",
+                        $post_type
                     )
-                );
-            }
+                )
+            );
+        }
 
-            // Explicit navigation links carry the id they point at.
-            if ( preg_match_all( '~<!--\s+wp:navigation-link\s+(\{.*?\})\s*/?-->~s', $content, $matches ) ) {
-                foreach ( $matches[1] as $json ) {
-                    $attrs = json_decode( $json, true );
-
-                    if ( ! is_array( $attrs ) || empty( $attrs['id'] ) ) {
-                        continue;
-                    }
-
-                    $kind = $attrs['kind'] ?? '';
-                    $type = $attrs['type'] ?? '';
-
-                    if ( 'post-type' === $kind && $type !== $post_type ) {
-                        continue;
-                    }
-
-                    $reachable[ (int) $attrs['id'] ] = true;
-                }
-            }
+        foreach ( $nav['ids'] as $id ) {
+            $reachable[ $id ] = true;
         }
 
         /**
@@ -616,29 +599,113 @@ class AceSeoOrphanReport {
             ARRAY_A
         );
 
-        // Walk down until a pass adds nothing; bounded so a parent cycle cannot spin.
-        for ( $depth = 0; $depth < 20; $depth++ ) {
-            $added = 0;
+        $reachable = self::propagate_to_children( $reachable, (array) $rows );
 
-            foreach ( (array) $rows as $row ) {
-                $id = (int) $row['ID'];
+        return array_keys( $reachable );
+    }
 
-                if ( isset( $reachable[ $id ] ) ) {
-                    continue;
-                }
-
-                if ( isset( $reachable[ (int) $row['post_parent'] ] ) ) {
-                    $reachable[ $id ] = true;
-                    $added++;
-                }
-            }
-
-            if ( 0 === $added ) {
-                break;
+    /**
+     * What block navigation makes reachable: the ids of navigation links and
+     * submenus, and whether a wp:page-list renders every page.
+     *
+     * A page list only counts in navigation, templates, template parts and the
+     * synced patterns those reference (directly or through other patterns), so
+     * an unused pattern holding one does not hide every orphan.
+     *
+     * @param array[] $blocks    Rows with 'ID', 'post_type' and 'post_content'.
+     * @param string  $post_type
+     * @return array{all: bool, ids: int[]}
+     */
+    public static function navigation_reachable( array $blocks, $post_type ) {
+        $patterns = array();
+        $queue    = array();
+        foreach ( $blocks as $row ) {
+            if ( 'wp_block' === $row['post_type'] ) {
+                $patterns[ (int) $row['ID'] ] = (string) $row['post_content'];
+            } else {
+                $queue[] = (string) $row['post_content'];
             }
         }
 
-        return array_keys( $reachable );
+        // Walk from the live areas into the patterns they reference.
+        $live = array();
+        $seen = array();
+        while ( $queue ) {
+            $content = array_shift( $queue );
+            $live[]  = $content;
+            if ( preg_match_all( '~<!--\s+wp:block\s+(\{.*?\})\s*/?-->~s', $content, $refs ) ) {
+                foreach ( $refs[1] as $json ) {
+                    $attrs = json_decode( $json, true );
+                    $ref   = is_array( $attrs ) ? (int) ( $attrs['ref'] ?? 0 ) : 0;
+                    if ( $ref && isset( $patterns[ $ref ] ) && ! isset( $seen[ $ref ] ) ) {
+                        $seen[ $ref ] = true;
+                        $queue[]      = $patterns[ $ref ];
+                    }
+                }
+            }
+        }
+
+        if ( 'page' === $post_type ) {
+            foreach ( $live as $content ) {
+                if ( false !== strpos( $content, 'wp:page-list' ) ) {
+                    return array( 'all' => true, 'ids' => array() );
+                }
+            }
+        }
+
+        // Explicit navigation links and submenu parents carry the id they point at.
+        $ids = array();
+        foreach ( $blocks as $row ) {
+            if ( ! preg_match_all( '~<!--\s+wp:navigation-(?:link|submenu)\s+(\{.*?\})\s*/?-->~s', (string) $row['post_content'], $matches ) ) {
+                continue;
+            }
+            foreach ( $matches[1] as $json ) {
+                $attrs = json_decode( $json, true );
+
+                if ( ! is_array( $attrs ) || empty( $attrs['id'] ) ) {
+                    continue;
+                }
+
+                $kind = $attrs['kind'] ?? '';
+                $type = $attrs['type'] ?? '';
+
+                if ( 'post-type' === $kind && $type !== $post_type ) {
+                    continue;
+                }
+
+                $ids[ (int) $attrs['id'] ] = true;
+            }
+        }
+
+        return array( 'all' => false, 'ids' => array_keys( $ids ) );
+    }
+
+    /**
+     * Breadth-first from the reachable set down the page tree: a child is
+     * reachable when its parent is. Each row is visited once, so depth does not
+     * matter and a parent cycle cannot spin.
+     *
+     * @param array   $reachable Set of reachable ids (id => true).
+     * @param array[] $rows      Rows with 'ID' and 'post_parent'.
+     * @return array The grown set.
+     */
+    public static function propagate_to_children( array $reachable, array $rows ) {
+        $children = array();
+        foreach ( $rows as $row ) {
+            $children[ (int) $row['post_parent'] ][] = (int) $row['ID'];
+        }
+
+        $queue = array_keys( $reachable );
+        for ( $i = 0; $i < count( $queue ); $i++ ) {
+            foreach ( $children[ $queue[ $i ] ] ?? array() as $child ) {
+                if ( ! isset( $reachable[ $child ] ) ) {
+                    $reachable[ $child ] = true;
+                    $queue[]             = $child;
+                }
+            }
+        }
+
+        return $reachable;
     }
 
     /**
