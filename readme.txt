@@ -56,6 +56,9 @@ Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a f
 * Initialise each site during network activation and when a new network site is created.
 * Clear site tasks on deactivation while retaining existing SEO data and shared service settings on uninstall.
 * Prepare a runtime-only release archive and contributor documentation.
+* The human-readable sitemap uses the active theme's fonts and colours from theme.json instead of fixed values.
+* White hat checks are fully configurable: neutral wording, empty starting lists and an editable AI instruction. Existing saved settings carry over unchanged.
+* Informational robots.txt notices can be dismissed.
 
 
 = 1.0.92 =

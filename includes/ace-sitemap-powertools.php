@@ -2284,37 +2284,59 @@ function ace_sitemap_powertools_get_human_theme_global_styles() {
     return is_string( $css ) ? $css : '';
 }
 
-function ace_sitemap_powertools_get_human_paddy_font_face_css() {
-    if ( ! function_exists( 'get_stylesheet_directory' ) || ! function_exists( 'get_stylesheet_directory_uri' ) ) {
+/**
+ * @font-face rules for the fonts the active theme declares in theme.json, so the
+ * human sitemap can use the theme's body font. Empty before WordPress 6.4.
+ */
+function ace_sitemap_powertools_get_human_font_face_css() {
+    if ( ! function_exists( 'wp_print_font_faces' ) ) {
         return '';
     }
 
-    $base_dir = trailingslashit( get_stylesheet_directory() ) . 'library/fonts/Paddy-Sans/Web/WOFF2/';
-    $base_uri = trailingslashit( get_stylesheet_directory_uri() ) . 'library/fonts/Paddy-Sans/Web/WOFF2/';
+    ob_start();
+    wp_print_font_faces();
+    $html = (string) ob_get_clean();
 
-    $variants = array(
-        array( 'file' => 'Paddy_Sans-Light-web-1_1.woff2', 'weight' => 300 ),
-        array( 'file' => 'Paddy_Sans-Regular-web-1_1.woff2', 'weight' => 400 ),
-        array( 'file' => 'Paddy_Sans-Medium-web-1_1.woff2', 'weight' => 500 ),
-        array( 'file' => 'Paddy_Sans-Semi_Bold-web-1_1.woff2', 'weight' => 600 ),
-        array( 'file' => 'Paddy_Sans-Bold-web-1_1.woff2', 'weight' => 700 ),
-    );
-
-    $css = '';
-    foreach ( $variants as $variant ) {
-        $path = $base_dir . $variant['file'];
-        if ( ! file_exists( $path ) ) {
-            continue;
-        }
-
-        $css .= '@font-face{font-family:"Paddy Sans";font-style:normal;font-weight:' . (int) $variant['weight'] . ';font-display:swap;src:url("' . esc_url_raw( $base_uri . $variant['file'] ) . '") format("woff2");}';
+    if ( ! preg_match_all( '#<style[^>]*>(.*?)</style>#s', $html, $matches ) ) {
+        return '';
     }
 
-    return $css;
+    return trim( implode( '', $matches[1] ) );
+}
+
+/**
+ * The theme's body font as a CSS value, from global styles. A preset reference becomes
+ * its custom property; empty when the theme sets no body font.
+ */
+function ace_sitemap_powertools_get_human_font_family() {
+    if ( ! function_exists( 'wp_get_global_styles' ) ) {
+        return '';
+    }
+
+    $family = wp_get_global_styles( array( 'typography', 'fontFamily' ) );
+    if ( ! is_string( $family ) || '' === trim( $family ) ) {
+        return '';
+    }
+
+    if ( preg_match( '/^var:preset\|font-family\|([a-z0-9-]+)$/', $family, $match ) ) {
+        return 'var(--wp--preset--font-family--' . $match[1] . ')';
+    }
+
+    // Raw CSS value from theme.json: drop anything that could close the declaration.
+    return trim( str_replace( array( ';', '{', '}', '<', '>' ), '', $family ) );
 }
 
 function ace_sitemap_powertools_get_human_theme_override_css() {
-    return '#sitemap,#sitemap *{font-family:var(--wp--preset--font-family--paddy-sans,"Paddy Sans",sans-serif) !important;}body{background:var(--wp--preset--color--background,#fff);color:var(--wp--preset--color--foreground,#1a1a1a);}#sitemap__table{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table th,#sitemap__table td{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table tbody tr:nth-child(odd){background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 94%,var(--wp--preset--color--tertiary,#67B650) 6%);}#sitemap__table tbody tr:hover{background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 85%,var(--wp--preset--color--primary,#1BAA55) 15%);}#sitemap__table tr td.loc a,#sitemap__table tr td.loc span{color:var(--wp--preset--color--tertiary,#004833);}#sitemap__table tr td.loc a:hover{color:var(--wp--preset--color--primary,#1BAA55);}#sitemap__header p,#sitemap__content .text{color:var(--wp--preset--color--darkgrey,#666);}.sitemap-brand__title{color:var(--wp--preset--color--primary,#1BAA55);}';
+    $family = ace_sitemap_powertools_get_human_font_family();
+    $css    = '' !== $family ? '#sitemap,#sitemap *{font-family:' . $family . ',sans-serif !important;}' : '';
+    $css   .= 'body{background:var(--wp--preset--color--background,#fff);color:var(--wp--preset--color--foreground,#1a1a1a);}#sitemap__table{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table th,#sitemap__table td{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table tbody tr:nth-child(odd){background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 94%,var(--wp--preset--color--tertiary,#1a1a1a) 6%);}#sitemap__table tbody tr:hover{background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 85%,var(--wp--preset--color--primary,#2271b1) 15%);}#sitemap__table tr td.loc a,#sitemap__table tr td.loc span{color:var(--wp--preset--color--tertiary,#1a1a1a);}#sitemap__table tr td.loc a:hover{color:var(--wp--preset--color--primary,#2271b1);}#sitemap__header p,#sitemap__content .text{color:var(--wp--preset--color--darkgrey,#666);}.sitemap-brand__title{color:var(--wp--preset--color--primary,#2271b1);}';
+
+    /**
+     * Filters the theme-matching CSS added to the human-readable sitemap view.
+     *
+     * @param string $css CSS rules.
+     */
+    return (string) apply_filters( 'ace_sitemap_powertools_human_theme_css', $css );
 }
 
 function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
@@ -2324,7 +2346,7 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
 
     $title_text = esc_html( $title );
     $css        = ace_sitemap_powertools_get_human_view_css();
-    $font_face  = ace_sitemap_powertools_get_human_paddy_font_face_css();
+    $font_face  = ace_sitemap_powertools_get_human_font_face_css();
     $theme_css  = ace_sitemap_powertools_get_human_theme_global_styles();
     $overrides  = ace_sitemap_powertools_get_human_theme_override_css();
     $theme_links = ace_sitemap_powertools_get_human_theme_stylesheet_links();
