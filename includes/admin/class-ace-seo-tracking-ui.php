@@ -46,9 +46,9 @@ class AceSeoTrackingUI {
                 if ( $configured !== $configured_pass ) { continue; }
                 $name = 'ads' === $key ? 'Site Kit' : 'Google for WooCommerce';
                 if ( $configured ) {
-                    echo '<div class="ace-trk-provider"><strong>' . esc_html( $name ) . '</strong> <span class="pill pill-ok">Configured</span> <span>' . self::detail( $provider['detail'] ) . '</span> <span class="ace-trk-links">' . self::links( $key, $provider ) . '</span></div>';
+                    echo '<div class="ace-trk-provider"><strong>' . esc_html( $name ) . '</strong> <span class="pill pill-ok">Configured</span> <span>' . self::detail( $provider['detail'] ) . '</span> <span class="ace-trk-links">' . self::links( $key, $provider ) . '</span></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- detail() and links() escape every dynamic value as they build markup.
                 } else {
-                    echo '<div class="ace-trk-alternative"><span>' . ( $ads['configured'] ? 'Alternative: ' : 'Not configured: ' ) . esc_html( $name ) . '</span> <span class="ace-trk-links">' . self::links( $key, $provider ) . '</span></div>';
+                    echo '<div class="ace-trk-alternative"><span>' . ( $ads['configured'] ? 'Alternative: ' : 'Not configured: ' ) . esc_html( $name ) . '</span> <span class="ace-trk-links">' . self::links( $key, $provider ) . '</span></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- detail() and links() escape every dynamic value as they build markup.
                 }
             }
         }

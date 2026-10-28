@@ -197,7 +197,7 @@ class AceSeoRetentionFront {
             return $content;
         }
         $cats  = get_the_category( get_queried_object_id() );
-        $label = ! empty( $cats ) ? sprintf( __( 'Latest in %s', 'ace-crawl-enhancer' ), $cats[0]->name ) : __( 'Keep reading', 'ace-crawl-enhancer' );
+        $label = ! empty( $cats ) ? sprintf( /* translators: %s: name or value. */ __( 'Latest in %s', 'ace-crawl-enhancer' ), $cats[0]->name ) : __( 'Keep reading', 'ace-crawl-enhancer' );
         $html  = '<aside class="ace-seo-continue" data-ace-seo-continue>'
             . '<p class="ace-seo-continue__label">' . esc_html( $label ) . '</p>'
             . '<a href="' . esc_url( get_permalink( $next ) ) . '">' . esc_html( get_the_title( $next ) ) . '</a>'

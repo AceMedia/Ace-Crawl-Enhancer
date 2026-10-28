@@ -1,24 +1,26 @@
 <?php
 /**
- * White hat status: does a post link to a bet or push readers to place one?
+ * White hat status: does a post carry promotional links or push readers to act on a promotion?
  *
- * Off by default, and generic: what counts as a bet link, a call to action or a bet block is all in
- * the settings (Ace SEO, White hat), so a site that is not about betting never sees any of it.
+ * Off by default, and generic: what counts as a promotional link, a trigger word, a call to action or
+ * a promotion block is all in the settings (Ace SEO, White hat). Fresh installs start with empty
+ * lists, so nothing is flagged until a site describes its own promotions (affiliate offers, sponsored
+ * products, gambling or any other regulated call to action).
  *
  * How a post is assessed, cheapest first, so AI tokens are only spent where rules cannot decide:
  *
- *   1. The post is rendered (blocks and shortcodes), so a dynamic bet banner that has dropped off
+ *   1. The post is rendered (blocks and shortcodes), so a dynamic promotion banner that has dropped off
  *      after its event is judged as it is now, not as it was saved.
- *   2. Any link matching a bet link pattern (and not an allowed pattern, such as the operator's
+ *   2. Any link matching a promotional link pattern (and not an allowed pattern, such as the brand's
  *      homepage) makes it not white hat. No AI.
- *   3. Only sentences containing a betting keyword are kept. None: white hat. No AI.
+ *   3. Only sentences containing a trigger keyword are kept. None: white hat. No AI.
  *   4. Those sentences (capped) go to the configured AI provider, or, with no provider, are matched
  *      against the call to action patterns.
  *   5. A hash of what was judged is stored; a later check with the same links and sentences reuses
  *      the verdict without a call.
  *
  * When it runs: shortly after a post is published or updated (cron, so saving is not slowed), again
- * after the latest event time found in its bet blocks has passed (plus a grace period), and in an
+ * after the latest event time found in its promotion blocks has passed (plus a grace period), and in an
  * hourly sweep that re-renders posts marked not white hat or unknown once a day. A re-render whose
  * hash has not changed costs no tokens.
  *
@@ -33,6 +35,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AceSeoWhiteHat {
 
     const OPTION        = 'ace_seo_whitehat_options';
+
+    /** Generic AI instruction for fresh installs. */
+    const DEFAULT_INSTRUCTION = 'You check articles for promotional calls to action. An article is white hat when it does not tell or encourage the reader to buy, sign up for, claim or otherwise act on a promoted offer. Reporting facts, prices or offers as information, and mentioning a brand, are fine. You get the headline and only the sentences that contain trigger words. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.';
+
+    /** The instruction used before it became a setting; kept for sites whose settings predate that. */
+    const LEGACY_INSTRUCTION = 'You check sports news articles for a betting company. An article is white hat when it contains no betting call to action: it does not tell or encourage the reader to place, back, add or claim a bet, and does not offer odds as a bet to take. Reporting odds or prices as information, and mentioning the brand, are fine. You get the headline and only the sentences that mention betting. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.';
     const META          = '_ace_seo_whitehat';
     const META_DATA     = '_ace_seo_whitehat_data';
     const META_RECHECK  = '_ace_seo_whitehat_recheck';
@@ -70,11 +78,13 @@ class AceSeoWhiteHat {
             'provider'        => 'none',     // none, anthropic, openai
             'model'           => '',
             'api_key'         => '',
-            // Substrings or /regex/, one per line. Empty until a site says what a bet link looks like.
+            // Substrings or /regex/, one per line. Empty until a site says what its promotions look like.
+            // The keys keep their original names so saved settings carry over.
             'bet_links'       => '',
             'allowed_links'   => '',
-            'keywords'        => "bet\nbets\nbetting\nodds\nstake\nacca\naccumulator\nbet builder\nbetslip\nfree bet\nboost\nprice\nback\nwager\ntip\ntips",
-            'cta_patterns'    => "bet now\nplace a bet\nplace your bet\nget on\nback them\nback him\nback her\nadd to betslip\nclaim your\nsign up and\nbet here",
+            'keywords'        => '',
+            'cta_patterns'    => '',
+            'instruction'     => '',
             'bet_blocks'      => '',
             'event_attr'      => 'eventTime',
             'grace_hours'     => 2,
@@ -85,6 +95,10 @@ class AceSeoWhiteHat {
     public static function options() {
         $saved = get_option( self::OPTION, array() );
         $o     = array_merge( self::defaults(), is_array( $saved ) ? array_intersect_key( $saved, self::defaults() ) : array() );
+        // Settings saved before the instruction became a setting keep the instruction they were tuned with.
+        if ( is_array( $saved ) && $saved && ! array_key_exists( 'instruction', $saved ) ) {
+            $o['instruction'] = self::LEGACY_INSTRUCTION;
+        }
         if ( defined( 'ACE_SEO_WHITEHAT_API_KEY' ) && ACE_SEO_WHITEHAT_API_KEY ) {
             $o['api_key'] = (string) ACE_SEO_WHITEHAT_API_KEY;
         }
@@ -149,7 +163,7 @@ class AceSeoWhiteHat {
         return (string) $html;
     }
 
-    /** The latest event time in the post's bet blocks (Unix time), 0 when there is none. */
+    /** The latest event time in the post's promotion blocks (Unix time), 0 when there is none. */
     private static function latest_event( WP_Post $post, array $o ) {
         $names = array_filter( array_map( 'trim', explode( ',', (string) $o['bet_blocks'] ) ) );
         $attr  = (string) $o['event_attr'];
@@ -200,7 +214,7 @@ class AceSeoWhiteHat {
             }
         }
 
-        // 3. Sentences that mention betting at all.
+        // 3. Sentences that contain a trigger keyword.
         $text      = trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $html ) ) );
         $keywords  = self::lines( $o['keywords'] );
         $sentences = array();
@@ -230,16 +244,16 @@ class AceSeoWhiteHat {
         if ( $bet_links ) {
             $data['status']    = 'no';
             $data['method']    = 'rules';
-            $data['reasons'][] = sprintf( 'Links to a bet: %s', implode( ', ', array_slice( $bet_links, 0, 5 ) ) );
+            $data['reasons'][] = sprintf( 'Promotional links: %s', implode( ', ', array_slice( $bet_links, 0, 5 ) ) );
         } elseif ( '' === $excerpt ) {
             $data['status']    = 'yes';
             $data['method']    = 'rules';
-            $data['reasons'][] = 'No bet links and no betting language.';
+            $data['reasons'][] = 'No promotional links and no trigger words.';
         } elseif ( 'none' === $o['provider'] || '' === $o['api_key'] ) {
             $cta               = self::matches_any( $excerpt, self::lines( $o['cta_patterns'] ) );
             $data['status']    = $cta ? 'no' : 'yes';
             $data['method']    = 'rules';
-            $data['reasons'][] = $cta ? sprintf( 'Betting call to action: "%s".', $cta ) : 'No bet links and no call to action phrase matched.';
+            $data['reasons'][] = $cta ? sprintf( 'Call to action: "%s".', $cta ) : 'No promotional links and no call to action phrase matched.';
         } else {
             $ai = self::ask_ai( $post, $excerpt, $o );
             if ( is_wp_error( $ai ) ) {
@@ -275,9 +289,8 @@ class AceSeoWhiteHat {
 
     /** The instruction the AI gets. Filterable; kept short because it is sent with every check. */
     private static function instruction() {
-        return (string) apply_filters( 'ace_seo_whitehat_instruction',
-            'You check sports news articles for a betting company. An article is white hat when it contains no betting call to action: it does not tell or encourage the reader to place, back, add or claim a bet, and does not offer odds as a bet to take. Reporting odds or prices as information, and mentioning the brand, are fine. You get the headline and only the sentences that mention betting. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.'
-        );
+        $saved = trim( (string) ( self::options()['instruction'] ?? '' ) );
+        return (string) apply_filters( 'ace_seo_whitehat_instruction', '' !== $saved ? $saved : self::DEFAULT_INSTRUCTION );
     }
 
     /**
@@ -365,7 +378,7 @@ class AceSeoWhiteHat {
     }
 
     /**
-     * Hourly: posts whose bet block event (plus grace) has passed, then posts marked no or unknown
+     * Hourly: posts whose promotion block event (plus grace) has passed, then posts marked no or unknown
      * that were last checked over a day ago. Bounded per run; unchanged content costs no tokens.
      */
     public static function sweep() {
@@ -424,6 +437,7 @@ class AceSeoWhiteHat {
             'allowed_links' => sanitize_textarea_field( (string) ( $in['allowed_links'] ?? '' ) ),
             'keywords'      => sanitize_textarea_field( (string) ( $in['keywords'] ?? '' ) ),
             'cta_patterns'  => sanitize_textarea_field( (string) ( $in['cta_patterns'] ?? '' ) ),
+            'instruction'   => sanitize_textarea_field( (string) ( $in['instruction'] ?? '' ) ),
             'bet_blocks'    => sanitize_text_field( (string) ( $in['bet_blocks'] ?? '' ) ),
             'event_attr'    => sanitize_key( (string) ( $in['event_attr'] ?? 'eventTime' ) ) ? preg_replace( '/[^A-Za-z0-9_]/', '', (string) $in['event_attr'] ) : '',
             'grace_hours'   => max( 0, min( 168, (int) ( $in['grace_hours'] ?? 2 ) ) ),
@@ -468,7 +482,7 @@ class AceSeoWhiteHat {
         <div class="wrap">
             <h1>White hat status</h1>
             <?php if ( $msg ) { delete_transient( 'ace_seo_whitehat_msg_' . get_current_user_id() ); echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $msg ) . '</p></div>'; } ?>
-            <p>Which posts have no bet links and no betting calls to action. Rules decide first (bet links, then whether the post mentions betting at all); only posts that mention betting without a bet link go to the AI, with just the headline and the sentences that mention betting, and only when those have changed since the last check. Posts are checked after they are published or updated, again after the events in their bet blocks have passed, and daily while they are not white hat.</p>
+            <p>Which posts have no promotional links and no promotional calls to action. Rules decide first (promotional links, then whether the post contains a trigger word at all); only posts with trigger words and no promotional link go to the AI, with just the headline and those sentences, and only when they have changed since the last check. Posts are checked after they are published or updated, again after the events in their promotion blocks have passed, and daily while they are not white hat.</p>
             <?php if ( self::enabled() ) : $c = self::counts(); ?>
                 <p><?php foreach ( self::labels() as $k => $l ) { echo esc_html( $l ) . ': <strong>' . esc_html( number_format_i18n( $c[ $k ] ) ) . '</strong> &nbsp; '; } ?>
                 <a href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&ace_wh=no' ) ); ?>">List posts that are not white hat</a></p>
@@ -481,17 +495,18 @@ class AceSeoWhiteHat {
                     <tr><th scope="row">Post types</th><td><?php foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $pt ) : if ( 'attachment' === $pt->name ) { continue; } ?>
                         <label style="margin-right:1em"><input type="checkbox" name="post_types[]" value="<?php echo esc_attr( $pt->name ); ?>" <?php checked( in_array( $pt->name, (array) $o['post_types'], true ) ); ?>> <?php echo esc_html( $pt->labels->name ); ?></label>
                     <?php endforeach; ?></td></tr>
-                    <tr><th scope="row">Bet links</th><td><textarea name="bet_links" rows="4" class="large-text code" placeholder="betslip&#10;/bet/&#10;/^https:\/\/sports\.example\.com\/.+\/"><?php echo esc_textarea( $o['bet_links'] ); ?></textarea><p class="description">One per line: a piece of the URL, or a <code>/regular expression/</code>. Any matching link makes a post not white hat.</p></td></tr>
-                    <tr><th scope="row">Allowed links</th><td><textarea name="allowed_links" rows="2" class="large-text code" placeholder="/^https:\/\/www\.example\.com\/?$/"><?php echo esc_textarea( $o['allowed_links'] ); ?></textarea><p class="description">Links that match a bet link pattern but are fine, such as the operator's homepage.</p></td></tr>
-                    <tr><th scope="row">Betting keywords</th><td><textarea name="keywords" rows="3" class="large-text"><?php echo esc_textarea( $o['keywords'] ); ?></textarea><p class="description">Whole words, one per line. Only sentences containing one are looked at; a post with none is white hat without an AI call.</p></td></tr>
+                    <tr><th scope="row">Promotional links</th><td><textarea name="bet_links" rows="4" class="large-text code" placeholder="?ref=&#10;/go/&#10;/^https:\/\/shop\.example\.com\/.+\/"><?php echo esc_textarea( $o['bet_links'] ); ?></textarea><p class="description">One per line: a piece of the URL, or a <code>/regular expression/</code>. Any matching link makes a post not white hat.</p></td></tr>
+                    <tr><th scope="row">Allowed links</th><td><textarea name="allowed_links" rows="2" class="large-text code" placeholder="/^https:\/\/www\.example\.com\/?$/"><?php echo esc_textarea( $o['allowed_links'] ); ?></textarea><p class="description">Links that match a promotional link pattern but are fine, such as the brand's homepage.</p></td></tr>
+                    <tr><th scope="row">Trigger keywords</th><td><textarea name="keywords" rows="3" class="large-text"><?php echo esc_textarea( $o['keywords'] ); ?></textarea><p class="description">Whole words, one per line. Only sentences containing one are looked at; a post with none is white hat without an AI call.</p></td></tr>
                     <tr><th scope="row">Calls to action</th><td><textarea name="cta_patterns" rows="3" class="large-text"><?php echo esc_textarea( $o['cta_patterns'] ); ?></textarea><p class="description">Used instead of the AI when no provider is set.</p></td></tr>
-                    <tr><th scope="row">Bet blocks</th><td><input type="text" name="bet_blocks" value="<?php echo esc_attr( $o['bet_blocks'] ); ?>" class="regular-text" placeholder="vendor/bet-builder"> with the event time in the attribute <input type="text" name="event_attr" value="<?php echo esc_attr( $o['event_attr'] ); ?>" style="width:9em"> , rechecked <input type="number" name="grace_hours" min="0" max="168" value="<?php echo esc_attr( (int) $o['grace_hours'] ); ?>" style="width:4em"> hours after it
+                    <tr><th scope="row">AI instruction</th><td><textarea name="instruction" rows="4" class="large-text" placeholder="<?php echo esc_attr( self::DEFAULT_INSTRUCTION ); ?>"><?php echo esc_textarea( $o['instruction'] ); ?></textarea><p class="description">What counts as a call to action on this site. Leave empty for the general instruction shown.</p></td></tr>
+                    <tr><th scope="row">Promotion blocks</th><td><input type="text" name="bet_blocks" value="<?php echo esc_attr( $o['bet_blocks'] ); ?>" class="regular-text" placeholder="vendor/offer-banner"> with the event time in the attribute <input type="text" name="event_attr" value="<?php echo esc_attr( $o['event_attr'] ); ?>" style="width:9em"> , rechecked <input type="number" name="grace_hours" min="0" max="168" value="<?php echo esc_attr( (int) $o['grace_hours'] ); ?>" style="width:4em"> hours after it
                         <p class="description">Block names, comma separated. When the latest event in a post has passed, the post is rendered again, so banners that have dropped off are no longer counted.</p></td></tr>
                     <tr><th scope="row">AI provider</th><td>
                         <select name="provider"><?php foreach ( array( 'none' => 'None: rules only', 'anthropic' => 'Anthropic (Claude)', 'openai' => 'OpenAI' ) as $k => $l ) : ?><option value="<?php echo esc_attr( $k ); ?>" <?php selected( $o['provider'], $k ); ?>><?php echo esc_html( $l ); ?></option><?php endforeach; ?></select>
                         <label>Model <input type="text" name="model" value="<?php echo esc_attr( $o['model'] ); ?>" class="regular-text" placeholder="claude-opus-5"></label>
                         <p><label>API key <input type="password" name="api_key" value="" autocomplete="new-password" class="regular-text" placeholder="<?php echo esc_attr( '' !== $o['api_key'] ? 'Saved (leave blank to keep, type clear to remove)' : 'Not set' ); ?>"></label></p>
-                        <p class="description">Or define <code>ACE_SEO_WHITEHAT_API_KEY</code> in wp-config.php. Up to <input type="number" name="max_chars" min="200" max="20000" value="<?php echo esc_attr( (int) $o['max_chars'] ); ?>" style="width:6em"> characters of betting sentences are sent per check.</p>
+                        <p class="description">Or define <code>ACE_SEO_WHITEHAT_API_KEY</code> in wp-config.php. Up to <input type="number" name="max_chars" min="200" max="20000" value="<?php echo esc_attr( (int) $o['max_chars'] ); ?>" style="width:6em"> characters of matching sentences are sent per check.</p>
                     </td></tr>
                     <tr><th scope="row">Check now</th><td><input type="text" name="check_ids" class="regular-text" placeholder="Post IDs, comma separated (up to 20)"><p class="description">Checked when you save, ignoring the unchanged-content shortcut. For many posts use <code>wp ace-crawl whitehat check</code>.</p></td></tr>
                 </tbody></table>

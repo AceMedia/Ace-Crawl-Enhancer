@@ -9,9 +9,9 @@ final class Ace_SEO_Retention_Snapshot {
         if ( ! is_dir( $directory ) || is_link( $directory ) ) { throw new RuntimeException( 'Use an existing private snapshot directory.' ); }
         $this->directory = realpath( $directory );
         if ( ( fileperms( $this->directory ) & 0077 ) !== 0 ) { throw new RuntimeException( 'The snapshot directory must be private (0700).' ); }
-        $this->lock = fopen( $this->directory . '/.lock', 'c' );
+        $this->lock = fopen( $this->directory . '/.lock', 'c' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         if ( ! $this->lock || ! flock( $this->lock, LOCK_EX | LOCK_NB ) ) { throw new RuntimeException( 'Another snapshot worker owns this run.' ); }
-        chmod( $this->directory . '/.lock', 0600 );
+        chmod( $this->directory . '/.lock', 0600 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         $file = $this->directory . '/state.json';
         $this->state = is_file( $file ) ? json_decode( file_get_contents( $file ), true, 512, JSON_THROW_ON_ERROR ) : null;
         // A crash between manifest publication and the final state checkpoint must not reopen the run.
@@ -19,16 +19,16 @@ final class Ace_SEO_Retention_Snapshot {
     }
 
     public function __destruct() {
-        if ( is_resource( $this->lock ) ) { flock( $this->lock, LOCK_UN ); fclose( $this->lock ); }
+        if ( is_resource( $this->lock ) ) { flock( $this->lock, LOCK_UN ); fclose( $this->lock ); } // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
     }
 
     private function atomic( $name, $value ) {
         $tmp = tempnam( $this->directory, '.pending-' );
         if ( false === $tmp ) { throw new RuntimeException( 'Could not create snapshot checkpoint.' ); }
-        chmod( $tmp, 0600 );
+        chmod( $tmp, 0600 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         $bytes = json_encode( $value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR );
-        if ( file_put_contents( $tmp, $bytes ) !== strlen( $bytes ) || ! rename( $tmp, $this->directory . '/' . $name ) ) {
-            @unlink( $tmp ); throw new RuntimeException( 'Could not publish snapshot checkpoint.' );
+        if ( file_put_contents( $tmp, $bytes ) !== strlen( $bytes ) || ! rename( $tmp, $this->directory . '/' . $name ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
+            wp_delete_file( $tmp ); throw new RuntimeException( 'Could not publish snapshot checkpoint.' );
         }
     }
 
@@ -37,7 +37,7 @@ final class Ace_SEO_Retention_Snapshot {
         $ids = array_values( array_unique( array_filter( array_map( 'intval', $ids ), static function ( $id ) { return $id > 0; } ) ) );
         sort( $ids, SORT_NUMERIC );
         foreach ( array( 'rule_version', 'scope', 'as_of', 'period', 'timezone' ) as $key ) {
-            if ( ! isset( $provenance[$key] ) ) { throw new InvalidArgumentException( 'Missing snapshot provenance: ' . $key ); }
+            if ( ! isset( $provenance[$key] ) ) { throw new InvalidArgumentException( 'Missing snapshot provenance: ' . esc_html( $key ) ); }
         }
         $this->state = array( 'status' => 'running', 'ids' => $ids, 'offset' => 0, 'bytes' => 0, 'created_at' => gmdate( 'c' ), 'provenance' => $provenance );
         $this->atomic( 'state.json', $this->state );
@@ -52,15 +52,15 @@ final class Ace_SEO_Retention_Snapshot {
         $expected = array_slice( $this->state['ids'], $this->state['offset'], count( $records ) );
         if ( $expected !== array_map( 'intval', array_column( $records, 'id' ) ) ) { throw new RuntimeException( 'Snapshot batch does not match the frozen scope and cursor.' ); }
         $path = $this->directory . '/records.jsonl';
-        $fh = fopen( $path, 'c+b' );
+        $fh = fopen( $path, 'c+b' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         if ( ! $fh ) { throw new RuntimeException( 'Cannot open snapshot records.' ); }
-        chmod( $path, 0600 );
+        chmod( $path, 0600 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         try {
             if ( fstat( $fh )['size'] < $this->state['bytes'] ) { throw new RuntimeException( 'Checkpointed snapshot data is missing; recover the original file rather than filling the gap.' ); }
             if ( ! ftruncate( $fh, $this->state['bytes'] ) || 0 !== fseek( $fh, $this->state['bytes'] ) ) { throw new RuntimeException( 'Cannot recover snapshot checkpoint.' ); }
             foreach ( $records as $record ) {
                 $line = json_encode( $record, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR ) . "\n";
-                if ( fwrite( $fh, $line ) !== strlen( $line ) ) { throw new RuntimeException( 'Incomplete snapshot write; resume from its checkpoint.' ); }
+                if ( fwrite( $fh, $line ) !== strlen( $line ) ) { throw new RuntimeException( 'Incomplete snapshot write; resume from its checkpoint.' ); } // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
             }
             fflush( $fh );
             if ( function_exists( 'fsync' ) ) { fsync( $fh ); }
@@ -69,7 +69,7 @@ final class Ace_SEO_Retention_Snapshot {
             $state['offset'] += count( $records );
             $this->atomic( 'state.json', $state );
             $this->state = $state;
-        } finally { fclose( $fh ); }
+        } finally { fclose( $fh ); } // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
     }
 
     public function finish() {
@@ -89,10 +89,10 @@ final class Ace_SEO_Retention_Snapshot {
         if ( 'complete' !== ( $this->state['status'] ?? '' ) ) { throw new RuntimeException( 'Only complete snapshots can be exported.' ); }
         $manifest = json_decode( file_get_contents( $this->directory . '/manifest.json' ), true, 512, JSON_THROW_ON_ERROR );
         if ( ! hash_equals( $manifest['sha256'], hash_file( 'sha256', $this->directory . '/records.jsonl' ) ) ) { throw new RuntimeException( 'Snapshot integrity check failed.' ); }
-        $out = @fopen( $destination, 'x' );
+        $out = @fopen( $destination, 'x' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         if ( ! $out ) { throw new RuntimeException( 'Choose a new CSV filename; existing exports are never overwritten.' ); }
-        chmod( $destination, 0600 );
-        $in = fopen( $this->directory . '/records.jsonl', 'rb' );
+        chmod( $destination, 0600 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
+        $in = fopen( $this->directory . '/records.jsonl', 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         try {
             if ( ! $in || false === fputcsv( $out, array( 'post_id', 'title', 'published', 'saved_group', 'saved_recommendation', 'saved_reason', 'saved_views', 'saved_clicks', 'saved_assessed_at', 'preview_group', 'preview_primary_suggestion', 'preview_all_suggestions', 'preview_why', 'period_start', 'period_end', 'as_of', 'rule_version' ), ',', '"', '' ) ) { throw new RuntimeException( 'Could not begin the CSV export.' ); }
             while ( false !== ( $line = fgets( $in ) ) ) {
@@ -105,8 +105,8 @@ final class Ace_SEO_Retention_Snapshot {
             if ( ! feof( $in ) || ! fflush( $out ) || ( function_exists( 'fsync' ) && ! fsync( $out ) ) ) { throw new RuntimeException( 'The CSV export did not finish cleanly.' ); }
         } catch ( Throwable $error ) {
             // A failed partial export must not be mistaken for an existing completed CSV on resume.
-            @unlink( $destination );
+            wp_delete_file( $destination );
             throw $error;
-        } finally { if ( is_resource( $in ) ) { fclose( $in ); } fclose( $out ); }
+        } finally { if ( is_resource( $in ) ) { fclose( $in ); } fclose( $out ); } // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
     }
 }

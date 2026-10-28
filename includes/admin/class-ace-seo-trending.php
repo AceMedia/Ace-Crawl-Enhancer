@@ -147,31 +147,30 @@ class AceSeoTrending {
 
     /** "Content ideas" section, rendered inside the Search digest page. */
     public static function render_section() {
-        $e = 'esc_html';
         $d = get_option(self::OPT, []);
         $next = wp_next_scheduled(self::CRON);
         echo '<h2>Content ideas: trending topics on Wikipedia</h2>';
-        echo '<p>Weekly on Monday 05:30 from Wikimedia pageviews (this week against last, articles under ' . (int) self::MIN_VIEWS . ' views this week are held back). Next run: ' . $e($next ? wp_date('D j M H:i', $next) : 'not scheduled') . '. ';
-        echo 'Built: ' . $e(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '. ';
+        echo '<p>Weekly on Monday 05:30 from Wikimedia pageviews (this week against last, articles under ' . (int) self::MIN_VIEWS . ' views this week are held back). Next run: ' . esc_html($next ? wp_date('D j M H:i', $next) : 'not scheduled') . '. ';
+        echo 'Built: ' . esc_html(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '. ';
         echo '<a href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=ace_seo_digest_run&trending=1'), 'ace_seo_digest_run')) . '">Rebuild with the digest</a>.</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin:0 0 1em">';
         wp_nonce_field('ace_seo_trending_topics');
-        echo '<input type="hidden" name="action" value="ace_seo_trending_topics"><p><label>Articles to watch, one English Wikipedia title per line' . (has_filter('ace_seo_trending_topics') ? ' (a plugin adds more)' : '') . '<br><textarea name="topics" rows="6" cols="60" style="max-width:100%">' . $e((string) get_option(self::OPT_TOPICS, '')) . '</textarea></label></p><button class="button">Save topics</button></form>';
+        echo '<input type="hidden" name="action" value="ace_seo_trending_topics"><p><label>Articles to watch, one English Wikipedia title per line' . (has_filter('ace_seo_trending_topics') ? ' (a plugin adds more)' : '') . '<br><textarea name="topics" rows="6" cols="60" style="max-width:100%">' . esc_html((string) get_option(self::OPT_TOPICS, '')) . '</textarea></label></p><button class="button">Save topics</button></form>';
         if (!self::topics()) { echo '<p>No topics yet: add some above.</p>'; return; }
         if (empty($d['rows'])) {
-            echo '<p>Nothing yet' . (!empty($d['dropped']) ? ' (dropped: ' . $e(implode(', ', $d['dropped'])) . ')' : '') . '.</p>';
+            echo '<p>Nothing yet' . (!empty($d['dropped']) ? ' (dropped: ' . esc_html(implode(', ', $d['dropped'])) . ')' : '') . '.</p>';
             return;
         }
         echo '<table class="widefat striped" style="max-width:1100px"><thead><tr><th>Article</th><th>This week</th><th>Last week</th><th>Rise</th><th>Draft</th></tr></thead><tbody>';
         foreach ($d['rows'] as $r) {
             $post = admin_url('post-new.php?post_title=' . rawurlencode((string) apply_filters('ace_seo_trending_post_title', $r['label'], $r)));
-            echo '<tr><td><a href="' . esc_url($r['url']) . '" target="_blank" rel="noopener">' . $e($r['label']) . '</a></td>';
+            echo '<tr><td><a href="' . esc_url($r['url']) . '" target="_blank" rel="noopener">' . esc_html($r['label']) . '</a></td>';
             echo '<td>' . (int) $r['this'] . '</td><td>' . (int) $r['last'] . '</td>';
             echo '<td>' . ($r['pct'] > 0 ? '+' : '') . (int) $r['pct'] . '%</td>';
             echo '<td><a href="' . esc_url($post) . '">Write a post</a></td></tr>';
         }
         echo '</tbody></table>';
-        if (!empty($d['dropped'])) echo '<p>Dropped (no article or ambiguous): ' . $e(implode(', ', $d['dropped'])) . '</p>';
+        if (!empty($d['dropped'])) echo '<p>Dropped (no article or ambiguous): ' . esc_html(implode(', ', $d['dropped'])) . '</p>';
     }
 
     public static function admin_topics() {

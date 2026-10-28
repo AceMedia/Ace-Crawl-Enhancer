@@ -139,20 +139,11 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 - [x] **Framework** (2026-07-07): `includes/integrations/class-ace-seo-integrations.php` — adapters
   run once on `template_redirect` (after all plugins register, before `wp_head`).
-- [x] **Ace-Community-Events**: IMPORTANT — the current ACE-CE (the events site's submodule
-  copy, far ahead of the stale canonical checkout) already emits its OWN Event JSON-LD +
-  BreadcrumbList via its `ACE_SEO` class, and already has IndexNow. The adapter therefore: removes
-  its duplicate BreadcrumbList emitter (the graph now covers every page), keeps its Event emitter
-  (it knows its recurrence/offers/performers meta best), and adds the missing types —
-  `businesses` → LocalBusiness, `job_listings` → JobPosting (hiringOrganization = linked
-  business or site publisher `@id`), `locations` → Place; address/geo mapped from its
-  `address`/`geo_location` meta convention.
-  - [x] Follow-up **done + LIVE** (2026-07-07): Ace-Community-Events `6afe3eb` registers its Event
-    node into the graph via `ace_seo_register_schema_provider()` (standalone fallback kept for
-    non-Ace-SEO sites). Deployed to the events consumer site; event pages verified
-    serving ONE `@graph` (WebPage+BreadcrumbList+Organization+Event), down from 2 blocks + a stray
-    Article. Also shipped ace-crawl `12f8ed7`: Article gets an `@id`, and an `ace_seo_emit_article`
-    filter lets typed CPTs (events/businesses/jobs/locations) skip the redundant Article node.
+- [x] **Directory adapter** (opt-in via the `ace_seo_directory_post_types` filter): maps a site's
+  business, job, location and event post types so they skip the redundant Article node and get
+  LocalBusiness, JobPosting (hiringOrganization = linked business or site publisher `@id`) and Place
+  schema from `address`/`geo_location` post meta. Plugins can also register their own nodes with
+  `ace_seo_register_schema_provider()` (the `ace_seo_emit_article` filter lets typed post types skip Article).
 - [x] **WooCommerce**: Product provider shipped in Phase 1 (`ace_seo_product_schema_enabled`,
   defaults off while Woo core emits its own); `ItemList` now emitted on ALL archives (incl.
   product-category) from the main query — new `ace-seo/archive-items` provider, capped at 10.
@@ -274,7 +265,7 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 - Clarity summary cards with a dated rolling window, report shortcuts and collapsible details/connection settings.
 - Save up to 60 project-specific rolling 24-hour snapshots, one immutable point per capture date; existing daily tracking cron collects without requiring an admin visit. Missing days stay missing, and project changes isolate history.
 - Optional Clarity count selector on the main chart (sessions, unique visitors, dead/rage/error clicks, quick backs and script errors when supplied). Dashed lines and tooltips distinguish rolling windows from calendar-day Analytics/sales. No unsupported historical backfill or total-click estimate.
-- Verified against the connected IEG Clarity response; 73 PHP assertions cover tracking, cron and data handling, including zero/missing metrics, segmented users, history isolation and retention. Browser checks cover chart selection, missing-day gaps, exact window tooltips and responsive cards.
+- Verified against the connected Clarity response of a production site; 73 PHP assertions cover tracking, cron and data handling, including zero/missing metrics, segmented users, history isolation and retention. Browser checks cover chart selection, missing-day gaps, exact window tooltips and responsive cards.
 
 ### Tracking 1.0.84 — selectable series and Google reporting
 
@@ -286,7 +277,7 @@ Local implementation for #32 adds a counts-free bucket/suggestion reference tabl
 - Add hourly cached GA4 session-source reports, native AI Assistant channels and recognised AI referral hosts, engaged sessions and key events. Each source row is assigned once; source bands stack sessions rather than unique users. Toggle between filled bands and lines or select individual channels.
 - Add advertising clicks/impressions via GA4’s linked/imported data, requesting campaign dimensions for compatibility, and final daily Google Search Console clicks/impressions. Missing permissions, failed reports and delayed search days remain explicitly unavailable. Reporting timezones and sampling/threshold caveats are visible.
 - CSV includes all available Google series and saved Clarity metrics with exact UTC windows. Google reporting cache clears with Re-run checks.
-- Live IEG probes confirmed all four report types. Validation now includes 93 PHP assertions plus browser checks for summed-area scaling, overlays, source-line mode, multi-selection, persistence and mobile layout.
+- Live probes on a production site confirmed all four report types. Validation now includes 93 PHP assertions plus browser checks for summed-area scaling, overlays, source-line mode, multi-selection, persistence and mobile layout.
 - Active labels use a responsive grid with accessible hover/focus metric help. Unified toolbar styling covers the traffic-mix button, selectors and Add series picker. Guidance follows the selected metrics and filled/line source mode; inactive controls and explanations are hidden. Desktop/mobile checks verify overflow, tooltip bounds, keyboard operation and search-only/empty context.
 
 ### Tracking 1.0.85 — independent basic view counts

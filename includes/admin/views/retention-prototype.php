@@ -14,7 +14,7 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
         'target' => 'Choose the canonical URL of an editable post or page on this site, without query parameters or fragments.',
         'permission' => 'Administrator permission required.',
     );
-    $notice = isset( $_GET['preview_notice'] ) && is_string( $_GET['preview_notice'] ) ? sanitize_key( $_GET['preview_notice'] ) : '';
+    $notice = isset( $_GET['preview_notice'] ) && is_string( $_GET['preview_notice'] ) ? sanitize_key( wp_unslash( $_GET['preview_notice'] ) ) : '';
     if ( $notice ) : ?>
         <p role="status"><strong><?php echo esc_html( $notices[ $notice ] ?? 'Assessment could not be saved. No redirect was applied; try a new preview.' ); ?></strong></p>
     <?php endif; ?>

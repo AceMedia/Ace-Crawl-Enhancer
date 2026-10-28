@@ -60,6 +60,7 @@ class AceSEOAiAssistant {
         }
     }
 
+    // phpcs:disable WordPress.Security.NonceVerification.Missing -- every ajax_* handler below calls $this->guard() (check_ajax_referer plus a capability check) before reading any input.
     /**
      * AJAX handler for generating SEO titles
      */
@@ -69,7 +70,7 @@ class AceSEOAiAssistant {
         $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
         $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
         $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
-        $post_id = intval( $_POST['post_id'] ?? 0 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -100,7 +101,7 @@ class AceSEOAiAssistant {
         $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
         $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
         $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
-        $post_id = intval( $_POST['post_id'] ?? 0 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -127,9 +128,9 @@ class AceSEOAiAssistant {
     public function ajax_analyze_content() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI analysis' );
@@ -150,9 +151,9 @@ class AceSEOAiAssistant {
     public function ajax_suggest_topics() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for topic suggestions' );
@@ -173,8 +174,8 @@ class AceSEOAiAssistant {
     public function ajax_improve_content() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for improvement suggestions' );
@@ -195,9 +196,9 @@ class AceSEOAiAssistant {
     public function ajax_generate_keywords() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $post_id = intval( $_POST['post_id'] ?? 0 );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for keyword suggestions' );
@@ -224,10 +225,10 @@ class AceSEOAiAssistant {
     public function ajax_generate_facebook_titles() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $seo_title = sanitize_text_field( $_POST['seo_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $seo_title = sanitize_text_field( wp_unslash( $_POST['seo_title'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -251,10 +252,10 @@ class AceSEOAiAssistant {
     public function ajax_generate_facebook_descriptions() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $meta_description = sanitize_text_field( $_POST['meta_description'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $meta_description = sanitize_text_field( wp_unslash( $_POST['meta_description'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -275,11 +276,11 @@ class AceSEOAiAssistant {
     public function ajax_generate_twitter_titles() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $seo_title = sanitize_text_field( $_POST['seo_title'] ?? '' );
-        $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $seo_title = sanitize_text_field( wp_unslash( $_POST['seo_title'] ?? '' ) );
+        $facebook_title = sanitize_text_field( wp_unslash( $_POST['facebook_title'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -303,11 +304,11 @@ class AceSEOAiAssistant {
     public function ajax_generate_twitter_descriptions() {
         $this->guard();
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $meta_description = sanitize_text_field( $_POST['meta_description'] ?? '' );
-        $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $meta_description = sanitize_text_field( wp_unslash( $_POST['meta_description'] ?? '' ) );
+        $facebook_description = sanitize_text_field( wp_unslash( $_POST['facebook_description'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI suggestions' );
@@ -336,12 +337,12 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
-        $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
-        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $facebook_title = sanitize_text_field( wp_unslash( $_POST['facebook_title'] ?? '' ) );
+        $facebook_description = sanitize_text_field( wp_unslash( $_POST['facebook_description'] ?? '' ) );
+        $featured_image_url = esc_url_raw( wp_unslash( $_POST['featured_image_url'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI image generation' );
@@ -373,12 +374,12 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $twitter_title = sanitize_text_field( $_POST['twitter_title'] ?? '' );
-        $twitter_description = sanitize_text_field( $_POST['twitter_description'] ?? '' );
-        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $twitter_title = sanitize_text_field( wp_unslash( $_POST['twitter_title'] ?? '' ) );
+        $twitter_description = sanitize_text_field( wp_unslash( $_POST['twitter_description'] ?? '' ) );
+        $featured_image_url = esc_url_raw( wp_unslash( $_POST['featured_image_url'] ?? '' ) );
         
         if ( empty( $post_content ) ) {
             wp_send_json_error( 'Content is required for AI image generation' );
@@ -410,8 +411,8 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
-        $custom_prompt = sanitize_textarea_field( $_POST['prompt'] ?? '' );
-        $platform = sanitize_text_field( $_POST['platform'] ?? 'facebook' );
+        $custom_prompt = sanitize_textarea_field( wp_unslash( $_POST['prompt'] ?? '' ) );
+        $platform = sanitize_text_field( wp_unslash( $_POST['platform'] ?? 'facebook' ) );
         
         if ( empty( $custom_prompt ) ) {
             wp_send_json_error( 'Image prompt is required' );
@@ -440,12 +441,12 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
-        $platform = sanitize_text_field( $_POST['platform'] ?? 'facebook' );
-        $custom_prompt = sanitize_textarea_field( $_POST['custom_prompt'] ?? '' );
-        $post_content = sanitize_textarea_field( $_POST['content'] ?? '' );
-        $focus_keyword = sanitize_text_field( $_POST['focus_keyword'] ?? '' );
-        $current_title = sanitize_text_field( $_POST['current_title'] ?? '' );
-        $featured_image_url = esc_url_raw( $_POST['featured_image_url'] ?? '' );
+        $platform = sanitize_text_field( wp_unslash( $_POST['platform'] ?? 'facebook' ) );
+        $custom_prompt = sanitize_textarea_field( wp_unslash( $_POST['custom_prompt'] ?? '' ) );
+        $post_content = sanitize_textarea_field( wp_unslash( $_POST['content'] ?? '' ) );
+        $focus_keyword = sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ?? '' ) );
+        $current_title = sanitize_text_field( wp_unslash( $_POST['current_title'] ?? '' ) );
+        $featured_image_url = esc_url_raw( wp_unslash( $_POST['featured_image_url'] ?? '' ) );
         
         if ( ! empty( $custom_prompt ) ) {
             // Generate from custom prompt
@@ -473,8 +474,8 @@ class AceSEOAiAssistant {
             }
             
             if ( $platform === 'facebook' ) {
-                $facebook_title = sanitize_text_field( $_POST['facebook_title'] ?? '' );
-                $facebook_description = sanitize_text_field( $_POST['facebook_description'] ?? '' );
+                $facebook_title = sanitize_text_field( wp_unslash( $_POST['facebook_title'] ?? '' ) );
+                $facebook_description = sanitize_text_field( wp_unslash( $_POST['facebook_description'] ?? '' ) );
                 
                 $image_suggestions = AceSEOApiHelper::generate_facebook_image( 
                     $post_content, 
@@ -484,8 +485,8 @@ class AceSEOAiAssistant {
                     $featured_image_url
                 );
             } else {
-                $twitter_title = sanitize_text_field( $_POST['twitter_title'] ?? '' );
-                $twitter_description = sanitize_text_field( $_POST['twitter_description'] ?? '' );
+                $twitter_title = sanitize_text_field( wp_unslash( $_POST['twitter_title'] ?? '' ) );
+                $twitter_description = sanitize_text_field( wp_unslash( $_POST['twitter_description'] ?? '' ) );
                 
                 $image_suggestions = AceSEOApiHelper::generate_twitter_image( 
                     $post_content, 
@@ -514,9 +515,9 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Insufficient permissions to upload files' );
         }
         
-        $image_url = esc_url_raw( $_POST['image_url'] ?? '' );
-        $post_id = intval( $_POST['post_id'] ?? 0 );
-        $filename = sanitize_file_name( $_POST['filename'] ?? '' );
+        $image_url = esc_url_raw( wp_unslash( $_POST['image_url'] ?? '' ) );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        $filename = sanitize_file_name( wp_unslash( $_POST['filename'] ?? '' ) );
         
         if ( empty( $image_url ) ) {
             wp_send_json_error( 'Image URL is required' );
@@ -727,6 +728,8 @@ class AceSEOAiAssistant {
         <?php
     }
 }
+
+// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 // Initialize the AI assistant
 new AceSEOAiAssistant();

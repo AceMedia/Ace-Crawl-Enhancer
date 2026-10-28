@@ -123,7 +123,7 @@ class AceSeoSchemaGraph {
         // Prevent breaking out of the script tag via </script> in values.
         $json = str_replace('</', '<\/', $json);
 
-        echo '<script type="application/ld+json">' . "\n" . $json . "\n" . '</script>' . "\n";
+        echo '<script type="application/ld+json">' . "\n" . $json . "\n" . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
     }
 }
 
@@ -132,7 +132,7 @@ if (!function_exists('ace_seo_register_schema_provider')) {
      * Public helper for other plugins to inject schema.org nodes into the
      * Ace SEO graph. See docs/schema-api.md in the plugin for examples.
      *
-     * @param string   $id       Unique provider id, e.g. 'ace-community-events/event'.
+     * @param string   $id       Unique provider id, e.g. 'my-plugin/event'.
      * @param callable $callback function( array $context ): array|null
      */
     function ace_seo_register_schema_provider($id, callable $callback) {

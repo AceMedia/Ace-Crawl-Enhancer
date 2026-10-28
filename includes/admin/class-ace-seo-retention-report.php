@@ -668,11 +668,11 @@ class AceSeoRetentionReport {
         $links   = isset( $signals['links'] ) && is_array( $signals['links'] ) ? $signals['links'] : array();
         $lookup  = self::candidate_lookup( $p['settings'] );
 
-        $types = array_map( 'esc_sql', (array) $p['settings']['post_types'] );
+        $types        = self::post_type_list( $p['settings']['post_types'] );
+        $placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
         $rows  = $wpdb->get_results( $wpdb->prepare(
-            "SELECT ID, post_content FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('" . implode( "','", $types ) . "') ORDER BY ID ASC LIMIT %d OFFSET %d",
-            self::BATCH,
-            (int) $p['offset']
+            "SELECT ID, post_content FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders}) ORDER BY ID ASC LIMIT %d OFFSET %d",
+            array_merge( $types, array( self::BATCH, (int) $p['offset'] ) )
         ) );
 
         $home = self::path_key( home_url( '/' ) );
@@ -1049,9 +1049,13 @@ class AceSeoRetentionReport {
     public static function rank_labels( array $s = array() ) {
         $c = self::rank_cutoffs( $s ?: self::settings() );
         return array(
+            /* translators: %s: minimum view count. */
             'daily'      => sprintf( __( 'Read daily (%s+ views in the window)', 'ace-crawl-enhancer' ), number_format_i18n( $c['daily'] ) ),
+            /* translators: %s: minimum view count. */
             'weekly'     => sprintf( __( 'Read weekly (%s+)', 'ace-crawl-enhancer' ), number_format_i18n( $c['weekly'] ) ),
+            /* translators: %s: minimum view count. */
             'monthly'    => sprintf( __( 'Read monthly (%s+)', 'ace-crawl-enhancer' ), number_format_i18n( $c['monthly'] ) ),
+            /* translators: %s: minimum view count. */
             'occasional' => sprintf( __( 'Read occasionally (%s+, or any search click)', 'ace-crawl-enhancer' ), number_format_i18n( $c['occasional'] ) ),
         );
     }
@@ -1093,7 +1097,9 @@ class AceSeoRetentionReport {
             return array();
         }
         $out  = array();
-        $rows = $wpdb->get_results( 'SELECT ID, post_content FROM ' . $wpdb->posts . ' WHERE ID IN (' . implode( ',', array_map( 'intval', $ids ) ) . ')' );
+        $ids          = array_map( 'intval', $ids );
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $rows         = $wpdb->get_results( $wpdb->prepare( "SELECT ID, post_content FROM {$wpdb->posts} WHERE ID IN ({$placeholders})", $ids ) );
         foreach ( $rows as $row ) {
             $text = wp_strip_all_tags( strip_shortcodes( (string) $row->post_content ) );
             $out[ (int) $row->ID ] = $text === '' ? 0 : count( preg_split( '/\s+/u', trim( $text ), -1, PREG_SPLIT_NO_EMPTY ) );
@@ -1265,8 +1271,8 @@ class AceSeoRetentionReport {
         $floor = max( 1, (int) ( ( $s ?: self::settings() )['retained_views'] ?? 1 ) );
         return array(
             'retained'  => __( 'Still being read', 'ace-crawl-enhancer' ),
-            'candidate' => 1 === $floor ? __( 'Short, with no recorded readers', 'ace-crawl-enhancer' ) : sprintf( __( 'Short, with fewer than %d views', 'ace-crawl-enhancer' ), $floor ),
-            'dormant'   => 1 === $floor ? __( 'No recorded readers', 'ace-crawl-enhancer' ) : sprintf( __( 'Below the readership threshold (fewer than %d views)', 'ace-crawl-enhancer' ), $floor ),
+            'candidate' => 1 === $floor ? __( 'Short, with no recorded readers', 'ace-crawl-enhancer' ) : sprintf( /* translators: %d: view count. */ __( 'Short, with fewer than %d views', 'ace-crawl-enhancer' ), $floor ),
+            'dormant'   => 1 === $floor ? __( 'No recorded readers', 'ace-crawl-enhancer' ) : sprintf( /* translators: %d: view count. */ __( 'Below the readership threshold (fewer than %d views)', 'ace-crawl-enhancer' ), $floor ),
             'unknown'   => __( 'Not ready to judge', 'ace-crawl-enhancer' ),
         );
     }
@@ -1376,29 +1382,36 @@ class AceSeoRetentionReport {
         return gmdate( 'Y-m-d H:i:s', strtotime( '-' . (int) $settings['older_than_years'] . ' years' ) );
     }
 
+    /** Sanitised post types for a post_type IN (...) list; falls back to posts. */
+    private static function post_type_list( $types ) {
+        $types = array_values( array_filter( array_map( 'sanitize_key', (array) $types ) ) );
+        return $types ? $types : array( 'post' );
+    }
+
     private static function count_all_posts( $types ) {
         global $wpdb;
-        $types = array_map( 'esc_sql', (array) $types );
-        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('" . implode( "','", $types ) . "')" );
+        $types        = self::post_type_list( $types );
+        $placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
+        return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders})", $types ) );
     }
 
     public static function count_candidates( array $settings ) {
         global $wpdb;
-        $types = array_map( 'esc_sql', (array) $settings['post_types'] );
+        $types        = self::post_type_list( $settings['post_types'] );
+        $placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
         return (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('" . implode( "','", $types ) . "') AND post_date_gmt < %s",
-            self::cutoff_date( $settings )
+            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders}) AND post_date_gmt < %s",
+            array_merge( $types, array( self::cutoff_date( $settings ) ) )
         ) );
     }
 
     private static function candidate_ids( array $settings, $limit, $offset ) {
         global $wpdb;
-        $types = array_map( 'esc_sql', (array) $settings['post_types'] );
+        $types        = self::post_type_list( $settings['post_types'] );
+        $placeholders = implode( ', ', array_fill( 0, count( $types ), '%s' ) );
         return array_map( 'intval', $wpdb->get_col( $wpdb->prepare(
-            "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ('" . implode( "','", $types ) . "') AND post_date_gmt < %s ORDER BY ID ASC LIMIT %d OFFSET %d",
-            self::cutoff_date( $settings ),
-            (int) $limit,
-            (int) $offset
+            "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type IN ({$placeholders}) AND post_date_gmt < %s ORDER BY ID ASC LIMIT %d OFFSET %d",
+            array_merge( $types, array( self::cutoff_date( $settings ), (int) $limit, (int) $offset ) )
         ) ) );
     }
 
@@ -1511,7 +1524,7 @@ class AceSeoRetentionReport {
             $args[] = (int) $offset;
         }
         $out = array();
-        foreach ( $wpdb->get_results( $wpdb->prepare( $sql, $args ) ) as $row ) {
+        foreach ( $wpdb->get_results( $wpdb->prepare( $sql, $args ) ) /* phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $sql holds only placeholders, built above. */ as $row ) {
             $v = maybe_unserialize( $row->meta_value );
             if ( ! is_array( $v ) ) {
                 continue;
@@ -1531,7 +1544,7 @@ class AceSeoRetentionReport {
         foreach ( self::meta_keys() as $key ) {
             $wpdb->delete( $wpdb->postmeta, array( 'meta_key' => $key ) );
         }
-        if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_group' ) ) {
+        if ( function_exists( 'wp_cache_flush_group' ) && function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_group' ) ) {
             wp_cache_flush_group( 'post_meta' );
         }
         delete_option( self::PROGRESS_OPTION );
@@ -1543,7 +1556,7 @@ class AceSeoRetentionReport {
 
     public static function csv( $bucket = '' ) {
         $cols = array( 'id', 'tier', 'rank', 'bucket', 'title', 'url', 'published', 'clicks', 'impressions', 'position', 'links_in', 'views', 'words', 'backlinks', 'reason' );
-        $fh   = fopen( 'php://temp', 'w+' );
+        $fh   = fopen( 'php://temp', 'w+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- in-memory stream, not a filesystem path.
         fputcsv( $fh, $cols );
         foreach ( self::rows( $bucket, 0 ) as $row ) {
             $line = array();
@@ -1554,7 +1567,7 @@ class AceSeoRetentionReport {
         }
         rewind( $fh );
         $csv = stream_get_contents( $fh );
-        fclose( $fh );
+        fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- in-memory stream.
         return $csv;
     }
 
@@ -1661,7 +1674,7 @@ class AceSeoRetentionReport {
         $links = array(
             'retained'  => array( __( 'Retained: old posts still being read, most read first', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'retained', 'orderby' => 'ace_seo_ret_views', 'order' => 'desc' ), $base ) ),
             'candidate' => array( __( 'Candidates for review: older posts with no recorded visits and less text', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'candidate' ), $base ) ),
-            'before'    => array( sprintf( __( 'Everything published before %d', 'ace-crawl-enhancer' ), $year ), add_query_arg( array( 'post_type' => 'post', 'post_status' => 'publish', 'ace_before' => $year . '-01-01' ), $base ) ),
+            'before'    => array( /* translators: %d: year. */ sprintf( __( 'Everything published before %d', 'ace-crawl-enhancer' ), $year ), add_query_arg( array( 'post_type' => 'post', 'post_status' => 'publish', 'ace_before' => $year . '-01-01' ), $base ) ),
         );
         return apply_filters( 'ace_seo_retention_shareable_links', $links, $o );
     }
@@ -1680,9 +1693,9 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_apply' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $action = sanitize_key( $_POST['retention_action'] ?? '' );
-        $bucket = sanitize_key( $_POST['bucket'] ?? '' );
-        $scope  = sanitize_key( $_POST['scope'] ?? 'ticked' );
+        $action = sanitize_key( wp_unslash( $_POST['retention_action'] ?? '' ) );
+        $bucket = sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) );
+        $scope  = sanitize_key( wp_unslash( $_POST['scope'] ?? 'ticked' ) );
         $args   = array(
             'date' => sanitize_text_field( wp_unslash( $_POST['action_date'] ?? '' ) ),
             'url'  => esc_url_raw( wp_unslash( $_POST['action_url'] ?? '' ) ),
@@ -1735,7 +1748,7 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_export' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $bucket = isset( $_GET['bucket'] ) ? sanitize_key( $_GET['bucket'] ) : '';
+        $bucket = isset( $_GET['bucket'] ) ? sanitize_key( wp_unslash( $_GET['bucket'] ) ) : '';
         nocache_headers();
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="retention-report' . ( $bucket ? '-' . $bucket : '' ) . '-' . gmdate( 'Ymd' ) . '.csv"' );
@@ -1748,13 +1761,13 @@ class AceSeoRetentionReport {
         global $wpdb;
         $out = array( 'timing' => 0, 'coverage' => 0, 'ambiguous' => 0, 'missing' => 0 );
         $base = "SELECT COUNT(*) FROM {$wpdb->postmeta} t JOIN {$wpdb->postmeta} r ON r.post_id = t.post_id AND r.meta_key = %s WHERE t.meta_key = %s AND t.meta_value = 'unknown'";
-        $total = (int) $wpdb->get_var( $wpdb->prepare( $base, self::META, self::META_TIER ) );
+        $total = (int) $wpdb->get_var( $wpdb->prepare( $base, self::META, self::META_TIER ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template, values bound by prepare().
         if ( ! $total ) {
             return $out;
         }
-        $out['timing']    = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%timing has not been confirmed%' ) );
-        $out['coverage']  = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s AND r.meta_value NOT LIKE %s', self::META, self::META_TIER, '%only has data from%', '%timing has not been confirmed%' ) );
-        $out['ambiguous'] = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%Several linked events%' ) );
+        $out['timing']    = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%timing has not been confirmed%' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template, values bound by prepare().
+        $out['coverage']  = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s AND r.meta_value NOT LIKE %s', self::META, self::META_TIER, '%only has data from%', '%timing has not been confirmed%' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template, values bound by prepare().
+        $out['ambiguous'] = (int) $wpdb->get_var( $wpdb->prepare( $base . ' AND r.meta_value LIKE %s', self::META, self::META_TIER, '%Several linked events%' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template, values bound by prepare().
         $out['missing']   = max( 0, $total - $out['timing'] - $out['coverage'] - $out['ambiguous'] );
         return $out;
     }
@@ -1951,7 +1964,7 @@ class AceSeoRetentionReport {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         ob_start();
-        self::render_rows_section( sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) ), (int) ( $_POST['paged'] ?? 1 ) );
+        self::render_rows_section( sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) ), absint( wp_unslash( $_POST['paged'] ?? 1 ) ) );
         wp_send_json_success( array( 'html' => ob_get_clean() ) );
     }
 
@@ -2162,8 +2175,8 @@ class AceSeoRetentionReport {
         }
         $p        = self::progress();
         $settings = ! empty( $p['settings'] ) ? $p['settings'] : self::settings();
-        $bucket   = isset( $_GET['bucket'] ) ? sanitize_key( $_GET['bucket'] ) : '';
-        $paged    = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+        $bucket   = isset( $_GET['bucket'] ) ? sanitize_key( wp_unslash( $_GET['bucket'] ) ) : '';
+        $paged    = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
         $per      = 100;
         $counts   = self::counts();
         $built    = array_sum( $counts ) > 0;
@@ -2386,7 +2399,7 @@ class AceSeoRetentionReport {
             return;
         }
         if ( 'csv' === $format ) {
-            fwrite( STDOUT, self::csv( $bucket ) );
+            fwrite( STDOUT, self::csv( $bucket ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- WP-CLI stdout, not a filesystem path.
             return;
         }
         $limit = isset( $assoc['limit'] ) ? (int) $assoc['limit'] : 50;

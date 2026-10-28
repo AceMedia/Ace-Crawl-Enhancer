@@ -3,6 +3,8 @@
  * Metabox template with modern Yoast-like interface
  */
 
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+
 // Get current post values
 $post_id = $post->ID;
 $focus_keyword = AceCrawlEnhancer::get_meta_value($post_id, 'focuskw');
@@ -85,7 +87,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
                        value="<?php echo esc_attr($focus_keyword); ?>" 
                        class="ace-seo-input"
                        placeholder="Enter your focus keyword">
-                <?php echo AceSEOAiAssistant::render_ai_buttons('keyword'); ?>
+                <?php echo AceSEOAiAssistant::render_ai_buttons('keyword'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
             </div>
             <div class="ace-seo-description">
                 Choose the main keyword you want this content to rank for in search engines.
@@ -101,7 +103,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
                     <?php echo esc_html($seo_title ?: $post->post_title); ?>
                 </div>
                 <div class="ace-seo-preview-description" id="preview-description">
-                    <?php echo esc_html($meta_description ?: wp_trim_words(strip_tags($post->post_content), 25)); ?>
+                    <?php echo esc_html($meta_description ?: wp_trim_words(wp_strip_all_tags($post->post_content), 25)); ?>
                 </div>
             </div>
         </div>
@@ -122,7 +124,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
                     placeholder="<?php echo esc_attr($post->post_title); ?>"
                     maxlength="60"
                 >
-                <?php echo AceSEOAiAssistant::render_ai_buttons('title'); ?>
+                <?php echo AceSEOAiAssistant::render_ai_buttons('title'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
             </div>
             <div class="ace-seo-progress-bar">
                 <div class="ace-seo-progress-fill" id="title-progress"></div>
@@ -135,7 +137,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
 <?php
 // Helper function to create safe placeholder text under character limit
 function ace_seo_safe_placeholder($content, $max_chars = 155) {
-    $trimmed = wp_trim_words(strip_tags($content), 15); // Use fewer words
+    $trimmed = wp_trim_words(wp_strip_all_tags($content), 15); // Use fewer words
     if (strlen($trimmed) > $max_chars) {
         $trimmed = substr($trimmed, 0, $max_chars - 3) . '...';
     }
@@ -159,7 +161,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     rows="3"
                 ><?php echo esc_textarea($meta_description); ?></textarea>
                 <div class="ace-seo-textarea-buttons">
-                    <?php echo AceSEOAiAssistant::render_ai_buttons('description'); ?>
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('description'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                 </div>
             </div>
             <div class="ace-seo-progress-bar">
@@ -248,9 +250,9 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         <?php echo esc_html($og_title ?: $seo_title ?: $post->post_title); ?>
                     </div>
                     <div class="ace-seo-social-preview-description" id="facebook-preview-description">
-                        <?php echo esc_html($og_description ?: $meta_description ?: wp_trim_words(strip_tags($post->post_content), 25)); ?>
+                        <?php echo esc_html($og_description ?: $meta_description ?: wp_trim_words(wp_strip_all_tags($post->post_content), 25)); ?>
                     </div>
-                    <div class="ace-seo-social-preview-url"><?php echo esc_html(parse_url(get_site_url(), PHP_URL_HOST)); ?></div>
+                    <div class="ace-seo-social-preview-url"><?php echo esc_html(wp_parse_url(get_site_url(), PHP_URL_HOST)); ?></div>
                 </div>
             </div>
 
@@ -269,7 +271,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         placeholder="<?php echo esc_attr($seo_title ?: $post->post_title); ?>"
                         maxlength="95"
                     >
-                    <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_title'); ?>
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_title'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                 </div>
             </div>
 
@@ -288,7 +290,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         rows="3"
                     ><?php echo esc_textarea($og_description); ?></textarea>
                     <div class="ace-seo-textarea-buttons">
-                        <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_description'); ?>
+                        <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_description'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                     </div>
                 </div>
             </div>
@@ -315,7 +317,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_opengraph-image">
                                 Select Image
                             </button>
-                            <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_image'); ?>
+                            <?php echo AceSEOAiAssistant::render_ai_buttons('facebook_image'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                         </div>
                     </div>
                 </div>
@@ -342,9 +344,9 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         <?php echo esc_html($twitter_title ?: $og_title ?: $seo_title ?: $post->post_title); ?>
                     </div>
                     <div class="ace-seo-social-preview-description" id="twitter-preview-description">
-                        <?php echo esc_html($twitter_description ?: $og_description ?: $meta_description ?: wp_trim_words(strip_tags($post->post_content), 25)); ?>
+                        <?php echo esc_html($twitter_description ?: $og_description ?: $meta_description ?: wp_trim_words(wp_strip_all_tags($post->post_content), 25)); ?>
                     </div>
-                    <div class="ace-seo-social-preview-url"><?php echo esc_html(parse_url(get_site_url(), PHP_URL_HOST)); ?></div>
+                    <div class="ace-seo-social-preview-url"><?php echo esc_html(wp_parse_url(get_site_url(), PHP_URL_HOST)); ?></div>
                 </div>
             </div>
 
@@ -363,7 +365,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         placeholder="<?php echo esc_attr($og_title ?: $seo_title ?: $post->post_title); ?>"
                         maxlength="70"
                     >
-                    <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_title'); ?>
+                    <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_title'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                 </div>
             </div>
 
@@ -382,7 +384,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         rows="3"
                     ><?php echo esc_textarea($twitter_description); ?></textarea>
                     <div class="ace-seo-textarea-buttons">
-                        <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_description'); ?>
+                        <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_description'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                     </div>
                 </div>
             </div>
@@ -415,7 +417,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_twitter-image">
                                 Select Image
                             </button>
-                            <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_image'); ?>
+                            <?php echo AceSEOAiAssistant::render_ai_buttons('twitter_image'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed button template escapes every dynamic attribute and label in render_ai_buttons(). ?>
                         </div>
                     </div>
                 </div>
@@ -687,7 +689,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
 <input type="hidden" id="yoast_wpseo_content_score" name="yoast_wpseo_content_score" value="<?php echo esc_attr(AceCrawlEnhancer::get_meta_value($post_id, 'content_score')); ?>">
 
 <!-- AI Nonce for AJAX requests -->
-<input type="hidden" id="ace_seo_ai_nonce" value="<?php echo wp_create_nonce('ace_seo_ai_nonce'); ?>">
+<input type="hidden" id="ace_seo_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('ace_seo_ai_nonce') ); ?>">
 
 <?php 
 // Render AI suggestions modal

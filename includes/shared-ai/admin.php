@@ -23,20 +23,19 @@ final class Admin {
 	}
 	private static function codex_section( Service $service, bool $network, array $record ) {
 		if ( ! $service->codex_available() ) {
-			?><h2>Sign in with ChatGPT</h2><p>Sign in from this screen needs the Ace Codex bridge installed on this server. See <code>docs/SHARED-AI-CONNECTION.md</code> for the install steps.</p><?php
-			self::bridge_form( $service, $network );
+			?><h2>Sign in with ChatGPT</h2><p>Signing in from this screen needs a Codex runner supplied by your host through the <code>ace_ai_codex_runner</code> filter. See <code>docs/SHARED-AI-CONNECTION.md</code>.</p><?php
 			return;
 		}
 		$status = $service->codex_login_status( $network );
 		?><h2>Sign in with ChatGPT</h2><?php
-		if ( is_wp_error( $status ) ) { ?><div class="notice notice-error inline"><p><?php echo esc_html( $status->get_error_message() ); ?></p></div><?php self::bridge_form( $service, $network ); return; }
+		if ( is_wp_error( $status ) ) { ?><div class="notice notice-error inline"><p><?php echo esc_html( $status->get_error_message() ); ?></p></div><?php return; }
 		if ( ! empty( $status['error'] ) ) { ?><div class="notice notice-warning inline"><p><?php echo esc_html( $status['error'] ); ?></p></div><?php }
 		if ( ! empty( $status['connected'] ) ) {
 			?><p>Connected as <strong><?php echo esc_html( $record['account_label'] ?? ( $status['account'] ?? 'ChatGPT account' ) ); ?></strong> through this server’s own Codex instance. Text features in Ace SEO and Adaptive Customer Engagement now use this account’s allowance.</p>
 			<form method="post"><?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?><input type="hidden" name="intent" value="disconnect"><?php submit_button( 'Sign out of ChatGPT at this scope', 'secondary' ); ?></form><?php
 		} elseif ( ! empty( $status['pending'] ) && ! empty( $status['code'] ) ) {
-			$url = esc_url( $status['url'] ?: 'https://auth.openai.com/codex/device' );
-			?><ol><li>Open <a href="<?php echo $url; ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $status['url'] ?: 'https://auth.openai.com/codex/device' ); ?></a> and sign in to the ChatGPT account whose subscription should power this <?php echo esc_html( $network ? 'network' : 'site' ); ?>.</li>
+			$url = $status['url'] ?: 'https://auth.openai.com/codex/device';
+			?><ol><li>Open <a href="<?php echo esc_url( $url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $status['url'] ?: 'https://auth.openai.com/codex/device' ); ?></a> and sign in to the ChatGPT account whose subscription should power this <?php echo esc_html( $network ? 'network' : 'site' ); ?>.</li>
 			<li>Enter this one-time code (it expires in 15 minutes):<br><code style="font-size:1.6em;letter-spacing:.08em"><?php echo esc_html( $status['code'] ); ?></code></li></ol>
 			<p id="ace-ai-codex-wait">Waiting for approval… this page updates by itself once the code is accepted.</p>
 			<form method="post" style="display:inline"><?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?><input type="hidden" name="intent" value="codex_cancel"><?php submit_button( 'Cancel sign-in', 'secondary', 'submit', false ); ?></form>
@@ -49,15 +48,6 @@ final class Admin {
 			<p><label><input type="checkbox" name="authorise_scope" value="1" required> I authorise this ChatGPT connection for Ace plugins and their scheduled jobs on <?php echo esc_html( $network ? 'this network, except sites with their own override or AI switched off' : 'this site' ); ?>.</label></p>
 			<?php submit_button( 'Sign in with ChatGPT', 'primary' ); ?></form><?php
 		}
-		self::bridge_form( $service, $network );
-	}
-	private static function bridge_form( Service $service, bool $network ) {
-		if ( is_multisite() && ! $network ) { return; }
-		$current = $service->codex_bridge();
-		?><details><summary>Codex bridge settings</summary>
-		<form method="post"><?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?><input type="hidden" name="intent" value="codex_bridge">
-		<p><label for="ace-ai-bridge">Bridge command</label><br><input class="regular-text" type="text" id="ace-ai-bridge" name="codex_bridge" value="<?php echo esc_attr( defined( 'ACE_AI_CODEX_BRIDGE' ) ? ACE_AI_CODEX_BRIDGE : $current ); ?>" <?php disabled( defined( 'ACE_AI_CODEX_BRIDGE' ) ); ?> placeholder="sudo -H -u ace-ai /usr/local/bin/ace-codex-bridge"><br>How PHP runs <code>ace-codex-bridge</code> on this server, usually through a sudo rule to the account that owns the Codex homes. Leave blank to use <code><?php echo esc_html( Service::BRIDGE_DEFAULT ); ?></code> when it exists. <?php echo defined( 'ACE_AI_CODEX_BRIDGE' ) ? 'Fixed by the ACE_AI_CODEX_BRIDGE constant.' : ''; ?></p>
-		<?php submit_button( 'Save bridge command', 'secondary' ); ?></form></details><?php
 	}
 	public static function render() {
 		$network = is_network_admin();
@@ -82,8 +72,6 @@ final class Admin {
 				if ( ! is_wp_error( $result ) ) { $result = ! empty( $result['connected'] ) ? true : ( ! empty( $result['code'] ) ? 'Enter the code below to finish signing in.' : ( $result['error'] ?: 'Codex is still requesting a code. Refresh in a moment.' ) ); }
 			} elseif ( 'codex_cancel' === $intent ) {
 				$result = $service->codex_login_cancel( $network ); $result = is_wp_error( $result ) ? $result : 'Sign-in cancelled.';
-			} elseif ( 'codex_bridge' === $intent ) {
-				$result = $service->save_codex_bridge( isset( $_POST['codex_bridge'] ) && is_string( $_POST['codex_bridge'] ) ? wp_unslash( $_POST['codex_bridge'] ) : '', $network );
 			} elseif ( 'model' === $intent ) {
 				$model = isset( $_POST['subscription_model'] ) && is_string( $_POST['subscription_model'] ) ? sanitize_text_field( wp_unslash( $_POST['subscription_model'] ) ) : '';
 				$result = $service->save_subscription_model( $model, $network );
@@ -122,7 +110,7 @@ final class Admin {
 		<p>Switching off or choosing inheritance removes this scope’s stored key. It does not revoke the key at OpenAI. A missing or expired override never falls back to another account.</p>
 		<?php submit_button( 'Save connection settings' ); ?></form>
 		<details><summary>Alternative: import a credential file from the sign-in helper</summary>
-		<p>For an open-source installation without the Codex bridge, complete sign-in on the computer running your browser, then import its protected credential file here. This is a separate route from a registered commercial website callback.</p>
+		<p>For an open-source installation without a Codex runner, complete sign-in on the computer running your browser, then import its protected credential file here. This is a separate route from a registered commercial website callback.</p>
 		<p>Host ID: <code><?php echo esc_html( $service->host_id() ); ?></code></p>
 		<p><a class="button" download="ace-chatgpt-login.mjs" href="<?php echo esc_url( plugins_url( 'bin/ace-chatgpt-login.mjs', dirname( __DIR__, 2 ) . '/bootstrap.php' ) ); ?>">Download sign-in helper</a></p>
 		<details><summary>Set up on a self-hosted server</summary><ol><li>Download the helper to the computer running your browser. It needs Node.js 20 or newer.</li><li>Run this command in a private folder, open the one-time link it prints, and authorise ChatGPT plan access.</li><li>Import the resulting credential file below, then choose a text model. Remove the transfer file when the import is complete.</li></ol><pre style="white-space:pre-wrap;overflow-wrap:anywhere"><?php echo esc_html( 'node ace-chatgpt-login.mjs ' . $service->host_id() . ' ace-chatgpt-credentials.json' ); ?></pre><p>Keep credentials private. Never paste them into chat or tickets. The companion registration file can be retained privately for later sign-in to the same account.</p></details>

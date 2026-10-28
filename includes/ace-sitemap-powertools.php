@@ -1631,7 +1631,7 @@ function ace_sitemap_powertools_gc_option_cache() {
     }
 
     if ( $deleted > 0 && function_exists( 'error_log' ) ) {
-        error_log( sprintf( 'Ace-Crawl-Enhancer: removed %d legacy ace_sitemap_cache_* option rows.', $deleted ) );
+        error_log( sprintf( 'Ace-Crawl-Enhancer: removed %d legacy ace_sitemap_cache_* option rows.', $deleted ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
     }
 
     return $deleted;
@@ -1762,7 +1762,7 @@ function ace_sitemap_powertools_handle_purge_cache_request() {
         return;
     }
 
-    if ( empty( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ) || ! wp_verify_nonce( $_POST['ace_sitemap_powertools_purge_cache_nonce'], 'ace_sitemap_purge_cache' ) ) {
+    if ( empty( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ?? '' ) ), 'ace_sitemap_purge_cache' ) ) {
         return;
     }
 
@@ -2118,7 +2118,7 @@ function ace_sitemap_powertools_send_unavailable() {
 }
 
 function ace_sitemap_powertools_is_probable_bot_request() {
-    $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( (string) $_SERVER['HTTP_USER_AGENT'] ) : '';
+    $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : '';
     if ( '' === $ua ) {
         return true;
     }
@@ -2167,7 +2167,7 @@ function ace_sitemap_powertools_should_render_human_view() {
         return false;
     }
 
-    $accept = isset( $_SERVER['HTTP_ACCEPT'] ) ? strtolower( (string) $_SERVER['HTTP_ACCEPT'] ) : '';
+    $accept = isset( $_SERVER['HTTP_ACCEPT'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_ACCEPT'] ) ) ) : '';
 
     // Fail towards XML: a client that sends no Accept header is far more likely a fetcher we
     // failed to recognise than a person, and a person shown XML loses a stylesheet while a
@@ -2189,7 +2189,7 @@ function ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list ) 
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_index_xml( $sitemap_list );
     if ( ! empty( $xml ) ) {
-        echo $xml;
+        echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- XML generated and escaped by the core sitemap renderer.
     }
 }
 
@@ -2203,7 +2203,7 @@ function ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list ) {
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_xml( $url_list );
     if ( ! empty( $xml ) ) {
-        echo $xml;
+        echo $xml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- XML generated and escaped by the core sitemap renderer.
     }
 }
 
@@ -2284,37 +2284,59 @@ function ace_sitemap_powertools_get_human_theme_global_styles() {
     return is_string( $css ) ? $css : '';
 }
 
-function ace_sitemap_powertools_get_human_paddy_font_face_css() {
-    if ( ! function_exists( 'get_stylesheet_directory' ) || ! function_exists( 'get_stylesheet_directory_uri' ) ) {
+/**
+ * @font-face rules for the fonts the active theme declares in theme.json, so the
+ * human sitemap can use the theme's body font. Empty before WordPress 6.4.
+ */
+function ace_sitemap_powertools_get_human_font_face_css() {
+    if ( ! function_exists( 'wp_print_font_faces' ) ) {
         return '';
     }
 
-    $base_dir = trailingslashit( get_stylesheet_directory() ) . 'library/fonts/Paddy-Sans/Web/WOFF2/';
-    $base_uri = trailingslashit( get_stylesheet_directory_uri() ) . 'library/fonts/Paddy-Sans/Web/WOFF2/';
+    ob_start();
+    wp_print_font_faces();
+    $html = (string) ob_get_clean();
 
-    $variants = array(
-        array( 'file' => 'Paddy_Sans-Light-web-1_1.woff2', 'weight' => 300 ),
-        array( 'file' => 'Paddy_Sans-Regular-web-1_1.woff2', 'weight' => 400 ),
-        array( 'file' => 'Paddy_Sans-Medium-web-1_1.woff2', 'weight' => 500 ),
-        array( 'file' => 'Paddy_Sans-Semi_Bold-web-1_1.woff2', 'weight' => 600 ),
-        array( 'file' => 'Paddy_Sans-Bold-web-1_1.woff2', 'weight' => 700 ),
-    );
-
-    $css = '';
-    foreach ( $variants as $variant ) {
-        $path = $base_dir . $variant['file'];
-        if ( ! file_exists( $path ) ) {
-            continue;
-        }
-
-        $css .= '@font-face{font-family:"Paddy Sans";font-style:normal;font-weight:' . (int) $variant['weight'] . ';font-display:swap;src:url("' . esc_url_raw( $base_uri . $variant['file'] ) . '") format("woff2");}';
+    if ( ! preg_match_all( '#<style[^>]*>(.*?)</style>#s', $html, $matches ) ) {
+        return '';
     }
 
-    return $css;
+    return trim( implode( '', $matches[1] ) );
+}
+
+/**
+ * The theme's body font as a CSS value, from global styles. A preset reference becomes
+ * its custom property; empty when the theme sets no body font.
+ */
+function ace_sitemap_powertools_get_human_font_family() {
+    if ( ! function_exists( 'wp_get_global_styles' ) ) {
+        return '';
+    }
+
+    $family = wp_get_global_styles( array( 'typography', 'fontFamily' ) );
+    if ( ! is_string( $family ) || '' === trim( $family ) ) {
+        return '';
+    }
+
+    if ( preg_match( '/^var:preset\|font-family\|([a-z0-9-]+)$/', $family, $match ) ) {
+        return 'var(--wp--preset--font-family--' . $match[1] . ')';
+    }
+
+    // Raw CSS value from theme.json: drop anything that could close the declaration.
+    return trim( str_replace( array( ';', '{', '}', '<', '>' ), '', $family ) );
 }
 
 function ace_sitemap_powertools_get_human_theme_override_css() {
-    return '#sitemap,#sitemap *{font-family:var(--wp--preset--font-family--paddy-sans,"Paddy Sans",sans-serif) !important;}body{background:var(--wp--preset--color--background,#fff);color:var(--wp--preset--color--foreground,#1a1a1a);}#sitemap__table{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table th,#sitemap__table td{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table tbody tr:nth-child(odd){background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 94%,var(--wp--preset--color--tertiary,#67B650) 6%);}#sitemap__table tbody tr:hover{background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 85%,var(--wp--preset--color--primary,#1BAA55) 15%);}#sitemap__table tr td.loc a,#sitemap__table tr td.loc span{color:var(--wp--preset--color--tertiary,#004833);}#sitemap__table tr td.loc a:hover{color:var(--wp--preset--color--primary,#1BAA55);}#sitemap__header p,#sitemap__content .text{color:var(--wp--preset--color--darkgrey,#666);}.sitemap-brand__title{color:var(--wp--preset--color--primary,#1BAA55);}';
+    $family = ace_sitemap_powertools_get_human_font_family();
+    $css    = '' !== $family ? '#sitemap,#sitemap *{font-family:' . $family . ',sans-serif !important;}' : '';
+    $css   .= 'body{background:var(--wp--preset--color--background,#fff);color:var(--wp--preset--color--foreground,#1a1a1a);}#sitemap__table{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table th,#sitemap__table td{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table tbody tr:nth-child(odd){background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 94%,var(--wp--preset--color--tertiary,#1a1a1a) 6%);}#sitemap__table tbody tr:hover{background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 85%,var(--wp--preset--color--primary,#2271b1) 15%);}#sitemap__table tr td.loc a,#sitemap__table tr td.loc span{color:var(--wp--preset--color--tertiary,#1a1a1a);}#sitemap__table tr td.loc a:hover{color:var(--wp--preset--color--primary,#2271b1);}#sitemap__header p,#sitemap__content .text{color:var(--wp--preset--color--darkgrey,#666);}.sitemap-brand__title{color:var(--wp--preset--color--primary,#2271b1);}';
+
+    /**
+     * Filters the theme-matching CSS added to the human-readable sitemap view.
+     *
+     * @param string $css CSS rules.
+     */
+    return (string) apply_filters( 'ace_sitemap_powertools_human_theme_css', $css );
 }
 
 function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
@@ -2324,34 +2346,35 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
 
     $title_text = esc_html( $title );
     $css        = ace_sitemap_powertools_get_human_view_css();
-    $font_face  = ace_sitemap_powertools_get_human_paddy_font_face_css();
+    $font_face  = ace_sitemap_powertools_get_human_font_face_css();
     $theme_css  = ace_sitemap_powertools_get_human_theme_global_styles();
     $overrides  = ace_sitemap_powertools_get_human_theme_override_css();
     $theme_links = ace_sitemap_powertools_get_human_theme_stylesheet_links();
     $lang       = function_exists( 'get_language_attributes' ) ? get_language_attributes( 'html' ) : 'lang="en"';
     $learn_more = sprintf(
         '<a href="%s">%s</a>',
-        esc_url( __( 'https://www.sitemaps.org/' ) ),
-        esc_html__( 'Learn more about XML sitemaps.' )
+        esc_url( __( 'https://www.sitemaps.org/', 'ace-crawl-enhancer' ) ),
+        esc_html__( 'Learn more about XML sitemaps.', 'ace-crawl-enhancer' )
     );
     $summary = sprintf(
-        esc_html__( 'Number of URLs in this XML Sitemap: %s.' ),
+        /* translators: %s: number of URLs. */
+        esc_html__( 'Number of URLs in this XML Sitemap: %s.', 'ace-crawl-enhancer' ),
         number_format_i18n( (int) $count )
     );
 
     $header_html = ace_sitemap_powertools_stylesheet_header_html( $context );
     if ( '' === $header_html ) {
-        $description = esc_html__( 'This XML Sitemap is generated by WordPress to make your content more visible for search engines.' );
+        $description = esc_html__( 'This XML Sitemap is generated by WordPress to make your content more visible for search engines.', 'ace-crawl-enhancer' );
         $header_html = '<div id="sitemap__header"><h1>' . $title_text . '</h1><p>' . $description . '</p><p>' . $learn_more . '</p></div>';
     }
 
-    echo '<!doctype html><html ' . $lang . '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-    echo '<title>' . $title_text . '</title>';
+    echo '<!doctype html><html ' . wp_kses_post( $lang ) . '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>' . esc_html( $title ) . '</title>';
     foreach ( $theme_links as $theme_link ) {
-        echo '<link rel="stylesheet" href="' . esc_url( $theme_link ) . '" />';
+        echo '<link rel="stylesheet" href="' . esc_url( $theme_link ) . '" />'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone sitemap document, wp_head() never runs here.
     }
-    echo '<style>' . $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides . '</style></head><body><div id="sitemap">';
-    echo $header_html;
+    echo '<style>' . wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) . '</style></head><body><div id="sitemap">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS only, tags stripped.
+    echo wp_kses_post( $header_html );
     echo '<div id="sitemap__content"><p class="text">' . esc_html( $summary ) . '</p>';
 }
 
@@ -2426,9 +2449,9 @@ function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
     }
 
     ace_sitemap_powertools_render_html_header( 'XML Sitemap', count( $sitemap_list ), 'index' );
-    echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL' ) . '</th>';
+    echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL', 'ace-crawl-enhancer' ) . '</th>';
     if ( $has_lastmod ) {
-        echo '<th class="lastmod">' . esc_html__( 'Last Modified' ) . '</th>';
+        echo '<th class="lastmod">' . esc_html__( 'Last Modified', 'ace-crawl-enhancer' ) . '</th>';
     }
     echo '</tr></thead><tbody>';
 
@@ -2444,13 +2467,13 @@ function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
 
         echo '<tr><td class="loc">';
         if ( $is_recent ) {
-            echo '<strong><a href="' . $loc . '">' . $loc . '</a></strong> <span class="muted">(most recent)</span>';
+            echo '<strong><a href="' . esc_url( $loc ) . '">' . esc_html( $loc ) . '</a></strong> <span class="muted">(most recent)</span>';
         } else {
-            echo '<a href="' . $loc . '">' . $loc . '</a>';
+            echo '<a href="' . esc_url( $loc ) . '">' . esc_html( $loc ) . '</a>';
         }
         echo '</td>';
         if ( $has_lastmod ) {
-            echo '<td class="lastmod">' . $lastmod . '</td>';
+            echo '<td class="lastmod">' . esc_html( $lastmod ) . '</td>';
         }
         echo '</tr>';
     }
@@ -2480,15 +2503,15 @@ function ace_sitemap_powertools_render_sitemap_html( $url_list ) {
     }
 
     ace_sitemap_powertools_render_html_header( 'XML Sitemap', count( $url_list ), 'sitemap' );
-    echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL' ) . '</th>';
+    echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL', 'ace-crawl-enhancer' ) . '</th>';
     if ( $has_lastmod ) {
-        echo '<th class="lastmod">' . esc_html__( 'Last Modified' ) . '</th>';
+        echo '<th class="lastmod">' . esc_html__( 'Last Modified', 'ace-crawl-enhancer' ) . '</th>';
     }
     if ( $has_changefreq ) {
-        echo '<th class="changefreq">' . esc_html__( 'Change Frequency' ) . '</th>';
+        echo '<th class="changefreq">' . esc_html__( 'Change Frequency', 'ace-crawl-enhancer' ) . '</th>';
     }
     if ( $has_priority ) {
-        echo '<th class="priority">' . esc_html__( 'Priority' ) . '</th>';
+        echo '<th class="priority">' . esc_html__( 'Priority', 'ace-crawl-enhancer' ) . '</th>';
     }
     echo '</tr></thead><tbody>';
 
@@ -2502,15 +2525,15 @@ function ace_sitemap_powertools_render_sitemap_html( $url_list ) {
             continue;
         }
 
-        echo '<tr><td class="loc"><a href="' . $loc . '">' . $loc . '</a></td>';
+        echo '<tr><td class="loc"><a href="' . esc_url( $loc ) . '">' . esc_html( $loc ) . '</a></td>';
         if ( $has_lastmod ) {
-            echo '<td class="lastmod">' . $lastmod . '</td>';
+            echo '<td class="lastmod">' . esc_html( $lastmod ) . '</td>';
         }
         if ( $has_changefreq ) {
-            echo '<td class="changefreq">' . $changefreq . '</td>';
+            echo '<td class="changefreq">' . esc_html( $changefreq ) . '</td>';
         }
         if ( $has_priority ) {
-            echo '<td class="priority">' . $priority . '</td>';
+            echo '<td class="priority">' . esc_html( $priority ) . '</td>';
         }
         echo '</tr>';
     }
@@ -2838,7 +2861,7 @@ function ace_sitemap_powertools_get_noindex_meta_map( $post_ids ) {
             AND meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')",
         $post_ids
     );
-    $rows         = $wpdb->get_results( $sql );
+    $rows         = $wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared immediately above.
     $excluded_ids = array();
 
     if ( $rows ) {
@@ -2884,7 +2907,7 @@ function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page
             $scan_offset,
             $batch_size
         );
-        $candidate_ids = array_map( 'intval', (array) $wpdb->get_col( $sql ) );
+        $candidate_ids = array_map( 'intval', (array) $wpdb->get_col( $sql ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared immediately above.
 
         if ( empty( $candidate_ids ) ) {
             break;
@@ -2966,11 +2989,12 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
     $filtered_ids = array_unique( array_map( 'intval', (array) $filtered_out ) );
     $extra        = 0;
     if ( $filtered_ids ) {
-        $in    = implode( ',', $filtered_ids );
+        $filtered_ids = array_values( $filtered_ids );
+        $placeholders = implode( ', ', array_fill( 0, count( $filtered_ids ), '%d' ) );
         $extra = (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(p.ID) FROM {$wpdb->posts} p
-                WHERE p.ID IN ({$in})
+                WHERE p.ID IN ({$placeholders})
                     AND p.post_type = %s
                     AND p.post_status = 'publish'
                     AND NOT EXISTS (
@@ -2979,7 +3003,7 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
                             AND pm.meta_key IN ('_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex')
                             AND pm.meta_value = '1'
                     )",
-                $post_type
+                array_merge( $filtered_ids, array( $post_type ) )
             )
         );
     }
@@ -3114,9 +3138,13 @@ function ace_sitemap_powertools_page_counts( $post_type, array $map ) {
         return array();
     }
     // INTERVAL(ID, b1+1, b2+1, ...) is the zero-based page of each ID.
-    $bucket = $map['b'] ? 'INTERVAL(p.ID, ' . implode( ', ', array_map( function ( $b ) { return (int) $b + 1; }, $map['b'] ) ) . ')' : '0';
-    $rows   = $wpdb->get_results( $wpdb->prepare(
-        "SELECT {$bucket} AS k, COUNT(*) AS c, MAX(p.post_modified_gmt) AS m
+    $bounds       = array_map( function ( $b ) { return (int) $b + 1; }, $map['b'] );
+    if ( ! $bounds ) {
+        $bounds = array( PHP_INT_MAX ); // No boundaries: every ID falls in page 0.
+    }
+    $placeholders = implode( ', ', array_fill( 0, count( $bounds ), '%d' ) );
+    $rows         = $wpdb->get_results( $wpdb->prepare(
+        "SELECT INTERVAL(p.ID, {$placeholders}) AS k, COUNT(*) AS c, MAX(p.post_modified_gmt) AS m
         FROM {$wpdb->posts} p
         WHERE p.post_type = %s
             AND p.post_status = 'publish'
@@ -3127,7 +3155,7 @@ function ace_sitemap_powertools_page_counts( $post_type, array $map ) {
                     AND pm.meta_value = '1'
             )
         GROUP BY k",
-        $post_type
+        array_merge( $bounds, array( $post_type ) )
     ) );
     $out = array_fill( 0, $n, array( 'c' => 0, 'm' => '' ) );
     foreach ( (array) $rows as $row ) {
@@ -3229,7 +3257,7 @@ function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_
                 'post__in'               => $post_ids,
                 'orderby'                => 'post__in',
                 'posts_per_page'         => count( $post_ids ),
-                'suppress_filters'       => true,
+                'suppress_filters'       => true, // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- sitemap lookups must not be altered by other plugins' query filters.
                 'update_post_meta_cache' => false,
                 'update_post_term_cache' => false,
             )
@@ -3249,7 +3277,7 @@ function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_
                     'orderby'                => 'date',
                     'order'                  => 'DESC',
                     'numberposts'            => 1,
-                    'suppress_filters'       => true,
+                    'suppress_filters'       => true, // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- sitemap lookups must not be altered by other plugins' query filters.
                     'update_post_meta_cache' => false,
                     'update_post_term_cache' => false,
                 )
@@ -3397,16 +3425,12 @@ function ace_sitemap_powertools_stylesheet_header_html( $context ) {
         $index_link_html = '<a class="sitemap-brand__index-link" href="' . esc_url( home_url( '/sitemap.xml' ) ) . '">Sitemap Index</a>';
     }
 
-    $header = <<<HTML
-					<div id="sitemap__header">
-						<div class="sitemap-brand">
-							{$logo_html}
-							<h1 class="sitemap-brand__title">{$title_line}</h1>
-							{$description_html}
-							{$index_link_html}
-						</div>
-					</div>
-HTML;
+    $header = '<div id="sitemap__header"><div class="sitemap-brand">'
+        . $logo_html
+        . '<h1 class="sitemap-brand__title">' . $title_line . '</h1>'
+        . $description_html
+        . $index_link_html
+        . '</div></div>';
 
     return $header;
 }
@@ -3839,8 +3863,7 @@ function ace_sitemap_powertools_stylesheet_css( $css ) {
         return $css;
     }
 
-    $extra = <<<CSS
-
+    $extra = '
 					.sitemap-brand {
 						display: flex;
 						gap: 10px;
@@ -3878,7 +3901,7 @@ function ace_sitemap_powertools_stylesheet_css( $css ) {
 					#sitemap__content .text {
 						text-align: center;
 					}
-CSS;
+';
 
     return $css . $extra;
 }
