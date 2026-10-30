@@ -53,6 +53,10 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Insufficient permissions for this post', 403 );
         }
 
+        // Only the checked request handler supplies post context to provider/cache helpers.
+        global $post;
+        $post = $post_id ? get_post( $post_id ) : null;
+
         // Hourly per-user cap on AI requests (0 disables the limit).
         $limit = (int) apply_filters( 'ace_seo_ai_rate_limit', 60 );
         if ( $limit > 0 && ! current_user_can( 'manage_options' ) ) {

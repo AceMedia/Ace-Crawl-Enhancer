@@ -327,8 +327,19 @@ class AceCrawlEnhancer {
     /**
      * Initialize admin components
      */
+    /** Load the Google integration handlers before REST route registration or scheduled work. */
+    public function load_google_services() {
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-google-data.php';
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
+        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
+        new AceSEOGoogleData();
+        new AceSEOSearchConsole();
+        new AceSEOPageSpeed();
+    }
+
     private function init_admin() {
-        $load_google_services = is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'WP_CLI' ) && WP_CLI );
+        $load_google_services = is_admin() || wp_doing_ajax() || wp_doing_cron() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'WP_CLI' ) && WP_CLI );
 
         // The Site Kit token bridge is a dependency-free helper. Load it on EVERY request (admin,
         // front-end, REST, WP-CLI and cron) so any code - not just the admin dashboard - can borrow
@@ -394,12 +405,6 @@ class AceCrawlEnhancer {
             require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard.php';
         }
 
-        if ( $load_google_services ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-google-data.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
-        }
         
         // Always load database optimizer for performance
         require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
@@ -410,9 +415,10 @@ class AceCrawlEnhancer {
         }
 
         if ( $load_google_services ) {
-            new AceSEOGoogleData();
-            new AceSEOSearchConsole();
-            new AceSEOPageSpeed();
+            $this->load_google_services();
+        } else {
+            // REST_REQUEST is defined after init. Load before the normal route callbacks run.
+            add_action( 'rest_api_init', array( $this, 'load_google_services' ), 0 );
         }
 
         // WP-CLI: register the Search Console commands (Site Kit-gated at runtime).

@@ -689,7 +689,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        $post_id = $post instanceof WP_Post ? $post->ID : 0;
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'titles', $post_content, $focus_keyword, $post_title );
@@ -823,7 +823,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        $post_id = $post instanceof WP_Post ? $post->ID : 0;
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'descriptions', $post_content, $focus_keyword, $post_title );
@@ -1242,7 +1242,7 @@ class AceSEOApiHelper {
         
         // Get current post ID
         global $post;
-        $post_id = $post ? $post->ID : absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        $post_id = $post instanceof WP_Post ? $post->ID : 0;
         
         // Check cache first
         $cache_key = self::get_post_cache_key( 'keywords', $post_content, '', $post_title );
