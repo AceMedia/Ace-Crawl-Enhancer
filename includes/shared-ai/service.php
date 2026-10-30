@@ -280,6 +280,19 @@ final class Service {
 	/** Return the available account-specific model catalogue without exposing its token. */
 	public function subscription_models() {
 		$r = $this->resolve();
+		if ( 'wordpress' === ( $r['record']['provider'] ?? '' ) ) {
+			if ( ! function_exists( 'wp_ai_client_prompt' ) || ( function_exists( 'wp_supports_ai' ) && ! wp_supports_ai() ) ) {
+				return new \WP_Error( 'ace_ai_wordpress_unavailable', 'The WordPress AI Client is unavailable or disabled.' );
+			}
+			try {
+				if ( true !== wp_ai_client_prompt()->is_supported_for_text_generation() ) {
+					return new \WP_Error( 'ace_ai_wordpress_unconfigured', 'Configure a text provider in WordPress AI settings.' );
+				}
+				return array( array( 'id' => 'wordpress', 'label' => 'WordPress configured text model' ) );
+			} catch ( \Throwable $error ) {
+				return new \WP_Error( 'ace_ai_wordpress_failed', 'The WordPress AI provider could not be checked.' );
+			}
+		}
 		if ( 'codex' === ( $r['record']['provider'] ?? '' ) ) {
 			$models = $this->codex_run( 'models', $this->codex_selected_scope(), '', 30 );
 			if ( is_wp_error( $models ) ) { return $models; }

@@ -10,7 +10,7 @@ check( true === $s->save( 'wordpress', '', array( 'text' ) ), 'Explicit core con
 $messages = array( array( 'role' => 'system', 'content' => 'Write plainly.' ), array( 'role' => 'user', 'content' => 'A title' ) );
 check( 'ace_ai_wordpress_unavailable' === $s->subscription_text( $messages )->code, 'Older WordPress fails safely without direct fallback' );
 if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
-    function wp_ai_client_prompt( $messages ) { $GLOBALS['core_messages'] = $messages; return new Ace_Core_Prompt_Test(); }
+    function wp_ai_client_prompt( $messages = null ) { $GLOBALS['core_messages'] = $messages; return new Ace_Core_Prompt_Test(); }
     function wp_supports_ai() { return $GLOBALS['core_enabled']; }
 }
 class Ace_Core_Prompt_Test {
@@ -78,3 +78,12 @@ $s->save( 'disabled', '', array() );
 $adopt->invoke( $s, array( 'connected' => true, 'account' => 'stale session' ), false );
 check( 'disabled' === $s->status()['status'], 'Polling an old Codex session cannot undo explicit AI disable' );
 echo "Disabled connection consent checks passed\n";
+
+$s->save( 'wordpress', '', array( 'text' ) );
+$GLOBALS['core_supported'] = true;
+$calls_before_catalogue = $GLOBALS['core_calls'];
+check( array( array( 'id' => 'wordpress', 'label' => 'WordPress configured text model' ) ) === $s->subscription_models(), 'Shared consumers can list the core-controlled model without ChatGPT credentials' );
+check( $calls_before_catalogue === $GLOBALS['core_calls'], 'Listing the core model does not generate content' );
+$GLOBALS['core_supported'] = false;
+check( is_wp_error( $s->subscription_models() ), 'Unconfigured core model does not report an active connection' );
+echo "Core model catalogue compatibility checks passed\n";
