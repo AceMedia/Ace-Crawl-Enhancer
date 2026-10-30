@@ -233,7 +233,7 @@ class AceSEOActivator {
         
         // Analytics table for tracking SEO performance
         $analytics_table = $wpdb->prefix . 'ace_seo_analytics';
-        $analytics_sql = "CREATE TABLE IF NOT EXISTS $analytics_table (
+        $analytics_sql = "CREATE TABLE $analytics_table (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             post_id bigint(20) NOT NULL,
             date_recorded datetime DEFAULT CURRENT_TIMESTAMP,
@@ -242,7 +242,7 @@ class AceSEOActivator {
             focus_keyword varchar(255) DEFAULT '',
             title_length int(3) DEFAULT 0,
             description_length int(3) DEFAULT 0,
-            PRIMARY KEY (id),
+            PRIMARY KEY  (id),
             KEY post_id (post_id),
             KEY date_recorded (date_recorded)
         ) $charset_collate;";

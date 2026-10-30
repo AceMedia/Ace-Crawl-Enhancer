@@ -97,6 +97,10 @@ class AceSEOPageSpeed {
             wp_send_json_error( array( 'message' => 'Post ID is required' ) );
         }
         
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            wp_send_json_error( array( 'message' => 'Insufficient permissions' ), 403 );
+        }
+
         $url = get_permalink( $post_id );
         $mobile_results = $this->run_pagespeed_test( $url, 'mobile' );
         $desktop_results = $this->run_pagespeed_test( $url, 'desktop' );

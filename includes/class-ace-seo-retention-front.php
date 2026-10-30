@@ -155,6 +155,7 @@ class AceSeoRetentionFront {
                 $latest = get_posts( array(
                     'post_type'           => 'post',
                     'post_status'         => 'publish',
+                    'has_password'        => false,
                     'cat'                 => $cat,
                     'posts_per_page'      => 2,
                     'orderby'             => 'date',
@@ -166,7 +167,7 @@ class AceSeoRetentionFront {
                 wp_cache_set( 'latest_' . $cat, $latest, 'ace_seo_retention', 10 * MINUTE_IN_SECONDS );
             }
             foreach ( (array) $latest as $id ) {
-                if ( (int) $id !== $post_id ) {
+                if ( (int) $id !== $post_id && self::is_public_post( get_post( $id ) ) ) {
                     $next = (int) $id;
                     break;
                 }
@@ -179,7 +180,8 @@ class AceSeoRetentionFront {
          * @param int $next    Post ID, 0 for nowhere.
          * @param int $post_id The retained post.
          */
-        return (int) apply_filters( 'ace_seo_retention_next_post_id', $next, $post_id );
+        $next = (int) apply_filters( 'ace_seo_retention_next_post_id', $next, $post_id );
+        return $next !== $post_id && self::is_public_post( get_post( $next ) ) ? $next : 0;
     }
 
     public static function continue_card( $content ) {
@@ -215,12 +217,19 @@ class AceSeoRetentionFront {
         <?php
     }
 
+    /** Public recommendations must never reveal protected content, even from filters or stale caches. */
+    private static function is_public_post( $post ) {
+        return $post instanceof WP_Post && 'publish' === $post->post_status
+            && empty( $post->post_password ) && is_post_publicly_viewable( $post );
+    }
+
     public static function register_routes() {
         if ( empty( self::options()['light_enabled'] ) ) {
             return;
         }
         register_rest_route( 'ace-seo/v1', '/retention/next', array(
             'methods'             => 'GET',
+            // Intentionally anonymous: the callback checks both source and destination visibility.
             'permission_callback' => '__return_true',
             'callback'            => array( __CLASS__, 'rest_next' ),
             'args'                => array( 'post' => array( 'type' => 'integer', 'required' => true ) ),
@@ -230,7 +239,7 @@ class AceSeoRetentionFront {
     /** For a theme's own load-more: where a reader of this post should go next. */
     public static function rest_next( WP_REST_Request $request ) {
         $post = get_post( absint( $request->get_param( 'post' ) ) );
-        if ( ! $post || 'publish' !== $post->post_status || ! is_post_publicly_viewable( $post ) ) {
+        if ( ! self::is_public_post( $post ) ) {
             return new WP_Error( 'ace_seo_not_found', 'No such post.', array( 'status' => 404 ) );
         }
         $next = self::next_post_id( $post->ID );

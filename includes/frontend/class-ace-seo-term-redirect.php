@@ -199,7 +199,7 @@ class ACE_SEO_Term_Redirect {
             $target = user_trailingslashit( trailingslashit( $target ) . $suffix );
         }
 
-        $query = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';
+        $query = isset( $_SERVER['QUERY_STRING'] ) ? substr( esc_url_raw( '?' . wp_unslash( $_SERVER['QUERY_STRING'] ) ), 1 ) : '';
         if ( '' !== $query ) {
             $target .= ( false === strpos( $target, '?' ) ? '?' : '&' ) . $query;
         }

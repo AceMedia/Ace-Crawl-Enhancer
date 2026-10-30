@@ -379,7 +379,7 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         return $query_vars;
     }
 
-    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
     if ( '' === $request_uri ) {
         return $query_vars;
     }
@@ -468,7 +468,7 @@ function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
         return;
     }
 
-    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
     if ( '' === $request_uri ) {
         return;
     }
@@ -497,7 +497,7 @@ function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
     }
 
     $target = home_url( user_trailingslashit( $term->slug . ltrim( $suffix, '/' ) ) );
-    $query_string = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';
+    $query_string = isset( $_SERVER['QUERY_STRING'] ) ? substr( esc_url_raw( '?' . wp_unslash( $_SERVER['QUERY_STRING'] ) ), 1 ) : '';
     if ( '' !== $query_string ) {
         $target .= ( false === strpos( $target, '?' ) ? '?' : '&' ) . $query_string;
     }
@@ -1868,7 +1868,7 @@ function ace_sitemap_powertools_serve_custom_routes() {
         exit;
     }
 
-    $path = isset( $_SERVER['REQUEST_URI'] ) ? wp_parse_url( (string) $_SERVER['REQUEST_URI'], PHP_URL_PATH ) : '';
+    $path = isset( $_SERVER['REQUEST_URI'] ) ? wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) : '';
     if ( ! $path ) {
         return;
     }
@@ -1963,7 +1963,7 @@ add_action( 'template_redirect', 'ace_sitemap_powertools_serve_custom_routes', 0
  */
 function ace_sitemap_powertools_handle_legacy_gone(): void {
     $path = isset( $_SERVER['REQUEST_URI'] )
-        ? wp_parse_url( (string) $_SERVER['REQUEST_URI'], PHP_URL_PATH )
+        ? wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH )
         : '';
 
     if ( ! $path ) {
@@ -2551,7 +2551,7 @@ function ace_sitemap_powertools_redirect_legacy_urls() {
         return;
     }
 
-    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? strtolower( (string) $_SERVER['REQUEST_URI'] ) : '';
+    $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? strtolower( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ) : '';
     $is_legacy   = false !== strpos( $request_uri, 'wp-sitemap' )
         || false !== strpos( $request_uri, 'sitemap=index' )
         || false !== strpos( $request_uri, 'sitemap-stylesheet=' );
@@ -2608,7 +2608,7 @@ function ace_sitemap_powertools_disable_canonical_redirects( $redirect_url, $req
     }
 
     if ( ! $path && isset( $_SERVER['REQUEST_URI'] ) ) {
-        $path = wp_parse_url( (string) $_SERVER['REQUEST_URI'], PHP_URL_PATH );
+        $path = wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH );
     }
 
     if ( $path && preg_match( '~/(sitemap\.xml|sitemap\.xsl|sitemap-index\.xsl)$~i', $path ) ) {

@@ -48,6 +48,11 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Insufficient permissions' );
         }
 
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
+        if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) {
+            wp_send_json_error( 'Insufficient permissions for this post', 403 );
+        }
+
         // Hourly per-user cap on AI requests (0 disables the limit).
         $limit = (int) apply_filters( 'ace_seo_ai_rate_limit', 60 );
         if ( $limit > 0 && ! current_user_can( 'manage_options' ) ) {
@@ -523,56 +528,37 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Image URL is required' );
         }
         
-        if ( ! $filename ) {
-            $filename = 'ai-generated-image-' . time() . '.png';
+        if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) {
+            wp_send_json_error( 'Insufficient permissions for this post', 403 );
         }
-        
-        // Download the image
-        $response = wp_remote_get( $image_url, array(
-            'timeout' => 30,
-            'headers' => array(
-                'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url()
-            )
-        ) );
-        
-        if ( is_wp_error( $response ) ) {
-            wp_send_json_error( 'Failed to download image: ' . $response->get_error_message() );
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+
+        // download_url uses the safe HTTP API, including redirect and private-host validation.
+        $temporary = download_url( $image_url, 30 );
+        if ( is_wp_error( $temporary ) ) {
+            wp_send_json_error( 'Failed to download image: ' . $temporary->get_error_message() );
         }
-        
-        $image_data = wp_remote_retrieve_body( $response );
-        if ( empty( $image_data ) ) {
-            wp_send_json_error( 'Downloaded image is empty' );
+        $mime = wp_get_image_mime( $temporary );
+        $extensions = array( 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp' );
+        if ( ! isset( $extensions[ $mime ] ) ) {
+            wp_delete_file( $temporary );
+            wp_send_json_error( 'The downloaded file is not a supported image.' );
         }
-        
-        // Save to uploads directory
-        $upload = wp_upload_bits( $filename, null, $image_data );
-        
-        if ( $upload['error'] ) {
-            wp_send_json_error( 'Failed to save image: ' . $upload['error'] );
-        }
-        
-        // Create attachment
-        $attachment = array(
-            'post_mime_type' => 'image/png',
-            'post_title'     => 'AI Generated Image',
-            'post_content'   => '',
-            'post_status'    => 'inherit'
-        );
-        
-        $attach_id = wp_insert_attachment( $attachment, $upload['file'], $post_id );
-        
+        // Derive the extension from the actual image, never from a browser-supplied filename.
+        $stem = $filename ? pathinfo( $filename, PATHINFO_FILENAME ) : 'ai-generated-image-' . time();
+        $file = array( 'name' => sanitize_file_name( $stem . '.' . $extensions[ $mime ] ), 'tmp_name' => $temporary );
+        $attach_id = media_handle_sideload( $file, $post_id, 'AI Generated Image' );
         if ( is_wp_error( $attach_id ) ) {
-            wp_send_json_error( 'Failed to create attachment: ' . $attach_id->get_error_message() );
+            wp_delete_file( $temporary );
+            wp_send_json_error( 'Failed to save image: ' . $attach_id->get_error_message() );
         }
-        
-        // Generate attachment metadata
-        require_once( ABSPATH . 'wp-admin/includes/image.php' );
-        $attach_data = wp_generate_attachment_metadata( $attach_id, $upload['file'] );
-        wp_update_attachment_metadata( $attach_id, $attach_data );
-        
+
         wp_send_json_success( array( 
             'attachment_id' => $attach_id,
-            'url' => $upload['url']
+            'url' => wp_get_attachment_url( $attach_id )
         ) );
     }
     

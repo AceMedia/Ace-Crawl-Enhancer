@@ -1197,7 +1197,7 @@ function ace_sitemap_gen_render_status_panel() {
         'Waiting rebuild' => (int) $s['stale'] . ( $s['backing_off'] ? ' (' . (int) $s['backing_off'] . ' retrying later)' : '' ),
         'Withheld URLs'   => (int) $s['withheld'],
         'Next pass'       => $s['next_run'] && $s['next_run'] <= time() ? 'Due now (runs on the next WP-Cron tick)' : $when( $s['next_run'] ),
-        'Last pass'       => $s['last_run'] ? $when( $s['last_run']['at'] ) . sprintf( ' &middot; built %d, failed %d, %d ms, %s MB peak', $s['last_run']['built'], $s['last_run']['failed'], $s['last_run']['ms'], $s['last_run']['peak_mb'] ) : '&ndash;',
+        'Last pass'       => $s['last_run'] ? $when( $s['last_run']['at'] ) . sprintf( ' &middot; built %d, failed %d, %d ms, %s MB peak', $s['last_run']['built'], $s['last_run']['failed'], $s['last_run']['ms'], esc_html( $s['last_run']['peak_mb'] ) ) : '&ndash;',
         'Last success'    => $when( $s['last_success'] ),
         'Last failure'    => $s['last_failure'] ? $when( $s['last_failure']['at'] ) . ' &middot; ' . esc_html( $s['last_failure']['cat'] ) : '&ndash;',
         'Host-wide limit' => esc_html( $s['host_lock'] ),
@@ -1205,7 +1205,7 @@ function ace_sitemap_gen_render_status_panel() {
 
     echo '<table class="widefat striped" style="max-width:720px"><tbody>';
     foreach ( $rows as $label => $value ) {
-        echo '<tr><th scope="row" style="width:180px">' . esc_html( $label ) . '</th><td>' . $value . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts above.
+        echo '<tr><th scope="row" style="width:180px">' . esc_html( $label ) . '</th><td>' . wp_kses_post( $value ) . '</td></tr>';
     }
     echo '</tbody></table>';
 
