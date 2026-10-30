@@ -19,3 +19,11 @@ New runtime declarations and stored data must continue these distinct families. 
 ## Delivery boundary
 
 The corrected package must pass local runtime and archive checks before the first AceHost deployment. Rollout order is TalkFuse, Sheffield Events, Uni Carts and William Unicycle, then IEG, then PPN dev. PPN live requires separate manual confirmation. Uploading a revised archive to WordPress.org and replying to the review email are separate actions from this code rollout.
+
+## Local verification
+
+The disposable native WordPress 7.1.3 installation passed clean and repeat activation on PHP 8.2 and 8.4, real HTTP redirect checks (57), redirect discovery (25), retention prototype (56), retention queue (34), sitemap generation and stable-page checks. The taxonomy permission checks exercise a custom taxonomy rather than assuming the category capability applies to every term.
+
+The PHP 7.4.33 / WordPress 6.0.18 Playground check activated the packaged plugin without output or external requests and found the analytics table. The tests use fictional content and block external services and mail. AI provider responses are mocked; they do not establish that a customer's paid provider account is configured.
+
+Browser checks cover the plugin dashboard and settings tabs. The ordinary General Settings screen loads no Ace Crawl Enhancer assets. Core translation update warnings in the isolated site are caused by deliberately blocked external HTTP. Site rollout verification is recorded separately after deployment.
