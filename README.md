@@ -12,7 +12,7 @@
 
 I built Ace Crawl Enhancer to manage WordPress SEO metadata, social previews, crawl settings and sitemap workflows in one place. It is part of my Ace Media plugin suite.
 
-Version **1.0.93** is a local release candidate. It requires **WordPress 6.0+ and PHP 7.4+**. Release verification and remaining checks are recorded separately; a candidate is not a WordPress.org approval or a live deployment.
+The current source and WordPress.org review candidate are **1.0.95**. The latest published [GitHub release is 1.0.92](https://github.com/AceMedia/Ace-Crawl-Enhancer/releases/tag/v1.0.92); it does not include the newer review fixes. The plugin requires **WordPress 6.0+ and PHP 7.4+**. Publishing a GitHub release, updating the review submission and receiving WordPress.org approval are separate steps.
 
 ## What it does
 
@@ -24,11 +24,27 @@ Version **1.0.93** is a local release candidate. It requires **WordPress 6.0+ an
 
 It follows WordPress's visibility settings. A physical `robots.txt`, a theme, another SEO plugin or a cache can still affect the final response: verify actual rendered pages and sitemap URLs before changing a site's indexing policy. Back up before migration and compare representative titles, canonicals, robots directives and structured data on staging.
 
-## Install and build
+## Install the current candidate
 
-Install the ZIP produced by `python3 scripts/build-release.py`, then activate the plugin and review its settings. The ZIP contains runtime files only. GitHub keeps the readable source, tests and build instructions in [the developer guide](docs/wiki/Development.md).
+From this repository's root, with Node.js/npm and Python 3.9 or later installed, run these commands in order:
 
-For development, use Node/npm with the declared build dependencies, run `npm install` and `npm run build`. The build produces the breadcrumbs and settings assets plus admin CSS. Most admin scripts are readable files in `assets/js/`.
+```sh
+npm install
+npm run build
+python3 scripts/build-release.py
+```
+
+This creates `dist/ace-crawl-enhancer-1.0.95.zip` and its `.zip.sha256` checksum file. The ZIP contains the reviewed runtime files. In WordPress, go to **Plugins → Add New Plugin → Upload Plugin**, choose that ZIP, install it and activate **Ace Crawl Enhancer**. If an older copy is installed, review WordPress's replacement prompt. Use the generated plugin ZIP, rather than GitHub's automatically generated source archive.
+
+Open **Ace SEO → Settings** for site-wide options. Start on a staging site and keep a backup when replacing another SEO plugin. The [developer guide](docs/wiki/Development.md) explains the source and release checks.
+
+## Try one SEO title
+
+Edit a published page, such as an About page. In the **Ace SEO** box below the editor, open the **SEO** tab, enter `About our workshop` in **SEO Title**, then save the page using WordPress's **Update** or **Save** button.
+
+Open the public page in a logged-out window and view its source. The HTML `<title>` should contain `About our workshop`; WordPress or the theme may append the site name. The page's visible heading stays as it was. This works locally without an account, API key or AI connection. Protected, private and preview content deliberately keeps its content-derived metadata out of public output.
+
+If the old title remains, clear that page's cache and refresh. Check for a theme or another SEO plugin printing a competing title or metadata before changing more settings.
 
 ## Privacy and optional connections
 
