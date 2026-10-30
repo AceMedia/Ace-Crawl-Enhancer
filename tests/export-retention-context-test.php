@@ -19,6 +19,10 @@ class AceSeoRetentionActions {
     public static $states = array();
     public static function state( $id ) { return self::$states[ $id ] ?? array(); }
 }
+// Timing is covered independently; keep this export-format test free of the real action class.
+class Ace_SEO_Retention_Evidence_View {
+    public static function timing_columns( $id, array $row, $as_of ) { return array( '', '', '', '', '' ); }
+}
 require dirname( __DIR__ ) . '/includes/class-ace-seo-export.php';
 $checks = array();
 function verify( $name, $condition ) { $GLOBALS['checks'][ $name ] = (bool) $condition; }
@@ -45,8 +49,8 @@ $r = AceSeoExport::retention_context( 1, $base );
 verify( 'redirect destinations and hidden notice settings are retained', $r[3] === 'Redirect set to https://example.test/newer; Older-article notice forced off' );
 $GLOBALS['meta'][1]['_ace_seo_retention'] = $base;
 $headers = AceSeoExport::header(); $rows = AceSeoExport::rows( array( 1, 2 ) );
-verify( 'existing column positions remain stable and context is appended', count( $headers ) === 28 && $headers[0] === 'ID' && $headers[23] === 'Search clicks (30 days)' && array_slice( $headers, 24 ) === array( 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings' ) );
-verify( 'all rows match the header and missing measurements stay blank', count( $rows ) === 2 && count( $rows[0] ) === 28 && count( $rows[1] ) === 28 && $rows[1][8] === '' && $rows[1][24] === 'Not assessed yet.' );
+verify( 'existing column positions remain stable and context is appended', count( $headers ) === 34 && $headers[0] === 'ID' && $headers[23] === 'Search clicks (30 days)' && array_slice( $headers, 24, 4 ) === array( 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings' ) );
+verify( 'all rows match the header and missing measurements stay blank', count( $rows ) === 2 && count( $rows[0] ) === 34 && count( $rows[1] ) === 34 && $rows[1][8] === '' && $rows[1][24] === 'Not assessed yet.' );
 $failed = array_keys( array_filter( $checks, static function ( $ok ) { return ! $ok; } ) );
 echo json_encode( array( 'passed' => count( $checks ) - count( $failed ), 'total' => count( $checks ), 'failed' => $failed ), JSON_PRETTY_PRINT ) . "\n";
 exit( $failed ? 1 : 0 );
