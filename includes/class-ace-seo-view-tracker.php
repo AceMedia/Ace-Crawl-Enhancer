@@ -52,7 +52,7 @@ class AceSeoViewTracker {
         }
 
         add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
-        add_action( 'wp_footer', array( __CLASS__, 'print_beacon' ), 99 );
+        add_action( 'wp_enqueue_scripts', array( __CLASS__, 'print_beacon' ) );
         add_action( 'template_redirect', array( __CLASS__, 'count_bot' ), 5 );
         if ( ! wp_next_scheduled( self::ROLLUP_HOOK ) ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::ROLLUP_HOOK );
@@ -139,11 +139,11 @@ class AceSeoViewTracker {
             return;
         }
         $url = rest_url( 'ace-seo/v1/hit' );
-        printf(
-            '<script id="ace-seo-hit">(function(){try{var d=new FormData();d.append("p","%d");d.append("r",document.referrer||"");if(navigator.sendBeacon){navigator.sendBeacon(%s,d);}}catch(e){}})();</script>' . "\n",
+        AceSeoAssets::inline_script( 'ace-seo-hit', sprintf(
+            '(function(){try{var d=new FormData();d.append("p","%d");d.append("r",document.referrer||"");if(navigator.sendBeacon){navigator.sendBeacon(%s,d);}}catch(e){}})();',
             absint( $id ),
             wp_json_encode( esc_url_raw( $url ) )
-        );
+        ), array() );
     }
 
     public static function register_routes() {

@@ -22,8 +22,8 @@ class AceSeoFrontend {
         // Adjust Jetpack OG tags instead of disabling everything: overwrite the bits we control.
         add_filter('jetpack_open_graph_tags', [$this, 'override_jetpack_og_tags'], 20);
 
-        // Start output buffering to strip lingering OG title/description from other sources on the homepage.
-        add_action('template_redirect', [$this, 'start_output_buffer'], 0);
+        // Core owns the response buffer and closes it safely (WordPress 6.9+).
+        add_filter('wp_template_enhancement_output_buffer', [$this, 'filter_head_output']);
     }
 
     public function remove_conflicting_outputs() {
@@ -42,13 +42,6 @@ class AceSeoFrontend {
         // Keep Jetpack enabled but override its OG fields via filter (see override_jetpack_og_tags) as a safety net.
     }
 
-    public function start_output_buffer() {
-        if (is_admin()) {
-            return;
-        }
-        ob_start([$this, 'filter_head_output']);
-    }
-
     /**
      * De-duplicate og:title / og:description in the head.
      *
@@ -60,30 +53,30 @@ class AceSeoFrontend {
      * tags vanished site-wide.)
      */
     public function filter_head_output($html) {
-        // Only act on pages that actually have a head section.
-        if (stripos($html, '<head') === false) {
-            return $html;
-        }
-
-        // Capture ACE's own canonical pair before stripping (markers removed).
-        $preserve = '';
-        if (preg_match('/<meta[^>]+property=["\']og:title["\'][^>]*data-ace-seo=["\']1["\'][^>]*>/i', $html, $m)) {
-            $preserve .= preg_replace('/\s*data-ace-seo=["\']1["\']/i', '', $m[0]) . "\n";
-        }
-        if (preg_match('/<meta[^>]+property=["\']og:description["\'][^>]*data-ace-seo=["\']1["\'][^>]*>/i', $html, $m)) {
-            $preserve .= preg_replace('/\s*data-ace-seo=["\']1["\']/i', '', $m[0]) . "\n";
-        }
-
-        // Strip ALL og:title / og:description (ACE's own marked copies and any
-        // duplicates injected by themes or other plugins).
-        $html = preg_replace('/[ \t]*<meta[^>]+property=["\']og:(title|description)["\'][^>]*>\n?/i', '', $html);
-
-        // Re-inject ACE's canonical pair once, immediately before </head>.
-        if ('' !== $preserve) {
-            $html = preg_replace('/<\/head>/i', $preserve . '</head>', $html, 1);
-        }
-
-        return $html;
+        // Leave streamed responses, non-HTML and third-party markup without our tags alone.
+        return preg_replace_callback( '/<head\b[^>]*>.*?<\/head>/is', static function ( $head_match ) {
+            $head = $head_match[0];
+            foreach ( array( 'title', 'description' ) as $property ) {
+                $pattern = '/<meta\b[^>]*\bproperty=["\']og:' . $property . '["\'][^>]*>/i';
+                $canonical = null;
+                if ( preg_match_all( $pattern, $head, $tags ) ) {
+                    foreach ( $tags[0] as $tag ) {
+                        if ( preg_match( '/\bdata-ace-seo=["\']1["\']/i', $tag ) ) {
+                            $canonical = preg_replace( '/\s+data-ace-seo=["\']1["\']/i', '', $tag );
+                            break;
+                        }
+                    }
+                }
+                if ( null === $canonical ) {
+                    continue;
+                }
+                $head = preg_replace( $pattern, '', $head );
+                $head = preg_replace_callback( '/<\/head>/i', static function () use ( $canonical ) {
+                    return $canonical . "\n</head>";
+                }, $head, 1 );
+            }
+            return $head;
+        }, $html, 1 );
     }
 
     public function output_schema_markup() {

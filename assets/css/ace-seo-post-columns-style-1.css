@@ -1,0 +1,4 @@
+#ace-seo-export-progress{display:none;align-items:center;gap:.6em;margin:.4em 0 .6em;padding:.5em .75em;background:#fff;border:1px solid #c3c4c7;border-left:4px solid #2271b1;max-width:640px}
+            #ace-seo-export-progress.is-on{display:flex}
+            #ace-seo-export-progress progress{flex:1;height:14px}
+            #ace-seo-export-progress .ace-msg{white-space:nowrap;font-variant-numeric:tabular-nums}

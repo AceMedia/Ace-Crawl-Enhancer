@@ -172,7 +172,7 @@ class AceSEODashboard {
      * Add dashboard styles
      */
     private function add_dashboard_styles() {
-        echo '<style>
+        AceSeoAssets::inline_style( 'ace-seo-class-ace-seo-dashboard-style', '
         .ace-dashboard-performance {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
@@ -253,14 +253,14 @@ class AceSEODashboard {
         .ace-dashboard-actions .button {
             margin-right: 10px;
         }
-        </style>';
+        ' );
     }
     
     /**
      * Add dashboard script
      */
     private function add_dashboard_script() {
-        echo '<script>
+        AceSeoAssets::inline_script( 'ace-seo-class-ace-seo-dashboard-script', '
         function triggerPerformanceCheck() {
             var button = event.target;
             button.disabled = true;
@@ -289,7 +289,7 @@ class AceSEODashboard {
                 }
             });
         }
-        </script>';
+        ' );
     }
 }
 

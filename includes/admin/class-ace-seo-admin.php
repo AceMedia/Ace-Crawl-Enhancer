@@ -32,12 +32,15 @@ class AceSeoAdmin {
     
     public function admin_init() {
         // Check for Yoast SEO and show compatibility notice
-        if (is_plugin_active('wordpress-seo/wp-seo.php')) {
+        if ( current_user_can( 'manage_options' ) && is_plugin_active('wordpress-seo/wp-seo.php')) {
             add_action('admin_notices', [$this, 'yoast_compatibility_notice']);
         }
     }
     
     public function admin_notices() {
+        if ( ! $this->is_plugin_screen() ) {
+            return;
+        }
         // Show welcome notice on first activation
         if (get_transient('ace_seo_activation_notice')) {
             ?>
@@ -53,7 +56,15 @@ class AceSeoAdmin {
         }
     }
     
+    private function is_plugin_screen() {
+        $screen = get_current_screen();
+        return current_user_can( 'manage_options' ) && $screen && false !== strpos( $screen->id, 'ace-seo' );
+    }
+
     public function yoast_compatibility_notice() {
+        if ( ! $this->is_plugin_screen() ) {
+            return;
+        }
         ?>
         <div class="notice notice-info">
             <p>

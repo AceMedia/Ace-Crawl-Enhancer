@@ -11,6 +11,11 @@ if ( PHP_SAPI !== 'cli' ) {
 
 define('ABSPATH',__DIR__.'/'); define('HOUR_IN_SECONDS',3600);
 $root=$argv[1]??dirname(__DIR__);
+define( 'ACE_SEO_URL', 'https://ordinary-wordpress.test/plugin/' );
+define( 'ACE_SEO_VERSION', 'test' );
+function wp_enqueue_style( $handle, $url, $dependencies, $version ) {}
+function did_action( $hook ) { return 0; }
+require $root . '/includes/class-ace-seo-assets.php';
 $GLOBALS['options']=array(); $GLOBALS['transients']=array(); $GLOBALS['admin']=true; $GLOBALS['nonce_ok']=true;
 class SettingsRedirect extends Exception {public $url;function __construct($url){$this->url=$url;}}
 function get_option($key,$fallback=false){return $GLOBALS['options'][$key]??$fallback;}

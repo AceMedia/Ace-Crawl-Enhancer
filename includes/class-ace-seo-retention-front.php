@@ -70,14 +70,14 @@ class AceSeoRetentionFront {
         add_filter( 'body_class', array( __CLASS__, 'body_class' ) );
         add_filter( 'pre_render_block', array( __CLASS__, 'skip_block' ), 10, 2 );
         add_filter( 'sidebars_widgets', array( __CLASS__, 'empty_sidebars' ) );
-        add_action( 'wp_head', array( __CLASS__, 'print_style' ), 99 );
+        add_action( 'wp_enqueue_scripts', array( __CLASS__, 'print_style' ) );
 
         if ( (int) $o['light_cache_hours'] > 0 ) {
             add_filter( 'ace_rc_page_ttl', array( __CLASS__, 'page_ttl' ), 20 );
         }
         if ( 'card' === $o['light_continue'] ) {
             add_filter( 'the_content', array( __CLASS__, 'continue_card' ), 20 );
-            add_action( 'wp_footer', array( __CLASS__, 'print_continue_script' ), 99 );
+            add_action( 'wp_enqueue_scripts', array( __CLASS__, 'print_continue_script' ) );
         }
 
         /**
@@ -134,10 +134,10 @@ class AceSeoRetentionFront {
     }
 
     public static function print_style() {
-        echo '<style id="ace-seo-light">body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
+        AceSeoAssets::inline_style( 'ace-seo-light', 'body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
             . '.ace-seo-continue{margin:2em 0 0;padding:1em 1.25em;border:1px solid rgba(127,127,127,.35);border-radius:.4em}'
             . '.ace-seo-continue__label{margin:0 0 .25em;font-size:.85em;text-transform:uppercase;letter-spacing:.04em;opacity:.75}'
-            . '.ace-seo-continue a{font-weight:600}</style>' . "\n";
+            . '.ace-seo-continue a{font-weight:600}' );
     }
 
     /**
@@ -213,7 +213,7 @@ class AceSeoRetentionFront {
      */
     public static function print_continue_script() {
         ?>
-        <script id="ace-seo-continue">(function(){var c=document.querySelector('[data-ace-seo-continue]');if(!c||!('IntersectionObserver' in window)){return;}var a=c.querySelector('a'),y=null,gone=false;new IntersectionObserver(function(e){y=e[0].intersectionRatio>=0.99?window.pageYOffset:y;},{threshold:[0,1]}).observe(c);window.addEventListener('scroll',function(){if(gone||y===null||!a){return;}if(window.pageYOffset-y>120){gone=true;window.location.assign(a.href);}},{passive:true});})();</script>
+        <?php AceSeoAssets::script( 'ace-seo-retention-front-script-1', 'assets/js/ace-seo-retention-front-script-1.js', array() ); ?>
         <?php
     }
 

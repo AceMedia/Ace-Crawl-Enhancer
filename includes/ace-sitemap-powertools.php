@@ -2370,10 +2370,18 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
 
     echo '<!doctype html><html ' . wp_kses_post( $lang ) . '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<title>' . esc_html( $title ) . '</title>';
-    foreach ( $theme_links as $theme_link ) {
-        echo '<link rel="stylesheet" href="' . esc_url( $theme_link ) . '" />'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone sitemap document, wp_head() never runs here.
+    $style_handles = array();
+    foreach ( $theme_links as $index => $theme_link ) {
+        $handle = 'ace-seo-sitemap-theme-' . absint( $index );
+        wp_enqueue_style( $handle, $theme_link, array(), ACE_SITEMAP_POWERTOOLS_VERSION );
+        $style_handles[] = $handle;
     }
-    echo '<style>' . wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) . '</style></head><body><div id="sitemap">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS only, tags stripped.
+    wp_register_style( 'ace-seo-sitemap-human', false, $style_handles, ACE_SITEMAP_POWERTOOLS_VERSION );
+    wp_enqueue_style( 'ace-seo-sitemap-human' );
+    wp_add_inline_style( 'ace-seo-sitemap-human', wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) );
+    // This standalone document has no wp_head(): print only its registered dependencies.
+    wp_print_styles( array( 'ace-seo-sitemap-human' ) );
+    echo '</head><body><div id="sitemap">';
     echo wp_kses_post( $header_html );
     echo '<div id="sitemap__content"><p class="text">' . esc_html( $summary ) . '</p>';
 }

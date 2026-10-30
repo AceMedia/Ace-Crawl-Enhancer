@@ -1964,8 +1964,13 @@ class AceSeoRetentionReport {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         ob_start();
-        self::render_rows_section( sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) ), absint( wp_unslash( $_POST['paged'] ?? 1 ) ) );
-        wp_send_json_success( array( 'html' => ob_get_clean() ) );
+        try {
+            self::render_rows_section( sanitize_key( wp_unslash( $_POST['bucket'] ?? '' ) ), absint( wp_unslash( $_POST['paged'] ?? 1 ) ) );
+            $html = ob_get_contents();
+        } finally {
+            ob_end_clean();
+        }
+        wp_send_json_success( array( 'html' => $html ) );
     }
 
     /** Plain names for the build phases. */

@@ -218,47 +218,8 @@ class AceSEOMetabox {
                 Loading search performance...
             </div>
         </div>
-        <script>
-        (function() {
-            var el = document.getElementById('ace-gsc-perf');
-            if (!el || typeof aceSeoAdmin === 'undefined' || !aceSeoAdmin.restUrl) { return; }
-            var url = el.getAttribute('data-url');
-            var esc = function(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
-            fetch(aceSeoAdmin.restUrl + 'google/search-console/page-metrics?days=28&url=' + encodeURIComponent(url), {
-                headers: { 'X-WP-Nonce': aceSeoAdmin.nonce }
-            }).then(function(r) { return r.json(); }).then(function(d) {
-                if (!d || d.connected === false) {
-                    el.innerHTML = '<p class="description">' + esc((d && d.message) || 'Search performance is unavailable.') + '</p>';
-                    return;
-                }
-                if (!d.impressions) {
-                    el.innerHTML = '<p class="description">No search impressions recorded for this page in the last 28 days.</p>';
-                    return;
-                }
-                var html = '<p style="margin:0 0 8px;"><strong>Last 28 days</strong></p>' +
-                    '<ul style="margin:0 0 10px;list-style:none;padding:0;">' +
-                    '<li>Impressions: <strong>' + esc(d.impressions.toLocaleString()) + '</strong></li>' +
-                    '<li>Clicks: <strong>' + esc(d.clicks.toLocaleString()) + '</strong></li>' +
-                    '<li>CTR: <strong>' + esc(d.ctr) + '%</strong></li>' +
-                    '<li>Avg position: <strong>' + esc(d.position) + '</strong></li>' +
-                    '</ul>';
-                if (d.top_queries && d.top_queries.length) {
-                    html += '<p style="margin:0 0 4px;"><strong>Top queries</strong></p><ol style="margin:0 0 10px;padding-left:18px;">';
-                    d.top_queries.slice(0, 5).forEach(function(q) {
-                        html += '<li>' + esc(q.query) + ' <span class="description">(pos ' + esc(q.position) + ', ' + esc(q.impressions) + ' impr)</span></li>';
-                    });
-                    html += '</ol>';
-                }
-                if (d.hint) {
-                    html += '<p class="description" style="border-left:3px solid #a4286a;padding-left:8px;">' + esc(d.hint) + '</p>';
-                }
-                el.innerHTML = html;
-            }).catch(function() {
-                el.innerHTML = '<p class="description">Could not load search performance.</p>';
-            });
-        })();
-        </script>
-        <style>@keyframes ace-spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}</style>
+        <?php AceSeoAssets::script( 'ace-seo-metabox-script-1', 'assets/js/ace-seo-metabox-script-1.js', array( 'ace-seo-admin' ) ); ?>
+        <?php AceSeoAssets::style( 'ace-seo-metabox-style-1', 'assets/css/ace-seo-metabox-style-1.css' ); ?>
         <?php
     }
 
@@ -401,7 +362,7 @@ class AceSEOMetabox {
             'ace-seo-admin',
             ACE_SEO_URL . 'assets/js/admin.js',
             array( 'jquery', 'wp-api' ),
-            ACE_SEO_VERSION . '.' . time(), // Add timestamp for cache busting during development
+            ACE_SEO_VERSION,
             true
         );
         
@@ -747,40 +708,7 @@ class AceSEOMetabox {
                 <p class="description"><?php esc_html_e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
-        <script>
-        jQuery(document).ready(function($) {
-            // Character counters for taxonomy fields
-            function updateCounter(field, counterClass, optimal, max) {
-                var length = $(field).val().length;
-                var counter = $(counterClass);
-                var progress = counter.find('.ace-counter-progress');
-                
-                counter.find('.ace-counter-text').text(length + ' characters');
-                
-                var percentage = (length / max) * 100;
-                progress.css('width', Math.min(percentage, 100) + '%');
-                
-                progress.removeClass('good warning error');
-                if (length >= optimal && length <= max) {
-                    progress.addClass('good');
-                } else if (length > 0 && (length < optimal || length > max)) {
-                    progress.addClass('warning');
-                } else if (length > max * 1.2) {
-                    progress.addClass('error');
-                }
-            }
-            
-            // Title counter (optimal: 50-60, max: 70)
-            $('#ace_seo_title').on('input', function() {
-                updateCounter(this, '.ace-title-counter', 50, 70);
-            }).trigger('input');
-            
-            // Description counter (optimal: 140-160, max: 170)
-            $('#ace_seo_desc').on('input', function() {
-                updateCounter(this, '.ace-desc-counter', 140, 170);
-            }).trigger('input');
-        });
-        </script>
+        <?php AceSeoAssets::script( 'ace-seo-metabox-script-2', 'assets/js/ace-seo-metabox-script-2.js' ); ?>
         <?php
     }
     

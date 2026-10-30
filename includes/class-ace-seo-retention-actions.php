@@ -50,6 +50,7 @@ class AceSeoRetentionActions {
         add_filter( 'ace_seo_robots_directives', array( __CLASS__, 'robots_unavailable_after' ) );
         add_action( 'template_redirect', array( __CLASS__, 'maybe_redirect' ), 2 );
         add_filter( 'the_content', array( __CLASS__, 'dated_content_notice' ), 5 );
+        add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_notice_style' ) );
         add_filter( 'ace_sitemap_powertools_news_query_args', array( __CLASS__, 'news_sitemap_exclusions' ) );
         add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
         add_action( 'added_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
@@ -737,6 +738,17 @@ class AceSeoRetentionActions {
         return apply_filters( 'ace_seo_retention_notice_html', $html, $post, $text );
     }
 
+    /** Queue the notice stylesheet before the document head is printed. */
+    public static function enqueue_notice_style() {
+        if ( ! is_singular() ) {
+            return;
+        }
+        $post = get_post( get_queried_object_id() );
+        if ( $post && self::notice_applies( $post ) ) {
+            AceSeoAssets::style( 'ace-seo-dated-notice', 'assets/css/ace-seo-dated-notice.css' );
+        }
+    }
+
     public static function dated_content_notice( $content ) {
         // Block themes render Post Content outside the classic loop, so "the main post" is the
         // queried one rather than in_the_loop(); anything else running the_content (a query loop's
@@ -751,7 +763,6 @@ class AceSeoRetentionActions {
             return $content;
         }
 
-        $style = '<style id="ace-seo-dated-notice-style">.ace-seo-dated-notice{margin:0 0 1.25em;padding:.6em .9em;border-left:3px solid currentColor;border-radius:.25em;background:rgba(127,127,127,.08);font-size:.9em;line-height:1.4;opacity:.85}</style>';
-        return $style . self::notice_html( $post ) . $content;
+        return self::notice_html( $post ) . $content;
     }
 }

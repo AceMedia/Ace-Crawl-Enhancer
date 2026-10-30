@@ -116,4 +116,4 @@ $o = AceSeoRetentionActions::options();
         <?php AceSeoRetentionReport::render_help(); ?>
     </section>
 </div>
-<noscript><style>.ace-redis-settings .tab-content { display: block; } .ace-retention-settings { scroll-margin-top: 40px; }</style></noscript>
+<?php AceSeoAssets::style( 'ace-seo-retention-noscript', 'assets/css/ace-seo-retention-noscript.css' ); ?>

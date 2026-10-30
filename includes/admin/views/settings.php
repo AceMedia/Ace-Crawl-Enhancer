@@ -1071,116 +1071,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             </p>
                             <p class="description">Recreate will remove existing Yoast keys first, then rebuild from ACE meta.</p>
                         </fieldset>
-                        <script>
-                        (function(){
-                            var fieldset = document.getElementById('yoast-keys');
-                            if (!fieldset) return;
-                            var ajaxUrl = fieldset.getAttribute('data-ajax-url') || '';
-                            var nonce = fieldset.getAttribute('data-yoast-nonce') || '';
-                            var statusEl = document.getElementById('ace-yoast-ajax-status');
-                            var setStatus = function(msg){
-                                if (!statusEl) return;
-                                statusEl.textContent = msg;
-                                statusEl.style.display = msg ? 'block' : 'none';
-                            };
-
-                            var updateCounts = function(data){
-                                var byId = function(id){ return document.getElementById(id); };
-                                var postmeta = byId('ace-yoast-count-postmeta');
-                                var termmeta = byId('ace-yoast-count-termmeta');
-                                var acePost = byId('ace-yoast-count-ace-postmeta');
-                                var aceTerm = byId('ace-yoast-count-ace-termmeta');
-                                var postVal = (data && data.postmeta != null) ? data.postmeta : '0';
-                                var termVal = (data && data.termmeta != null) ? data.termmeta : '0';
-                                var acePostVal = (data && data.ace_postmeta != null) ? data.ace_postmeta : '0';
-                                var aceTermVal = (data && data.ace_termmeta != null) ? data.ace_termmeta : '0';
-                                if (postmeta) postmeta.textContent = postVal;
-                                if (termmeta) termmeta.textContent = termVal;
-                                if (acePost) acePost.textContent = acePostVal;
-                                if (aceTerm) aceTerm.textContent = aceTermVal;
-                            };
-
-                            var postAjax = function(action, extra){
-                                if (!ajaxUrl) {
-                                    setStatus('AJAX URL missing.');
-                                    return Promise.reject();
-                                }
-                                var formData = new FormData();
-                                formData.append('action', action);
-                                formData.append('nonce', nonce);
-                                if (extra) {
-                                    Object.keys(extra).forEach(function(key){
-                                        formData.append(key, extra[key]);
-                                    });
-                                }
-                                return fetch(ajaxUrl, {
-                                    method: 'POST',
-                                    credentials: 'same-origin',
-                                    body: formData
-                                }).then(function(resp){ return resp.json(); });
-                            };
-
-                            var refreshCounts = function(){
-                                setStatus('Loading counts...');
-                                return postAjax('ace_seo_get_yoast_key_counts').then(function(resp){
-                                    if (resp && resp.success) {
-                                        updateCounts(resp.data || {});
-                                        setStatus('');
-                                    } else {
-                                        setStatus('Failed to load Yoast counts.');
-                                    }
-                                }).catch(function(){
-                                    setStatus('Request failed.');
-                                });
-                            };
-
-                            var refreshBtn = document.getElementById('ace-yoast-refresh');
-                            if (refreshBtn) {
-                                refreshBtn.addEventListener('click', function(e){
-                                    e.preventDefault();
-                                    refreshCounts();
-                                });
-                            }
-
-                            var deleteBtn = document.getElementById('ace-yoast-delete');
-                            if (deleteBtn) {
-                                deleteBtn.addEventListener('click', function(e){
-                                    e.preventDefault();
-                                    if (!confirm('Remove all Yoast SEO meta keys from the database? This cannot be undone.')) {
-                                        return;
-                                    }
-                                    postAjax('ace_seo_delete_yoast_keys').then(function(resp){
-                                        if (resp && resp.success) {
-                                            refreshCounts();
-                                            alert('Yoast keys removed.');
-                                        } else {
-                                            alert('Failed to remove Yoast keys.');
-                                        }
-                                    });
-                                });
-                            }
-
-                            var recreateBtn = document.getElementById('ace-yoast-recreate');
-                            if (recreateBtn) {
-                                recreateBtn.addEventListener('click', function(e){
-                                    e.preventDefault();
-                                    if (!confirm('Recreate Yoast SEO meta keys from ACE data? This will overwrite existing Yoast keys.')) {
-                                        return;
-                                    }
-                                    postAjax('ace_seo_recreate_yoast_keys').then(function(resp){
-                                        if (resp && resp.success) {
-                                            refreshCounts();
-                                            alert('Yoast keys recreated from ACE.');
-                                        } else {
-                                            alert('Failed to recreate Yoast keys.');
-                                        }
-                                    });
-                                });
-                            }
-
-                            refreshCounts();
-                        })();
-                        </script>
+                        <?php AceSeoAssets::script( 'ace-seo-settings-script-1', 'assets/js/ace-seo-settings-script-1.js' ); ?>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1191,144 +1082,17 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
     </div> <!-- .ace-seo-container -->
 </div>
 
-<style>
-.ace-optimization-result {
-    padding: 12px;
-    border-radius: 4px;
-    margin-top: 15px;
-}
-.ace-optimization-result.success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-}
-.ace-optimization-result.error {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-}
-.ace-optimization-result.info {
-    background: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
-}
-.notice.inline {
-    display: inline-block;
-    margin: 10px 0;
-    padding: 10px 15px;
-}
-.migration-progress-container {
-    margin: 20px 0;
-}
-.migration-progress-bar {
-    width: 100%;
-    height: 25px;
-    background-color: #f0f0f1;
-    border-radius: 3px;
-    overflow: hidden;
-    position: relative;
-}
-.migration-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #00a32a, #00ba37);
-    transition: width 0.3s ease;
-    position: relative;
-}
-.migration-progress-fill:after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%);
-    animation: aceMigrationShine 1.5s infinite;
-}
-@keyframes aceMigrationShine {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-.migration-progress-text {
-    text-align: center;
-    margin-top: 10px;
-    font-weight: 600;
-    color: #1d2327;
-}
-.migration-current-item {
-    background: #f6f7f7;
-    border: 1px solid #dcdcde;
-    border-radius: 4px;
-    padding: 10px;
-    margin: 15px 0;
-    font-family: monospace;
-    font-size: 13px;
-}
-.migration-log {
-    margin-top: 20px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-.migration-log h4 {
-    margin-bottom: 10px;
-}
-.migration-log-content {
-    background: #2c3338;
-    color: #f0f0f1;
-    padding: 15px;
-    border-radius: 4px;
-    font-family: "Consolas", "Monaco", "Courier New", monospace;
-    font-size: 12px;
-    line-height: 1.4;
-    max-height: 250px;
-    overflow-y: auto;
-}
-.migration-log-entry {
-    margin-bottom: 5px;
-}
-.migration-log-entry.success {
-    color: #4f9c4f;
-}
-.migration-log-entry.error {
-    color: #d63384;
-}
-.migration-log-entry.warning {
-    color: #ffc107;
-}
-.migration-log-entry.info {
-    color: #0dcaf0;
-}
-#migration-stats {
-    margin: 15px 0;
-    padding: 15px;
-    background: #f6f7f7;
-    border-left: 4px solid #0073aa;
-    border-radius: 0 4px 4px 0;
-}
-#migration-stats ul {
-    margin: 0;
-    list-style: none;
-}
-#migration-stats li {
-    padding: 5px 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-#migration-stats .stat-value {
-    font-weight: 600;
-    color: #0073aa;
-}
-</style>
+<?php AceSeoAssets::style( 'ace-seo-settings-style-1', 'assets/css/ace-seo-settings-style-1.css' ); ?>
 
-<script>
+<?php AceSeoAssets::inline_script( 'ace-seo-settings-script-2', '
 jQuery(document).ready(function($) {
-    var ajaxurl = window.ajaxurl || (window.ace_seo_admin && ace_seo_admin.ajax_url) || "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
-    var yoastNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_yoast_tools') ); ?>';
-    var migrationStatsNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_migration_stats') ); ?>';
-    var migrationBatchNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_batch_migrate') ); ?>';
-    var optimizeDbNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_optimize_db_manual') ); ?>';
-    var adminNonce = '<?php echo esc_js( wp_create_nonce('ace_seo_admin') ); ?>';
-    var sitemapPurgeNonce = '<?php echo esc_js( wp_create_nonce('ace_sitemap_purge_cache') ); ?>';
+    var ajaxurl = window.ajaxurl || (window.ace_seo_admin && ace_seo_admin.ajax_url) || "' . (esc_js(admin_url('admin-ajax.php'))) . '";
+    var yoastNonce = \'' . (esc_js( wp_create_nonce('ace_seo_yoast_tools') )) . '\';
+    var migrationStatsNonce = \'' . (esc_js( wp_create_nonce('ace_seo_migration_stats') )) . '\';
+    var migrationBatchNonce = \'' . (esc_js( wp_create_nonce('ace_seo_batch_migrate') )) . '\';
+    var optimizeDbNonce = \'' . (esc_js( wp_create_nonce('ace_seo_optimize_db_manual') )) . '\';
+    var adminNonce = \'' . (esc_js( wp_create_nonce('ace_seo_admin') )) . '\';
+    var sitemapPurgeNonce = \'' . (esc_js( wp_create_nonce('ace_sitemap_purge_cache') )) . '\';
 
     var migrationState = {
         isRunning: false,
@@ -1346,17 +1110,17 @@ jQuery(document).ready(function($) {
 
     // Kick off migration stats when the tab is first visited (or immediately if already visible).
     function initMigrationSection() {
-        if (migrationInitialized || !$('#migration-status-text').length) {
+        if (migrationInitialized || !$(\'#migration-status-text\').length) {
             return;
         }
         migrationInitialized = true;
 
         // Fallback: if AJAX fails silently, surface an error and let the button be clicked.
         var fallbackTimer = setTimeout(function() {
-            var statusText = ($('#migration-status-text').text() || '').trim().toLowerCase();
-            if (statusText === 'loading...' || !statusText) {
-                $('#migration-status-text').text('Unable to load migration stats. You can still try starting the migration.');
-                $('#start-migration-btn').prop('disabled', false);
+            var statusText = ($(\'#migration-status-text\').text() || \'\').trim().toLowerCase();
+            if (statusText === \'loading...\' || !statusText) {
+                $(\'#migration-status-text\').text(\'Unable to load migration stats. You can still try starting the migration.\');
+                $(\'#start-migration-btn\').prop(\'disabled\', false);
             }
         }, 5000);
 
@@ -1367,23 +1131,23 @@ jQuery(document).ready(function($) {
 
     // Initialize immediately if the section is in view on load, and again when the Yoast tab is clicked.
     initMigrationSection();
-    $(document).on('click', 'a[href="#yoast"], .ace-subtab-link[data-target-group="yoast-migration"]', initMigrationSection);
-    if ($('#ace-yoast-count-postmeta').length) {
+    $(document).on(\'click\', \'a[href="#yoast"], .ace-subtab-link[data-target-group="yoast-migration"]\', initMigrationSection);
+    if ($(\'#ace-yoast-count-postmeta\').length) {
         fetchYoastCounts();
     }
 
     function updateMigrationStats(stats) {
         var pendingTotal = getPendingTotal(stats);
-        var statsHtml = '<ul>' +
-            '<li><span>Posts with Yoast SEO data:</span><span class="stat-value">' + stats.yoast_posts + '</span></li>' +
-            '<li><span>Posts with Ace SEO data:</span><span class="stat-value">' + stats.ace_posts + '</span></li>' +
-            '<li><span>Taxonomies with Yoast SEO data:</span><span class="stat-value">' + (stats.yoast_taxonomies || 0) + '</span></li>' +
-            '<li><span>Taxonomies with Ace SEO data:</span><span class="stat-value">' + (stats.ace_taxonomies || 0) + '</span></li>' +
-            '<li><span>Posts ready to migrate:</span><span class="stat-value">' + stats.pending_migration + '</span></li>' +
-            '<li><span>Taxonomies ready to migrate:</span><span class="stat-value">' + (stats.pending_tax_migration || 0) + '</span></li>' +
-            '<li><span>Total items ready to migrate:</span><span class="stat-value">' + pendingTotal + '</span></li>' +
-            '</ul>';
-        $('#migration-stats').html(statsHtml);
+        var statsHtml = \'<ul>\' +
+            \'<li><span>Posts with Yoast SEO data:</span><span class="stat-value">\' + stats.yoast_posts + \'</span></li>\' +
+            \'<li><span>Posts with Ace SEO data:</span><span class="stat-value">\' + stats.ace_posts + \'</span></li>\' +
+            \'<li><span>Taxonomies with Yoast SEO data:</span><span class="stat-value">\' + (stats.yoast_taxonomies || 0) + \'</span></li>\' +
+            \'<li><span>Taxonomies with Ace SEO data:</span><span class="stat-value">\' + (stats.ace_taxonomies || 0) + \'</span></li>\' +
+            \'<li><span>Posts ready to migrate:</span><span class="stat-value">\' + stats.pending_migration + \'</span></li>\' +
+            \'<li><span>Taxonomies ready to migrate:</span><span class="stat-value">\' + (stats.pending_tax_migration || 0) + \'</span></li>\' +
+            \'<li><span>Total items ready to migrate:</span><span class="stat-value">\' + pendingTotal + \'</span></li>\' +
+            \'</ul>\';
+        $(\'#migration-stats\').html(statsHtml);
     }
 
     function getPendingTotal(stats) {
@@ -1401,9 +1165,9 @@ jQuery(document).ready(function($) {
     function loadMigrationStats() {
         return $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_get_migration_stats',
+                action: \'ace_seo_get_migration_stats\',
                 nonce: migrationStatsNonce
             }
         }).done(function(response) {
@@ -1416,106 +1180,106 @@ jQuery(document).ready(function($) {
                 updateMigrationStats(stats);
 
                 if (pendingTotal > 0) {
-                    $('#start-migration-btn').prop('disabled', false);
-                    $('#migration-status-text').text('Ready to migrate');
+                    $(\'#start-migration-btn\').prop(\'disabled\', false);
+                    $(\'#migration-status-text\').text(\'Ready to migrate\');
                 } else if (hasAceData && hasYoastData) {
-                    $('#start-migration-btn').prop('disabled', false);
-                    $('#migration-status-text').text('Migration complete');
+                    $(\'#start-migration-btn\').prop(\'disabled\', false);
+                    $(\'#migration-status-text\').text(\'Migration complete\');
                 } else if (hasAceData) {
-                    $('#start-migration-btn').prop('disabled', false);
-                    $('#migration-status-text').text('No pending migration (already migrated)');
+                    $(\'#start-migration-btn\').prop(\'disabled\', false);
+                    $(\'#migration-status-text\').text(\'No pending migration (already migrated)\');
                 } else {
-                    $('#migration-status-text').text('No Yoast SEO data found to migrate');
-                    $('#start-migration-btn').prop('disabled', true);
+                    $(\'#migration-status-text\').text(\'No Yoast SEO data found to migrate\');
+                    $(\'#start-migration-btn\').prop(\'disabled\', true);
                 }
             } else {
-                $('#migration-status-text').text('Error loading migration stats');
-                $('#start-migration-btn').prop('disabled', false);
+                $(\'#migration-status-text\').text(\'Error loading migration stats\');
+                $(\'#start-migration-btn\').prop(\'disabled\', false);
             }
         }).fail(function() {
-            $('#migration-status-text').text('Error loading migration stats');
-            $('#start-migration-btn').prop('disabled', false);
+            $(\'#migration-status-text\').text(\'Error loading migration stats\');
+            $(\'#start-migration-btn\').prop(\'disabled\', false);
         });
     }
 
     function updateYoastCounts(data) {
-        var postmeta = data && data.postmeta != null ? data.postmeta : '0';
-        var termmeta = data && data.termmeta != null ? data.termmeta : '0';
-        var acePost = data && data.ace_postmeta != null ? data.ace_postmeta : '0';
-        var aceTerm = data && data.ace_termmeta != null ? data.ace_termmeta : '0';
-        $('#ace-yoast-count-postmeta').text(postmeta);
-        $('#ace-yoast-count-termmeta').text(termmeta);
-        $('#ace-yoast-count-ace-postmeta').text(acePost);
-        $('#ace-yoast-count-ace-termmeta').text(aceTerm);
+        var postmeta = data && data.postmeta != null ? data.postmeta : \'0\';
+        var termmeta = data && data.termmeta != null ? data.termmeta : \'0\';
+        var acePost = data && data.ace_postmeta != null ? data.ace_postmeta : \'0\';
+        var aceTerm = data && data.ace_termmeta != null ? data.ace_termmeta : \'0\';
+        $(\'#ace-yoast-count-postmeta\').text(postmeta);
+        $(\'#ace-yoast-count-termmeta\').text(termmeta);
+        $(\'#ace-yoast-count-ace-postmeta\').text(acePost);
+        $(\'#ace-yoast-count-ace-termmeta\').text(aceTerm);
     }
 
     function fetchYoastCounts() {
         if (!ajaxurl) {
-            updateYoastCounts({ postmeta: 'error', termmeta: 'error', ace_postmeta: 'error', ace_termmeta: 'error' });
-            $('#ace-yoast-ajax-status').text('AJAX URL missing.').show();
+            updateYoastCounts({ postmeta: \'error\', termmeta: \'error\', ace_postmeta: \'error\', ace_termmeta: \'error\' });
+            $(\'#ace-yoast-ajax-status\').text(\'AJAX URL missing.\').show();
             return $.Deferred().reject().promise();
         }
         return $.post(ajaxurl, {
-            action: 'ace_seo_get_yoast_key_counts',
+            action: \'ace_seo_get_yoast_key_counts\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
                 updateYoastCounts(resp.data);
-                $('#ace-yoast-ajax-status').hide().text('');
+                $(\'#ace-yoast-ajax-status\').hide().text(\'\');
             } else {
-                var message = resp && resp.data && resp.data.message ? resp.data.message : 'Failed to load Yoast counts.';
-                $('#ace-yoast-ajax-status').text(message).show();
+                var message = resp && resp.data && resp.data.message ? resp.data.message : \'Failed to load Yoast counts.\';
+                $(\'#ace-yoast-ajax-status\').text(message).show();
             }
         }).fail(function() {
-            updateYoastCounts({ postmeta: 'error', termmeta: 'error', ace_postmeta: 'error', ace_termmeta: 'error' });
-            $('#ace-yoast-ajax-status').text('Request failed.').show();
+            updateYoastCounts({ postmeta: \'error\', termmeta: \'error\', ace_postmeta: \'error\', ace_termmeta: \'error\' });
+            $(\'#ace-yoast-ajax-status\').text(\'Request failed.\').show();
         });
     }
 
-    $(document).on('click', '#ace-yoast-refresh', function() {
+    $(document).on(\'click\', \'#ace-yoast-refresh\', function() {
         fetchYoastCounts();
     });
 
-    $(document).on('click', '#ace-yoast-delete', function() {
-        if (!confirm('Remove all Yoast SEO meta keys from the database? This cannot be undone.')) {
+    $(document).on(\'click\', \'#ace-yoast-delete\', function() {
+        if (!confirm(\'Remove all Yoast SEO meta keys from the database? This cannot be undone.\')) {
             return;
         }
         $.post(ajaxurl, {
-            action: 'ace_seo_delete_yoast_keys',
+            action: \'ace_seo_delete_yoast_keys\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
                 fetchYoastCounts();
-                alert('Yoast keys removed.');
+                alert(\'Yoast keys removed.\');
             } else {
-                alert('Failed to remove Yoast keys.');
+                alert(\'Failed to remove Yoast keys.\');
             }
         });
     });
 
-    $(document).on('click', '#ace-yoast-recreate', function() {
-        if (!confirm('Recreate Yoast SEO meta keys from ACE data? This will overwrite existing Yoast keys.')) {
+    $(document).on(\'click\', \'#ace-yoast-recreate\', function() {
+        if (!confirm(\'Recreate Yoast SEO meta keys from ACE data? This will overwrite existing Yoast keys.\')) {
             return;
         }
         $.post(ajaxurl, {
-            action: 'ace_seo_recreate_yoast_keys',
+            action: \'ace_seo_recreate_yoast_keys\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
                 fetchYoastCounts();
-                alert('Yoast keys recreated from ACE.');
+                alert(\'Yoast keys recreated from ACE.\');
             } else {
-                alert('Failed to recreate Yoast keys.');
+                alert(\'Failed to recreate Yoast keys.\');
             }
         });
     });
 
     function logMessage(message, type) {
-        var entryType = type || 'info';
+        var entryType = type || \'info\';
         var timestamp = new Date().toLocaleTimeString();
-        var logEntry = '<div class="migration-log-entry ' + entryType + '">[' + timestamp + '] ' + message + '</div>';
-        $('#migration-log-content').append(logEntry);
-        var logContent = $('#migration-log-content');
+        var logEntry = \'<div class="migration-log-entry \' + entryType + \'">[\' + timestamp + \'] \' + message + \'</div>\';
+        $(\'#migration-log-content\').append(logEntry);
+        var logContent = $(\'#migration-log-content\');
         if (logContent.length) {
             logContent.scrollTop(logContent[0].scrollHeight);
         }
@@ -1524,18 +1288,18 @@ jQuery(document).ready(function($) {
     function updateProgress() {
         var percent = migrationState.totalPosts > 0 ?
             Math.round((migrationState.processedPosts / migrationState.totalPosts) * 100) : 0;
-        $('.migration-progress-fill').css('width', percent + '%');
-        $('#migration-progress-current').text(migrationState.processedPosts);
-        $('#migration-progress-total').text(migrationState.totalPosts);
-        $('#migration-progress-percent').text(percent);
+        $(\'.migration-progress-fill\').css(\'width\', percent + \'%\');
+        $(\'#migration-progress-current\').text(migrationState.processedPosts);
+        $(\'#migration-progress-total\').text(migrationState.totalPosts);
+        $(\'#migration-progress-percent\').text(percent);
     }
 
     function updateCurrentItem(item) {
         if (item) {
-            var itemHtml = 'Processing: <strong>' + item.title + '</strong> (ID: ' + item.id + ', Type: ' + item.type + ')';
-            $('#migration-current-item').html(itemHtml).show();
+            var itemHtml = \'Processing: <strong>\' + item.title + \'</strong> (ID: \' + item.id + \', Type: \' + item.type + \')\';
+            $(\'#migration-current-item\').html(itemHtml).show();
         } else {
-            $('#migration-current-item').hide();
+            $(\'#migration-current-item\').hide();
         }
     }
 
@@ -1546,9 +1310,9 @@ jQuery(document).ready(function($) {
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_batch_migrate_yoast',
+                action: \'ace_seo_batch_migrate_yoast\',
                 batch: migrationState.currentBatch,
                 batch_size: migrationState.batchSize,
                 nonce: migrationBatchNonce
@@ -1560,13 +1324,13 @@ jQuery(document).ready(function($) {
                 migrationState.totalMigrated += data.migrated;
                 migrationState.currentBatch++;
                 updateProgress();
-                logMessage('Batch ' + migrationState.currentBatch + ': Processed ' + data.processed + ' posts, migrated ' + data.migrated + ' fields', 'success');
+                logMessage(\'Batch \' + migrationState.currentBatch + \': Processed \' + data.processed + \' posts, migrated \' + data.migrated + \' fields\', \'success\');
                 if (data.current_item) {
                     updateCurrentItem(data.current_item);
                 }
                 if (data.errors && data.errors.length > 0) {
                     data.errors.forEach(function(error) {
-                        logMessage(error, 'error');
+                        logMessage(error, \'error\');
                         migrationState.errors.push(error);
                     });
                 }
@@ -1576,11 +1340,11 @@ jQuery(document).ready(function($) {
                     setTimeout(processBatch, 500);
                 }
             } else {
-                logMessage('Error: ' + response.data, 'error');
+                logMessage(\'Error: \' + response.data, \'error\');
                 stopMigration();
             }
         }).fail(function(xhr, status, error) {
-            logMessage('Network error: ' + error, 'error');
+            logMessage(\'Network error: \' + error, \'error\');
             stopMigration();
         });
     }
@@ -1593,18 +1357,18 @@ jQuery(document).ready(function($) {
         migrationState.totalMigrated = 0;
         migrationState.errors = [];
 
-        $('#start-migration-btn').hide().prop('disabled', true);
-        $('#pause-migration-btn, #cancel-migration-btn').show();
-        $('#ace-migration-progress').show();
-        $('#ace-migration-results').hide();
-        $('#migration-status-text').text('Migration in progress...');
-        $('#migration-log-content').empty();
+        $(\'#start-migration-btn\').hide().prop(\'disabled\', true);
+        $(\'#pause-migration-btn, #cancel-migration-btn\').show();
+        $(\'#ace-migration-progress\').show();
+        $(\'#ace-migration-results\').hide();
+        $(\'#migration-status-text\').text(\'Migration in progress...\');
+        $(\'#migration-log-content\').empty();
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_get_migration_stats',
+                action: \'ace_seo_get_migration_stats\',
                 nonce: migrationStatsNonce
             }
         }).done(function(response) {
@@ -1612,16 +1376,16 @@ jQuery(document).ready(function($) {
                 migrationState.totalPosts = getPendingTotal(response.data);
 
                 if (migrationState.totalPosts <= 0) {
-                    logMessage('No pending Yoast items were found to migrate.', 'warning');
+                    logMessage(\'No pending Yoast items were found to migrate.\', \'warning\');
                     completeMigration();
                     return;
                 }
 
                 updateProgress();
-                logMessage('Starting migration of ' + migrationState.totalPosts + ' items...', 'info');
+                logMessage(\'Starting migration of \' + migrationState.totalPosts + \' items...\', \'info\');
                 processBatch();
             } else {
-                logMessage('Error getting migration stats: ' + response.data, 'error');
+                logMessage(\'Error getting migration stats: \' + response.data, \'error\');
                 stopMigration();
             }
         });
@@ -1629,366 +1393,252 @@ jQuery(document).ready(function($) {
 
     function pauseMigration() {
         migrationState.isPaused = true;
-        $('#pause-migration-btn').hide();
-        $('#resume-migration-btn').show();
-        $('#migration-status-text').text('Migration paused');
-        logMessage('Migration paused by user', 'warning');
+        $(\'#pause-migration-btn\').hide();
+        $(\'#resume-migration-btn\').show();
+        $(\'#migration-status-text\').text(\'Migration paused\');
+        logMessage(\'Migration paused by user\', \'warning\');
     }
 
     function resumeMigration() {
         migrationState.isPaused = false;
-        $('#resume-migration-btn').hide();
-        $('#pause-migration-btn').show();
-        $('#migration-status-text').text('Migration in progress...');
-        logMessage('Migration resumed', 'info');
+        $(\'#resume-migration-btn\').hide();
+        $(\'#pause-migration-btn\').show();
+        $(\'#migration-status-text\').text(\'Migration in progress...\');
+        logMessage(\'Migration resumed\', \'info\');
         processBatch();
     }
 
     function stopMigration() {
         migrationState.isRunning = false;
         migrationState.isPaused = false;
-        $('#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn').hide();
-        $('#start-migration-btn').show().prop('disabled', false);
-        $('#migration-status-text').text('Migration stopped');
+        $(\'#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn\').hide();
+        $(\'#start-migration-btn\').show().prop(\'disabled\', false);
+        $(\'#migration-status-text\').text(\'Migration stopped\');
         updateCurrentItem(null);
-        logMessage('Migration stopped', 'warning');
+        logMessage(\'Migration stopped\', \'warning\');
     }
 
     function completeMigration() {
         migrationState.isRunning = false;
         migrationState.isPaused = false;
-        $('#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn').hide();
-        $('#start-migration-btn').show().prop('disabled', false);
-        $('#migration-status-text').text('Migration completed successfully!');
+        $(\'#pause-migration-btn, #resume-migration-btn, #cancel-migration-btn\').hide();
+        $(\'#start-migration-btn\').show().prop(\'disabled\', false);
+        $(\'#migration-status-text\').text(\'Migration completed successfully!\');
         updateCurrentItem(null);
-        logMessage('Migration completed! Migrated ' + migrationState.totalMigrated + ' SEO fields from ' + migrationState.processedPosts + ' posts', 'success');
+        logMessage(\'Migration completed! Migrated \' + migrationState.totalMigrated + \' SEO fields from \' + migrationState.processedPosts + \' posts\', \'success\');
         if (migrationState.errors.length > 0) {
-            logMessage('Completed with ' + migrationState.errors.length + ' errors - check log above', 'warning');
+            logMessage(\'Completed with \' + migrationState.errors.length + \' errors - check log above\', \'warning\');
         }
         showMigrationResults();
         setTimeout(loadMigrationStats, 1000);
     }
 
     function showMigrationResults() {
-        var resultsHtml = '<div class="ace-optimization-result success">' +
-            '<p><strong>Migration Summary:</strong></p>' +
-            '<ul>' +
-            '<li>Posts processed: ' + migrationState.processedPosts + '</li>' +
-            '<li>SEO fields migrated: ' + migrationState.totalMigrated + '</li>' +
-            '<li>Errors encountered: ' + migrationState.errors.length + '</li>' +
-            '<li>Duration: Started at ' + new Date().toLocaleTimeString() + '</li>' +
-            '</ul>' +
+        var resultsHtml = \'<div class="ace-optimization-result success">\' +
+            \'<p><strong>Migration Summary:</strong></p>\' +
+            \'<ul>\' +
+            \'<li>Posts processed: \' + migrationState.processedPosts + \'</li>\' +
+            \'<li>SEO fields migrated: \' + migrationState.totalMigrated + \'</li>\' +
+            \'<li>Errors encountered: \' + migrationState.errors.length + \'</li>\' +
+            \'<li>Duration: Started at \' + new Date().toLocaleTimeString() + \'</li>\' +
+            \'</ul>\' +
             (migrationState.errors.length > 0 ?
-                '<p><em>Some errors occurred during migration. Check the log above for details.</em></p>' :
-                '<p><em>All data migrated successfully!</em></p>') +
-            '</div>';
-        $('#migration-results-content').html(resultsHtml);
-        $('#ace-migration-results').show();
+                \'<p><em>Some errors occurred during migration. Check the log above for details.</em></p>\' :
+                \'<p><em>All data migrated successfully!</em></p>\') +
+            \'</div>\';
+        $(\'#migration-results-content\').html(resultsHtml);
+        $(\'#ace-migration-results\').show();
     }
 
-    $('#start-migration-btn').on('click', startMigration);
-    $('#pause-migration-btn').on('click', pauseMigration);
-    $('#resume-migration-btn').on('click', resumeMigration);
-    $('#cancel-migration-btn').on('click', function() {
-        if (confirm('Are you sure you want to cancel the migration? Progress will be saved and you can resume later.')) {
+    $(\'#start-migration-btn\').on(\'click\', startMigration);
+    $(\'#pause-migration-btn\').on(\'click\', pauseMigration);
+    $(\'#resume-migration-btn\').on(\'click\', resumeMigration);
+    $(\'#cancel-migration-btn\').on(\'click\', function() {
+        if (confirm(\'Are you sure you want to cancel the migration? Progress will be saved and you can resume later.\')) {
             stopMigration();
         }
     });
 
-    $('#ace-optimize-db-btn').on('click', function() {
+    $(\'#ace-optimize-db-btn\').on(\'click\', function() {
         var $btn = $(this);
-        var $result = $('#ace-db-optimization-result');
+        var $result = $(\'#ace-db-optimization-result\');
 
-        $btn.prop('disabled', true).text('Optimizing Database...');
-        $result.hide().removeClass('success error info');
+        $btn.prop(\'disabled\', true).text(\'Optimizing Database...\');
+        $result.hide().removeClass(\'success error info\');
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_optimize_database_manual',
+                action: \'ace_seo_optimize_database_manual\',
                 nonce: optimizeDbNonce
             }
         }).done(function(response) {
             if (response.success) {
-                var message = '<strong>Database optimization completed!</strong><br><br>';
+                var message = \'<strong>Database optimization completed!</strong><br><br>\';
                 var hasResults = false;
 
                 $.each(response.data, function(table, indexes) {
                     if (Object.keys(indexes).length > 0) {
                         hasResults = true;
-                        message += '<strong>' + table.replace('_', ' ').toUpperCase() + ' TABLE:</strong><br>';
+                        message += \'<strong>\' + table.replace(\'_\', \' \').toUpperCase() + \' TABLE:</strong><br>\';
                         $.each(indexes, function(index_name, result) {
-                            var status = result.status === 'created' ? '✅' :
-                                result.status === 'exists' ? '✓' : '⚠️';
-                            message += status + ' ' + index_name + ': ' + result.message + '<br>';
+                            var status = result.status === \'created\' ? \'✅\' :
+                                result.status === \'exists\' ? \'✓\' : \'⚠️\';
+                            message += status + \' \' + index_name + \': \' + result.message + \'<br>\';
                         });
-                        message += '<br>';
+                        message += \'<br>\';
                     }
                 });
 
                 if (!hasResults) {
-                    message = '<strong>✅ Database optimization complete!</strong><br>All indexes are already optimized.';
+                    message = \'<strong>✅ Database optimization complete!</strong><br>All indexes are already optimized.\';
                 } else {
-                    message += '<em>Page will refresh in 3 seconds to show updated statistics...</em>';
+                    message += \'<em>Page will refresh in 3 seconds to show updated statistics...</em>\';
                     setTimeout(function() {
                         location.reload();
                     }, 3000);
                 }
 
-                $result.addClass('success').html(message).show();
+                $result.addClass(\'success\').html(message).show();
             } else {
-                $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
+                $result.addClass(\'error\').html(\'<strong>Error:</strong> \' + response.data).show();
             }
         }).fail(function() {
-            $result.addClass('error').html('<strong>Network error:</strong> Failed to optimize database. Please try again.').show();
+            $result.addClass(\'error\').html(\'<strong>Network error:</strong> Failed to optimize database. Please try again.\').show();
         }).always(function() {
-            $btn.prop('disabled', false).text('Optimize Database Performance');
+            $btn.prop(\'disabled\', false).text(\'Optimize Database Performance\');
         });
     });
 
-    $('#ace-refresh-cache-btn').on('click', function() {
+    $(\'#ace-refresh-cache-btn\').on(\'click\', function() {
         var $btn = $(this);
-        var $result = $('#ace-cache-result');
+        var $result = $(\'#ace-cache-result\');
 
-        $btn.prop('disabled', true).text('Refreshing...');
-        $result.hide().removeClass('success error info');
+        $btn.prop(\'disabled\', true).text(\'Refreshing...\');
+        $result.hide().removeClass(\'success error info\');
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_refresh_dashboard_cache',
+                action: \'ace_seo_refresh_dashboard_cache\',
                 nonce: adminNonce
             }
         }).done(function(response) {
             if (response.success) {
-                var message = '<strong>Cache refreshed successfully!</strong><br>';
-                message += 'Statistics: ' + response.data.stats.total_posts + ' posts, ';
-                message += response.data.stats.focus_keywords + ' with keywords, ';
-                message += response.data.stats.meta_descriptions + ' with descriptions<br>';
-                message += 'Recent posts cached: ' + response.data.recent_posts_count;
-                $result.addClass('success').html(message).show();
+                var message = \'<strong>Cache refreshed successfully!</strong><br>\';
+                message += \'Statistics: \' + response.data.stats.total_posts + \' posts, \';
+                message += response.data.stats.focus_keywords + \' with keywords, \';
+                message += response.data.stats.meta_descriptions + \' with descriptions<br>\';
+                message += \'Recent posts cached: \' + response.data.recent_posts_count;
+                $result.addClass(\'success\').html(message).show();
                 updateCacheStatusDisplay(response.data.cache_status);
             } else {
-                $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
+                $result.addClass(\'error\').html(\'<strong>Error:</strong> \' + response.data).show();
             }
         }).fail(function() {
-            $result.addClass('error').html('<strong>Network error:</strong> Failed to refresh cache.').show();
+            $result.addClass(\'error\').html(\'<strong>Network error:</strong> Failed to refresh cache.\').show();
         }).always(function() {
-            $btn.prop('disabled', false).text('Refresh Dashboard Cache');
+            $btn.prop(\'disabled\', false).text(\'Refresh Dashboard Cache\');
         });
     });
 
-    $('#ace-clear-cache-btn').on('click', function() {
+    $(\'#ace-clear-cache-btn\').on(\'click\', function() {
         var $btn = $(this);
-        var $result = $('#ace-cache-result');
+        var $result = $(\'#ace-cache-result\');
 
-        $btn.prop('disabled', true).text('Clearing...');
-        $result.hide().removeClass('success error info');
+        $btn.prop(\'disabled\', true).text(\'Clearing...\');
+        $result.hide().removeClass(\'success error info\');
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_seo_clear_dashboard_cache',
+                action: \'ace_seo_clear_dashboard_cache\',
                 nonce: adminNonce
             }
         }).done(function(response) {
             if (response.success) {
-                $result.addClass('success').html('<strong>Cache cleared successfully!</strong><br>' + response.data.note).show();
+                $result.addClass(\'success\').html(\'<strong>Cache cleared successfully!</strong><br>\' + response.data.note).show();
                 updateCacheStatusDisplay(response.data.cache_status);
             } else {
-                $result.addClass('error').html('<strong>Error:</strong> ' + response.data).show();
+                $result.addClass(\'error\').html(\'<strong>Error:</strong> \' + response.data).show();
             }
         }).fail(function() {
-            $result.addClass('error').html('<strong>Network error:</strong> Failed to clear cache.').show();
+            $result.addClass(\'error\').html(\'<strong>Network error:</strong> Failed to clear cache.\').show();
         }).always(function() {
-            $btn.prop('disabled', false).text('Clear Cache');
+            $btn.prop(\'disabled\', false).text(\'Clear Cache\');
         });
     });
 
-    $('#sitemap_purge_cache').on('click', function() {
+    $(\'#sitemap_purge_cache\').on(\'click\', function() {
         var $btn = $(this);
-        var $result = $('#sitemap-purge-result');
+        var $result = $(\'#sitemap-purge-result\');
         if (!$btn.length) return;
 
-        $btn.prop('disabled', true).text('Purging...');
-        $result.hide().removeClass('success error info');
+        $btn.prop(\'disabled\', true).text(\'Purging...\');
+        $result.hide().removeClass(\'success error info\');
 
         $.ajax({
             url: ajaxurl,
-            type: 'POST',
+            type: \'POST\',
             data: {
-                action: 'ace_sitemap_purge_cache',
+                action: \'ace_sitemap_purge_cache\',
                 nonce: sitemapPurgeNonce
             }
         }).done(function(response) {
             if (response.success) {
-                var message = '<strong>Sitemap cache cleared.</strong><br>New cache version: <code>' + response.data.cache_version + '</code>';
-                $result.addClass('success').html(message).show();
+                var message = \'<strong>Sitemap cache cleared.</strong><br>New cache version: <code>\' + response.data.cache_version + \'</code>\';
+                $result.addClass(\'success\').html(message).show();
             } else {
                 var errorMessage = response && response.data && response.data.message ? response.data.message : response.data;
-                $result.addClass('error').html('<strong>Error:</strong> ' + errorMessage).show();
+                $result.addClass(\'error\').html(\'<strong>Error:</strong> \' + errorMessage).show();
             }
         }).fail(function() {
-            $result.addClass('error').html('<strong>Network error:</strong> Failed to purge sitemap cache.').show();
+            $result.addClass(\'error\').html(\'<strong>Network error:</strong> Failed to purge sitemap cache.\').show();
         }).always(function() {
-            $btn.prop('disabled', false).text('Purge sitemap cache');
+            $btn.prop(\'disabled\', false).text(\'Purge sitemap cache\');
         });
     });
 
     function updateCacheStatusDisplay(cacheStatus) {
-        var $statusList = $('.ace-cache-status-list');
+        var $statusList = $(\'.ace-cache-status-list\');
         if (!$statusList.length) return;
 
-        var statusHtml = '<li>Statistics Cache: ';
+        var statusHtml = \'<li>Statistics Cache: \';
         if (cacheStatus.stats_cached) {
-            var ageText = cacheStatus.stats_age > 0 ? humanTimeDiff(cacheStatus.stats_age) + ' old' : 'just generated';
-            statusHtml += '✅ Active (' + ageText + ')';
+            var ageText = cacheStatus.stats_age > 0 ? humanTimeDiff(cacheStatus.stats_age) + \' old\' : \'just generated\';
+            statusHtml += \'✅ Active (\' + ageText + \')\';
         } else {
-            statusHtml += '⏳ Not generated yet - click "Refresh Dashboard Cache" to generate';
+            statusHtml += \'⏳ Not generated yet - click "Refresh Dashboard Cache" to generate\';
         }
-        statusHtml += '</li>';
+        statusHtml += \'</li>\';
 
-        statusHtml += '<li>Recent Posts Cache: ';
+        statusHtml += \'<li>Recent Posts Cache: \';
         if (cacheStatus.recent_cached) {
-            statusHtml += '✅ Active';
+            statusHtml += \'✅ Active\';
         } else {
-            statusHtml += '⏳ Not generated yet - will be created with statistics cache';
+            statusHtml += \'⏳ Not generated yet - will be created with statistics cache\';
         }
-        statusHtml += '</li>';
+        statusHtml += \'</li>\';
 
-        statusHtml += '<li>Cache Duration: ' + humanTimeDiff(cacheStatus.cache_duration) + '</li>';
+        statusHtml += \'<li>Cache Duration: \' + humanTimeDiff(cacheStatus.cache_duration) + \'</li>\';
 
         $statusList.html(statusHtml);
 
     }
 
     function humanTimeDiff(seconds) {
-        if (seconds < 60) return seconds + 's';
+        if (seconds < 60) return seconds + \'s\';
         var minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return minutes + 'm';
+        if (minutes < 60) return minutes + \'m\';
         var hours = Math.floor(minutes / 60);
-        if (hours < 24) return hours + 'h';
+        if (hours < 24) return hours + \'h\';
         var days = Math.floor(hours / 24);
-        return days + 'd';
+        return days + \'d\';
     }
 });
-</script>
+' ); ?>
 
-<script>
-// Fallback initializer: if main admin JS fails to bind tabs.
-(function(){
-    if (window.AceCrawlEnhancerAdminFallbackApplied) return;
-    window.AceCrawlEnhancerAdminFallbackApplied = true;
-
-    var tabs = document.querySelectorAll('.ace-redis-sidebar .nav-tab');
-    if (!tabs.length) return;
-
-    function updateSubnav(tabId) {
-        var subnavBlocks = document.querySelectorAll('.ace-redis-sidebar .ace-tab-subnav');
-        subnavBlocks.forEach(function(block){
-            block.classList.remove('active');
-        });
-        var activeBlock = document.querySelector('.ace-redis-sidebar .ace-tab-subnav[data-tab="' + tabId + '"]');
-        if (activeBlock) activeBlock.classList.add('active');
-    }
-
-    function setActiveSubtabLink(tabId, sectionId) {
-        document.querySelectorAll('.ace-subtab-link').forEach(function(link){
-            link.classList.remove('is-active');
-        });
-
-        if (!tabId || !sectionId) return;
-
-        var activeLink = document.querySelector('.ace-subtab-link[data-target-tab="' + tabId + '"][data-target-group="' + sectionId + '"]');
-        if (activeLink) activeLink.classList.add('is-active');
-    }
-
-    function activateTab(targetHash) {
-        if (!targetHash || targetHash.charAt(0) !== '#') return;
-
-        document.querySelectorAll('.ace-redis-sidebar .nav-tab').forEach(function(t){
-            t.classList.remove('nav-tab-active');
-        });
-
-        var activeTab = document.querySelector('.ace-redis-sidebar .nav-tab[href="' + targetHash + '"]');
-        if (activeTab) activeTab.classList.add('nav-tab-active');
-
-        document.querySelectorAll('.tab-content').forEach(function(panel){
-            panel.classList.remove('active');
-        });
-
-        var panel = document.querySelector(targetHash);
-        if (panel) panel.classList.add('active');
-
-        updateSubnav(targetHash.replace('#', ''));
-        setActiveSubtabLink('', '');
-
-        if (history && history.replaceState) {
-            history.replaceState(null, '', targetHash);
-        }
-    }
-
-    function activateSubSection(tabId, sectionId) {
-        var tabHash = '#' + tabId;
-        activateTab(tabHash);
-
-        if (!sectionId) return;
-
-        var section = document.getElementById(sectionId);
-        if (section) {
-            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-
-        setActiveSubtabLink(tabId, sectionId);
-
-        if (history && history.replaceState) {
-            history.replaceState(null, '', tabHash + '/' + sectionId);
-        }
-    }
-
-    var anyActive = document.querySelector('.tab-content.active');
-    if (!anyActive) {
-        var first = tabs[0];
-        var firstHref = first.getAttribute('href');
-        if (firstHref) {
-            activateTab(firstHref);
-        }
-    } else {
-        var activeTab = document.querySelector('.ace-redis-sidebar .nav-tab.nav-tab-active');
-        if (activeTab) {
-            updateSubnav((activeTab.getAttribute('href') || '').replace('#', ''));
-        }
-    }
-
-    tabs.forEach(function(tab){
-        tab.addEventListener('click', function(e){
-            if (e.defaultPrevented) return;
-            e.preventDefault();
-            activateTab(tab.getAttribute('href'));
-        });
-    });
-
-    document.querySelectorAll('.ace-subtab-link').forEach(function(link){
-        link.addEventListener('click', function(e){
-            e.preventDefault();
-            var tabId = link.getAttribute('data-target-tab');
-            var sectionId = link.getAttribute('data-target-group');
-            if (!tabId) return;
-            activateSubSection(tabId, sectionId);
-        });
-    });
-
-    var hash = window.location.hash || '';
-    if (hash.indexOf('/') > -1) {
-        var parts = hash.replace('#', '').split('/');
-        if (parts.length >= 1 && parts[0]) {
-            activateSubSection(parts[0], parts[1] || '');
-        }
-    } else if (hash) {
-        activateTab(hash);
-    }
-})();
-</script>
+<?php AceSeoAssets::script( 'ace-seo-settings-script-3', 'assets/js/ace-seo-settings-script-3.js' ); ?>

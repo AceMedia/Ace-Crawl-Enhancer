@@ -164,21 +164,7 @@ final class Ace_SEO_Retention_Evidence_View {
         $tiers = array_merge( AceSeoRetentionReport::tier_labels(), array( 'unknown' => 'Not ready to judge' ) );
         $action_tools = array( 'consolidate' => 'redirect', 'noindex' => 'noindex' );
         ?>
-        <style>
-        .ace-evidence-reference td,.ace-evidence-reference th{vertical-align:top;padding:12px;min-width:145px}
-        .ace-evidence-reference .ace-evidence-quiet{background:#f0f0f1;color:#50575e}
-        .ace-evidence-reference .ace-evidence-review{background:#fff8e5;color:#3c2c00}
-        .ace-evidence-reference .ace-evidence-useful{background:#edf5ee;color:#274a30}
-        .ace-evidence-reference .ace-evidence-uncertain{background:#f6f7f7;color:#50575e;border:1px solid #dcdcde}
-        .ace-evidence-status{display:inline-block;padding:5px 8px;border-radius:3px;background:#fff8e5;color:#3c2c00}
-        .ace-evidence-status.ace-evidence-uncertain{background:#f6f7f7;color:#50575e;border:1px solid #646970}
-        .ace-evidence-status.ace-evidence-useful{background:#edf5ee;color:#274a30}
-        .ace-evidence-reference small{display:block;margin-top:5px;line-height:1.5}
-        .ace-evidence-badge{display:inline-block;padding:3px 7px;border:1px solid #135e96;border-radius:3px;background:#eaf3fb;color:#12466b;font-size:12px;line-height:1.4;margin-top:6px}
-        .ace-evidence-planned{display:inline-block;padding:3px 7px;border:1px solid #6b4388;border-radius:3px;background:#f5eefb;color:#56356d;font-size:12px;line-height:1.4;margin-top:6px}
-        .ace-evidence-legend{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
-        .ace-evidence-legend span{padding:5px 9px;border:1px solid #8c8f94;border-radius:3px;color:#3c434a}
-        </style>
+        <?php AceSeoAssets::style( 'ace-seo-retention-evidence-view-style-1', 'assets/css/ace-seo-retention-evidence-view-style-1.css' ); ?>
         <section id="retention-evidence"><h2>Which next steps fit?</h2>
         <p>The group tells us what we know about an article. The next step tells us what might help. Use this guide to see how they fit together.</p>
         <div class="ace-evidence-legend" aria-label="Reference table key"><span style="background:#f0f0f1">— No change needed / not a good fit</span><span style="background:#edf5ee">✓ Still useful</span><span style="background:#fff8e5">△ Worth a look</span><span style="background:#ffdfb8">! A confirmed problem needs attention</span><span style="background:#f6f7f7">? We need more information</span></div>
