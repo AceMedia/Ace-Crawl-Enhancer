@@ -249,7 +249,7 @@ class AceSeoWhiteHat {
             $data['status']    = 'yes';
             $data['method']    = 'rules';
             $data['reasons'][] = 'No promotional links and no trigger words.';
-        } elseif ( 'none' === $o['provider'] || '' === $o['api_key'] ) {
+        } elseif ( 'none' === $o['provider'] || ( 'wordpress' !== $o['provider'] && '' === $o['api_key'] ) ) {
             $cta               = self::matches_any( $excerpt, self::lines( $o['cta_patterns'] ) );
             $data['status']    = $cta ? 'no' : 'yes';
             $data['method']    = 'rules';
@@ -264,7 +264,7 @@ class AceSeoWhiteHat {
             } else {
                 $data['status']  = $ai['white_hat'] ? 'yes' : 'no';
                 $data['method']  = 'ai';
-                $data['model']   = $o['model'];
+                $data['model']   = 'wordpress' === $o['provider'] ? 'wordpress' : $o['model'];
                 $data['reasons'] = array_slice( array_map( 'sanitize_text_field', (array) $ai['reasons'] ), 0, 5 );
             }
         }
@@ -303,6 +303,15 @@ class AceSeoWhiteHat {
         $pre = apply_filters( 'pre_ace_seo_whitehat_ai', null, $input, $post, $o );
         if ( null !== $pre ) {
             return is_wp_error( $pre ) ? $pre : array( 'white_hat' => ! empty( $pre['white_hat'] ), 'reasons' => (array) ( $pre['reasons'] ?? array() ) );
+        }
+        if ( 'wordpress' === $o['provider'] ) {
+            $service = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+            if ( ! $service || ! method_exists( $service, 'wordpress_text' ) ) {
+                return new WP_Error( 'ace_seo_whitehat_core', 'Configure the WordPress AI connection first.' );
+            }
+            $answer = $service->wordpress_text( array( array( 'role' => 'system', 'content' => self::instruction() ), array( 'role' => 'user', 'content' => $input ) ) );
+            if ( is_wp_error( $answer ) ) { return $answer; }
+            return self::parse_ai_reply( $answer['message'] );
         }
         if ( '' === $o['model'] ) {
             return new WP_Error( 'ace_seo_whitehat_model', 'No AI model is set (Ace SEO, White hat).' );
@@ -367,6 +376,10 @@ class AceSeoWhiteHat {
             $text = (string) ( $body['choices'][0]['message']['content'] ?? '' );
         }
 
+        return self::parse_ai_reply( $text );
+    }
+
+    private static function parse_ai_reply( $text ) {
         if ( ! preg_match( '/\{.*\}/s', $text, $json ) ) {
             return new WP_Error( 'ace_seo_whitehat_parse', 'The AI reply was not JSON.' );
         }
@@ -429,7 +442,7 @@ class AceSeoWhiteHat {
         $clean   = array(
             'enabled'       => ! empty( $in['enabled'] ) ? 1 : 0,
             'post_types'    => array_values( array_filter( array_map( 'sanitize_key', (array) ( $in['post_types'] ?? array( 'post' ) ) ), 'post_type_exists' ) ),
-            'provider'      => in_array( $in['provider'] ?? '', array( 'none', 'anthropic', 'openai' ), true ) ? $in['provider'] : 'none',
+            'provider'      => in_array( $in['provider'] ?? '', array( 'none', 'wordpress', 'anthropic', 'openai' ), true ) ? $in['provider'] : 'none',
             'model'         => sanitize_text_field( (string) ( $in['model'] ?? '' ) ),
             // A blank key field keeps the saved key; the word "clear" removes it.
             'api_key'       => 'clear' === trim( (string) ( $in['api_key'] ?? '' ) ) ? '' : ( '' !== trim( (string) ( $in['api_key'] ?? '' ) ) ? sanitize_text_field( $in['api_key'] ) : (string) ( $current['api_key'] ?? '' ) ),
@@ -503,7 +516,8 @@ class AceSeoWhiteHat {
                     <tr><th scope="row">Promotion blocks</th><td><input type="text" name="bet_blocks" value="<?php echo esc_attr( $o['bet_blocks'] ); ?>" class="regular-text" placeholder="vendor/offer-banner"> with the event time in the attribute <input type="text" name="event_attr" value="<?php echo esc_attr( $o['event_attr'] ); ?>" style="width:9em"> , rechecked <input type="number" name="grace_hours" min="0" max="168" value="<?php echo esc_attr( (int) $o['grace_hours'] ); ?>" style="width:4em"> hours after it
                         <p class="description">Block names, comma separated. When the latest event in a post has passed, the post is rendered again, so banners that have dropped off are no longer counted.</p></td></tr>
                     <tr><th scope="row">AI provider</th><td>
-                        <select name="provider"><?php foreach ( array( 'none' => 'None: rules only', 'anthropic' => 'Anthropic (Claude)', 'openai' => 'OpenAI' ) as $k => $l ) : ?><option value="<?php echo esc_attr( $k ); ?>" <?php selected( $o['provider'], $k ); ?>><?php echo esc_html( $l ); ?></option><?php endforeach; ?></select>
+                        <select name="provider"><?php foreach ( array( 'none' => 'None: rules only', 'wordpress' => 'WordPress AI Client (recommended)', 'anthropic' => 'Anthropic (Claude)', 'openai' => 'OpenAI' ) as $k => $l ) : ?><option value="<?php echo esc_attr( $k ); ?>" <?php selected( $o['provider'], $k ); ?>><?php echo esc_html( $l ); ?></option><?php endforeach; ?></select>
+                        <p>WordPress AI uses the provider and model in WordPress settings. Enable text in the shared Ace AI connection before selecting it here. The model and key below apply only to direct Anthropic or OpenAI connections.</p>
                         <label>Model <input type="text" name="model" value="<?php echo esc_attr( $o['model'] ); ?>" class="regular-text" placeholder="claude-opus-5"></label>
                         <p><label>API key <input type="password" name="api_key" value="" autocomplete="new-password" class="regular-text" placeholder="<?php echo esc_attr( '' !== $o['api_key'] ? 'Saved (leave blank to keep, type clear to remove)' : 'Not set' ); ?>"></label></p>
                         <p class="description">Or define <code>ACE_SEO_WHITEHAT_API_KEY</code> in wp-config.php. Up to <input type="number" name="max_chars" min="200" max="20000" value="<?php echo esc_attr( (int) $o['max_chars'] ); ?>" style="width:6em"> characters of matching sentences are sent per check.</p>

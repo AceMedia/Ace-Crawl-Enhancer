@@ -178,7 +178,7 @@ class AceSEOApiHelper {
         $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
         if ( $shared && $shared->subscription_selected() ) {
             $result = self::make_openai_request( "Say 'Hello, this is a test' in exactly those words." );
-            return is_wp_error( $result ) ? $result : 'ChatGPT connection successful. Response: ' . substr( $result, 0, 100 );
+            return is_wp_error( $result ) ? $result : 'AI connection successful. Response: ' . substr( $result, 0, 100 );
         }
         $api_key = self::get_openai_key();
         
@@ -295,7 +295,7 @@ class AceSEOApiHelper {
     public static function make_openai_request( $prompt, $model = 'gpt-3.5-turbo', $enable_web_search = false ) {
         $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
         if ( $shared && $shared->subscription_selected() ) {
-            if ( $enable_web_search ) { return new WP_Error( 'ace_ai_subscription_web_search', 'Web search is not enabled for this subscription text connection.' ); }
+            if ( $enable_web_search ) { return new WP_Error( 'ace_ai_subscription_web_search', 'Web search is not enabled for the selected text connection.' ); }
             $result = $shared->subscription_text( array( array( 'role' => 'user', 'content' => $prompt ) ), $model );
             return is_wp_error( $result ) ? $result : $result['message'];
         }

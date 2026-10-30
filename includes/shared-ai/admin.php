@@ -22,6 +22,10 @@ final class Admin {
 		wp_send_json_success( $status );
 	}
 	private static function codex_section( Service $service, bool $network, array $record ) {
+		if ( 'wordpress' === ( $record['provider'] ?? '' ) ) {
+			?><p>WordPress AI is selected. To use ChatGPT instead, select this scope’s own connection and save before signing in.</p><?php
+			return;
+		}
 		if ( ! $service->codex_available() ) {
 			?><h2>Sign in with ChatGPT</h2><p>Signing in from this screen needs a Codex runner supplied by your host through the <code>ace_ai_codex_runner</code> filter. See <code>docs/SHARED-AI-CONNECTION.md</code>.</p><?php
 			return;
@@ -39,7 +43,7 @@ final class Admin {
 			<li>Enter this one-time code (it expires in 15 minutes):<br><code style="font-size:1.6em;letter-spacing:.08em"><?php echo esc_html( $status['code'] ); ?></code></li></ol>
 			<p id="ace-ai-codex-wait">Waiting for approval… this page updates by itself once the code is accepted.</p>
 			<form method="post" style="display:inline"><?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?><input type="hidden" name="intent" value="codex_cancel"><?php submit_button( 'Cancel sign-in', 'secondary', 'submit', false ); ?></form>
-			<script>(function(){var u=<?php echo wp_json_encode( add_query_arg( array( 'action' => 'ace_ai_codex_status', 'network' => $network ? 1 : 0, '_wpnonce' => wp_create_nonce( 'ace-ai-codex-status-' . ( $network ? 'network' : 'site' ) ) ), admin_url( 'admin-ajax.php' ) ) ); ?>;function tick(){fetch(u,{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){var d=j&&j.data||{};if(d.connected){location.reload();return;}if(!d.pending){document.getElementById('ace-ai-codex-wait').textContent=d.error||'The code expired or the sign-in was cancelled. Start again.';return;}setTimeout(tick,4000);}).catch(function(){setTimeout(tick,8000);});}setTimeout(tick,4000);})();</script><?php
+			<?php \AceSeoAssets::inline_script( 'ace-seo-admin-script-1', '(function(){var u=' . (wp_json_encode( add_query_arg( array( 'action' => 'ace_ai_codex_status', 'network' => $network ? 1 : 0, '_wpnonce' => wp_create_nonce( 'ace-ai-codex-status-' . ( $network ? 'network' : 'site' ) ) ), admin_url( 'admin-ajax.php' ) ) )) . ';function tick(){fetch(u,{credentials:\'same-origin\'}).then(function(r){return r.json()}).then(function(j){var d=j&&j.data||{};if(d.connected){location.reload();return;}if(!d.pending){document.getElementById(\'ace-ai-codex-wait\').textContent=d.error||\'The code expired or the sign-in was cancelled. Start again.\';return;}setTimeout(tick,4000);}).catch(function(){setTimeout(tick,8000);});}setTimeout(tick,4000);})();' ); ?><?php
 		} elseif ( ! empty( $status['pending'] ) ) {
 			?><p id="ace-ai-codex-wait">Codex is requesting a sign-in code… <a href="">Refresh</a> in a few seconds.</p><?php
 		} else {
@@ -82,7 +86,7 @@ final class Admin {
 			if ( ! is_wp_error( $result ) && 'settings' === $intent && $service->subscription_key_missing( $network ) ) { $message = 'Saved. Images and voice are ticked but need an OpenAI API key alongside the ChatGPT sign-in: add one above and save again.'; }
 		}
 		$record = $network ? get_network_option( get_current_network_id(), Service::OPTION, array() ) : get_option( Service::OPTION, array() );
-		$mode = $record['mode'] ?? ( is_multisite() && ! $network ? 'inherit' : 'own' );
+		$mode = 'wordpress' === ( $record['provider'] ?? '' ) ? 'wordpress' : ( $record['mode'] ?? ( is_multisite() && ! $network ? 'inherit' : ( function_exists( 'wp_ai_client_prompt' ) ? 'wordpress' : 'own' ) ) );
 		$status = $network ? Service::resolve_records( $record, null, false, time() ) : $service->status();
 		if ( $network ) { $status['scope'] = 'network'; }
 		$features = $record['features'] ?? array( 'text' );
@@ -99,9 +103,11 @@ final class Admin {
 		<?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?>
 		<p><label for="ace-ai-mode">Connection</label><br><select id="ace-ai-mode" name="connection_mode">
 		<?php if ( is_multisite() && ! $network ) { ?><option value="inherit" <?php selected( $mode, 'inherit' ); ?>>Use the network connection</option><?php } ?>
+		<option value="wordpress" <?php selected( $mode, 'wordpress' ); ?>>WordPress AI Client (recommended for text)</option>
 		<option value="own" <?php selected( $mode, 'own' ); ?>><?php echo esc_html( $network ? 'Use this network connection' : 'Use this site’s own connection' ); ?></option>
 		<option value="disabled" <?php selected( $mode, 'disabled' ); ?>>Switch AI off</option></select></p>
-		<h2>OpenAI API key</h2><p><?php echo esc_html( $signed_in ? 'Your ChatGPT sign-in provides text. Add an API key here as well to allow image generation and voice, which are separately billed, then tick them below.' : 'This is separately billed API access. It does not use a ChatGPT subscription.' ); ?></p>
+		<p>WordPress AI uses the provider and model configured in WordPress. Save this choice and enable text to authorise selected writing prompts and content to be sent there. It requires a supported WordPress version and a configured text provider. Existing explicit connections are kept until you change them. Images and voice need a separate OpenAI connection.</p>
+		<h2>Alternative: OpenAI API key</h2><p><?php echo esc_html( $signed_in ? 'Your ChatGPT sign-in provides text. Add an API key here as well to allow image generation and voice, which are separately billed, then tick them below.' : 'This is separately billed API access. It does not use a ChatGPT subscription.' ); ?></p>
 		<p><label for="ace-ai-key">API key</label><br><input class="regular-text" type="password" id="ace-ai-key" name="api_key" value="" autocomplete="new-password"><br>Leave blank to keep this scope’s saved key. Keys are never shown here.</p>
 		<fieldset><legend>Allow this connection to provide</legend>
 		<?php foreach ( array( 'text' => 'Text suggestions', 'images' => 'Image generation', 'audio' => 'Voice and transcription' ) as $feature => $label ) { ?>
