@@ -3,6 +3,7 @@
 if ( PHP_SAPI !== 'cli' || '1' !== getenv( 'ACE_SEO_REDIRECT_TESTS' ) || empty( $argv[1] ) ) { exit( "Disposable WordPress opt-in required.\n" ); }
 require $argv[1];
 if ( 'Ace Redirect Tests' !== get_option( 'blogname' ) ) { exit( "Disposable Ace Redirect Tests site required.\n" ); }
+require_once dirname( __DIR__ ) . '/includes/admin/class-ace-seo-metabox.php';
 $original_user = get_current_user_id();
 $original_post = $_POST;
 $taxonomy = 'ace_review_private';
