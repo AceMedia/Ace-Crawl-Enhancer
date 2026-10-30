@@ -10,7 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 ROOT = Path(__file__).resolve().parents[1]
 SLUG = "ace-crawl-enhancer"
 FILES = json.loads((ROOT / "scripts/release-files.json").read_text())
-VERSION = "1.0.93"
+VERSION = "1.0.94"
 
 if len(FILES) != len(set(FILES)):
     raise SystemExit("Duplicate path in release manifest")
