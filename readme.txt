@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.94
+Stable tag: 1.0.95
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,10 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.95 =
+* Keep password-protected, private and preview content out of public descriptions, social metadata and structured data.
+
 
 = 1.0.94 =
 * Load interface assets through WordPress and keep notices on relevant screens.

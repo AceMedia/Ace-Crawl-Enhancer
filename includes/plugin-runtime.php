@@ -17,6 +17,21 @@ define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibi
 class AceCrawlEnhancer {
     
     /**
+     * Public metadata must never depend on a visitor's password or capabilities.
+     * Otherwise a cache or crawler can retain content from a restricted post.
+     */
+    public static function current_request_has_public_metadata() {
+        if ( is_preview() ) {
+            return false;
+        }
+        $post = get_queried_object();
+        if ( $post instanceof WP_Post ) {
+            return '' === (string) $post->post_password && is_post_publicly_viewable( $post );
+        }
+        return ! is_singular();
+    }
+
+    /**
      * Single instance of the plugin
      */
     private static $instance = null;
@@ -1923,6 +1938,9 @@ class AceCrawlEnhancer {
      * Filter document title
      */
     public function filter_document_title_parts($title_parts) {
+        if ( ! self::current_request_has_public_metadata() ) {
+            return $title_parts;
+        }
         if (is_home() || is_front_page()) {
             if (isset($title_parts['tagline'])) {
                 $title_parts['tagline'] = '';
@@ -2050,6 +2068,9 @@ class AceCrawlEnhancer {
      * Output meta description
      */
     public function output_meta_description() {
+        if ( ! self::current_request_has_public_metadata() ) {
+            return;
+        }
         $meta_desc = '';
         $context   = '';
         if (is_singular()) {
@@ -2861,6 +2882,9 @@ class AceCrawlEnhancer {
     }
 
     public function output_opengraph_tags() {
+        if ( ! self::current_request_has_public_metadata() ) {
+            return;
+        }
         // A static front page is also "singular"; let it fall through to the
         // homepage branch so it gets og:type=website (not article).
         if (is_singular() && ! is_front_page()) {
@@ -3021,6 +3045,9 @@ class AceCrawlEnhancer {
      * Output Twitter Card tags
      */
     public function output_twitter_tags() {
+        if ( ! self::current_request_has_public_metadata() ) {
+            return;
+        }
         if (is_singular()) {
             global $post;
             
@@ -3221,6 +3248,9 @@ class AceCrawlEnhancer {
      * Filter title (legacy compatibility)
      */
     public function filter_title($title) {
+        if ( ! self::current_request_has_public_metadata() ) {
+            return $title;
+        }
         // Legacy wp_title support for themes still using it; keep in sync with document_title_parts logic.
         if (is_home() || is_front_page()) {
             $home_title = $this->get_homepage_title();

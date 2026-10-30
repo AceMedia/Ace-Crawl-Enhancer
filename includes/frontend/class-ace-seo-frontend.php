@@ -80,6 +80,9 @@ class AceSeoFrontend {
     }
 
     public function output_schema_markup() {
+        if ( ! AceCrawlEnhancer::current_request_has_public_metadata() ) {
+            return;
+        }
         $graph = [];
         $publisher = $this->get_publisher_schema();
         $publisher_ref = !empty($publisher['@id']) ? ['@id' => $publisher['@id']] : null;
