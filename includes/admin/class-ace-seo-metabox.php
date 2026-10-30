@@ -723,7 +723,7 @@ class AceSEOMetabox {
         }
         
         // Check user permissions
-        if ( ! current_user_can( 'manage_categories' ) ) {
+        if ( ! current_user_can( 'edit_term', $term_id ) ) {
             return;
         }
         
