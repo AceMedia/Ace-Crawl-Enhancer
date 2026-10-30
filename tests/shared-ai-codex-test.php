@@ -108,7 +108,9 @@ check( is_wp_error( $net->save( 'own', 'not-a-key', array( 'images' ), true ) ),
 check( 'codex' === $GLOBALS['network_records'][1][ Service::OPTION ]['provider'], 'Sign-in survives a bad key' );
 check( true !== $net->disconnect_subscription( true ) || true, 'Sign-out' );
 check( 'disabled' === $GLOBALS['network_records'][1][ Service::OPTION ]['mode'] && ! empty( $GLOBALS['network_records'][1][ Service::OPTION ]['api_secret'] ), 'Sign-out keeps the API key for the next account' );
-file_put_contents( $state, 'connected' ); // the next account signs in
+file_put_contents( $state, 'connected' ); // The runner still has a session, but polling must not reconnect it.
+check( empty( $net->codex_login_status( true )['saved'] ) && 'disabled' === $site->status()['status'], 'Status polling honours an explicit disconnect' );
+$net->codex_login_start( true ); // An explicit sign-in authorises the next account.
 check( ! empty( $net->codex_login_status( true )['saved'] ) && 'sk-hybrid' === $site->api_key( 'images' ), 'Next sign-in carries the key and features over' );
 // Signing in on a scope that already had an API-key connection keeps that key for images and voice.
 $GLOBALS['network_records'] = array();

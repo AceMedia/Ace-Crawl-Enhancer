@@ -73,3 +73,8 @@ check( 'Editor suggestion' === AceSEOApiHelper::make_openai_request( 'Suggest a 
 $GLOBALS['core_supported'] = false;
 check( is_wp_error( AceSEOApiHelper::make_openai_request( 'Suggest a title' ) ), 'Editor helper returns unavailable core provider without direct HTTP' );
 echo "Editor core integration checks passed\n";
+
+$s->save( 'disabled', '', array() );
+$adopt->invoke( $s, array( 'connected' => true, 'account' => 'stale session' ), false );
+check( 'disabled' === $s->status()['status'], 'Polling an old Codex session cannot undo explicit AI disable' );
+echo "Disabled connection consent checks passed\n";

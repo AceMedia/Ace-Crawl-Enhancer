@@ -201,8 +201,13 @@ final class Service {
 	public function codex_login_start( bool $network = false ) {
 		if ( ! current_user_can( $network ? 'manage_network_options' : 'manage_options' ) || ( $network && ! is_multisite() ) ) { return new \WP_Error( 'ace_ai_forbidden', 'You cannot change this connection.' ); }
 		$record = $network ? get_network_option( get_current_network_id(), self::OPTION, array() ) : get_option( self::OPTION, array() );
-		if ( 'wordpress' === ( $record['provider'] ?? '' ) ) { return new \WP_Error( 'ace_ai_explicit_connection', 'Switch from WordPress AI to this scope’s own connection before signing in with ChatGPT.' ); }
+		if ( 'wordpress' === ( $record['provider'] ?? '' ) ) { return new \WP_Error( 'ace_ai_explicit_connection', 'Select this scope’s own connection and save before signing in with ChatGPT.' ); }
 		$status = $this->codex_run( 'login-start', $this->codex_scope( $network ), '', 75 );
+		if ( ! is_wp_error( $status ) && 'disabled' === ( $record['mode'] ?? '' ) && ( ! empty( $status['pending'] ) || ! empty( $status['connected'] ) ) ) {
+			// An explicit sign-in authorises reconnecting; a status poll alone never does.
+			$record['mode'] = 'own';
+			if ( $network ) { update_network_option( get_current_network_id(), self::OPTION, $record ); } else { update_option( self::OPTION, $record, false ); }
+		}
 		return is_wp_error( $status ) ? $status : $this->codex_adopt( $status, $network );
 	}
 	public function codex_login_cancel( bool $network = false ) {
@@ -218,8 +223,8 @@ final class Service {
 	private function codex_adopt( array $status, bool $network ): array {
 		$record = $network ? get_network_option( get_current_network_id(), self::OPTION, array() ) : get_option( self::OPTION, array() );
 		$record = is_array( $record ) ? $record : array();
-		if ( 'wordpress' === ( $record['provider'] ?? '' ) ) {
-			return array( 'connected' => false, 'pending' => false, 'saved' => false, 'error' => 'WordPress AI is selected. The existing ChatGPT session was not adopted.' );
+		if ( 'wordpress' === ( $record['provider'] ?? '' ) || 'disabled' === ( $record['mode'] ?? '' ) ) {
+			return array( 'connected' => false, 'pending' => false, 'saved' => false, 'error' => 'The saved connection choice prevents adopting this ChatGPT session.' );
 		}
 		if ( ! empty( $status['connected'] ) && 'codex' !== ( $record['provider'] ?? '' ) ) {
 			$previous = $record;
