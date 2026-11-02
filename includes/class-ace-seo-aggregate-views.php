@@ -57,7 +57,9 @@ class AceSeoAggregateViews {
         $origin = untrailingslashit( (string) $request->get_header( 'origin' ) );
         $home = wp_parse_url( home_url() );
         $expected = $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
-        return self::enabled() && $origin === $expected
+        // The beacon's no-referrer policy makes browsers following the Fetch spec, such as Safari,
+        // send "Origin: null". Sec-Fetch-Site still proves the request came from our own page.
+        return self::enabled() && ( $origin === $expected || 'null' === $origin )
             && 'same-origin' === $request->get_header( 'sec-fetch-site' )
             && strlen( $request->get_body() ) <= 32;
     }
