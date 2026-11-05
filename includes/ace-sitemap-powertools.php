@@ -3717,7 +3717,7 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
             }
             $m = $page_lastmods[ $post_type ][ $page - 1 ] ?? '';
             if ( $m && '0000-00-00 00:00:00' !== $m ) {
-                $cache[ $key ] = mysql2date( 'c', $m );
+                $cache[ $key ] = get_date_from_gmt( $m, 'c' );
                 return $cache[ $key ];
             }
         }
@@ -3726,7 +3726,7 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
     if ( $post_type ) {
         $lastmod = get_lastpostmodified( 'GMT', $post_type );
         if ( $lastmod ) {
-            $cache[ $key ] = mysql2date( 'c', $lastmod );
+            $cache[ $key ] = get_date_from_gmt( $lastmod, 'c' );
             ace_sitemap_powertools_cache_set( $persistent_key, $cache[ $key ] );
             return $cache[ $key ];
         }
