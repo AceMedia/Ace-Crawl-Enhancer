@@ -61,3 +61,5 @@ asset_check( false !== strpos( $filtered, 'content="body"' ) && false !== strpos
 asset_check( $before === ob_get_level(), 'Filtering never opens or closes another component buffer.' );
 $fragment = '<p>No head</p>';
 asset_check( $fragment === $frontend->filter_head_output( $fragment ), 'Fragments remain untouched.' );
+$huge = '<!doctype html><html><head><title>x</title><script>' . str_repeat( 'a ', 1500000 ) . '</script></head><body>kept</body></html>';
+asset_check( $huge === $frontend->filter_head_output( $huge ), 'A head past the backtrack limit keeps the page.' );

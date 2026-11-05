@@ -54,29 +54,40 @@ class AceSeoFrontend {
      */
     public function filter_head_output($html) {
         // Leave streamed responses, non-HTML and third-party markup without our tags alone.
-        return preg_replace_callback( '/<head\b[^>]*>.*?<\/head>/is', static function ( $head_match ) {
-            $head = $head_match[0];
-            foreach ( array( 'title', 'description' ) as $property ) {
-                $pattern = '/<meta\b[^>]*\bproperty=["\']og:' . $property . '["\'][^>]*>/i';
-                $canonical = null;
-                if ( preg_match_all( $pattern, $head, $tags ) ) {
-                    foreach ( $tags[0] as $tag ) {
-                        if ( preg_match( '/\bdata-ace-seo=["\']1["\']/i', $tag ) ) {
-                            $canonical = preg_replace( '/\s+data-ace-seo=["\']1["\']/i', '', $tag );
-                            break;
-                        }
+        // Found by position, not one regex over the head: a head past pcre.backtrack_limit made
+        // preg_replace_callback return null, which emptied the whole page.
+        if ( ! is_string( $html ) || ! preg_match( '/<head\b[^>]*>/i', $html, $open, PREG_OFFSET_CAPTURE ) ) {
+            return $html;
+        }
+        $start = $open[0][1];
+        $close = stripos( $html, '</head>', $start );
+        if ( false === $close ) {
+            return $html;
+        }
+        $length   = $close + 7 - $start;
+        $original = substr( $html, $start, $length );
+        $head     = $original;
+        foreach ( array( 'title', 'description' ) as $property ) {
+            $pattern = '/<meta\b[^>]*\bproperty=["\']og:' . $property . '["\'][^>]*>/i';
+            $canonical = null;
+            if ( preg_match_all( $pattern, $head, $tags ) ) {
+                foreach ( $tags[0] as $tag ) {
+                    if ( preg_match( '/\bdata-ace-seo=["\']1["\']/i', $tag ) ) {
+                        $canonical = preg_replace( '/\s+data-ace-seo=["\']1["\']/i', '', $tag );
+                        break;
                     }
                 }
-                if ( null === $canonical ) {
-                    continue;
-                }
-                $head = preg_replace( $pattern, '', $head );
-                $head = preg_replace_callback( '/<\/head>/i', static function () use ( $canonical ) {
-                    return $canonical . "\n</head>";
-                }, $head, 1 );
             }
-            return $head;
-        }, $html, 1 );
+            if ( null === $canonical ) {
+                continue;
+            }
+            $without = preg_replace( $pattern, '', $head );
+            if ( null === $without ) {
+                continue;
+            }
+            $head = substr( $without, 0, -7 ) . $canonical . "\n</head>";
+        }
+        return $head === $original ? $html : substr_replace( $html, $head, $start, $length );
     }
 
     public function output_schema_markup() {
