@@ -422,6 +422,13 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         }
     }
 
+    // A more specific rewrite rule (a plugin's own route, such as /results/ for racing results)
+    // already mapped this path to a different page: that rule wins over a tag of the same slug.
+    // WordPress's catch-all page rule maps /slug/ to pagename=slug, which still falls through.
+    if ( ! empty( $query_vars['pagename'] ) && sanitize_title( basename( (string) $query_vars['pagename'] ) ) !== $slug ) {
+        return $query_vars;
+    }
+
     if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) ) {
         return $query_vars;
     }
