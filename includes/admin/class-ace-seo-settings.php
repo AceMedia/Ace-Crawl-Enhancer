@@ -394,6 +394,7 @@ class AceSEOSettings {
         $options['general']['site_name'] = sanitize_text_field(wp_unslash($_POST['site_name'] ?? ''));
         $options['general']['home_title'] = sanitize_text_field(wp_unslash($_POST['home_title'] ?? ''));
         $options['general']['home_description'] = sanitize_textarea_field(wp_unslash($_POST['home_description'] ?? ''));
+        $options['general']['capitalise_names'] = !empty($_POST['capitalise_names']) ? 1 : 0;
         
         // Update template settings
         $options['templates']['title_template_post'] = sanitize_text_field(wp_unslash($_POST['title_template_post'] ?? ''));

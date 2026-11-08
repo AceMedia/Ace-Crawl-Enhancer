@@ -12,6 +12,22 @@ define('ACE_SEO_META_PREFIX', '_ace_seo_');
 define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibility with existing templates
 
 /**
+ * A term or archive name as titles and breadcrumbs show it. With "Capitalise names" on (Settings >
+ * General), a name stored in lower case ("guides", "bet builder tips") starts with a capital, so a title
+ * or crumb reads as a heading; the stored name is untouched.
+ */
+function ace_seo_display_name($name) {
+    $name = (string) $name;
+    $options = get_option('ace_seo_options', []);
+    if ('' === $name || empty($options['general']['capitalise_names'])) {
+        return $name;
+    }
+    return function_exists('mb_strtoupper')
+        ? mb_strtoupper(mb_substr($name, 0, 1)) . mb_substr($name, 1)
+        : ucfirst($name);
+}
+
+/**
  * Main plugin class
  */
 class AceCrawlEnhancer {
@@ -259,6 +275,7 @@ class AceCrawlEnhancer {
             // Use a very late priority so we override themes that append site/tagline.
             add_filter('wp_title', [$this, 'filter_title'], 999);
             add_filter('document_title_parts', [$this, 'filter_document_title_parts'], 999);
+            add_filter('document_title_separator', [$this, 'filter_document_title_separator'], 999);
             add_action('wp_head', [$this, 'output_meta_description'], 1);
             // We emit our own canonical (below) for every page type — drop WordPress core's
             // rel_canonical so singular pages don't get a second, duplicate <link rel="canonical">.
@@ -1723,7 +1740,7 @@ class AceCrawlEnhancer {
             $archive_title = preg_replace('/^(Category|Tag|Author|Archives?):\s*/', '', $archive_title);
             // Strip HTML tags including span tags that WordPress may add
             $archive_title = wp_strip_all_tags($archive_title);
-            $variables['{archive_title}'] = $archive_title;
+            $variables['{archive_title}'] = ace_seo_display_name($archive_title);
         }
         
         if (is_search()) {
@@ -1737,22 +1754,22 @@ class AceCrawlEnhancer {
         
         if (is_category()) {
             $category = get_queried_object();
-            $variables['{category_name}'] = $category ? $category->name : '';
+            $variables['{category_name}'] = $category ? ace_seo_display_name($category->name) : '';
         }
         
         if (is_tag()) {
             $tag = get_queried_object();
-            $variables['{tag_name}'] = $tag ? $tag->name : '';
+            $variables['{tag_name}'] = $tag ? ace_seo_display_name($tag->name) : '';
         }
         
         // Add custom taxonomy support
         if (is_tax()) {
             $term = get_queried_object();
             if ($term) {
-                $variables['{term_name}'] = $term->name;
+                $variables['{term_name}'] = ace_seo_display_name($term->name);
                 $variables['{taxonomy_name}'] = $term->taxonomy;
                 // Also set archive_title for custom taxonomies
-                $variables['{archive_title}'] = $term->name;
+                $variables['{archive_title}'] = ace_seo_display_name($term->name);
             }
         }
         
@@ -2008,7 +2025,22 @@ class AceCrawlEnhancer {
             }
         }
         
+        // Titles WordPress builds itself (a 404, a page with no template) carry the site name from the
+        // settings rather than the blog name, so every title brands the same way.
+        $site_name = trim((string) (get_option('ace_seo_options', [])['general']['site_name'] ?? ''));
+        if ('' !== $site_name && !empty($title_parts['site'])) {
+            $title_parts['site'] = $site_name;
+        }
+
         return $title_parts;
+    }
+
+    /**
+     * WordPress's own title separator follows the plugin's, so core-built titles match the templates.
+     */
+    public function filter_document_title_separator($sep) {
+        $configured = trim((string) (get_option('ace_seo_options', [])['general']['separator'] ?? ''));
+        return '' !== $configured ? $configured : $sep;
     }
     
     /**
@@ -2979,6 +3011,10 @@ class AceCrawlEnhancer {
             if (empty($og_image) && $home_id && has_post_thumbnail($home_id)) {
                 $og_image = get_the_post_thumbnail_url($home_id, 'large');
             }
+            // ...then the site's Default Social Image, as on singular pages, so the homepage never shares bare.
+            if (empty($og_image)) {
+                $og_image = (string) (get_option('ace_seo_options', [])['social']['default_image'] ?? '');
+            }
             $og_image = self::normalise_og_image(apply_filters('ace_seo_home_og_image', $og_image));
 
             $default_og_url = $home_id ? get_permalink($home_id) : home_url('/');
@@ -3032,6 +3068,10 @@ class AceCrawlEnhancer {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
             $og_image = self::normalise_og_image(apply_filters('ace_seo_archive_og_image', '', $og_term));
+            // An archive the site gives no image of its own shares the Default Social Image.
+            if ('' === $og_image['url']) {
+                $og_image = self::normalise_og_image((string) (get_option('ace_seo_options', [])['social']['default_image'] ?? ''));
+            }
             $this->print_og_image($og_image, true);
 
             // OG URL for special pages

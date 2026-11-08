@@ -689,7 +689,7 @@ class ACE_SEO_Breadcrumbs {
      */
     private static function format_item($label, $url = '', $is_current = false) {
         return [
-            'label' => wp_strip_all_tags($label),
+            'label' => function_exists('ace_seo_display_name') ? ace_seo_display_name(wp_strip_all_tags($label)) : wp_strip_all_tags($label),
             'url' => $url ? esc_url_raw($url) : '',
             'is_current' => (bool) $is_current,
         ];

@@ -166,6 +166,16 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                 <p class="description">Character used to separate title parts</p>
                             </div>
                         </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <label for="capitalise_names">Capitalise names</label>
+                            </div>
+                            <div class="setting-field">
+                                <label><input type="checkbox" name="capitalise_names" id="capitalise_names" value="1" <?php checked(!empty($options['general']['capitalise_names'])); ?> /> Start category, tag and term names with a capital in titles and breadcrumbs</label>
+                                <p class="description">For sites whose tags are stored in lower case. The stored names are not changed.</p>
+                            </div>
+                        </div>
                         
                         <div class="setting-row">
                             <div class="setting-label">
