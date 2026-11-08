@@ -652,6 +652,18 @@ class ACE_SEO_Breadcrumbs {
 
         if (!empty($taxonomy_object->rewrite['slug'])) {
             $link = home_url(trailingslashit($taxonomy_object->rewrite['slug']));
+
+            // Core serves nothing at the tag or format base (/tag/ is a 404), so those crumbs only
+            // appear when a page has been published there. Plugins that answer at their own
+            // taxonomy's base (a hubs dashboard at /events/) keep theirs.
+            if (in_array($taxonomy, ['post_tag', 'post_format'], true)) {
+                $base_page = get_page_by_path(trim($taxonomy_object->rewrite['slug'], '/'));
+                $link      = ($base_page && 'publish' === $base_page->post_status) ? get_permalink($base_page) : '';
+            }
+
+            if (!apply_filters('ace_seo_breadcrumb_taxonomy_base', '' !== $link, $taxonomy, $link)) {
+                return null;
+            }
         } else {
             $link = get_post_type_archive_link($taxonomy_object->object_type[0] ?? '');
         }
