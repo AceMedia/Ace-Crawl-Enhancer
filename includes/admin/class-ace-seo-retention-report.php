@@ -75,6 +75,8 @@ class AceSeoRetentionReport {
     const META_WORDS = '_ace_seo_ret_words';
     const META_LINKS = '_ace_seo_ret_links';
     const META_BUILT = '_ace_seo_ret_built';
+    /** Admin query cache tag (Ace Redis Cache) for the report's counts; bumped wherever the meta is written. */
+    const CACHE_TAG  = 'ace_seo_retention';
 
     const WEEKLY_HOOK = 'ace_seo_retention_weekly';
 
@@ -860,6 +862,7 @@ class AceSeoRetentionReport {
             }
         }
 
+        self::forget_counts();
         $p['offset'] += self::BATCH;
         if ( count( $ids ) < self::BATCH ) {
             $p['phase']    = 'done';
@@ -1061,15 +1064,17 @@ class AceSeoRetentionReport {
     }
 
     public static function rank_counts() {
-        global $wpdb;
-        $counts = array_fill_keys( self::RANKS, 0 );
-        $rows   = $wpdb->get_results( $wpdb->prepare( "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value", self::META_RANK ) );
-        foreach ( (array) $rows as $row ) {
-            if ( isset( $counts[ $row->meta_value ] ) ) {
-                $counts[ $row->meta_value ] = (int) $row->n;
+        return self::cached( 'rank_counts', static function () {
+            global $wpdb;
+            $counts = array_fill_keys( self::RANKS, 0 );
+            $rows   = $wpdb->get_results( $wpdb->prepare( "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value", self::META_RANK ) );
+            foreach ( (array) $rows as $row ) {
+                if ( isset( $counts[ $row->meta_value ] ) ) {
+                    $counts[ $row->meta_value ] = (int) $row->n;
+                }
             }
-        }
-        return $counts;
+            return $counts;
+        } );
     }
 
     public static function tier( array $r, array $s ) {
@@ -1249,22 +1254,44 @@ class AceSeoRetentionReport {
                 delete_post_meta( (int) $post_id, $key );
             }
         }
+        self::forget_counts();
     }
 
     /** Counts per tier, from the flat meta. */
     public static function tier_counts() {
-        global $wpdb;
-        $counts = array_fill_keys( self::TIERS, 0 );
-        $rows   = $wpdb->get_results( $wpdb->prepare(
-            "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value",
-            self::META_TIER
-        ) );
-        foreach ( $rows as $row ) {
-            if ( isset( $counts[ $row->meta_value ] ) ) {
-                $counts[ $row->meta_value ] = (int) $row->n;
+        return self::cached( 'tier_counts', static function () {
+            global $wpdb;
+            $counts = array_fill_keys( self::TIERS, 0 );
+            $rows   = $wpdb->get_results( $wpdb->prepare(
+                "SELECT meta_value, COUNT(*) AS n FROM {$wpdb->postmeta} WHERE meta_key = %s GROUP BY meta_value",
+                self::META_TIER
+            ) );
+            foreach ( $rows as $row ) {
+                if ( isset( $counts[ $row->meta_value ] ) ) {
+                    $counts[ $row->meta_value ] = (int) $row->n;
+                }
             }
+            return $counts;
+        } );
+    }
+
+    /**
+     * The counts are whole-table postmeta scans, so wp-admin keeps them in Ace Redis Cache's admin
+     * query cache when that plugin is there and its setting is on. Every write of the report's meta
+     * bumps the tag; the hour only bounds drift from posts deleted outside the report.
+     */
+    private static function cached( $key, callable $compute ) {
+        if ( ! function_exists( 'ace_rc_admin_cache_remember' ) ) {
+            return $compute();
         }
-        return $counts;
+        return ace_rc_admin_cache_remember( 'ace_seo_retention:' . $key, $compute, array( self::CACHE_TAG ), HOUR_IN_SECONDS );
+    }
+
+    /** Drop the cached counts after the report's meta changes. */
+    public static function forget_counts() {
+        if ( function_exists( 'ace_rc_admin_cache_bump' ) ) {
+            ace_rc_admin_cache_bump( self::CACHE_TAG );
+        }
     }
 
     public static function tier_labels( array $s = array() ) {
@@ -1490,19 +1517,21 @@ class AceSeoRetentionReport {
     /* ---- Reading the report ---------------------------------------------------------------------- */
 
     public static function counts() {
-        global $wpdb;
-        $counts = array_fill_keys( self::BUCKETS, 0 );
-        $rows   = $wpdb->get_results( $wpdb->prepare(
-            "SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s",
-            self::META
-        ) );
-        foreach ( $rows as $row ) {
-            $v = maybe_unserialize( $row->meta_value );
-            if ( is_array( $v ) && isset( $counts[ $v['bucket'] ?? '' ] ) ) {
-                $counts[ $v['bucket'] ]++;
+        return self::cached( 'counts', static function () {
+            global $wpdb;
+            $counts = array_fill_keys( self::BUCKETS, 0 );
+            $rows   = $wpdb->get_results( $wpdb->prepare(
+                "SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s",
+                self::META
+            ) );
+            foreach ( $rows as $row ) {
+                $v = maybe_unserialize( $row->meta_value );
+                if ( is_array( $v ) && isset( $counts[ $v['bucket'] ?? '' ] ) ) {
+                    $counts[ $v['bucket'] ]++;
+                }
             }
-        }
-        return $counts;
+            return $counts;
+        } );
     }
 
     /**
@@ -1547,6 +1576,7 @@ class AceSeoRetentionReport {
         if ( function_exists( 'wp_cache_flush_group' ) && function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_group' ) ) {
             wp_cache_flush_group( 'post_meta' );
         }
+        self::forget_counts();
         delete_option( self::PROGRESS_OPTION );
         delete_option( self::SIGNALS_OPTION );
         wp_clear_scheduled_hook( self::CRON_HOOK );
@@ -1758,6 +1788,12 @@ class AceSeoRetentionReport {
 
     /** Why held posts are held, from the saved reasons: one primary reason per post so the counts add up. */
     public static function hold_reasons() {
+        return self::cached( 'hold_reasons', static function () {
+            return self::count_hold_reasons();
+        } );
+    }
+
+    private static function count_hold_reasons() {
         global $wpdb;
         $out = array( 'timing' => 0, 'coverage' => 0, 'ambiguous' => 0, 'missing' => 0 );
         $base = "SELECT COUNT(*) FROM {$wpdb->postmeta} t JOIN {$wpdb->postmeta} r ON r.post_id = t.post_id AND r.meta_key = %s WHERE t.meta_key = %s AND t.meta_value = 'unknown'";
