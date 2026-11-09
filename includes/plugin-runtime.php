@@ -2692,6 +2692,37 @@ class AceCrawlEnhancer {
     }
 
     /**
+     * A page of a query loop names itself as canonical.
+     *
+     * Block themes page their query loops with their own argument
+     * (?query-3-page=2) rather than /page/2/. Each such page lists different
+     * posts, so pointing it at page one would tell search engines to drop the
+     * page, and with it the only plain links to the older posts. Google's
+     * guidance for paginated lists is a self-referencing canonical on each
+     * page. Turn off with the ace_seo_query_loop_page_canonical filter.
+     *
+     * @param string $canonical Canonical URL after cleaning.
+     * @return string
+     */
+    private static function query_loop_page_canonical($canonical) {
+        if (is_singular() || !apply_filters('ace_seo_query_loop_page_canonical', true)) {
+            return $canonical;
+        }
+
+        foreach ($_GET as $key => $value) { // phpcs:ignore WordPress.Security.NonceVerification -- read only, to name the page being shown
+            if (!is_string($key) || !preg_match('/^query-(\d+)-page$/', $key)) {
+                continue;
+            }
+            $page = absint(is_array($value) ? 0 : $value);
+            if ($page > 1) {
+                $canonical = add_query_arg($key, $page, $canonical);
+            }
+        }
+
+        return $canonical;
+    }
+
+    /**
      * Print a canonical tag, tidied.
      *
      * Every branch above goes through here so the normalising cannot be
@@ -2713,6 +2744,7 @@ class AceCrawlEnhancer {
         }
 
         $canonical = self::strip_non_canonical_args($canonical);
+        $canonical = self::query_loop_page_canonical($canonical);
 
         /**
          * Filter the canonical URL just before it is printed, for any kind of
