@@ -30,6 +30,7 @@ final class AceCrawlLegacyNames {
 		'ace_seo_display_name' => 'acecrawl_display_name',
 		'ace_seo_filter_robots_txt' => 'acecrawl_filter_robots_txt',
 		'ace_seo_force_noindex_robots' => 'acecrawl_force_noindex_robots',
+		'ace_seo_register_schema_provider' => 'acecrawl_register_schema_provider',
 		'ace_seo_robots_file_notice' => 'acecrawl_robots_file_notice',
 		'ace_seo_robots_file_result_notice' => 'acecrawl_robots_file_result_notice',
 		'ace_seo_safe_placeholder' => 'acecrawl_safe_placeholder',
@@ -531,6 +532,8 @@ final class AceCrawlLegacyNames {
 		self::names();
 		// Some files load later (admin screens, CLI), so give their names a second pass.
 		add_action( 'plugins_loaded', array( __CLASS__, 'names' ), PHP_INT_MAX );
+		// Front-end and admin files load on the plugin's own init (priority 10), so follow straight after it.
+		add_action( 'init', array( __CLASS__, 'names' ), 11 );
 		add_action( 'admin_init', array( __CLASS__, 'names' ), 0 );
 		spl_autoload_register( array( __CLASS__, 'alias_class' ) );
 		self::hooks();
