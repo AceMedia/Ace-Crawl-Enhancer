@@ -144,15 +144,15 @@ function ace_seo_filter_robots_txt( $output, $public ) {
         return $output;
     }
 
-    $path = (string) wp_parse_url( site_url(), PHP_URL_PATH );
-    $path = '/' === $path ? '' : untrailingslashit( (string) $path );
-
     if ( 'deindex' === ace_seo_discourage_mode() ) {
         // Crawling has to be allowed for the noindex on each page to be read at
         // all, and the sitemap is what sends a crawler back round to read them.
+        // The admin can live outside wp-admin/ at the site root, so ask WordPress where it is.
+        $admin_path = (string) wp_parse_url( admin_url( '/' ), PHP_URL_PATH );
+        $ajax_path  = (string) wp_parse_url( admin_url( 'admin-ajax.php' ), PHP_URL_PATH );
         return "User-agent: *\n"
-            . "Disallow: $path/wp-admin/\n"
-            . "Allow: $path/wp-admin/admin-ajax.php\n\n"
+            . 'Disallow: ' . trailingslashit( $admin_path ) . "\n"
+            . 'Allow: ' . $ajax_path . "\n\n"
             . 'Sitemap: ' . home_url( '/wp-sitemap.xml' ) . "\n";
     }
 
