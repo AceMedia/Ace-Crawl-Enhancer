@@ -253,6 +253,15 @@ class AceCrawlRetentionReport {
         }
         $err = static::last_error();
         if ( ! $err || ! in_array( (int) $err['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_RECOVERABLE_ERROR ), true ) ) {
+            // A silent exit or wp_die() mid-step records no error, and used to leave no tick and a held lease.
+            self::$in_tick = false;
+            $p = self::progress();
+            $p['notes'][] = sprintf( 'A worker ended early at %s %s/%s without reporting an error. The build carried on from there.', (string) ( $p['phase'] ?? '' ), (int) ( $p['offset'] ?? 0 ), (int) ( $p['total'] ?? 0 ) );
+            self::save_progress( $p );
+            if ( self::is_building() && ! self::$running_all ) {
+                self::schedule_tick();
+            }
+            static::lock_delete( self::$worker );
             return;
         }
         self::$in_tick = false;
@@ -449,6 +458,10 @@ class AceCrawlRetentionReport {
                 // and the site.
                 foreach ( $report as $url => $row ) {
                     $gsc[ self::path_key( $url ) ] = $row;
+                }
+                $p['gsc_rows'] = count( $gsc );
+                if ( ! $gsc ) {
+                    $p['notes'][] = 'Search Console returned no pages for this period, so anything that relies on search data is missing from this build.';
                 }
             }
         } else {
@@ -909,6 +922,8 @@ class AceCrawlRetentionReport {
             'trend_moves'=> (array) ( $p['trend_moves'] ?? array() ),
             'cats'       => (array) ( $p['cats'] ?? array() ),
             'share'      => $p['share'] ?? null,
+            'gsc_rows'   => $p['gsc_rows'] ?? null,
+            'notes'      => array_values( (array) ( $p['notes'] ?? array() ) ),
         );
         update_option( self::HISTORY_OPTION, array_slice( $h, -self::HISTORY_KEEP ), false );
     }
