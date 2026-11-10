@@ -290,7 +290,6 @@ class AceCrawlEnhancer {
             add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
             add_action('load-post.php', [$this, 'maybe_migrate_post_data']);
             add_action('load-post-new.php', [$this, 'maybe_migrate_post_data']);
-            add_action('load-edit-tags.php', [$this, 'maybe_migrate_taxonomy_data']);
             add_action('load-term.php', [$this, 'maybe_migrate_taxonomy_data']);
             
             // Add admin notices for migration status
@@ -1191,44 +1190,45 @@ class AceCrawlEnhancer {
      * Maybe migrate taxonomy data when loading term in admin
      */
     public function maybe_migrate_taxonomy_data() {
-        if (!is_admin()) {
-            return;
-        }
-        
-        // Check if we're on a term edit page
         $screen = get_current_screen();
-        if (!$screen || $screen->base !== 'term') {
+        if (!$screen || 'term' !== $screen->base || empty($screen->taxonomy)) {
             return;
         }
-        
-        // Get term ID from URL
-        $term_id = isset($_GET['tag_ID']) ? intval($_GET['tag_ID']) : 0;
-        if (!$term_id) {
+
+        // The term edit form passes the term itself, so no request input is read here.
+        add_action($screen->taxonomy . '_pre_edit_form', [$this, 'migrate_taxonomy_data_for_term'], 10, 1);
+    }
+
+    /**
+     * Copy a term's Yoast SEO fields across once a day, for a user who can edit that term.
+     *
+     * @param WP_Term $term Term being edited.
+     */
+    public function migrate_taxonomy_data_for_term($term) {
+        if (!$term instanceof WP_Term || !current_user_can('edit_term', $term->term_id)) {
             return;
         }
-        
-        $term = get_term($term_id);
-        if (!$term || is_wp_error($term)) {
+
+        $term_id         = (int) $term->term_id;
+        $migration_check = (int) get_term_meta($term_id, '_ace_seo_taxonomy_migration_check', true);
+        if ($migration_check && (time() - $migration_check) <= DAY_IN_SECONDS) {
             return;
         }
-        
-        // Check if we've already migrated this term recently
-        $migration_check = get_term_meta($term_id, '_ace_seo_taxonomy_migration_check', true);
-        
-        // If no migration check or it's been more than a day, check for migration
-        if (empty($migration_check) || (time() - $migration_check) > DAY_IN_SECONDS) {
-            $migrated = self::migrate_yoast_taxonomy_data($term_id, $term->taxonomy);
-            
-            // Mark this term as checked
-            update_term_meta($term_id, '_ace_seo_taxonomy_migration_check', time());
-            
-            if ($migrated > 0) {
-                add_action('admin_notices', function() use ($migrated, $term) {
-                    echo '<div class="notice notice-info is-dismissible">';
-                    echo '<p><strong>Ace SEO:</strong> Migrated ' . esc_html( $migrated ) . ' SEO fields from Yoast SEO for ' . esc_html($term->name) . '.</p>';
-                    echo '</div>';
-                });
-            }
+
+        $migrated = self::migrate_yoast_taxonomy_data($term_id, $term->taxonomy);
+        update_term_meta($term_id, '_ace_seo_taxonomy_migration_check', time());
+
+        if ($migrated > 0) {
+            printf(
+                '<div class="notice notice-info is-dismissible"><p><strong>%1$s</strong> %2$s</p></div>',
+                esc_html__('Ace SEO:', 'ace-crawl-enhancer'),
+                esc_html(sprintf(
+                    /* translators: 1: number of fields, 2: term name. */
+                    __('Migrated %1$d SEO fields from Yoast SEO for %2$s.', 'ace-crawl-enhancer'),
+                    (int) $migrated,
+                    $term->name
+                ))
+            );
         }
     }
     
