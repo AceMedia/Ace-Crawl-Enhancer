@@ -3,8 +3,13 @@ if (!defined('ABSPATH')) { exit; }
 
 // acecrawl-source-only:start
 // Source installs from before the acecrawl prefix keep their old names working. The release build leaves this out.
+// A site marked converted by `wp acecrawl convert-names` skips the layer; the command itself stays available.
 if ( file_exists( ACECRAWL_PATH . 'compat/legacy-names.php' ) ) {
     require_once ACECRAWL_PATH . 'compat/legacy-names.php';
+    AceCrawlLegacyNames::start();
+    if ( defined( 'WP_CLI' ) && WP_CLI ) {
+        require_once ACECRAWL_PATH . 'compat/convert-names-command.php';
+    }
 }
 // acecrawl-source-only:end
 require_once ACECRAWL_PATH . 'includes/class-ace-seo-assets.php';

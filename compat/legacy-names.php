@@ -528,6 +528,18 @@ final class AceCrawlLegacyNames {
 		'ace_seo_trending_weekly' => 'acecrawl_trending_weekly',
 	);
 
+	/** @var bool Whether the layer runs on this request; off once a site is converted. */
+	public static $active = false;
+
+	/** Switch the layer on, unless `wp acecrawl convert-names` has marked this site converted. */
+	public static function start() {
+		if ( get_option( 'acecrawl_names_converted' ) ) {
+			return;
+		}
+		self::$active = true;
+		self::early();
+	}
+
 	/** @var array Hooks being bridged right now, so a bridge never re-enters itself. */
 	private static $running = array();
 
@@ -547,6 +559,9 @@ final class AceCrawlLegacyNames {
 
 	/** Everything else, once the plugin's own code has loaded. */
 	public static function boot() {
+		if ( ! self::$active ) {
+			return;
+		}
 		self::names();
 		// Some files load later (admin screens, CLI), so give their names a second pass.
 		add_action( 'plugins_loaded', array( __CLASS__, 'names' ), PHP_INT_MAX );
@@ -666,4 +681,3 @@ final class AceCrawlLegacyNames {
 	}
 }
 
-AceCrawlLegacyNames::early();
