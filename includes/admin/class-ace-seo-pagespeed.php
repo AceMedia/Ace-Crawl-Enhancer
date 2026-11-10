@@ -11,21 +11,21 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOPageSpeed {
+class AceCrawlPageSpeed {
     
     /**
      * Initialize PageSpeed functionality
      */
     public function __construct() {
-        add_action( 'wp_ajax_ace_seo_test_pagespeed', array( $this, 'test_page_performance' ) );
-        add_action( 'wp_ajax_ace_seo_get_pagespeed_report', array( $this, 'get_pagespeed_report' ) );
-        add_action( 'wp_ajax_ace_seo_monitor_performance', array( $this, 'monitor_site_performance' ) );
+        add_action( 'wp_ajax_acecrawl_test_pagespeed', array( $this, 'test_page_performance' ) );
+        add_action( 'wp_ajax_acecrawl_get_pagespeed_report', array( $this, 'get_pagespeed_report' ) );
+        add_action( 'wp_ajax_acecrawl_monitor_performance', array( $this, 'monitor_site_performance' ) );
         
         // Schedule daily performance checks if monitoring is enabled
-        add_action( 'ace_seo_daily_performance_check', array( $this, 'scheduled_performance_check' ) );
+        add_action( 'acecrawl_daily_performance_check', array( $this, 'scheduled_performance_check' ) );
         
         // Add performance data to SEO analysis
-        add_filter( 'ace_seo_analysis_data', array( $this, 'add_performance_to_analysis' ), 10, 2 );
+        add_filter( 'acecrawl_analysis_data', array( $this, 'add_performance_to_analysis' ), 10, 2 );
         
         // Add performance metrics to admin columns
         add_filter( 'manage_posts_columns', array( $this, 'add_performance_column' ) );
@@ -159,7 +159,7 @@ class AceSEOPageSpeed {
         }
         
         // Store monitoring data
-        update_option( 'ace_seo_performance_monitoring', $monitoring_results, false );
+        update_option( 'acecrawl_performance_monitoring', $monitoring_results, false );
         
         wp_send_json_success( $monitoring_results );
     }
@@ -168,7 +168,7 @@ class AceSEOPageSpeed {
      * Run PageSpeed Insights test
      */
     private function run_pagespeed_test( $url, $strategy = 'mobile' ) {
-        if ( ! class_exists( 'AceSEOApiHelper' ) ) {
+        if ( ! class_exists( 'AceCrawlApiHelper' ) ) {
             return new WP_Error( 'missing_helper', 'API Helper class not found' );
         }
         
@@ -184,7 +184,7 @@ class AceSEOPageSpeed {
             );
         }
         
-        $pagespeed_data = AceSEOApiHelper::make_pagespeed_request( $url, $strategy );
+        $pagespeed_data = AceCrawlApiHelper::make_pagespeed_request( $url, $strategy );
         
         if ( is_wp_error( $pagespeed_data ) ) {
             return $pagespeed_data;
@@ -575,14 +575,14 @@ class AceSEOPageSpeed {
      * Check for performance alerts
      */
     private function check_performance_alerts() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $performance_settings = $options['performance'] ?? array();
         
         if ( empty( $performance_settings['pagespeed_alerts'] ) ) {
             return;
         }
         
-        $monitoring_data = get_option( 'ace_seo_performance_monitoring', array() );
+        $monitoring_data = get_option( 'acecrawl_performance_monitoring', array() );
         
         foreach ( $monitoring_data as $data ) {
             if ( $data['mobile_score'] < 50 ) {
@@ -615,8 +615,8 @@ class AceSEOPageSpeed {
      * Schedule performance monitoring
      */
     private function maybe_schedule_monitoring() {
-        if ( $this->is_performance_monitoring_enabled() && ! wp_next_scheduled( 'ace_seo_daily_performance_check' ) ) {
-            wp_schedule_event( time(), 'daily', 'ace_seo_daily_performance_check' );
+        if ( $this->is_performance_monitoring_enabled() && ! wp_next_scheduled( 'acecrawl_daily_performance_check' ) ) {
+            wp_schedule_event( time(), 'daily', 'acecrawl_daily_performance_check' );
         }
     }
     
@@ -624,11 +624,11 @@ class AceSEOPageSpeed {
      * Check if performance monitoring is enabled
      */
     private function is_performance_monitoring_enabled() {
-        if ( ! class_exists( 'AceSEOApiHelper' ) ) {
+        if ( ! class_exists( 'AceCrawlApiHelper' ) ) {
             return false;
         }
         
-        return AceSEOApiHelper::is_performance_monitoring_enabled();
+        return AceCrawlApiHelper::is_performance_monitoring_enabled();
     }
     
     /**
@@ -841,4 +841,4 @@ class AceSEOPageSpeed {
 }
 
 // Initialize the PageSpeed integration
-new AceSEOPageSpeed();
+new AceCrawlPageSpeed();

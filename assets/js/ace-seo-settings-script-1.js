@@ -48,7 +48,7 @@
 
                             var refreshCounts = function(){
                                 setStatus('Loading counts...');
-                                return postAjax('ace_seo_get_yoast_key_counts').then(function(resp){
+                                return postAjax('acecrawl_get_yoast_key_counts').then(function(resp){
                                     if (resp && resp.success) {
                                         updateCounts(resp.data || {});
                                         setStatus('');
@@ -75,7 +75,7 @@
                                     if (!confirm('Remove all Yoast SEO meta keys from the database? This cannot be undone.')) {
                                         return;
                                     }
-                                    postAjax('ace_seo_delete_yoast_keys').then(function(resp){
+                                    postAjax('acecrawl_delete_yoast_keys').then(function(resp){
                                         if (resp && resp.success) {
                                             refreshCounts();
                                             alert('Yoast keys removed.');
@@ -93,7 +93,7 @@
                                     if (!confirm('Recreate Yoast SEO meta keys from ACE data? This will overwrite existing Yoast keys.')) {
                                         return;
                                     }
-                                    postAjax('ace_seo_recreate_yoast_keys').then(function(resp){
+                                    postAjax('acecrawl_recreate_yoast_keys').then(function(resp){
                                         if (resp && resp.success) {
                                             refreshCounts();
                                             alert('Yoast keys recreated from ACE.');

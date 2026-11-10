@@ -7,11 +7,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-if ( ! defined( 'ACE_SITEMAP_POWERTOOLS_VERSION' ) ) {
-    define( 'ACE_SITEMAP_POWERTOOLS_VERSION', '1.0.4' );
+if ( ! defined( 'ACECRAWL_SITEMAP_POWERTOOLS_VERSION' ) ) {
+    define( 'ACECRAWL_SITEMAP_POWERTOOLS_VERSION', '1.0.4' );
 }
 
-function ace_sitemap_powertools_default_options() {
+function acecrawl_sitemap_default_options() {
     return array(
         'enable_custom_routes'     => 1,
         'serve_custom_routes'      => 1,
@@ -38,9 +38,9 @@ function ace_sitemap_powertools_default_options() {
     );
 }
 
-function ace_sitemap_powertools_get_options() {
-    $defaults = ace_sitemap_powertools_default_options();
-    $saved    = get_option( 'ace_sitemap_powertools_options' );
+function acecrawl_sitemap_get_options() {
+    $defaults = acecrawl_sitemap_default_options();
+    $saved    = get_option( 'acecrawl_sitemap_options' );
 
     if ( ! is_array( $saved ) ) {
         $saved = array();
@@ -49,18 +49,18 @@ function ace_sitemap_powertools_get_options() {
     return array_merge( $defaults, $saved );
 }
 
-function ace_sitemap_powertools_get_option( $key ) {
-    $options = ace_sitemap_powertools_get_options();
+function acecrawl_sitemap_get_option( $key ) {
+    $options = acecrawl_sitemap_get_options();
 
     return isset( $options[ $key ] ) ? $options[ $key ] : null;
 }
 
-function ace_sitemap_powertools_has_redis_cache_plugin() {
+function acecrawl_sitemap_has_redis_cache_plugin() {
     return defined( 'ACE_REDIS_CACHE_PLUGIN_FILE' ) || function_exists( 'ace_redis_cache' ) || class_exists( 'AceMedia\\RedisCache\\AceRedisCache' );
 }
 
-function ace_sitemap_powertools_redis_cache_available() {
-    if ( ! ace_sitemap_powertools_has_redis_cache_plugin() ) {
+function acecrawl_sitemap_redis_cache_available() {
+    if ( ! acecrawl_sitemap_has_redis_cache_plugin() ) {
         return false;
     }
 
@@ -71,8 +71,8 @@ function ace_sitemap_powertools_redis_cache_available() {
     return true;
 }
 
-function ace_sitemap_powertools_effective_post_max_urls() {
-    $limit = (int) ace_sitemap_powertools_get_option( 'post_max_urls' );
+function acecrawl_sitemap_effective_post_max_urls() {
+    $limit = (int) acecrawl_sitemap_get_option( 'post_max_urls' );
 
     if ( $limit < 1 ) {
         $limit = 250;
@@ -81,7 +81,7 @@ function ace_sitemap_powertools_effective_post_max_urls() {
     return max( 1, $limit );
 }
 
-function ace_sitemap_powertools_is_enabled( $key ) {
+function acecrawl_sitemap_is_enabled( $key ) {
     /**
      * Filter whether a Sitemap Powertools feature is on. Used to switch the whole
      * feature set off when the site discourages search engines.
@@ -89,29 +89,29 @@ function ace_sitemap_powertools_is_enabled( $key ) {
      * @param bool   $enabled Whether the feature is enabled by its saved option.
      * @param string $key     Feature key.
      */
-    return (bool) apply_filters( 'ace_sitemap_powertools_is_enabled', (bool) ace_sitemap_powertools_get_option( $key ), $key );
+    return (bool) apply_filters( 'acecrawl_sitemap_is_enabled', (bool) acecrawl_sitemap_get_option( $key ), $key );
 }
 
-function ace_sitemap_powertools_excluded_sitemap_post_types() {
-    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_post_types' );
+function acecrawl_sitemap_excluded_sitemap_post_types() {
+    $saved = acecrawl_sitemap_get_option( 'excluded_sitemap_post_types' );
     if ( ! is_array( $saved ) ) {
         $saved = array();
     }
 
     return (array) apply_filters(
-        'ace_sitemap_powertools_excluded_sitemap_post_types',
+        'acecrawl_sitemap_excluded_sitemap_post_types',
         array_values( array_unique( array_map( 'sanitize_key', $saved ) ) )
     );
 }
 
-function ace_sitemap_powertools_excluded_sitemap_taxonomies() {
-    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_taxonomies' );
+function acecrawl_sitemap_excluded_sitemap_taxonomies() {
+    $saved = acecrawl_sitemap_get_option( 'excluded_sitemap_taxonomies' );
     if ( ! is_array( $saved ) ) {
         $saved = array( 'ace_event' );
     }
 
     return (array) apply_filters(
-        'ace_sitemap_powertools_excluded_sitemap_taxonomies',
+        'acecrawl_sitemap_excluded_sitemap_taxonomies',
         array_values( array_unique( array_merge( array( 'post_format' ), array_map( 'sanitize_key', $saved ) ) ) )
     );
 }
@@ -123,7 +123,7 @@ function ace_sitemap_powertools_excluded_sitemap_taxonomies() {
  *
  * @return array taxonomy => array( label, description, builtin )
  */
-function ace_sitemap_powertools_detected_sitemap_taxonomies() {
+function acecrawl_sitemap_detected_sitemap_taxonomies() {
     $taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
     if ( ! is_array( $taxonomies ) ) {
         return array();
@@ -167,15 +167,15 @@ function ace_sitemap_powertools_detected_sitemap_taxonomies() {
  *
  * @return string[]
  */
-function ace_sitemap_powertools_recommended_excluded_taxonomies() {
+function acecrawl_sitemap_recommended_excluded_taxonomies() {
     $excluded = array( 'post_tag' );
-    foreach ( ace_sitemap_powertools_detected_sitemap_taxonomies() as $name => $item ) {
+    foreach ( acecrawl_sitemap_detected_sitemap_taxonomies() as $name => $item ) {
         if ( empty( $item['builtin'] ) ) {
             $excluded[] = $name;
         }
     }
 
-    return (array) apply_filters( 'ace_sitemap_powertools_recommended_excluded_taxonomies', array_values( array_unique( $excluded ) ) );
+    return (array) apply_filters( 'acecrawl_sitemap_recommended_excluded_taxonomies', array_values( array_unique( $excluded ) ) );
 }
 
 /**
@@ -185,11 +185,11 @@ function ace_sitemap_powertools_recommended_excluded_taxonomies() {
  * @param string $taxonomy Taxonomy name.
  * @return int
  */
-function ace_sitemap_powertools_taxonomy_min_posts( $taxonomy ) {
-    $saved = ace_sitemap_powertools_get_option( 'sitemap_taxonomy_min_posts' );
+function acecrawl_sitemap_taxonomy_min_posts( $taxonomy ) {
+    $saved = acecrawl_sitemap_get_option( 'sitemap_taxonomy_min_posts' );
     $min   = is_array( $saved ) && isset( $saved[ $taxonomy ] ) ? (int) $saved[ $taxonomy ] : 0;
 
-    return max( 0, (int) apply_filters( 'ace_sitemap_powertools_taxonomy_min_posts', $min, $taxonomy ) );
+    return max( 0, (int) apply_filters( 'acecrawl_sitemap_taxonomy_min_posts', $min, $taxonomy ) );
 }
 
 /**
@@ -200,15 +200,15 @@ function ace_sitemap_powertools_taxonomy_min_posts( $taxonomy ) {
  * @param string $taxonomy Taxonomy name.
  * @return array
  */
-function ace_sitemap_powertools_taxonomy_query_args( $args, $taxonomy ) {
-    $min = ace_sitemap_powertools_taxonomy_min_posts( $taxonomy );
+function acecrawl_sitemap_taxonomy_query_args( $args, $taxonomy ) {
+    $min = acecrawl_sitemap_taxonomy_min_posts( $taxonomy );
     if ( $min > 1 ) {
         $args['ace_sitemap_min_posts'] = $min;
     }
 
     return $args;
 }
-add_filter( 'wp_sitemaps_taxonomies_query_args', 'ace_sitemap_powertools_taxonomy_query_args', 10, 2 );
+add_filter( 'wp_sitemaps_taxonomies_query_args', 'acecrawl_sitemap_taxonomy_query_args', 10, 2 );
 
 /**
  * WP_Term_Query has no minimum count argument, so apply it as a WHERE on the
@@ -219,14 +219,14 @@ add_filter( 'wp_sitemaps_taxonomies_query_args', 'ace_sitemap_powertools_taxonom
  * @param array $args       Query arguments.
  * @return array
  */
-function ace_sitemap_powertools_taxonomy_min_posts_clause( $pieces, $taxonomies, $args ) {
+function acecrawl_sitemap_taxonomy_min_posts_clause( $pieces, $taxonomies, $args ) {
     if ( ! empty( $args['ace_sitemap_min_posts'] ) ) {
         $pieces['where'] .= ' AND tt.count >= ' . absint( $args['ace_sitemap_min_posts'] );
     }
 
     return $pieces;
 }
-add_filter( 'terms_clauses', 'ace_sitemap_powertools_taxonomy_min_posts_clause', 10, 3 );
+add_filter( 'terms_clauses', 'acecrawl_sitemap_taxonomy_min_posts_clause', 10, 3 );
 
 /**
  * With a minimum in place a term enters or leaves the sitemap when its post
@@ -236,26 +236,26 @@ add_filter( 'terms_clauses', 'ace_sitemap_powertools_taxonomy_min_posts_clause',
  * @param int    $tt_id    Term taxonomy ID.
  * @param string $taxonomy Taxonomy name.
  */
-function ace_sitemap_powertools_taxonomy_count_changed( $tt_id, $taxonomy ) {
-    if ( is_string( $taxonomy ) && function_exists( 'ace_sitemap_gen_mark_dirty' ) && ace_sitemap_powertools_taxonomy_min_posts( $taxonomy ) > 1 ) {
-        ace_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
+function acecrawl_sitemap_taxonomy_count_changed( $tt_id, $taxonomy ) {
+    if ( is_string( $taxonomy ) && function_exists( 'acecrawl_sitemap_gen_mark_dirty' ) && acecrawl_sitemap_taxonomy_min_posts( $taxonomy ) > 1 ) {
+        acecrawl_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
     }
 }
-add_action( 'edited_term_taxonomy', 'ace_sitemap_powertools_taxonomy_count_changed', 10, 2 );
+add_action( 'edited_term_taxonomy', 'acecrawl_sitemap_taxonomy_count_changed', 10, 2 );
 
-function ace_sitemap_powertools_excluded_sitemap_providers() {
-    $saved = ace_sitemap_powertools_get_option( 'excluded_sitemap_providers' );
+function acecrawl_sitemap_excluded_sitemap_providers() {
+    $saved = acecrawl_sitemap_get_option( 'excluded_sitemap_providers' );
     if ( ! is_array( $saved ) ) {
         $saved = array();
     }
 
     return (array) apply_filters(
-        'ace_sitemap_powertools_excluded_sitemap_providers',
+        'acecrawl_sitemap_excluded_sitemap_providers',
         array_values( array_unique( array_map( 'sanitize_key', $saved ) ) )
     );
 }
 
-function ace_sitemap_powertools_detected_custom_providers() {
+function acecrawl_sitemap_detected_custom_providers() {
     if ( ! function_exists( 'wp_sitemaps_get_server' ) ) {
         return array();
     }
@@ -281,7 +281,7 @@ function ace_sitemap_powertools_detected_custom_providers() {
     return $items;
 }
 
-function ace_sitemap_powertools_detected_custom_post_types() {
+function acecrawl_sitemap_detected_custom_post_types() {
     $post_types = get_post_types( array( 'public' => true ), 'objects' );
     if ( ! is_array( $post_types ) ) {
         return array();
@@ -308,7 +308,7 @@ function ace_sitemap_powertools_detected_custom_post_types() {
     return $items;
 }
 
-function ace_sitemap_powertools_detected_custom_taxonomies() {
+function acecrawl_sitemap_detected_custom_taxonomies() {
     $taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
     if ( ! is_array( $taxonomies ) ) {
         return array();
@@ -335,7 +335,7 @@ function ace_sitemap_powertools_detected_custom_taxonomies() {
     return $items;
 }
 
-function ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) {
+function acecrawl_sitemap_can_use_root_level_tag_slug( $slug ) {
     $slug = sanitize_title( (string) $slug );
     if ( '' === $slug ) {
         return false;
@@ -364,8 +364,8 @@ function ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) {
     return true;
 }
 
-function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) {
-    if ( is_admin() || ! ace_sitemap_powertools_root_tag_archives_enabled() ) {
+function acecrawl_sitemap_resolve_root_slug_to_tag_archive( $query_vars ) {
+    if ( is_admin() || ! acecrawl_sitemap_root_tag_archives_enabled() ) {
         return $query_vars;
     }
 
@@ -429,7 +429,7 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
         return $query_vars;
     }
 
-    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $slug ) ) {
+    if ( ! acecrawl_sitemap_can_use_root_level_tag_slug( $slug ) ) {
         return $query_vars;
     }
 
@@ -446,23 +446,23 @@ function ace_sitemap_powertools_resolve_root_slug_to_tag_archive( $query_vars ) 
 
     return $resolved;
 }
-add_filter( 'request', 'ace_sitemap_powertools_resolve_root_slug_to_tag_archive', 20 );
+add_filter( 'request', 'acecrawl_sitemap_resolve_root_slug_to_tag_archive', 20 );
 
-function ace_sitemap_powertools_use_root_level_tag_links( $termlink, $term, $taxonomy ) {
-    if ( 'post_tag' !== $taxonomy || ! $term instanceof WP_Term || ! ace_sitemap_powertools_root_tag_links_enabled() ) {
+function acecrawl_sitemap_use_root_level_tag_links( $termlink, $term, $taxonomy ) {
+    if ( 'post_tag' !== $taxonomy || ! $term instanceof WP_Term || ! acecrawl_sitemap_root_tag_links_enabled() ) {
         return $termlink;
     }
 
-    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $term->slug ) ) {
+    if ( ! acecrawl_sitemap_can_use_root_level_tag_slug( $term->slug ) ) {
         return $termlink;
     }
 
     return home_url( user_trailingslashit( $term->slug ) );
 }
-add_filter( 'term_link', 'ace_sitemap_powertools_use_root_level_tag_links', 20, 3 );
+add_filter( 'term_link', 'acecrawl_sitemap_use_root_level_tag_links', 20, 3 );
 
-function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
-    if ( is_admin() || ! is_tag() || ! ace_sitemap_powertools_tag_base_redirect_enabled() ) {
+function acecrawl_sitemap_redirect_tag_base_to_root_slug() {
+    if ( is_admin() || ! is_tag() || ! acecrawl_sitemap_tag_base_redirect_enabled() ) {
         return;
     }
 
@@ -471,7 +471,7 @@ function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
         return;
     }
 
-    if ( ! ace_sitemap_powertools_can_use_root_level_tag_slug( $term->slug ) ) {
+    if ( ! acecrawl_sitemap_can_use_root_level_tag_slug( $term->slug ) ) {
         return;
     }
 
@@ -512,10 +512,10 @@ function ace_sitemap_powertools_redirect_tag_base_to_root_slug() {
     wp_safe_redirect( $target, 301 );
     exit;
 }
-add_action( 'template_redirect', 'ace_sitemap_powertools_redirect_tag_base_to_root_slug', 1 );
+add_action( 'template_redirect', 'acecrawl_sitemap_redirect_tag_base_to_root_slug', 1 );
 
-function ace_sitemap_powertools_register_settings() {
-    register_setting( 'ace_sitemap_powertools', 'ace_sitemap_powertools_options', 'ace_sitemap_powertools_sanitize_options' );
+function acecrawl_sitemap_register_settings() {
+    register_setting( 'acecrawl_sitemap_powertools', 'acecrawl_sitemap_options', 'acecrawl_sitemap_sanitize_options' );
 
     add_settings_section(
         'ace_sitemap_powertools_section_routing',
@@ -527,20 +527,20 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_custom_routes',
         'Clean sitemap URLs',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
             'key' => 'enable_custom_routes',
             'label' => 'Enable clean sitemap URLs (e.g. /sitemap.xml, /news-1.xml).',
-            'description' => ace_sitemap_powertools_clean_urls_description(),
+            'description' => acecrawl_sitemap_clean_urls_description(),
         )
     );
 
     add_settings_field(
         'serve_custom_routes',
         'Serve clean routes',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -552,7 +552,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_legacy_redirects',
         'Legacy redirects',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -564,7 +564,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'disable_canonical_redirects',
         'Disable canonical redirects',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -576,7 +576,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_root_tag_archive_fallback',
         'Root Tag Archive Fallback',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -588,7 +588,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_root_tag_links',
         'Root Tag Links',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -600,7 +600,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_tag_base_redirect',
         'Tag Base Redirect',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_routing',
         array(
@@ -619,7 +619,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_news_provider',
         'News URL',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_providers',
         array(
@@ -631,7 +631,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_authors_provider',
         'Authors URL',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_providers',
         array(
@@ -643,7 +643,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_categories_route',
         'Categories URL',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_providers',
         array(
@@ -655,7 +655,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_tags_route',
         'Tags URL',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_providers',
         array(
@@ -674,7 +674,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_custom_header',
         'Header branding',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_display',
         array(
@@ -693,12 +693,12 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'excluded_sitemap_providers',
         'Third-Party Providers',
-        'ace_sitemap_powertools_field_detected_sitemaps',
+        'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_detected',
         array(
             'key' => 'excluded_sitemap_providers',
-            'choices' => ace_sitemap_powertools_detected_custom_providers(),
+            'choices' => acecrawl_sitemap_detected_custom_providers(),
             'empty_label' => 'No third-party sitemap providers detected.',
         )
     );
@@ -706,12 +706,12 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'excluded_sitemap_taxonomies',
         'Custom Taxonomy Sitemaps',
-        'ace_sitemap_powertools_field_detected_sitemaps',
+        'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_detected',
         array(
             'key' => 'excluded_sitemap_taxonomies',
-            'choices' => ace_sitemap_powertools_detected_custom_taxonomies(),
+            'choices' => acecrawl_sitemap_detected_custom_taxonomies(),
             'empty_label' => 'No custom public taxonomies detected.',
         )
     );
@@ -719,12 +719,12 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'excluded_sitemap_post_types',
         'Custom Post Type Sitemaps',
-        'ace_sitemap_powertools_field_detected_sitemaps',
+        'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_detected',
         array(
             'key' => 'excluded_sitemap_post_types',
-            'choices' => ace_sitemap_powertools_detected_custom_post_types(),
+            'choices' => acecrawl_sitemap_detected_custom_post_types(),
             'empty_label' => 'No custom public post types detected.',
         )
     );
@@ -732,7 +732,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_index_link',
         'Index link',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_display',
         array(
@@ -744,7 +744,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_recent_marker',
         'Most recent marker',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_display',
         array(
@@ -763,7 +763,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'post_max_urls',
         'Post URLs per sitemap',
-        'ace_sitemap_powertools_field_number',
+        'acecrawl_sitemap_field_number',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_performance',
         array(
@@ -776,7 +776,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_sitemap_cache',
         'Enable sitemap cache',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_performance',
         array(
@@ -788,7 +788,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'enable_index_lastmod',
         'Index lastmod',
-        'ace_sitemap_powertools_field_checkbox',
+        'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_performance',
         array(
@@ -800,7 +800,7 @@ function ace_sitemap_powertools_register_settings() {
     add_settings_field(
         'sitemap_cache_ttl',
         'Sitemap cache TTL (seconds)',
-        'ace_sitemap_powertools_field_number',
+        'acecrawl_sitemap_field_number',
         'ace-sitemap-powertools',
         'ace_sitemap_powertools_section_performance',
         array(
@@ -810,10 +810,10 @@ function ace_sitemap_powertools_register_settings() {
         )
     );
 }
-add_action( 'admin_init', 'ace_sitemap_powertools_register_settings' );
+add_action( 'admin_init', 'acecrawl_sitemap_register_settings' );
 
-function ace_sitemap_powertools_sanitize_options( $input ) {
-    $defaults  = ace_sitemap_powertools_default_options();
+function acecrawl_sitemap_sanitize_options( $input ) {
+    $defaults  = acecrawl_sitemap_default_options();
     $checkboxes = array(
         'enable_custom_routes',
         'serve_custom_routes',
@@ -850,7 +850,7 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
         $output[ $key ] = $value;
     }
 
-    if ( ! ace_sitemap_powertools_has_redis_cache_plugin() ) {
+    if ( ! acecrawl_sitemap_has_redis_cache_plugin() ) {
         $output['enable_sitemap_cache'] = 0;
     }
 
@@ -890,7 +890,7 @@ function ace_sitemap_powertools_sanitize_options( $input ) {
     return array_merge( $defaults, $output );
 }
 
-function ace_sitemap_powertools_route_description( $route ) {
+function acecrawl_sitemap_route_description( $route ) {
     $provider = isset( $route['provider'] ) ? $route['provider'] : '';
     $subtype  = isset( $route['subtype'] ) ? $route['subtype'] : '';
 
@@ -921,31 +921,31 @@ function ace_sitemap_powertools_route_description( $route ) {
     return $subtype ? $provider . ': ' . $subtype : $provider;
 }
 
-function ace_sitemap_powertools_root_tag_archives_enabled() {
-    return (bool) ace_sitemap_powertools_get_option( 'enable_root_tag_archive_fallback' );
+function acecrawl_sitemap_root_tag_archives_enabled() {
+    return (bool) acecrawl_sitemap_get_option( 'enable_root_tag_archive_fallback' );
 }
 
-function ace_sitemap_powertools_root_tag_links_enabled() {
-    return (bool) ace_sitemap_powertools_get_option( 'enable_root_tag_links' );
+function acecrawl_sitemap_root_tag_links_enabled() {
+    return (bool) acecrawl_sitemap_get_option( 'enable_root_tag_links' );
 }
 
-function ace_sitemap_powertools_tag_base_redirect_enabled() {
-    return (bool) ace_sitemap_powertools_get_option( 'enable_tag_base_redirect' );
+function acecrawl_sitemap_tag_base_redirect_enabled() {
+    return (bool) acecrawl_sitemap_get_option( 'enable_tag_base_redirect' );
 }
 
-function ace_sitemap_powertools_clean_urls_description() {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) ) {
+function acecrawl_sitemap_clean_urls_description() {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) ) {
         return '<p class="description">Enable clean URLs to show the active route list.</p>';
     }
 
-    $routes = ace_sitemap_powertools_custom_routes();
+    $routes = acecrawl_sitemap_custom_routes();
     if ( empty( $routes ) ) {
         return '<p class="description">No clean URL routes are currently active.</p>';
     }
 
     $items = array();
     foreach ( $routes as $slug => $route ) {
-        $description = ace_sitemap_powertools_route_description( $route );
+        $description = acecrawl_sitemap_route_description( $route );
         $items[] = '<li><code>/' . esc_html( $slug ) . '-1.xml</code> → ' . esc_html( $description ) . '</li>';
     }
 
@@ -970,9 +970,9 @@ function ace_sitemap_powertools_clean_urls_description() {
         'ace_sitemap_powertools_excluded_clean_slugs',
         array( 'popular' )
     );
-    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
-    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
-    $excluded_providers  = ace_sitemap_powertools_excluded_sitemap_providers();
+    $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
+    $excluded_taxonomies = acecrawl_sitemap_excluded_sitemap_taxonomies();
+    $excluded_providers  = acecrawl_sitemap_excluded_sitemap_providers();
 
     $core = array( 'posts', 'taxonomies', 'users' );
     $extra = array();
@@ -1072,36 +1072,36 @@ function ace_sitemap_powertools_clean_urls_description() {
     return $html;
 }
 
-function ace_sitemap_powertools_field_checkbox( $args ) {
-    $options = ace_sitemap_powertools_get_options();
+function acecrawl_sitemap_field_checkbox( $args ) {
+    $options = acecrawl_sitemap_get_options();
     $key     = $args['key'];
     $label   = isset( $args['label'] ) ? $args['label'] : '';
     $description = isset( $args['description'] ) ? $args['description'] : '';
     $value   = ! empty( $options[ $key ] );
 
     echo '<label>';
-    echo '<input type="checkbox" name="ace_sitemap_powertools_options[' . esc_attr( $key ) . ']" value="1" ' . checked( $value, true, false ) . ' />';
+    echo '<input type="checkbox" name="acecrawl_sitemap_options[' . esc_attr( $key ) . ']" value="1" ' . checked( $value, true, false ) . ' />';
     echo ' ' . esc_html( $label ) . '</label>';
     if ( $description ) {
         echo wp_kses_post( $description );
     }
 }
 
-function ace_sitemap_powertools_field_number( $args ) {
-    $options = ace_sitemap_powertools_get_options();
+function acecrawl_sitemap_field_number( $args ) {
+    $options = acecrawl_sitemap_get_options();
     $key     = $args['key'];
     $label   = isset( $args['label'] ) ? $args['label'] : '';
     $min     = isset( $args['min'] ) ? (int) $args['min'] : 0;
     $value   = isset( $options[ $key ] ) ? (int) $options[ $key ] : 0;
 
-    echo '<input type="number" name="ace_sitemap_powertools_options[' . esc_attr( $key ) . ']" min="' . esc_attr( $min ) . '" value="' . esc_attr( $value ) . '" />';
+    echo '<input type="number" name="acecrawl_sitemap_options[' . esc_attr( $key ) . ']" min="' . esc_attr( $min ) . '" value="' . esc_attr( $value ) . '" />';
     if ( $label ) {
         echo '<p class="description">' . esc_html( $label ) . '</p>';
     }
 }
 
-function ace_sitemap_powertools_field_detected_sitemaps( $args ) {
-    $options     = ace_sitemap_powertools_get_options();
+function acecrawl_sitemap_field_detected_sitemaps( $args ) {
+    $options     = acecrawl_sitemap_get_options();
     $key         = $args['key'];
     $choices     = isset( $args['choices'] ) && is_array( $args['choices'] ) ? $args['choices'] : array();
     $empty_label = isset( $args['empty_label'] ) ? $args['empty_label'] : 'No items detected.';
@@ -1118,7 +1118,7 @@ function ace_sitemap_powertools_field_detected_sitemaps( $args ) {
         $checked     = ! in_array( sanitize_key( $value ), $excluded, true );
 
         echo '<label style="display:block;margin-bottom:8px;">';
-        echo '<input type="checkbox" name="ace_sitemap_powertools_options[' . esc_attr( $key ) . '][]" value="' . esc_attr( $value ) . '" ' . checked( $checked, true, false ) . ' />';
+        echo '<input type="checkbox" name="acecrawl_sitemap_options[' . esc_attr( $key ) . '][]" value="' . esc_attr( $value ) . '" ' . checked( $checked, true, false ) . ' />';
         echo ' ' . esc_html( $label );
         if ( $description ) {
             echo ' <span class="description">(' . esc_html( $description ) . ')</span>';
@@ -1129,21 +1129,21 @@ function ace_sitemap_powertools_field_detected_sitemaps( $args ) {
     echo '<p class="description">Unchecked items will be excluded from the sitemap index and sitemap routes.</p>';
 }
 
-function ace_sitemap_powertools_render_settings_page() {
+function acecrawl_sitemap_render_settings_page() {
     echo '<div class="wrap">';
     echo '<h1>Ace Sitemap Powertools</h1>';
     echo '<p>Configure clean sitemap URLs and output. After changing routes, re-save permalinks to flush rewrite rules.</p>';
     echo '<form method="post" action="options.php">';
-    settings_fields( 'ace_sitemap_powertools' );
+    settings_fields( 'acecrawl_sitemap_powertools' );
     do_settings_sections( 'ace-sitemap-powertools' );
     submit_button();
     echo '</form>';
 
-    ace_sitemap_gen_render_status_panel();
+    acecrawl_sitemap_gen_render_status_panel();
     echo '</div>';
 }
 
-function ace_sitemap_powertools_get_provider() {
+function acecrawl_sitemap_get_provider() {
     if ( ! class_exists( 'WP_Sitemaps_Posts' ) ) {
         return null;
     }
@@ -1197,7 +1197,7 @@ function ace_sitemap_powertools_get_provider() {
              * of the news feed (retention) is still listed in the regular one.
              */
             public function news_query_args( $args, $post_type ) {
-                return 'post' === $post_type ? (array) apply_filters( 'ace_sitemap_powertools_news_query_args', $args ) : $args;
+                return 'post' === $post_type ? (array) apply_filters( 'acecrawl_sitemap_news_query_args', $args ) : $args;
             }
         }
     }
@@ -1205,28 +1205,28 @@ function ace_sitemap_powertools_get_provider() {
     return new ACE_News_Posts_Sitemaps_Provider();
 }
 
-function ace_sitemap_powertools_register_news_provider( $wp_sitemaps ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+function acecrawl_sitemap_register_news_provider( $wp_sitemaps ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
         return;
     }
 
-    $provider = ace_sitemap_powertools_get_provider();
+    $provider = acecrawl_sitemap_get_provider();
     if ( ! $provider ) {
         return;
     }
 
     $wp_sitemaps->registry->add_provider( 'news', $provider );
 }
-add_action( 'wp_sitemaps_init', 'ace_sitemap_powertools_register_news_provider' );
+add_action( 'wp_sitemaps_init', 'acecrawl_sitemap_register_news_provider' );
 
-function ace_sitemap_powertools_custom_routes() {
+function acecrawl_sitemap_custom_routes() {
     static $cache = null;
 
     if ( null !== $cache ) {
         return $cache;
     }
 
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) ) {
         $cache = array();
         return $cache;
     }
@@ -1235,27 +1235,27 @@ function ace_sitemap_powertools_custom_routes() {
         'ace_sitemap_powertools_excluded_clean_slugs',
         array( 'popular' )
     );
-    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
-    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
+    $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
+    $excluded_taxonomies = acecrawl_sitemap_excluded_sitemap_taxonomies();
 
     $routes = array();
 
-    if ( ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+    if ( acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
         $routes['news'] = array( 'provider' => 'news', 'subtype' => '' );
     } else {
         $routes['posts'] = array( 'provider' => 'posts', 'subtype' => 'post' );
     }
 
-    if ( ace_sitemap_powertools_is_enabled( 'enable_authors_provider' ) ) {
+    if ( acecrawl_sitemap_is_enabled( 'enable_authors_provider' ) ) {
         $routes['authors'] = array( 'provider' => 'authors', 'subtype' => '' );
     }
 
     // An excluded taxonomy gets no clean route either: it would only answer an empty sitemap.
-    if ( ace_sitemap_powertools_is_enabled( 'enable_categories_route' ) && ! in_array( 'category', $excluded_taxonomies, true ) ) {
+    if ( acecrawl_sitemap_is_enabled( 'enable_categories_route' ) && ! in_array( 'category', $excluded_taxonomies, true ) ) {
         $routes['categories'] = array( 'provider' => 'taxonomies', 'subtype' => 'category' );
     }
 
-    if ( ace_sitemap_powertools_is_enabled( 'enable_tags_route' ) && ! in_array( 'post_tag', $excluded_taxonomies, true ) ) {
+    if ( acecrawl_sitemap_is_enabled( 'enable_tags_route' ) && ! in_array( 'post_tag', $excluded_taxonomies, true ) ) {
         $routes['tags'] = array( 'provider' => 'taxonomies', 'subtype' => 'post_tag' );
     }
 
@@ -1293,7 +1293,7 @@ function ace_sitemap_powertools_custom_routes() {
 
     $post_types = get_post_types( array( 'public' => true ), 'objects' );
     unset( $post_types['attachment'] );
-    if ( ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+    if ( acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
         unset( $post_types['post'] );
     }
 
@@ -1330,12 +1330,12 @@ function ace_sitemap_powertools_custom_routes() {
         }
     }
 
-    $cache = apply_filters( 'ace_sitemap_powertools_custom_routes', $routes );
+    $cache = apply_filters( 'acecrawl_sitemap_custom_routes', $routes );
     return $cache;
 }
 
-function ace_sitemap_powertools_add_rewrite_rules() {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) ) {
+function acecrawl_sitemap_add_rewrite_rules() {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) ) {
         return;
     }
 
@@ -1343,7 +1343,7 @@ function ace_sitemap_powertools_add_rewrite_rules() {
     add_rewrite_rule( '^sitemap\\.xsl$', 'index.php?sitemap-stylesheet=sitemap', 'top' );
     add_rewrite_rule( '^sitemap-index\\.xsl$', 'index.php?sitemap-stylesheet=index', 'top' );
 
-    $routes = ace_sitemap_powertools_custom_routes();
+    $routes = acecrawl_sitemap_custom_routes();
     foreach ( $routes as $slug => $route ) {
         $slug = trim( (string) $slug, '/' );
         if ( '' === $slug ) {
@@ -1361,46 +1361,46 @@ function ace_sitemap_powertools_add_rewrite_rules() {
         add_rewrite_rule( '^' . $pattern . '-([0-9]+)$', $query, 'top' );
     }
 }
-add_action( 'init', 'ace_sitemap_powertools_add_rewrite_rules' );
+add_action( 'init', 'acecrawl_sitemap_add_rewrite_rules' );
 
-function ace_sitemap_powertools_get_cache_version() {
+function acecrawl_sitemap_get_cache_version() {
     $version = 0;
 
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
-        $version = (int) wp_cache_get( 'ace_sitemap_cache_version', 'ace_sitemap_meta' );
+    if ( acecrawl_sitemap_redis_cache_available() ) {
+        $version = (int) wp_cache_get( 'acecrawl_sitemap_cache_version', 'ace_sitemap_meta' );
         if ( $version < 1 ) {
             $version = 1;
-            wp_cache_set( 'ace_sitemap_cache_version', $version, 'ace_sitemap_meta' );
+            wp_cache_set( 'acecrawl_sitemap_cache_version', $version, 'ace_sitemap_meta' );
         }
     } else {
-        $version = (int) get_option( 'ace_sitemap_cache_version', 1 );
+        $version = (int) get_option( 'acecrawl_sitemap_cache_version', 1 );
     }
 
     return $version > 0 ? $version : 1;
 }
 
-function ace_sitemap_powertools_bump_cache_version() {
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
-        $version = (int) wp_cache_incr( 'ace_sitemap_cache_version', 1, 'ace_sitemap_meta' );
+function acecrawl_sitemap_bump_cache_version() {
+    if ( acecrawl_sitemap_redis_cache_available() ) {
+        $version = (int) wp_cache_incr( 'acecrawl_sitemap_cache_version', 1, 'ace_sitemap_meta' );
         if ( $version < 1 ) {
-            $current = ace_sitemap_powertools_get_cache_version();
-            wp_cache_set( 'ace_sitemap_cache_version', $current + 1, 'ace_sitemap_meta' );
+            $current = acecrawl_sitemap_get_cache_version();
+            wp_cache_set( 'acecrawl_sitemap_cache_version', $current + 1, 'ace_sitemap_meta' );
         }
         return;
     }
 
-    $version = ace_sitemap_powertools_get_cache_version();
-    update_option( 'ace_sitemap_cache_version', $version + 1 );
+    $version = acecrawl_sitemap_get_cache_version();
+    update_option( 'acecrawl_sitemap_cache_version', $version + 1 );
 }
 
-function ace_sitemap_powertools_bump_cache_version_debounced( $scope ) {
+function acecrawl_sitemap_bump_cache_version_debounced( $scope ) {
     $scope = sanitize_key( (string) $scope );
     if ( '' === $scope ) {
         $scope = 'global';
     }
 
     $lock_key = 'ace_sitemap_cache_bump_' . $scope;
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
+    if ( acecrawl_sitemap_redis_cache_available() ) {
         if ( ! wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 15 ) ) {
             return false;
         }
@@ -1411,11 +1411,11 @@ function ace_sitemap_powertools_bump_cache_version_debounced( $scope ) {
 
         set_transient( $lock_key, 1, 15 );
     }
-    ace_sitemap_powertools_bump_cache_version();
+    acecrawl_sitemap_bump_cache_version();
     return true;
 }
 
-function ace_sitemap_powertools_is_public_sitemap_post( $post ) {
+function acecrawl_sitemap_is_public_sitemap_post( $post ) {
     if ( ! ( $post instanceof WP_Post ) ) {
         return false;
     }
@@ -1428,7 +1428,7 @@ function ace_sitemap_powertools_is_public_sitemap_post( $post ) {
     return is_post_type_viewable( $post_type_object );
 }
 
-function ace_sitemap_powertools_maybe_bump_cache_version_on_save( $post_id, $post, $update ) {
+function acecrawl_sitemap_maybe_bump_cache_version_on_save( $post_id, $post, $update ) {
     if ( ! $update || ! ( $post instanceof WP_Post ) ) {
         return;
     }
@@ -1437,7 +1437,7 @@ function ace_sitemap_powertools_maybe_bump_cache_version_on_save( $post_id, $pos
         return;
     }
 
-    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+    if ( ! acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
         return;
     }
 
@@ -1445,10 +1445,10 @@ function ace_sitemap_powertools_maybe_bump_cache_version_on_save( $post_id, $pos
         return;
     }
 
-    ace_sitemap_powertools_bump_cache_version_debounced( 'save_post_' . (int) $post_id );
+    acecrawl_sitemap_bump_cache_version_debounced( 'save_post_' . (int) $post_id );
 }
 
-function ace_sitemap_powertools_maybe_bump_cache_version_on_transition( $new_status, $old_status, $post ) {
+function acecrawl_sitemap_maybe_bump_cache_version_on_transition( $new_status, $old_status, $post ) {
     if ( ! ( $post instanceof WP_Post ) ) {
         return;
     }
@@ -1457,7 +1457,7 @@ function ace_sitemap_powertools_maybe_bump_cache_version_on_transition( $new_sta
         return;
     }
 
-    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+    if ( ! acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
         return;
     }
 
@@ -1469,15 +1469,15 @@ function ace_sitemap_powertools_maybe_bump_cache_version_on_transition( $new_sta
         return;
     }
 
-    ace_sitemap_powertools_bump_cache_version_debounced( 'transition_post_' . (int) $post->ID );
+    acecrawl_sitemap_bump_cache_version_debounced( 'transition_post_' . (int) $post->ID );
 }
 
-function ace_sitemap_powertools_maybe_bump_cache_version_on_delete( $post_id, $post ) {
+function acecrawl_sitemap_maybe_bump_cache_version_on_delete( $post_id, $post ) {
     if ( ! ( $post instanceof WP_Post ) ) {
         return;
     }
 
-    if ( ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+    if ( ! acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
         return;
     }
 
@@ -1485,21 +1485,21 @@ function ace_sitemap_powertools_maybe_bump_cache_version_on_delete( $post_id, $p
         return;
     }
 
-    ace_sitemap_powertools_bump_cache_version_debounced( 'delete_post_' . (int) $post_id );
+    acecrawl_sitemap_bump_cache_version_debounced( 'delete_post_' . (int) $post_id );
 }
 
-function ace_sitemap_powertools_cache_get_stale( $key ) {
-    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+function acecrawl_sitemap_cache_get_stale( $key ) {
+    if ( ! acecrawl_sitemap_cache_enabled() ) {
         return null;
     }
 
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
+    if ( acecrawl_sitemap_redis_cache_available() ) {
         $found  = false;
         $stale  = wp_cache_get( 'stale:' . $key, 'ace_sitemap', false, $found );
         return $found ? $stale : null;
     }
 
-    $option_key = ace_sitemap_powertools_cache_option_key( $key );
+    $option_key = acecrawl_sitemap_cache_option_key( $key );
     $stored     = get_option( $option_key );
 
     if ( ! is_array( $stored ) || ! array_key_exists( 'data', $stored ) ) {
@@ -1509,13 +1509,13 @@ function ace_sitemap_powertools_cache_get_stale( $key ) {
     return $stored['data'];
 }
 
-function ace_sitemap_powertools_cache_lock_key( $key ) {
+function acecrawl_sitemap_cache_lock_key( $key ) {
     return 'ace_sitemap_cache_lock_' . md5( (string) $key );
 }
 
-function ace_sitemap_powertools_cache_acquire_lock( $key ) {
-    $lock_key = ace_sitemap_powertools_cache_lock_key( $key );
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
+function acecrawl_sitemap_cache_acquire_lock( $key ) {
+    $lock_key = acecrawl_sitemap_cache_lock_key( $key );
+    if ( acecrawl_sitemap_redis_cache_available() ) {
         return wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 30 );
     }
 
@@ -1526,36 +1526,36 @@ function ace_sitemap_powertools_cache_acquire_lock( $key ) {
     return true;
 }
 
-function ace_sitemap_powertools_cache_release_lock( $key ) {
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
-        wp_cache_delete( ace_sitemap_powertools_cache_lock_key( $key ), 'ace_sitemap_locks' );
+function acecrawl_sitemap_cache_release_lock( $key ) {
+    if ( acecrawl_sitemap_redis_cache_available() ) {
+        wp_cache_delete( acecrawl_sitemap_cache_lock_key( $key ), 'ace_sitemap_locks' );
         return;
     }
 
-    delete_transient( ace_sitemap_powertools_cache_lock_key( $key ) );
+    delete_transient( acecrawl_sitemap_cache_lock_key( $key ) );
 }
 
-function ace_sitemap_powertools_cache_remember( $key, $callback, $fallback = null ) {
+function acecrawl_sitemap_cache_remember( $key, $callback, $fallback = null ) {
     // A background generation build is itself the cache; reading this layer there would
     // hand it the very list it is replacing.
-    if ( function_exists( 'ace_sitemap_gen_is_building' ) && ace_sitemap_gen_is_building() ) {
+    if ( function_exists( 'acecrawl_sitemap_gen_is_building' ) && acecrawl_sitemap_gen_is_building() ) {
         return is_callable( $callback ) ? call_user_func( $callback ) : $fallback;
     }
 
-    $cached = ace_sitemap_powertools_cache_get( $key );
+    $cached = acecrawl_sitemap_cache_get( $key );
     if ( null !== $cached ) {
         return $cached;
     }
 
-    $stale = ace_sitemap_powertools_cache_get_stale( $key );
-    if ( ! ace_sitemap_powertools_cache_acquire_lock( $key ) ) {
+    $stale = acecrawl_sitemap_cache_get_stale( $key );
+    if ( ! acecrawl_sitemap_cache_acquire_lock( $key ) ) {
         if ( null !== $stale ) {
             return $stale;
         }
 
         for ( $attempt = 0; $attempt < 3; $attempt++ ) {
             usleep( 250000 );
-            $cached = ace_sitemap_powertools_cache_get( $key );
+            $cached = acecrawl_sitemap_cache_get( $key );
             if ( null !== $cached ) {
                 return $cached;
             }
@@ -1566,34 +1566,34 @@ function ace_sitemap_powertools_cache_remember( $key, $callback, $fallback = nul
 
     try {
         $value = is_callable( $callback ) ? call_user_func( $callback ) : $fallback;
-        ace_sitemap_powertools_cache_set( $key, $value );
+        acecrawl_sitemap_cache_set( $key, $value );
         return $value;
     } finally {
-        ace_sitemap_powertools_cache_release_lock( $key );
+        acecrawl_sitemap_cache_release_lock( $key );
     }
 }
 
-function ace_sitemap_powertools_get_cache_ttl() {
-    $ttl = (int) ace_sitemap_powertools_get_option( 'sitemap_cache_ttl' );
+function acecrawl_sitemap_get_cache_ttl() {
+    $ttl = (int) acecrawl_sitemap_get_option( 'sitemap_cache_ttl' );
     if ( $ttl < 60 ) {
         $ttl = 60;
     }
-    return (int) apply_filters( 'ace_sitemap_powertools_cache_ttl', $ttl );
+    return (int) apply_filters( 'acecrawl_sitemap_cache_ttl', $ttl );
 }
 
-function ace_sitemap_powertools_cache_enabled() {
-    if ( function_exists( 'ace_sitemap_gen_is_building' ) && ace_sitemap_gen_is_building() ) {
+function acecrawl_sitemap_cache_enabled() {
+    if ( function_exists( 'acecrawl_sitemap_gen_is_building' ) && acecrawl_sitemap_gen_is_building() ) {
         return false;
     }
-    return ace_sitemap_powertools_is_enabled( 'enable_sitemap_cache' ) && ace_sitemap_powertools_redis_cache_available();
+    return acecrawl_sitemap_is_enabled( 'enable_sitemap_cache' ) && acecrawl_sitemap_redis_cache_available();
 }
 
-function ace_sitemap_powertools_purge_cache() {
+function acecrawl_sitemap_purge_cache() {
     // Rebuilds in the background; the current sitemaps stay online meanwhile.
-    ace_sitemap_gen_mark_dirty( 'all', true );
+    acecrawl_sitemap_gen_mark_dirty( 'all', true );
 
-    if ( ace_sitemap_powertools_redis_cache_available() ) {
-        ace_sitemap_powertools_bump_cache_version();
+    if ( acecrawl_sitemap_redis_cache_available() ) {
+        acecrawl_sitemap_bump_cache_version();
         return;
     }
 
@@ -1604,7 +1604,7 @@ function ace_sitemap_powertools_purge_cache() {
     }
 
     $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'ace_sitemap_cache_%'" );
-    ace_sitemap_powertools_bump_cache_version();
+    acecrawl_sitemap_bump_cache_version();
 }
 
 /**
@@ -1618,7 +1618,7 @@ function ace_sitemap_powertools_purge_cache() {
  *
  * @return int Number of rows deleted.
  */
-function ace_sitemap_powertools_gc_option_cache() {
+function acecrawl_sitemap_gc_option_cache() {
     global $wpdb;
 
     if ( ! $wpdb ) {
@@ -1652,26 +1652,26 @@ function ace_sitemap_powertools_gc_option_cache() {
  * On sites that never had the bloat this is a single indexed DELETE returning 0 rows.
  * Runs over several admin requests if there is a very large backlog (50k/run cap).
  */
-function ace_sitemap_powertools_maybe_purge_legacy_cache() {
-    if ( get_option( 'ace_sitemap_powertools_legacy_cache_purged' ) ) {
+function acecrawl_sitemap_maybe_purge_legacy_cache() {
+    if ( get_option( 'acecrawl_sitemap_legacy_cache_purged' ) ) {
         return;
     }
 
-    $deleted = ace_sitemap_powertools_gc_option_cache();
+    $deleted = acecrawl_sitemap_gc_option_cache();
 
     // Only mark complete once a run comes back under the per-run cap (i.e. backlog drained).
     if ( $deleted < 50000 ) {
-        update_option( 'ace_sitemap_powertools_legacy_cache_purged', 1, false );
+        update_option( 'acecrawl_sitemap_legacy_cache_purged', 1, false );
     }
 }
-add_action( 'admin_init', 'ace_sitemap_powertools_maybe_purge_legacy_cache' );
+add_action( 'admin_init', 'acecrawl_sitemap_maybe_purge_legacy_cache' );
 
-function ace_sitemap_powertools_cache_option_key( $key ) {
+function acecrawl_sitemap_cache_option_key( $key ) {
     return 'ace_sitemap_cache_' . md5( (string) $key );
 }
 
-function ace_sitemap_powertools_cache_get( $key ) {
-    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+function acecrawl_sitemap_cache_get( $key ) {
+    if ( ! acecrawl_sitemap_cache_enabled() ) {
         return null;
     }
 
@@ -1681,14 +1681,14 @@ function ace_sitemap_powertools_cache_get( $key ) {
         return $cached;
     }
 
-    if ( ! ace_sitemap_powertools_redis_cache_available() ) {
-        $option_key = ace_sitemap_powertools_cache_option_key( $key );
+    if ( ! acecrawl_sitemap_redis_cache_available() ) {
+        $option_key = acecrawl_sitemap_cache_option_key( $key );
         $stored = get_option( $option_key );
         if ( ! is_array( $stored ) || ! isset( $stored['t'] ) || ! array_key_exists( 'data', $stored ) ) {
             return null;
         }
 
-        $ttl = ace_sitemap_powertools_get_cache_ttl();
+        $ttl = acecrawl_sitemap_get_cache_ttl();
         if ( $ttl > 0 && ( time() - (int) $stored['t'] ) > $ttl ) {
             return null;
         }
@@ -1699,12 +1699,12 @@ function ace_sitemap_powertools_cache_get( $key ) {
     return null;
 }
 
-function ace_sitemap_powertools_cache_set( $key, $value ) {
-    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+function acecrawl_sitemap_cache_set( $key, $value ) {
+    if ( ! acecrawl_sitemap_cache_enabled() ) {
         return;
     }
 
-    $ttl = ace_sitemap_powertools_get_cache_ttl();
+    $ttl = acecrawl_sitemap_get_cache_ttl();
     wp_cache_set( $key, $value, 'ace_sitemap', $ttl );
     wp_cache_set( 'stale:' . $key, $value, 'ace_sitemap', max( $ttl * 2, $ttl + 60 ) );
 
@@ -1713,11 +1713,11 @@ function ace_sitemap_powertools_cache_set( $key, $value ) {
     // only reached when Redis is the backing store. Writing each sitemap chunk (~0.4 MB)
     // to wp_options as a permanent, never-expiring row is what previously bloated
     // wp_options to multiple GB. Legacy rows are cleared once by
-    // ace_sitemap_powertools_maybe_purge_legacy_cache().
+    // acecrawl_sitemap_maybe_purge_legacy_cache().
 }
 
-function ace_sitemap_powertools_filter_redis_cache_exclusions( $exclusions ) {
-    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+function acecrawl_sitemap_filter_redis_cache_exclusions( $exclusions ) {
+    if ( ! acecrawl_sitemap_cache_enabled() ) {
         return $exclusions;
     }
 
@@ -1725,7 +1725,7 @@ function ace_sitemap_powertools_filter_redis_cache_exclusions( $exclusions ) {
     $exclusions[] = 'wp-sitemap';
     $exclusions[] = 'sitemap-stylesheet';
 
-    $routes = function_exists( 'ace_sitemap_powertools_custom_routes' ) ? ace_sitemap_powertools_custom_routes() : array();
+    $routes = function_exists( 'acecrawl_sitemap_custom_routes' ) ? acecrawl_sitemap_custom_routes() : array();
     foreach ( array_keys( (array) $routes ) as $slug ) {
         $slug = trim( (string) $slug );
         if ( '' !== $slug ) {
@@ -1736,32 +1736,32 @@ function ace_sitemap_powertools_filter_redis_cache_exclusions( $exclusions ) {
 
     return array_values( array_unique( array_filter( $exclusions ) ) );
 }
-add_filter( 'ace_redis_cache_excluded_urls', 'ace_sitemap_powertools_filter_redis_cache_exclusions' );
+add_filter( 'ace_redis_cache_excluded_urls', 'acecrawl_sitemap_filter_redis_cache_exclusions' );
 
-function ace_sitemap_powertools_filter_redis_sitemap_prime_delay( $delay ) {
-    if ( ! ace_sitemap_powertools_cache_enabled() ) {
+function acecrawl_sitemap_filter_redis_sitemap_prime_delay( $delay ) {
+    if ( ! acecrawl_sitemap_cache_enabled() ) {
         return $delay;
     }
 
-    return max( 300, ace_sitemap_powertools_get_cache_ttl() );
+    return max( 300, acecrawl_sitemap_get_cache_ttl() );
 }
-add_filter( 'ace_rc_sitemap_prime_delay', 'ace_sitemap_powertools_filter_redis_sitemap_prime_delay' );
+add_filter( 'ace_rc_sitemap_prime_delay', 'acecrawl_sitemap_filter_redis_sitemap_prime_delay' );
 
 // Invalidate sitemap cache only when public sitemap content changes.
-add_action( 'save_post', 'ace_sitemap_powertools_maybe_bump_cache_version_on_save', 20, 3 );
-add_action( 'deleted_post', 'ace_sitemap_powertools_maybe_bump_cache_version_on_delete', 20, 2 );
-add_action( 'transition_post_status', 'ace_sitemap_powertools_maybe_bump_cache_version_on_transition', 20, 3 );
-add_action( 'edited_term', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
-add_action( 'delete_term', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
-add_action( 'user_register', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
-add_action( 'profile_update', 'ace_sitemap_powertools_bump_cache_version', 20, 0 );
+add_action( 'save_post', 'acecrawl_sitemap_maybe_bump_cache_version_on_save', 20, 3 );
+add_action( 'deleted_post', 'acecrawl_sitemap_maybe_bump_cache_version_on_delete', 20, 2 );
+add_action( 'transition_post_status', 'acecrawl_sitemap_maybe_bump_cache_version_on_transition', 20, 3 );
+add_action( 'edited_term', 'acecrawl_sitemap_bump_cache_version', 20, 0 );
+add_action( 'delete_term', 'acecrawl_sitemap_bump_cache_version', 20, 0 );
+add_action( 'user_register', 'acecrawl_sitemap_bump_cache_version', 20, 0 );
+add_action( 'profile_update', 'acecrawl_sitemap_bump_cache_version', 20, 0 );
 
-function ace_sitemap_powertools_handle_purge_cache_request() {
+function acecrawl_sitemap_handle_purge_cache_request() {
     if ( ! is_admin() ) {
         return;
     }
 
-    if ( empty( $_POST['ace_sitemap_powertools_purge_cache'] ) ) {
+    if ( empty( $_POST['acecrawl_sitemap_purge_cache'] ) ) {
         return;
     }
 
@@ -1769,30 +1769,30 @@ function ace_sitemap_powertools_handle_purge_cache_request() {
         return;
     }
 
-    if ( empty( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ?? '' ) ), 'ace_sitemap_purge_cache' ) ) {
+    if ( empty( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ?? '' ) ), 'acecrawl_sitemap_purge_cache' ) ) {
         return;
     }
 
-    ace_sitemap_powertools_purge_cache();
-    update_option( 'ace_sitemap_powertools_purge_notice', 1, false );
+    acecrawl_sitemap_purge_cache();
+    update_option( 'acecrawl_sitemap_purge_notice', 1, false );
 }
-add_action( 'admin_init', 'ace_sitemap_powertools_handle_purge_cache_request' );
+add_action( 'admin_init', 'acecrawl_sitemap_handle_purge_cache_request' );
 
-function ace_sitemap_powertools_ajax_purge_cache() {
+function acecrawl_sitemap_ajax_purge_cache() {
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 
-    check_ajax_referer( 'ace_sitemap_purge_cache', 'nonce' );
+    check_ajax_referer( 'acecrawl_sitemap_purge_cache', 'nonce' );
 
-    ace_sitemap_powertools_purge_cache();
+    acecrawl_sitemap_purge_cache();
     wp_send_json_success( array(
-        'cache_version' => ace_sitemap_powertools_get_cache_version(),
+        'cache_version' => acecrawl_sitemap_get_cache_version(),
     ) );
 }
-add_action( 'wp_ajax_ace_sitemap_purge_cache', 'ace_sitemap_powertools_ajax_purge_cache' );
+add_action( 'wp_ajax_acecrawl_sitemap_purge_cache', 'acecrawl_sitemap_ajax_purge_cache' );
 
-function ace_sitemap_powertools_admin_notices() {
+function acecrawl_sitemap_admin_notices() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
@@ -1802,20 +1802,20 @@ function ace_sitemap_powertools_admin_notices() {
         return;
     }
 
-    if ( get_option( 'ace_sitemap_powertools_large_site_notice' ) ) {
+    if ( get_option( 'acecrawl_sitemap_large_site_notice' ) ) {
         echo '<div class="notice notice-info is-dismissible"><p><strong>Ace Sitemap:</strong> Large site detected (1000+ posts). We disabled sitemap index <code>lastmod</code> by default to reduce expensive cold-load work while keeping per-URL <code>lastmod</code> in sub-sitemaps. You can re-enable it in the Sitemaps → Caching section.</p></div>';
-        delete_option( 'ace_sitemap_powertools_large_site_notice' );
+        delete_option( 'acecrawl_sitemap_large_site_notice' );
     }
 
-    if ( get_option( 'ace_sitemap_powertools_purge_notice' ) ) {
+    if ( get_option( 'acecrawl_sitemap_purge_notice' ) ) {
         echo '<div class="notice notice-success is-dismissible"><p>Sitemap cache cleared.</p></div>';
-        delete_option( 'ace_sitemap_powertools_purge_notice' );
+        delete_option( 'acecrawl_sitemap_purge_notice' );
     }
 }
-add_action( 'admin_notices', 'ace_sitemap_powertools_admin_notices' );
+add_action( 'admin_notices', 'acecrawl_sitemap_admin_notices' );
 
-function ace_sitemap_powertools_serve_custom_routes() {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) || ! ace_sitemap_powertools_is_enabled( 'serve_custom_routes' ) ) {
+function acecrawl_sitemap_serve_custom_routes() {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) || ! acecrawl_sitemap_is_enabled( 'serve_custom_routes' ) ) {
         return;
     }
 
@@ -1828,14 +1828,14 @@ function ace_sitemap_powertools_serve_custom_routes() {
         $wp_sitemaps = wp_sitemaps_get_server();
 
         if ( 'index' === $requested_sitemap ) {
-            $sitemap_list = ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps );
+            $sitemap_list = acecrawl_sitemap_get_cached_index_list( $wp_sitemaps );
             if ( null === $sitemap_list ) {
-                ace_sitemap_powertools_send_unavailable();
+                acecrawl_sitemap_send_unavailable();
             }
-            if ( ace_sitemap_powertools_should_render_human_view() ) {
-                ace_sitemap_powertools_render_index_html( $sitemap_list );
+            if ( acecrawl_sitemap_should_render_human_view() ) {
+                acecrawl_sitemap_render_index_html( $sitemap_list );
             } else {
-                ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list );
+                acecrawl_sitemap_render_index_xml( $wp_sitemaps, $sitemap_list );
             }
             exit;
         }
@@ -1854,9 +1854,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
             return;
         }
 
-        $url_list = ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page );
+        $url_list = acecrawl_sitemap_get_cached_url_list( $provider, $route, $page );
         if ( null === $url_list ) {
-            ace_sitemap_powertools_send_unavailable();
+            acecrawl_sitemap_send_unavailable();
         }
         if ( empty( $url_list ) ) {
             global $wp_query;
@@ -1867,10 +1867,10 @@ function ace_sitemap_powertools_serve_custom_routes() {
             return;
         }
 
-        if ( ace_sitemap_powertools_should_render_human_view() ) {
-            ace_sitemap_powertools_render_sitemap_html( $url_list );
+        if ( acecrawl_sitemap_should_render_human_view() ) {
+            acecrawl_sitemap_render_sitemap_html( $url_list );
         } else {
-            ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list );
+            acecrawl_sitemap_render_sitemap_xml( $wp_sitemaps, $url_list );
         }
         exit;
     }
@@ -1883,15 +1883,15 @@ function ace_sitemap_powertools_serve_custom_routes() {
     $path = trim( $path, '/' );
     if ( 'sitemap.xml' === $path ) {
         $wp_sitemaps  = wp_sitemaps_get_server();
-        $sitemap_list = ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps );
+        $sitemap_list = acecrawl_sitemap_get_cached_index_list( $wp_sitemaps );
         if ( null === $sitemap_list ) {
-            ace_sitemap_powertools_send_unavailable();
+            acecrawl_sitemap_send_unavailable();
         }
 
-        if ( ace_sitemap_powertools_should_render_human_view() ) {
-            ace_sitemap_powertools_render_index_html( $sitemap_list );
+        if ( acecrawl_sitemap_should_render_human_view() ) {
+            acecrawl_sitemap_render_index_html( $sitemap_list );
         } else {
-            ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list );
+            acecrawl_sitemap_render_index_xml( $wp_sitemaps, $sitemap_list );
         }
         exit;
     }
@@ -1911,15 +1911,15 @@ function ace_sitemap_powertools_serve_custom_routes() {
         return;
     }
 
-    $routes = ace_sitemap_powertools_custom_routes();
+    $routes = acecrawl_sitemap_custom_routes();
     if ( ! isset( $routes[ $slug ] ) ) {
         return;
     }
 
     // A discouraged site serves no sitemaps — unless it is trying to get out of the
     // index, where the sitemap is what brings a crawler back to read each noindex.
-    if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged()
-        && 'block' === ace_seo_discourage_mode() ) {
+    if ( function_exists( 'acecrawl_site_is_discouraged' ) && acecrawl_site_is_discouraged()
+        && 'block' === acecrawl_discourage_mode() ) {
         global $wp_query;
         if ( $wp_query ) {
             $wp_query->set_404();
@@ -1935,9 +1935,9 @@ function ace_sitemap_powertools_serve_custom_routes() {
         return;
     }
 
-    $url_list = ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page );
+    $url_list = acecrawl_sitemap_get_cached_url_list( $provider, $route, $page );
     if ( null === $url_list ) {
-        ace_sitemap_powertools_send_unavailable();
+        acecrawl_sitemap_send_unavailable();
     }
     if ( empty( $url_list ) ) {
         global $wp_query;
@@ -1948,14 +1948,14 @@ function ace_sitemap_powertools_serve_custom_routes() {
         return;
     }
 
-    if ( ace_sitemap_powertools_should_render_human_view() ) {
-        ace_sitemap_powertools_render_sitemap_html( $url_list );
+    if ( acecrawl_sitemap_should_render_human_view() ) {
+        acecrawl_sitemap_render_sitemap_html( $url_list );
     } else {
-        ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list );
+        acecrawl_sitemap_render_sitemap_xml( $wp_sitemaps, $url_list );
     }
     exit;
 }
-add_action( 'template_redirect', 'ace_sitemap_powertools_serve_custom_routes', 0 );
+add_action( 'template_redirect', 'acecrawl_sitemap_serve_custom_routes', 0 );
 
 /**
  * Return 410 Gone for legacy sitemap URL patterns that no longer exist on this site.
@@ -1968,7 +1968,7 @@ add_action( 'template_redirect', 'ace_sitemap_powertools_serve_custom_routes', 0
  *
  * @return void
  */
-function ace_sitemap_powertools_handle_legacy_gone(): void {
+function acecrawl_sitemap_handle_legacy_gone(): void {
     $path = isset( $_SERVER['REQUEST_URI'] )
         ? wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH )
         : '';
@@ -2011,9 +2011,9 @@ function ace_sitemap_powertools_handle_legacy_gone(): void {
         }
     }
 }
-add_action( 'template_redirect', 'ace_sitemap_powertools_handle_legacy_gone', -1 );
+add_action( 'template_redirect', 'acecrawl_sitemap_handle_legacy_gone', -1 );
 
-function ace_sitemap_powertools_mark_valid_core_sitemap_success() {
+function acecrawl_sitemap_mark_valid_core_sitemap_success() {
     if ( ! function_exists( 'wp_sitemaps_get_server' ) ) {
         return;
     }
@@ -2027,7 +2027,7 @@ function ace_sitemap_powertools_mark_valid_core_sitemap_success() {
 
     if ( 'index' === $sitemap ) {
         if ( ! empty( $wp_sitemaps->index->get_sitemap_list() ) ) {
-            ace_sitemap_powertools_send_success_status();
+            acecrawl_sitemap_send_success_status();
         }
         return;
     }
@@ -2045,15 +2045,15 @@ function ace_sitemap_powertools_mark_valid_core_sitemap_success() {
     $subtype  = sanitize_key( (string) get_query_var( 'sitemap-subtype' ) );
     $url_list = $provider->get_url_list( $page, $subtype );
     if ( ! empty( $url_list ) ) {
-        ace_sitemap_powertools_send_success_status();
+        acecrawl_sitemap_send_success_status();
     }
 }
-add_action( 'template_redirect', 'ace_sitemap_powertools_mark_valid_core_sitemap_success', 9 );
+add_action( 'template_redirect', 'acecrawl_sitemap_mark_valid_core_sitemap_success', 9 );
 
-function ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps ) {
-    if ( ace_sitemap_gen_enabled() ) {
-        return ace_sitemap_gen_get(
-            ace_sitemap_gen_index_key(),
+function acecrawl_sitemap_get_cached_index_list( $wp_sitemaps ) {
+    if ( acecrawl_sitemap_gen_enabled() ) {
+        return acecrawl_sitemap_gen_get(
+            acecrawl_sitemap_gen_index_key(),
             array( 'provider' => 'index', 'subtype' => '', 'page' => 0 ),
             function () use ( $wp_sitemaps ) {
                 return $wp_sitemaps->index->get_sitemap_list();
@@ -2063,25 +2063,25 @@ function ace_sitemap_powertools_get_cached_index_list( $wp_sitemaps ) {
 
     $sitemap_list = null;
 
-    if ( ace_sitemap_powertools_cache_enabled() ) {
-        $cache_key    = 'index_list_v' . ace_sitemap_powertools_get_cache_version();
-        $sitemap_list = ace_sitemap_powertools_cache_get( $cache_key );
+    if ( acecrawl_sitemap_cache_enabled() ) {
+        $cache_key    = 'index_list_v' . acecrawl_sitemap_get_cache_version();
+        $sitemap_list = acecrawl_sitemap_cache_get( $cache_key );
     }
 
     if ( ! is_array( $sitemap_list ) ) {
         $sitemap_list = $wp_sitemaps->index->get_sitemap_list();
-        if ( ace_sitemap_powertools_cache_enabled() && is_array( $sitemap_list ) ) {
-            ace_sitemap_powertools_cache_set( $cache_key, $sitemap_list );
+        if ( acecrawl_sitemap_cache_enabled() && is_array( $sitemap_list ) ) {
+            acecrawl_sitemap_cache_set( $cache_key, $sitemap_list );
         }
     }
 
     return is_array( $sitemap_list ) ? $sitemap_list : array();
 }
 
-function ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page ) {
-    if ( ace_sitemap_gen_enabled() ) {
-        return ace_sitemap_gen_get(
-            ace_sitemap_gen_url_key( $route['provider'], $route['subtype'], $page ),
+function acecrawl_sitemap_get_cached_url_list( $provider, $route, $page ) {
+    if ( acecrawl_sitemap_gen_enabled() ) {
+        return acecrawl_sitemap_gen_get(
+            acecrawl_sitemap_gen_url_key( $route['provider'], $route['subtype'], $page ),
             array( 'provider' => sanitize_key( (string) $route['provider'] ), 'subtype' => sanitize_key( (string) $route['subtype'] ), 'page' => (int) $page ),
             function () use ( $provider, $route, $page ) {
                 return $provider->get_url_list( $page, $route['subtype'] );
@@ -2091,21 +2091,21 @@ function ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page ) 
 
     $url_list = null;
 
-    if ( ace_sitemap_powertools_cache_enabled() ) {
+    if ( acecrawl_sitemap_cache_enabled() ) {
         $cache_key = sprintf(
             'url_list_v%d_%s_%s_%d',
-            ace_sitemap_powertools_get_cache_version(),
+            acecrawl_sitemap_get_cache_version(),
             sanitize_key( (string) $route['provider'] ),
             sanitize_key( (string) $route['subtype'] ),
             (int) $page
         );
-        $url_list = ace_sitemap_powertools_cache_get( $cache_key );
+        $url_list = acecrawl_sitemap_cache_get( $cache_key );
     }
 
     if ( ! is_array( $url_list ) ) {
         $url_list = $provider->get_url_list( $page, $route['subtype'] );
-        if ( ace_sitemap_powertools_cache_enabled() && is_array( $url_list ) ) {
-            ace_sitemap_powertools_cache_set( $cache_key, $url_list );
+        if ( acecrawl_sitemap_cache_enabled() && is_array( $url_list ) ) {
+            acecrawl_sitemap_cache_set( $cache_key, $url_list );
         }
     }
 
@@ -2116,7 +2116,7 @@ function ace_sitemap_powertools_get_cached_url_list( $provider, $route, $page ) 
  * Nothing to serve yet (first build still running elsewhere): ask the client to come back
  * rather than answering with an empty sitemap that looks like a real one.
  */
-function ace_sitemap_powertools_send_unavailable() {
+function acecrawl_sitemap_send_unavailable() {
     status_header( 503 );
     header( 'Retry-After: 30' );
     header( 'Cache-Control: no-store' );
@@ -2124,7 +2124,7 @@ function ace_sitemap_powertools_send_unavailable() {
     exit;
 }
 
-function ace_sitemap_powertools_is_probable_bot_request() {
+function acecrawl_sitemap_is_probable_bot_request() {
     $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : '';
     if ( '' === $ua ) {
         return true;
@@ -2161,7 +2161,7 @@ function ace_sitemap_powertools_is_probable_bot_request() {
     return false;
 }
 
-function ace_sitemap_powertools_should_render_human_view() {
+function acecrawl_sitemap_should_render_human_view() {
     if ( isset( $_GET['bot'] ) ) {
         return false;
     }
@@ -2170,7 +2170,7 @@ function ace_sitemap_powertools_should_render_human_view() {
         return true;
     }
 
-    if ( ace_sitemap_powertools_is_probable_bot_request() ) {
+    if ( acecrawl_sitemap_is_probable_bot_request() ) {
         return false;
     }
 
@@ -2186,13 +2186,13 @@ function ace_sitemap_powertools_should_render_human_view() {
     return false !== strpos( $accept, 'text/html' );
 }
 
-function ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list ) {
+function acecrawl_sitemap_render_index_xml( $wp_sitemaps, $sitemap_list ) {
     if ( ! isset( $wp_sitemaps->renderer ) || ! is_object( $wp_sitemaps->renderer ) ) {
         return;
     }
 
-    ace_sitemap_powertools_send_response_cache_headers();
-    ace_sitemap_powertools_send_success_status();
+    acecrawl_sitemap_send_response_cache_headers();
+    acecrawl_sitemap_send_success_status();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_index_xml( $sitemap_list );
     if ( ! empty( $xml ) ) {
@@ -2200,13 +2200,13 @@ function ace_sitemap_powertools_render_index_xml( $wp_sitemaps, $sitemap_list ) 
     }
 }
 
-function ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list ) {
+function acecrawl_sitemap_render_sitemap_xml( $wp_sitemaps, $url_list ) {
     if ( ! isset( $wp_sitemaps->renderer ) || ! is_object( $wp_sitemaps->renderer ) ) {
         return;
     }
 
-    ace_sitemap_powertools_send_response_cache_headers();
-    ace_sitemap_powertools_send_success_status();
+    acecrawl_sitemap_send_response_cache_headers();
+    acecrawl_sitemap_send_success_status();
     header( 'Content-Type: application/xml; charset=UTF-8' );
     $xml = $wp_sitemaps->renderer->get_sitemap_xml( $url_list );
     if ( ! empty( $xml ) ) {
@@ -2214,7 +2214,7 @@ function ace_sitemap_powertools_render_sitemap_xml( $wp_sitemaps, $url_list ) {
     }
 }
 
-function ace_sitemap_powertools_send_success_status() {
+function acecrawl_sitemap_send_success_status() {
     global $wp_query;
 
     if ( $wp_query instanceof WP_Query ) {
@@ -2224,10 +2224,10 @@ function ace_sitemap_powertools_send_success_status() {
     status_header( 200 );
 }
 
-function ace_sitemap_powertools_send_response_cache_headers() {
+function acecrawl_sitemap_send_response_cache_headers() {
     $ttl = (int) apply_filters(
         'ace_sitemap_powertools_response_cache_ttl',
-        ace_sitemap_powertools_get_cache_ttl()
+        acecrawl_sitemap_get_cache_ttl()
     );
 
     if ( $ttl < 60 ) {
@@ -2245,7 +2245,7 @@ function ace_sitemap_powertools_send_response_cache_headers() {
     }
 }
 
-function ace_sitemap_powertools_get_human_view_css() {
+function acecrawl_sitemap_get_human_view_css() {
     if ( class_exists( 'WP_Sitemaps_Stylesheet' ) ) {
         $stylesheet = new WP_Sitemaps_Stylesheet();
         if ( method_exists( $stylesheet, 'get_stylesheet_css' ) ) {
@@ -2256,7 +2256,7 @@ function ace_sitemap_powertools_get_human_view_css() {
     return '#sitemap{font-family:Arial,sans-serif;max-width:980px;margin:0 auto;padding:16px}#sitemap__table{width:100%;border-collapse:collapse}#sitemap__table th,#sitemap__table td{border:1px solid #ddd;padding:8px;text-align:left}#sitemap__table thead{background:#f5f5f5}.text{margin:12px 0}';
 }
 
-function ace_sitemap_powertools_get_human_theme_stylesheet_links() {
+function acecrawl_sitemap_get_human_theme_stylesheet_links() {
     $urls = array();
 
     if ( function_exists( 'get_stylesheet_uri' ) ) {
@@ -2282,7 +2282,7 @@ function ace_sitemap_powertools_get_human_theme_stylesheet_links() {
     return array_values( array_unique( $urls ) );
 }
 
-function ace_sitemap_powertools_get_human_theme_global_styles() {
+function acecrawl_sitemap_get_human_theme_global_styles() {
     if ( ! function_exists( 'wp_get_global_stylesheet' ) ) {
         return '';
     }
@@ -2295,7 +2295,7 @@ function ace_sitemap_powertools_get_human_theme_global_styles() {
  * @font-face rules for the fonts the active theme declares in theme.json, so the
  * human sitemap can use the theme's body font. Empty before WordPress 6.4.
  */
-function ace_sitemap_powertools_get_human_font_face_css() {
+function acecrawl_sitemap_get_human_font_face_css() {
     if ( ! function_exists( 'wp_print_font_faces' ) ) {
         return '';
     }
@@ -2315,7 +2315,7 @@ function ace_sitemap_powertools_get_human_font_face_css() {
  * The theme's body font as a CSS value, from global styles. A preset reference becomes
  * its custom property; empty when the theme sets no body font.
  */
-function ace_sitemap_powertools_get_human_font_family() {
+function acecrawl_sitemap_get_human_font_family() {
     if ( ! function_exists( 'wp_get_global_styles' ) ) {
         return '';
     }
@@ -2333,8 +2333,8 @@ function ace_sitemap_powertools_get_human_font_family() {
     return trim( str_replace( array( ';', '{', '}', '<', '>' ), '', $family ) );
 }
 
-function ace_sitemap_powertools_get_human_theme_override_css() {
-    $family = ace_sitemap_powertools_get_human_font_family();
+function acecrawl_sitemap_get_human_theme_override_css() {
+    $family = acecrawl_sitemap_get_human_font_family();
     $css    = '' !== $family ? '#sitemap,#sitemap *{font-family:' . $family . ',sans-serif !important;}' : '';
     $css   .= 'body{background:var(--wp--preset--color--background,#fff);color:var(--wp--preset--color--foreground,#1a1a1a);}#sitemap__table{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table th,#sitemap__table td{border-color:var(--wp--preset--color--lightgrey,#d9d9d9);}#sitemap__table tbody tr:nth-child(odd){background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 94%,var(--wp--preset--color--tertiary,#1a1a1a) 6%);}#sitemap__table tbody tr:hover{background:color-mix(in srgb,var(--wp--preset--color--background,#fff) 85%,var(--wp--preset--color--primary,#2271b1) 15%);}#sitemap__table tr td.loc a,#sitemap__table tr td.loc span{color:var(--wp--preset--color--tertiary,#1a1a1a);}#sitemap__table tr td.loc a:hover{color:var(--wp--preset--color--primary,#2271b1);}#sitemap__header p,#sitemap__content .text{color:var(--wp--preset--color--darkgrey,#666);}.sitemap-brand__title{color:var(--wp--preset--color--primary,#2271b1);}';
 
@@ -2343,20 +2343,20 @@ function ace_sitemap_powertools_get_human_theme_override_css() {
      *
      * @param string $css CSS rules.
      */
-    return (string) apply_filters( 'ace_sitemap_powertools_human_theme_css', $css );
+    return (string) apply_filters( 'acecrawl_sitemap_human_theme_css', $css );
 }
 
-function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
-    ace_sitemap_powertools_send_response_cache_headers();
+function acecrawl_sitemap_render_html_header( $title, $count, $context ) {
+    acecrawl_sitemap_send_response_cache_headers();
     header( 'Content-Type: text/html; charset=UTF-8' );
     status_header( 200 );
 
     $title_text = esc_html( $title );
-    $css        = ace_sitemap_powertools_get_human_view_css();
-    $font_face  = ace_sitemap_powertools_get_human_font_face_css();
-    $theme_css  = ace_sitemap_powertools_get_human_theme_global_styles();
-    $overrides  = ace_sitemap_powertools_get_human_theme_override_css();
-    $theme_links = ace_sitemap_powertools_get_human_theme_stylesheet_links();
+    $css        = acecrawl_sitemap_get_human_view_css();
+    $font_face  = acecrawl_sitemap_get_human_font_face_css();
+    $theme_css  = acecrawl_sitemap_get_human_theme_global_styles();
+    $overrides  = acecrawl_sitemap_get_human_theme_override_css();
+    $theme_links = acecrawl_sitemap_get_human_theme_stylesheet_links();
     $lang       = function_exists( 'get_language_attributes' ) ? get_language_attributes( 'html' ) : 'lang="en"';
     $learn_more = sprintf(
         '<a href="%s">%s</a>',
@@ -2369,7 +2369,7 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
         number_format_i18n( (int) $count )
     );
 
-    $header_html = ace_sitemap_powertools_stylesheet_header_html( $context );
+    $header_html = acecrawl_sitemap_stylesheet_header_html( $context );
     if ( '' === $header_html ) {
         $description = esc_html__( 'This XML Sitemap is generated by WordPress to make your content more visible for search engines.', 'ace-crawl-enhancer' );
         $header_html = '<div id="sitemap__header"><h1>' . $title_text . '</h1><p>' . $description . '</p><p>' . $learn_more . '</p></div>';
@@ -2380,10 +2380,10 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
     $style_handles = array();
     foreach ( $theme_links as $index => $theme_link ) {
         $handle = 'ace-seo-sitemap-theme-' . absint( $index );
-        wp_enqueue_style( $handle, $theme_link, array(), ACE_SITEMAP_POWERTOOLS_VERSION );
+        wp_enqueue_style( $handle, $theme_link, array(), ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
         $style_handles[] = $handle;
     }
-    wp_register_style( 'ace-seo-sitemap-human', false, $style_handles, ACE_SITEMAP_POWERTOOLS_VERSION );
+    wp_register_style( 'ace-seo-sitemap-human', false, $style_handles, ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
     wp_enqueue_style( 'ace-seo-sitemap-human' );
     wp_add_inline_style( 'ace-seo-sitemap-human', wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) );
     // This standalone document has no wp_head(): print only its registered dependencies.
@@ -2393,11 +2393,11 @@ function ace_sitemap_powertools_render_html_header( $title, $count, $context ) {
     echo '<div id="sitemap__content"><p class="text">' . esc_html( $summary ) . '</p>';
 }
 
-function ace_sitemap_powertools_render_html_footer() {
+function acecrawl_sitemap_render_html_footer() {
     echo '</div></div></body></html>';
 }
 
-function ace_sitemap_powertools_is_page_one_loc( $loc ) {
+function acecrawl_sitemap_is_page_one_loc( $loc ) {
     if ( ! is_string( $loc ) || '' === $loc ) {
         return false;
     }
@@ -2405,7 +2405,7 @@ function ace_sitemap_powertools_is_page_one_loc( $loc ) {
     return (bool) preg_match( '~(?:-1\.xml|-1(?:$|\?)|[?&]paged=1(?:$|&))~i', $loc );
 }
 
-function ace_sitemap_powertools_recent_prefix_from_loc( $loc ) {
+function acecrawl_sitemap_recent_prefix_from_loc( $loc ) {
     if ( false !== strpos( $loc, '-1.xml' ) ) {
         return preg_replace( '~-1\.xml.*$~i', '-', $loc );
     }
@@ -2425,16 +2425,16 @@ function ace_sitemap_powertools_recent_prefix_from_loc( $loc ) {
     return '';
 }
 
-function ace_sitemap_powertools_html_should_mark_recent( $loc, $sitemap_list ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_recent_marker' ) ) {
+function acecrawl_sitemap_html_should_mark_recent( $loc, $sitemap_list ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_recent_marker' ) ) {
         return false;
     }
 
-    if ( ! ace_sitemap_powertools_is_page_one_loc( $loc ) ) {
+    if ( ! acecrawl_sitemap_is_page_one_loc( $loc ) ) {
         return false;
     }
 
-    $prefix = ace_sitemap_powertools_recent_prefix_from_loc( $loc );
+    $prefix = acecrawl_sitemap_recent_prefix_from_loc( $loc );
     if ( '' === $prefix ) {
         return false;
     }
@@ -2450,7 +2450,7 @@ function ace_sitemap_powertools_html_should_mark_recent( $loc, $sitemap_list ) {
     return $count >= 5;
 }
 
-function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
+function acecrawl_sitemap_render_index_html( $sitemap_list ) {
     if ( ! is_array( $sitemap_list ) ) {
         $sitemap_list = array();
     }
@@ -2463,7 +2463,7 @@ function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
         }
     }
 
-    ace_sitemap_powertools_render_html_header( 'XML Sitemap', count( $sitemap_list ), 'index' );
+    acecrawl_sitemap_render_html_header( 'XML Sitemap', count( $sitemap_list ), 'index' );
     echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL', 'ace-crawl-enhancer' ) . '</th>';
     if ( $has_lastmod ) {
         echo '<th class="lastmod">' . esc_html__( 'Last Modified', 'ace-crawl-enhancer' ) . '</th>';
@@ -2478,7 +2478,7 @@ function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
             continue;
         }
 
-        $is_recent = ace_sitemap_powertools_html_should_mark_recent( $raw_loc, $sitemap_list );
+        $is_recent = acecrawl_sitemap_html_should_mark_recent( $raw_loc, $sitemap_list );
 
         echo '<tr><td class="loc">';
         if ( $is_recent ) {
@@ -2494,10 +2494,10 @@ function ace_sitemap_powertools_render_index_html( $sitemap_list ) {
     }
 
     echo '</tbody></table>';
-    ace_sitemap_powertools_render_html_footer();
+    acecrawl_sitemap_render_html_footer();
 }
 
-function ace_sitemap_powertools_render_sitemap_html( $url_list ) {
+function acecrawl_sitemap_render_sitemap_html( $url_list ) {
     if ( ! is_array( $url_list ) ) {
         $url_list = array();
     }
@@ -2517,7 +2517,7 @@ function ace_sitemap_powertools_render_sitemap_html( $url_list ) {
         }
     }
 
-    ace_sitemap_powertools_render_html_header( 'XML Sitemap', count( $url_list ), 'sitemap' );
+    acecrawl_sitemap_render_html_header( 'XML Sitemap', count( $url_list ), 'sitemap' );
     echo '<table id="sitemap__table"><thead><tr><th class="loc">' . esc_html__( 'URL', 'ace-crawl-enhancer' ) . '</th>';
     if ( $has_lastmod ) {
         echo '<th class="lastmod">' . esc_html__( 'Last Modified', 'ace-crawl-enhancer' ) . '</th>';
@@ -2554,11 +2554,11 @@ function ace_sitemap_powertools_render_sitemap_html( $url_list ) {
     }
 
     echo '</tbody></table>';
-    ace_sitemap_powertools_render_html_footer();
+    acecrawl_sitemap_render_html_footer();
 }
 
-function ace_sitemap_powertools_redirect_legacy_urls() {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) || ! ace_sitemap_powertools_is_enabled( 'enable_legacy_redirects' ) ) {
+function acecrawl_sitemap_redirect_legacy_urls() {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) || ! acecrawl_sitemap_is_enabled( 'enable_legacy_redirects' ) ) {
         return;
     }
 
@@ -2599,17 +2599,17 @@ function ace_sitemap_powertools_redirect_legacy_urls() {
             $page = 1;
         }
 
-        $target = ace_sitemap_powertools_build_custom_url( $sitemap, $subtype, $page );
+        $target = acecrawl_sitemap_build_custom_url( $sitemap, $subtype, $page );
         if ( $target ) {
             wp_safe_redirect( $target, 301 );
             exit;
         }
     }
 }
-add_action( 'template_redirect', 'ace_sitemap_powertools_redirect_legacy_urls', 0 );
+add_action( 'template_redirect', 'acecrawl_sitemap_redirect_legacy_urls', 0 );
 
-function ace_sitemap_powertools_disable_canonical_redirects( $redirect_url, $requested_url ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'disable_canonical_redirects' ) ) {
+function acecrawl_sitemap_disable_canonical_redirects( $redirect_url, $requested_url ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'disable_canonical_redirects' ) ) {
         return $redirect_url;
     }
 
@@ -2635,7 +2635,7 @@ function ace_sitemap_powertools_disable_canonical_redirects( $redirect_url, $req
     }
 
     if ( $path ) {
-        $routes = ace_sitemap_powertools_custom_routes();
+        $routes = acecrawl_sitemap_custom_routes();
         foreach ( array_keys( $routes ) as $slug ) {
             if ( preg_match( '~/' . preg_quote( $slug, '~' ) . '-\d+(\.xml)?$~i', $path ) ) {
                 return false;
@@ -2645,27 +2645,27 @@ function ace_sitemap_powertools_disable_canonical_redirects( $redirect_url, $req
 
     return $redirect_url;
 }
-add_filter( 'redirect_canonical', 'ace_sitemap_powertools_disable_canonical_redirects', 0, 2 );
+add_filter( 'redirect_canonical', 'acecrawl_sitemap_disable_canonical_redirects', 0, 2 );
 
-function ace_sitemap_powertools_stylesheet_urls( $url, $type ) {
+function acecrawl_sitemap_stylesheet_urls( $url, $type ) {
     if ( 'sitemap' === $type ) {
-        return home_url( '/?sitemap-stylesheet=sitemap&v=' . ACE_SITEMAP_POWERTOOLS_VERSION );
+        return home_url( '/?sitemap-stylesheet=sitemap&v=' . ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
     }
 
-    return home_url( '/?sitemap-stylesheet=index&v=' . ACE_SITEMAP_POWERTOOLS_VERSION );
+    return home_url( '/?sitemap-stylesheet=index&v=' . ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
 }
 
-function ace_sitemap_powertools_stylesheet_url( $url ) {
+function acecrawl_sitemap_stylesheet_url( $url ) {
     return false;
 }
-add_filter( 'wp_sitemaps_stylesheet_url', 'ace_sitemap_powertools_stylesheet_url' );
+add_filter( 'wp_sitemaps_stylesheet_url', 'acecrawl_sitemap_stylesheet_url' );
 
-function ace_sitemap_powertools_stylesheet_index_url( $url ) {
+function acecrawl_sitemap_stylesheet_index_url( $url ) {
     return false;
 }
-add_filter( 'wp_sitemaps_stylesheet_index_url', 'ace_sitemap_powertools_stylesheet_index_url' );
+add_filter( 'wp_sitemaps_stylesheet_index_url', 'acecrawl_sitemap_stylesheet_index_url' );
 
-function ace_sitemap_powertools_get_authors_provider() {
+function acecrawl_sitemap_get_authors_provider() {
     if ( ! class_exists( 'WP_Sitemaps_Users' ) ) {
         return null;
     }
@@ -2682,22 +2682,22 @@ function ace_sitemap_powertools_get_authors_provider() {
     return new ACE_Authors_Sitemaps_Provider();
 }
 
-function ace_sitemap_powertools_register_authors_provider( $wp_sitemaps ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_authors_provider' ) ) {
+function acecrawl_sitemap_register_authors_provider( $wp_sitemaps ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_authors_provider' ) ) {
         return;
     }
 
-    $provider = ace_sitemap_powertools_get_authors_provider();
+    $provider = acecrawl_sitemap_get_authors_provider();
     if ( ! $provider ) {
         return;
     }
 
     $wp_sitemaps->registry->add_provider( 'authors', $provider );
 }
-add_action( 'wp_sitemaps_init', 'ace_sitemap_powertools_register_authors_provider' );
+add_action( 'wp_sitemaps_init', 'acecrawl_sitemap_register_authors_provider' );
 
-function ace_sitemap_powertools_disable_users_provider( $provider, $name ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_authors_provider' ) ) {
+function acecrawl_sitemap_disable_users_provider( $provider, $name ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_authors_provider' ) ) {
         return $provider;
     }
 
@@ -2707,21 +2707,21 @@ function ace_sitemap_powertools_disable_users_provider( $provider, $name ) {
 
     return false;
 }
-add_filter( 'wp_sitemaps_add_provider', 'ace_sitemap_powertools_disable_users_provider', 20, 2 );
+add_filter( 'wp_sitemaps_add_provider', 'acecrawl_sitemap_disable_users_provider', 20, 2 );
 
-function ace_sitemap_powertools_disable_excluded_providers( $provider, $name ) {
-    $excluded_providers = ace_sitemap_powertools_excluded_sitemap_providers();
+function acecrawl_sitemap_disable_excluded_providers( $provider, $name ) {
+    $excluded_providers = acecrawl_sitemap_excluded_sitemap_providers();
     if ( in_array( sanitize_key( (string) $name ), $excluded_providers, true ) ) {
         return false;
     }
 
     return $provider;
 }
-add_filter( 'wp_sitemaps_add_provider', 'ace_sitemap_powertools_disable_excluded_providers', 25, 2 );
+add_filter( 'wp_sitemaps_add_provider', 'acecrawl_sitemap_disable_excluded_providers', 25, 2 );
 
-function ace_sitemap_powertools_post_types_filter( $post_types ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
-        $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+function acecrawl_sitemap_post_types_filter( $post_types ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
+        $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
         foreach ( $excluded_post_types as $post_type ) {
             if ( isset( $post_types[ $post_type ] ) ) {
                 unset( $post_types[ $post_type ] );
@@ -2734,7 +2734,7 @@ function ace_sitemap_powertools_post_types_filter( $post_types ) {
         unset( $post_types['post'] );
     }
 
-    $excluded_post_types = ace_sitemap_powertools_excluded_sitemap_post_types();
+    $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
     foreach ( $excluded_post_types as $post_type ) {
         if ( isset( $post_types[ $post_type ] ) ) {
             unset( $post_types[ $post_type ] );
@@ -2743,10 +2743,10 @@ function ace_sitemap_powertools_post_types_filter( $post_types ) {
 
     return $post_types;
 }
-add_filter( 'wp_sitemaps_post_types', 'ace_sitemap_powertools_post_types_filter' );
+add_filter( 'wp_sitemaps_post_types', 'acecrawl_sitemap_post_types_filter' );
 
-function ace_sitemap_powertools_taxonomies_filter( $taxonomies ) {
-    $excluded_taxonomies = ace_sitemap_powertools_excluded_sitemap_taxonomies();
+function acecrawl_sitemap_taxonomies_filter( $taxonomies ) {
+    $excluded_taxonomies = acecrawl_sitemap_excluded_sitemap_taxonomies();
 
     foreach ( $excluded_taxonomies as $taxonomy ) {
         if ( isset( $taxonomies[ $taxonomy ] ) ) {
@@ -2756,7 +2756,7 @@ function ace_sitemap_powertools_taxonomies_filter( $taxonomies ) {
 
     return $taxonomies;
 }
-add_filter( 'wp_sitemaps_taxonomies', 'ace_sitemap_powertools_taxonomies_filter' );
+add_filter( 'wp_sitemaps_taxonomies', 'acecrawl_sitemap_taxonomies_filter' );
 
 /**
  * Collapse no-op segments out of a URL's path.
@@ -2771,7 +2771,7 @@ add_filter( 'wp_sitemaps_taxonomies', 'ace_sitemap_powertools_taxonomies_filter'
  * @param string $url URL to tidy.
  * @return string
  */
-function ace_sitemap_powertools_normalise_url( $url ) {
+function acecrawl_sitemap_normalise_url( $url ) {
     if ( ! is_string( $url ) || false === strpos( $url, '/' ) ) {
         return $url;
     }
@@ -2808,14 +2808,14 @@ function ace_sitemap_powertools_normalise_url( $url ) {
  * @param array $entry Sitemap entry.
  * @return array
  */
-function ace_sitemap_powertools_normalise_taxonomy_entry( $entry ) {
+function acecrawl_sitemap_normalise_taxonomy_entry( $entry ) {
     if ( isset( $entry['loc'] ) ) {
-        $entry['loc'] = ace_sitemap_powertools_normalise_url( $entry['loc'] );
+        $entry['loc'] = acecrawl_sitemap_normalise_url( $entry['loc'] );
     }
 
     return $entry;
 }
-add_filter( 'wp_sitemaps_taxonomies_entry', 'ace_sitemap_powertools_normalise_taxonomy_entry' );
+add_filter( 'wp_sitemaps_taxonomies_entry', 'acecrawl_sitemap_normalise_taxonomy_entry' );
 
 /**
  * Tidy every term link the site builds.
@@ -2832,12 +2832,12 @@ add_filter( 'wp_sitemaps_taxonomies_entry', 'ace_sitemap_powertools_normalise_ta
  * @param string $termlink Term URL.
  * @return string
  */
-function ace_sitemap_powertools_normalise_term_link( $termlink ) {
-    return ace_sitemap_powertools_normalise_url( $termlink );
+function acecrawl_sitemap_normalise_term_link( $termlink ) {
+    return acecrawl_sitemap_normalise_url( $termlink );
 }
-add_filter( 'term_link', 'ace_sitemap_powertools_normalise_term_link', 99 );
+add_filter( 'term_link', 'acecrawl_sitemap_normalise_term_link', 99 );
 
-function ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) {
+function acecrawl_sitemap_should_short_circuit_posts_sitemap( $post_type ) {
     if ( ! post_type_exists( $post_type ) ) {
         return false;
     }
@@ -2850,7 +2850,7 @@ function ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type )
     return true;
 }
 
-function ace_sitemap_powertools_posts_order_sql( $post_type ) {
+function acecrawl_sitemap_posts_order_sql( $post_type ) {
     global $wpdb;
 
     if ( 'post' === $post_type ) {
@@ -2860,7 +2860,7 @@ function ace_sitemap_powertools_posts_order_sql( $post_type ) {
     return "{$wpdb->posts}.ID ASC";
 }
 
-function ace_sitemap_powertools_get_noindex_meta_map( $post_ids ) {
+function acecrawl_sitemap_get_noindex_meta_map( $post_ids ) {
     global $wpdb;
 
     $post_ids = array_values( array_filter( array_map( 'intval', (array) $post_ids ) ) );
@@ -2890,14 +2890,14 @@ function ace_sitemap_powertools_get_noindex_meta_map( $post_ids ) {
     return $excluded_ids;
 }
 
-function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page ) {
+function acecrawl_sitemap_get_visible_post_ids_for_page( $post_type, $page_num, $per_page ) {
     global $wpdb;
 
-    if ( ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
-        $map = ace_sitemap_powertools_page_map( $post_type );
+    if ( acecrawl_sitemap_stable_pages_supported( $post_type ) ) {
+        $map = acecrawl_sitemap_page_map( $post_type );
         if ( $map ) {
-            $range = ace_sitemap_powertools_page_range( $map, (int) $page_num );
-            return $range ? ace_sitemap_powertools_visible_ids_in_range( $post_type, $range[0], $range[1] ) : array();
+            $range = acecrawl_sitemap_page_range( $map, (int) $page_num );
+            return $range ? acecrawl_sitemap_visible_ids_in_range( $post_type, $range[0], $range[1] ) : array();
         }
     }
 
@@ -2908,7 +2908,7 @@ function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page
     $visible_seen  = 0;
     $scan_offset   = 0;
     $batch_size    = max( 250, $per_page * 2 );
-    $order_sql     = ace_sitemap_powertools_posts_order_sql( $post_type );
+    $order_sql     = acecrawl_sitemap_posts_order_sql( $post_type );
 
     while ( count( $collected_ids ) < $per_page ) {
         $sql = $wpdb->prepare(
@@ -2928,12 +2928,12 @@ function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page
             break;
         }
 
-        $excluded_ids = ace_sitemap_powertools_get_noindex_meta_map( $candidate_ids );
+        $excluded_ids = acecrawl_sitemap_get_noindex_meta_map( $candidate_ids );
         // Site-level opt-out for URLs that are published and indexable but do not belong in a
         // sitemap — e.g. a page whose canonical points at another URL, which Search Console
         // would only ever report as "Duplicate, Google chose different canonical". Additive:
         // defaults to no exclusions, so existing sites are unaffected.
-        $filtered_out = apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+        $filtered_out = apply_filters( 'acecrawl_sitemap_excluded_post_ids', array(), $post_type );
         foreach ( (array) $filtered_out as $fid ) {
             $excluded_ids[ (int) $fid ] = true;
         }
@@ -2963,7 +2963,7 @@ function ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page
     return $collected_ids;
 }
 
-function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
+function acecrawl_sitemap_get_visible_post_count( $post_type ) {
     global $wpdb;
 
     $published_count = (int) $wpdb->get_var(
@@ -2994,7 +2994,7 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
         )
     );
 
-    $filtered_out = apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+    $filtered_out = apply_filters( 'acecrawl_sitemap_excluded_post_ids', array(), $post_type );
 
     // Only subtract per-site excluded ids that are actually published posts of this type and are
     // NOT already counted in $excluded_count (i.e. not already noindex). Subtracting the raw
@@ -3040,15 +3040,15 @@ function ace_sitemap_powertools_get_visible_post_count( $post_type ) {
  * trigger one full rebalance. Ordering is unchanged (ID ascending), so a page holds the same
  * posts it would have held, give or take what has since been removed.
  */
-function ace_sitemap_powertools_stable_pages_supported( $post_type ) {
+function acecrawl_sitemap_stable_pages_supported( $post_type ) {
     global $wpdb;
-    $on = function_exists( 'ace_sitemap_gen_enabled' ) && ace_sitemap_gen_enabled()
-        && "{$wpdb->posts}.ID ASC" === ace_sitemap_powertools_posts_order_sql( $post_type );
-    return (bool) apply_filters( 'ace_sitemap_powertools_stable_pages', $on, $post_type );
+    $on = function_exists( 'acecrawl_sitemap_gen_enabled' ) && acecrawl_sitemap_gen_enabled()
+        && "{$wpdb->posts}.ID ASC" === acecrawl_sitemap_posts_order_sql( $post_type );
+    return (bool) apply_filters( 'acecrawl_sitemap_stable_pages', $on, $post_type );
 }
 
 /** Published, not noindexed, not excluded by filter: IDs after $after up to $upto (null = open). */
-function ace_sitemap_powertools_visible_ids_in_range( $post_type, $after = 0, $upto = null ) {
+function acecrawl_sitemap_visible_ids_in_range( $post_type, $after = 0, $upto = null ) {
     global $wpdb;
 
     $upper = null === $upto ? '' : $wpdb->prepare( ' AND p.ID <= %d', (int) $upto );
@@ -3069,7 +3069,7 @@ function ace_sitemap_powertools_visible_ids_in_range( $post_type, $after = 0, $u
         (int) $after
     ) ) );
 
-    $filtered = (array) apply_filters( 'ace_sitemap_powertools_excluded_post_ids', array(), $post_type );
+    $filtered = (array) apply_filters( 'acecrawl_sitemap_excluded_post_ids', array(), $post_type );
     if ( $filtered && $ids ) {
         $ids = array_values( array_diff( $ids, array_map( 'intval', $filtered ) ) );
     }
@@ -3077,46 +3077,46 @@ function ace_sitemap_powertools_visible_ids_in_range( $post_type, $after = 0, $u
 }
 
 /** Stored page maps, keyed by post type. Lives in the generation store beside the sequences. */
-function ace_sitemap_powertools_page_maps() {
-    return function_exists( 'ace_sitemap_gen_meta_get' ) ? (array) ace_sitemap_gen_meta_get( 'pagemap' ) : array();
+function acecrawl_sitemap_page_maps() {
+    return function_exists( 'acecrawl_sitemap_gen_meta_get' ) ? (array) acecrawl_sitemap_gen_meta_get( 'pagemap' ) : array();
 }
 
 /** The stored map for a type when it is usable at the current page size, else null. Never builds. */
-function ace_sitemap_powertools_stored_page_map( $post_type ) {
-    $map = ace_sitemap_powertools_page_maps()[ $post_type ] ?? null;
-    return is_array( $map ) && (int) ( $map['per'] ?? 0 ) === ace_sitemap_powertools_effective_post_max_urls() ? $map : null;
+function acecrawl_sitemap_stored_page_map( $post_type ) {
+    $map = acecrawl_sitemap_page_maps()[ $post_type ] ?? null;
+    return is_array( $map ) && (int) ( $map['per'] ?? 0 ) === acecrawl_sitemap_effective_post_max_urls() ? $map : null;
 }
 
 /** The map for a type, built on first use (or when the page size changed). */
-function ace_sitemap_powertools_page_map( $post_type ) {
-    if ( ! ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
+function acecrawl_sitemap_page_map( $post_type ) {
+    if ( ! acecrawl_sitemap_stable_pages_supported( $post_type ) ) {
         return null;
     }
-    $map = ace_sitemap_powertools_stored_page_map( $post_type );
-    return $map ? $map : ace_sitemap_powertools_rebuild_page_map( $post_type );
+    $map = acecrawl_sitemap_stored_page_map( $post_type );
+    return $map ? $map : acecrawl_sitemap_rebuild_page_map( $post_type );
 }
 
 /** Lay pages out afresh from the current visible IDs. Every page of the type changes. */
-function ace_sitemap_powertools_rebuild_page_map( $post_type ) {
-    $per    = ace_sitemap_powertools_effective_post_max_urls();
-    $chunks = array_chunk( ace_sitemap_powertools_visible_ids_in_range( $post_type ), $per );
+function acecrawl_sitemap_rebuild_page_map( $post_type ) {
+    $per    = acecrawl_sitemap_effective_post_max_urls();
+    $chunks = array_chunk( acecrawl_sitemap_visible_ids_in_range( $post_type ), $per );
     $bounds = array();
     foreach ( array_slice( $chunks, 0, -1 ) as $chunk ) {
         $bounds[] = (int) end( $chunk );
     }
     $map = array( 'per' => $per, 'b' => $bounds, 'n' => count( $chunks ), 'built' => time(), 'checked' => time() );
 
-    ace_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
+    acecrawl_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
         $maps[ $post_type ] = $map;
         return $maps;
     } );
     // A scope-wide mark, written now, so pages built from here on are current.
-    ace_sitemap_gen_mark_dirty( 'posts:' . $post_type, true );
+    acecrawl_sitemap_gen_mark_dirty( 'posts:' . $post_type, true );
     return $map;
 }
 
 /** [after, upto] for a page (upto null on the open-ended last page), or null when out of range. */
-function ace_sitemap_powertools_page_range( array $map, $page ) {
+function acecrawl_sitemap_page_range( array $map, $page ) {
     $page = (int) $page;
     if ( $page < 1 || $page > (int) $map['n'] ) {
         return null;
@@ -3127,7 +3127,7 @@ function ace_sitemap_powertools_page_range( array $map, $page ) {
 }
 
 /** The page an ID belongs to under a map: the first page whose bound reaches it. */
-function ace_sitemap_powertools_page_for_id( array $map, $id ) {
+function acecrawl_sitemap_page_for_id( array $map, $id ) {
     if ( (int) $map['n'] < 1 ) {
         return 0;
     }
@@ -3146,7 +3146,7 @@ function ace_sitemap_powertools_page_for_id( array $map, $id ) {
 }
 
 /** Visible posts per page in one grouped query (index = page - 1). */
-function ace_sitemap_powertools_page_counts( $post_type, array $map ) {
+function acecrawl_sitemap_page_counts( $post_type, array $map ) {
     global $wpdb;
     $n = (int) $map['n'];
     if ( $n < 1 ) {
@@ -3184,83 +3184,83 @@ function ace_sitemap_powertools_page_counts( $post_type, array $map ) {
  * page and the new ones change) and rebalance when any earlier page has thinned below the
  * fill floor (every page changes, so this is meant to be rare).
  */
-function ace_sitemap_powertools_maintain_page_map( $post_type ) {
-    $map = ace_sitemap_powertools_page_map( $post_type );
-    if ( ! $map || time() - (int) ( $map['checked'] ?? 0 ) < (int) apply_filters( 'ace_sitemap_powertools_stable_pages_check_interval', MINUTE_IN_SECONDS ) ) {
+function acecrawl_sitemap_maintain_page_map( $post_type ) {
+    $map = acecrawl_sitemap_page_map( $post_type );
+    if ( ! $map || time() - (int) ( $map['checked'] ?? 0 ) < (int) apply_filters( 'acecrawl_sitemap_stable_pages_check_interval', MINUTE_IN_SECONDS ) ) {
         return $map;
     }
 
     $per    = (int) $map['per'];
     $n      = (int) $map['n'];
-    $counts = ace_sitemap_powertools_page_counts( $post_type, $map );
-    $floor  = (float) apply_filters( 'ace_sitemap_powertools_stable_pages_min_fill', 0.25, $post_type );
+    $counts = acecrawl_sitemap_page_counts( $post_type, $map );
+    $floor  = (float) apply_filters( 'acecrawl_sitemap_stable_pages_min_fill', 0.25, $post_type );
 
     for ( $i = 0; $i < $n - 1; $i++ ) {
         if ( $counts[ $i ]['c'] < max( 1, (int) floor( $per * $floor ) ) ) {
-            return ace_sitemap_powertools_rebuild_page_map( $post_type );
+            return acecrawl_sitemap_rebuild_page_map( $post_type );
         }
     }
 
     if ( $n < 1 ) {
         // Nothing was visible when the map was laid out; lay it out again once something is.
-        $any = ace_sitemap_powertools_visible_ids_in_range( $post_type );
-        return $any ? ace_sitemap_powertools_rebuild_page_map( $post_type ) : $map;
+        $any = acecrawl_sitemap_visible_ids_in_range( $post_type );
+        return $any ? acecrawl_sitemap_rebuild_page_map( $post_type ) : $map;
     }
 
     $map['checked'] = time();
     if ( $counts[ $n - 1 ]['c'] > $per ) {
-        $last   = ace_sitemap_powertools_page_range( $map, $n );
-        $chunks = array_chunk( ace_sitemap_powertools_visible_ids_in_range( $post_type, $last[0] ), $per );
+        $last   = acecrawl_sitemap_page_range( $map, $n );
+        $chunks = array_chunk( acecrawl_sitemap_visible_ids_in_range( $post_type, $last[0] ), $per );
         foreach ( array_slice( $chunks, 0, -1 ) as $chunk ) {
             $map['b'][] = (int) end( $chunk );
         }
         $map['n'] = count( $map['b'] ) + 1;
         for ( $page = $n; $page <= $map['n']; $page++ ) {
-            ace_sitemap_gen_mark_dirty( 'posts:' . $post_type, false, ace_sitemap_gen_url_key( 'posts', $post_type, $page ) );
+            acecrawl_sitemap_gen_mark_dirty( 'posts:' . $post_type, false, acecrawl_sitemap_gen_url_key( 'posts', $post_type, $page ) );
         }
     }
 
-    ace_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
+    acecrawl_sitemap_gen_meta_update( 'pagemap', function ( $maps ) use ( $post_type, $map ) {
         $maps[ $post_type ] = $map;
         return $maps;
     } );
-    ace_sitemap_gen_mark_dirty( null, true );
+    acecrawl_sitemap_gen_mark_dirty( null, true );
     return $map;
 }
 
 /** Before each worker pass: lay out or tidy the map of every type that can use one. */
-function ace_sitemap_powertools_page_maps_before_pass() {
+function acecrawl_sitemap_page_maps_before_pass() {
     foreach ( get_post_types( array( 'public' => true ) ) as $post_type ) {
-        if ( ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) && ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
-            ace_sitemap_powertools_maintain_page_map( $post_type );
+        if ( acecrawl_sitemap_should_short_circuit_posts_sitemap( $post_type ) && acecrawl_sitemap_stable_pages_supported( $post_type ) ) {
+            acecrawl_sitemap_maintain_page_map( $post_type );
         }
     }
 }
-add_action( 'ace_sitemap_generation_before_pass', 'ace_sitemap_powertools_page_maps_before_pass' );
+add_action( 'acecrawl_sitemap_generation_before_pass', 'acecrawl_sitemap_page_maps_before_pass' );
 
 /** A mapped type's pages are tracked per page, so one edit rebuilds one page. */
-function ace_sitemap_powertools_page_map_keyed_scopes( $scopes, $provider, $subtype ) {
-    if ( 'posts' === $provider && $subtype && ace_sitemap_powertools_stable_pages_supported( $subtype ) && ace_sitemap_powertools_stored_page_map( $subtype ) ) {
+function acecrawl_sitemap_page_map_keyed_scopes( $scopes, $provider, $subtype ) {
+    if ( 'posts' === $provider && $subtype && acecrawl_sitemap_stable_pages_supported( $subtype ) && acecrawl_sitemap_stored_page_map( $subtype ) ) {
         $scopes[] = 'posts:' . $subtype;
     }
     return $scopes;
 }
-add_filter( 'ace_sitemap_generation_keyed_scopes', 'ace_sitemap_powertools_page_map_keyed_scopes', 10, 3 );
+add_filter( 'acecrawl_sitemap_generation_keyed_scopes', 'acecrawl_sitemap_page_map_keyed_scopes', 10, 3 );
 
 /** The page a post lives on, as a generation key; null (whole type) when there is no map. */
-function ace_sitemap_powertools_page_map_post_key( $key, $post ) {
-    if ( null !== $key || ! ( $post instanceof WP_Post ) || ! ace_sitemap_powertools_stable_pages_supported( $post->post_type ) ) {
+function acecrawl_sitemap_page_map_post_key( $key, $post ) {
+    if ( null !== $key || ! ( $post instanceof WP_Post ) || ! acecrawl_sitemap_stable_pages_supported( $post->post_type ) ) {
         return $key;
     }
-    $map  = ace_sitemap_powertools_stored_page_map( $post->post_type );
-    $page = $map ? ace_sitemap_powertools_page_for_id( $map, $post->ID ) : 0;
-    return $page > 0 ? ace_sitemap_gen_url_key( 'posts', $post->post_type, $page ) : null;
+    $map  = acecrawl_sitemap_stored_page_map( $post->post_type );
+    $page = $map ? acecrawl_sitemap_page_for_id( $map, $post->ID ) : 0;
+    return $page > 0 ? acecrawl_sitemap_gen_url_key( 'posts', $post->post_type, $page ) : null;
 }
-add_filter( 'ace_sitemap_generation_post_key', 'ace_sitemap_powertools_page_map_post_key', 10, 2 );
+add_filter( 'acecrawl_sitemap_generation_post_key', 'acecrawl_sitemap_page_map_post_key', 10, 2 );
 
-function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num ) {
-    $per_page = ace_sitemap_powertools_effective_post_max_urls();
-    $post_ids = ace_sitemap_powertools_get_visible_post_ids_for_page( $post_type, $page_num, $per_page );
+function acecrawl_sitemap_build_posts_sitemap_url_list( $post_type, $page_num ) {
+    $per_page = acecrawl_sitemap_effective_post_max_urls();
+    $post_ids = acecrawl_sitemap_get_visible_post_ids_for_page( $post_type, $page_num, $per_page );
 
     if ( empty( $post_ids ) ) {
         $url_list = array();
@@ -3318,36 +3318,36 @@ function ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_
     return $url_list;
 }
 
-function ace_sitemap_powertools_posts_pre_url_list( $url_list, $post_type, $page_num ) {
-    if ( null !== $url_list || ! ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) ) {
+function acecrawl_sitemap_posts_pre_url_list( $url_list, $post_type, $page_num ) {
+    if ( null !== $url_list || ! acecrawl_sitemap_should_short_circuit_posts_sitemap( $post_type ) ) {
         return $url_list;
     }
 
     $cache_key = sprintf(
         'posts_url_list_v%d_%s_%d_%d',
-        ace_sitemap_powertools_get_cache_version(),
+        acecrawl_sitemap_get_cache_version(),
         sanitize_key( $post_type ),
         (int) $page_num,
-        ace_sitemap_powertools_effective_post_max_urls()
+        acecrawl_sitemap_effective_post_max_urls()
     );
 
-    return ace_sitemap_powertools_cache_remember(
+    return acecrawl_sitemap_cache_remember(
         $cache_key,
         function () use ( $post_type, $page_num ) {
-            return ace_sitemap_powertools_build_posts_sitemap_url_list( $post_type, $page_num );
+            return acecrawl_sitemap_build_posts_sitemap_url_list( $post_type, $page_num );
         },
         array()
     );
 }
-add_filter( 'wp_sitemaps_posts_pre_url_list', 'ace_sitemap_powertools_posts_pre_url_list', 10, 3 );
+add_filter( 'wp_sitemaps_posts_pre_url_list', 'acecrawl_sitemap_posts_pre_url_list', 10, 3 );
 
-function ace_sitemap_powertools_posts_pre_max_num_pages( $max_num_pages, $post_type ) {
-    if ( null !== $max_num_pages || ! ace_sitemap_powertools_should_short_circuit_posts_sitemap( $post_type ) ) {
+function acecrawl_sitemap_posts_pre_max_num_pages( $max_num_pages, $post_type ) {
+    if ( null !== $max_num_pages || ! acecrawl_sitemap_should_short_circuit_posts_sitemap( $post_type ) ) {
         return $max_num_pages;
     }
 
-    if ( ace_sitemap_powertools_stable_pages_supported( $post_type ) ) {
-        $map = ace_sitemap_powertools_maintain_page_map( $post_type );
+    if ( acecrawl_sitemap_stable_pages_supported( $post_type ) ) {
+        $map = acecrawl_sitemap_maintain_page_map( $post_type );
         if ( $map ) {
             $min_num_pages = ( 'page' === $post_type && 'posts' === get_option( 'show_on_front' ) ) ? 1 : 0;
             return max( $min_num_pages, (int) $map['n'] );
@@ -3356,16 +3356,16 @@ function ace_sitemap_powertools_posts_pre_max_num_pages( $max_num_pages, $post_t
 
     $cache_key = sprintf(
         'posts_max_pages_v%d_%s_%d',
-        ace_sitemap_powertools_get_cache_version(),
+        acecrawl_sitemap_get_cache_version(),
         sanitize_key( $post_type ),
-        ace_sitemap_powertools_effective_post_max_urls()
+        acecrawl_sitemap_effective_post_max_urls()
     );
 
-    return (int) ace_sitemap_powertools_cache_remember(
+    return (int) acecrawl_sitemap_cache_remember(
         $cache_key,
         function () use ( $post_type ) {
-            $visible_count  = ace_sitemap_powertools_get_visible_post_count( $post_type );
-            $max_num_pages  = (int) ceil( $visible_count / ace_sitemap_powertools_effective_post_max_urls() );
+            $visible_count  = acecrawl_sitemap_get_visible_post_count( $post_type );
+            $max_num_pages  = (int) ceil( $visible_count / acecrawl_sitemap_effective_post_max_urls() );
             $min_num_pages  = ( 'page' === $post_type && 'posts' === get_option( 'show_on_front' ) ) ? 1 : 0;
 
             return max( $min_num_pages, $max_num_pages );
@@ -3373,9 +3373,9 @@ function ace_sitemap_powertools_posts_pre_max_num_pages( $max_num_pages, $post_t
         0
     );
 }
-add_filter( 'wp_sitemaps_posts_pre_max_num_pages', 'ace_sitemap_powertools_posts_pre_max_num_pages', 10, 2 );
+add_filter( 'wp_sitemaps_posts_pre_max_num_pages', 'acecrawl_sitemap_posts_pre_max_num_pages', 10, 2 );
 
-function ace_sitemap_powertools_posts_query_args( $args, $post_type ) {
+function acecrawl_sitemap_posts_query_args( $args, $post_type ) {
     if ( ! is_array( $args ) ) {
         return $args;
     }
@@ -3390,19 +3390,19 @@ function ace_sitemap_powertools_posts_query_args( $args, $post_type ) {
 
     return $args;
 }
-add_filter( 'wp_sitemaps_posts_query_args', 'ace_sitemap_powertools_posts_query_args', 10, 2 );
+add_filter( 'wp_sitemaps_posts_query_args', 'acecrawl_sitemap_posts_query_args', 10, 2 );
 
-function ace_sitemap_powertools_max_urls( $max_urls, $object_type ) {
+function acecrawl_sitemap_max_urls( $max_urls, $object_type ) {
     if ( 'post' === $object_type ) {
-        return ace_sitemap_powertools_effective_post_max_urls();
+        return acecrawl_sitemap_effective_post_max_urls();
     }
 
     return $max_urls;
 }
-add_filter( 'wp_sitemaps_max_urls', 'ace_sitemap_powertools_max_urls', 10, 2 );
+add_filter( 'wp_sitemaps_max_urls', 'acecrawl_sitemap_max_urls', 10, 2 );
 
-function ace_sitemap_powertools_stylesheet_header_html( $context ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_header' ) ) {
+function acecrawl_sitemap_stylesheet_header_html( $context ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_header' ) ) {
         return '';
     }
 
@@ -3436,7 +3436,7 @@ function ace_sitemap_powertools_stylesheet_header_html( $context ) {
     }
 
     $index_link_html = '';
-    if ( 'index' !== $context && ace_sitemap_powertools_is_enabled( 'enable_index_link' ) ) {
+    if ( 'index' !== $context && acecrawl_sitemap_is_enabled( 'enable_index_link' ) ) {
         $index_link_html = '<a class="sitemap-brand__index-link" href="' . esc_url( home_url( '/sitemap.xml' ) ) . '">Sitemap Index</a>';
     }
 
@@ -3450,20 +3450,20 @@ function ace_sitemap_powertools_stylesheet_header_html( $context ) {
     return $header;
 }
 
-function ace_sitemap_powertools_replace_stylesheet_header( $xsl_content ) {
-    return ace_sitemap_powertools_replace_stylesheet_header_for_context( $xsl_content, 'sitemap' );
+function acecrawl_sitemap_replace_stylesheet_header( $xsl_content ) {
+    return acecrawl_sitemap_replace_stylesheet_header_for_context( $xsl_content, 'sitemap' );
 }
 
-function ace_sitemap_powertools_replace_stylesheet_index_header( $xsl_content ) {
-    return ace_sitemap_powertools_replace_stylesheet_header_for_context( $xsl_content, 'index' );
+function acecrawl_sitemap_replace_stylesheet_index_header( $xsl_content ) {
+    return acecrawl_sitemap_replace_stylesheet_header_for_context( $xsl_content, 'index' );
 }
 
-function ace_sitemap_powertools_replace_stylesheet_header_for_context( $xsl_content, $context ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_header' ) ) {
+function acecrawl_sitemap_replace_stylesheet_header_for_context( $xsl_content, $context ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_header' ) ) {
         return $xsl_content;
     }
 
-    $header = ace_sitemap_powertools_stylesheet_header_html( $context );
+    $header = acecrawl_sitemap_stylesheet_header_html( $context );
     $pattern = '/<div id="sitemap__header">.*?<\\/div>\\s*<div id="sitemap__content">/s';
     $replacement = $header . "\n\t\t\t\t\t<div id=\"sitemap__content\">";
 
@@ -3474,10 +3474,10 @@ function ace_sitemap_powertools_replace_stylesheet_header_for_context( $xsl_cont
 
     return $xsl_content;
 }
-add_filter( 'wp_sitemaps_stylesheet_content', 'ace_sitemap_powertools_replace_stylesheet_header' );
-add_filter( 'wp_sitemaps_stylesheet_index_content', 'ace_sitemap_powertools_replace_stylesheet_index_header' );
+add_filter( 'wp_sitemaps_stylesheet_content', 'acecrawl_sitemap_replace_stylesheet_header' );
+add_filter( 'wp_sitemaps_stylesheet_index_content', 'acecrawl_sitemap_replace_stylesheet_index_header' );
 
-function ace_sitemap_powertools_fix_stylesheet_namespaces( $xsl_content ) {
+function acecrawl_sitemap_fix_stylesheet_namespaces( $xsl_content ) {
     if ( false === strpos( $xsl_content, '<xsl:stylesheet' ) ) {
         return $xsl_content;
     }
@@ -3523,10 +3523,10 @@ function ace_sitemap_powertools_fix_stylesheet_namespaces( $xsl_content ) {
 
     return $xsl_content;
 }
-add_filter( 'wp_sitemaps_stylesheet_content', 'ace_sitemap_powertools_fix_stylesheet_namespaces', 9999 );
-add_filter( 'wp_sitemaps_stylesheet_index_content', 'ace_sitemap_powertools_fix_stylesheet_namespaces', 9999 );
+add_filter( 'wp_sitemaps_stylesheet_content', 'acecrawl_sitemap_fix_stylesheet_namespaces', 9999 );
+add_filter( 'wp_sitemaps_stylesheet_index_content', 'acecrawl_sitemap_fix_stylesheet_namespaces', 9999 );
 
-function ace_sitemap_powertools_parse_loc( $loc ) {
+function acecrawl_sitemap_parse_loc( $loc ) {
     $parsed = array(
         'provider' => '',
         'subtype'  => '',
@@ -3555,14 +3555,14 @@ function ace_sitemap_powertools_parse_loc( $loc ) {
     return $parsed;
 }
 
-function ace_sitemap_powertools_route_lookup() {
+function acecrawl_sitemap_route_lookup() {
     static $cache = null;
 
     if ( null !== $cache ) {
         return $cache;
     }
 
-    $routes = ace_sitemap_powertools_custom_routes();
+    $routes = acecrawl_sitemap_custom_routes();
     $lookup = array();
 
     foreach ( $routes as $slug => $route ) {
@@ -3576,8 +3576,8 @@ function ace_sitemap_powertools_route_lookup() {
     return $cache;
 }
 
-function ace_sitemap_powertools_custom_loc_for_entry( $entry, $object_type, $object_subtype, $page ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) ) {
+function acecrawl_sitemap_custom_loc_for_entry( $entry, $object_type, $object_subtype, $page ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) ) {
         return $entry;
     }
 
@@ -3585,12 +3585,12 @@ function ace_sitemap_powertools_custom_loc_for_entry( $entry, $object_type, $obj
         return $entry;
     }
 
-    $parsed = ace_sitemap_powertools_parse_loc( $entry['loc'] );
+    $parsed = acecrawl_sitemap_parse_loc( $entry['loc'] );
     if ( empty( $parsed['provider'] ) || empty( $parsed['page'] ) ) {
         return $entry;
     }
 
-    $lookup = ace_sitemap_powertools_route_lookup();
+    $lookup = acecrawl_sitemap_route_lookup();
     $key    = $parsed['provider'] . '|' . (string) $parsed['subtype'];
 
     if ( ! isset( $lookup[ $key ] ) ) {
@@ -3602,7 +3602,7 @@ function ace_sitemap_powertools_custom_loc_for_entry( $entry, $object_type, $obj
         return $entry;
     }
 
-    $max_pages = ace_sitemap_powertools_get_max_pages_for_route( $parsed['provider'], $parsed['subtype'] );
+    $max_pages = acecrawl_sitemap_get_max_pages_for_route( $parsed['provider'], $parsed['subtype'] );
     if ( 1 === (int) $parsed['page'] && $max_pages <= 1 ) {
         $entry['loc'] = home_url( '/' . $slug . '.xml' );
     } else {
@@ -3610,9 +3610,9 @@ function ace_sitemap_powertools_custom_loc_for_entry( $entry, $object_type, $obj
     }
     return $entry;
 }
-add_filter( 'wp_sitemaps_index_entry', 'ace_sitemap_powertools_custom_loc_for_entry', 10, 4 );
+add_filter( 'wp_sitemaps_index_entry', 'acecrawl_sitemap_custom_loc_for_entry', 10, 4 );
 
-function ace_sitemap_powertools_index_entry_lastmod( $entry, $object_type, $object_subtype, $page ) {
+function acecrawl_sitemap_index_entry_lastmod( $entry, $object_type, $object_subtype, $page ) {
     if ( ! is_array( $entry ) ) {
         return $entry;
     }
@@ -3621,21 +3621,21 @@ function ace_sitemap_powertools_index_entry_lastmod( $entry, $object_type, $obje
         return $entry;
     }
 
-    if ( ! ace_sitemap_powertools_should_set_index_lastmod( $object_type, $object_subtype ) ) {
+    if ( ! acecrawl_sitemap_should_set_index_lastmod( $object_type, $object_subtype ) ) {
         return $entry;
     }
 
-    $lastmod = ace_sitemap_powertools_get_index_entry_lastmod( $object_type, $object_subtype, $page );
+    $lastmod = acecrawl_sitemap_get_index_entry_lastmod( $object_type, $object_subtype, $page );
     if ( $lastmod ) {
         $entry['lastmod'] = $lastmod;
     }
 
     return $entry;
 }
-add_filter( 'wp_sitemaps_index_entry', 'ace_sitemap_powertools_index_entry_lastmod', 20, 4 );
+add_filter( 'wp_sitemaps_index_entry', 'acecrawl_sitemap_index_entry_lastmod', 20, 4 );
 
-function ace_sitemap_powertools_should_set_index_lastmod( $provider, $subtype ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_index_lastmod' ) ) {
+function acecrawl_sitemap_should_set_index_lastmod( $provider, $subtype ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_index_lastmod' ) ) {
         return false;
     }
 
@@ -3674,7 +3674,7 @@ function ace_sitemap_powertools_should_set_index_lastmod( $provider, $subtype ) 
     return $object && is_post_type_viewable( $object );
 }
 
-function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $page ) {
+function acecrawl_sitemap_get_index_entry_lastmod( $provider, $subtype, $page ) {
     static $cache = array();
 
     $page = (int) $page;
@@ -3691,12 +3691,12 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
 
     $persistent_key = sprintf(
         'index_lastmod_v%d_%s_%s_%d',
-        ace_sitemap_powertools_get_cache_version(),
+        acecrawl_sitemap_get_cache_version(),
         sanitize_key( (string) $provider ),
         sanitize_key( (string) $subtype ),
         $page
     );
-    $cached = ace_sitemap_powertools_cache_get( $persistent_key );
+    $cached = acecrawl_sitemap_cache_get( $persistent_key );
     if ( is_string( $cached ) && '' !== $cached ) {
         $cache[ $key ] = $cached;
         return $cache[ $key ];
@@ -3716,11 +3716,11 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
     // With stable pages each page knows its own newest change, so a crawler re-reads only the
     // pages that moved instead of every page carrying the type-wide date.
     if ( $post_type && in_array( $provider, array( 'posts', 'post' ), true ) ) {
-        $map = $post_type && ace_sitemap_powertools_stable_pages_supported( $post_type ) ? ace_sitemap_powertools_stored_page_map( $post_type ) : null;
+        $map = $post_type && acecrawl_sitemap_stable_pages_supported( $post_type ) ? acecrawl_sitemap_stored_page_map( $post_type ) : null;
         if ( $map ) {
             static $page_lastmods = array();
             if ( ! isset( $page_lastmods[ $post_type ] ) ) {
-                $page_lastmods[ $post_type ] = wp_list_pluck( ace_sitemap_powertools_page_counts( $post_type, $map ), 'm' );
+                $page_lastmods[ $post_type ] = wp_list_pluck( acecrawl_sitemap_page_counts( $post_type, $map ), 'm' );
             }
             $m = $page_lastmods[ $post_type ][ $page - 1 ] ?? '';
             if ( $m && '0000-00-00 00:00:00' !== $m ) {
@@ -3734,7 +3734,7 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
         $lastmod = get_lastpostmodified( 'GMT', $post_type );
         if ( $lastmod ) {
             $cache[ $key ] = get_date_from_gmt( $lastmod, 'c' );
-            ace_sitemap_powertools_cache_set( $persistent_key, $cache[ $key ] );
+            acecrawl_sitemap_cache_set( $persistent_key, $cache[ $key ] );
             return $cache[ $key ];
         }
     }
@@ -3742,7 +3742,7 @@ function ace_sitemap_powertools_get_index_entry_lastmod( $provider, $subtype, $p
     return $cache[ $key ];
 }
 
-function ace_sitemap_powertools_get_max_pages_for_route( $provider, $subtype ) {
+function acecrawl_sitemap_get_max_pages_for_route( $provider, $subtype ) {
     static $cache = array();
 
     $key = $provider . '|' . (string) $subtype;
@@ -3757,11 +3757,11 @@ function ace_sitemap_powertools_get_max_pages_for_route( $provider, $subtype ) {
 
     $persistent_key = sprintf(
         'max_pages_v%d_%s_%s',
-        ace_sitemap_powertools_get_cache_version(),
+        acecrawl_sitemap_get_cache_version(),
         sanitize_key( (string) $provider ),
         sanitize_key( (string) $subtype )
     );
-    $cached = ace_sitemap_powertools_cache_get( $persistent_key );
+    $cached = acecrawl_sitemap_cache_get( $persistent_key );
     if ( is_numeric( $cached ) ) {
         $cache[ $key ] = (int) $cached;
         return $cache[ $key ];
@@ -3775,31 +3775,31 @@ function ace_sitemap_powertools_get_max_pages_for_route( $provider, $subtype ) {
     }
 
     $cache[ $key ] = (int) $provider_obj->get_max_num_pages( $subtype );
-    ace_sitemap_powertools_cache_set( $persistent_key, $cache[ $key ] );
+    acecrawl_sitemap_cache_set( $persistent_key, $cache[ $key ] );
     return $cache[ $key ];
 }
 
-function ace_sitemap_powertools_build_custom_url( $provider, $subtype, $page ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_routes' ) ) {
+function acecrawl_sitemap_build_custom_url( $provider, $subtype, $page ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) ) {
         return '';
     }
 
-    if ( 'users' === $provider && ace_sitemap_powertools_is_enabled( 'enable_authors_provider' ) ) {
+    if ( 'users' === $provider && acecrawl_sitemap_is_enabled( 'enable_authors_provider' ) ) {
         $provider = 'authors';
     }
 
-    if ( 'posts' === $provider && 'post' === $subtype && ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+    if ( 'posts' === $provider && 'post' === $subtype && acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
         $provider = 'news';
         $subtype  = '';
     }
 
-    $lookup = ace_sitemap_powertools_route_lookup();
+    $lookup = acecrawl_sitemap_route_lookup();
     $key    = $provider . '|' . (string) $subtype;
 
     if ( isset( $lookup[ $key ] ) ) {
         $slug = trim( $lookup[ $key ], '/' );
         if ( '' !== $slug ) {
-            $max_pages = ace_sitemap_powertools_get_max_pages_for_route( $provider, $subtype );
+            $max_pages = acecrawl_sitemap_get_max_pages_for_route( $provider, $subtype );
             if ( 1 === (int) $page && $max_pages <= 1 ) {
                 return home_url( '/' . $slug . '.xml' );
             }
@@ -3810,8 +3810,8 @@ function ace_sitemap_powertools_build_custom_url( $provider, $subtype, $page ) {
     return '';
 }
 
-function ace_sitemap_powertools_index_mark_recent( $xsl_content ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_recent_marker' ) ) {
+function acecrawl_sitemap_index_mark_recent( $xsl_content ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_recent_marker' ) ) {
         return $xsl_content;
     }
 
@@ -3871,10 +3871,10 @@ XSL;
 
     return $xsl_content;
 }
-add_filter( 'wp_sitemaps_stylesheet_index_content', 'ace_sitemap_powertools_index_mark_recent', 20 );
+add_filter( 'wp_sitemaps_stylesheet_index_content', 'acecrawl_sitemap_index_mark_recent', 20 );
 
-function ace_sitemap_powertools_stylesheet_css( $css ) {
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_custom_header' ) ) {
+function acecrawl_sitemap_stylesheet_css( $css ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_header' ) ) {
         return $css;
     }
 
@@ -3920,22 +3920,22 @@ function ace_sitemap_powertools_stylesheet_css( $css ) {
 
     return $css . $extra;
 }
-add_filter( 'wp_sitemaps_stylesheet_css', 'ace_sitemap_powertools_stylesheet_css' );
+add_filter( 'wp_sitemaps_stylesheet_css', 'acecrawl_sitemap_stylesheet_css' );
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-    WP_CLI::add_command( 'ace-sitemap-powertools check', 'ace_sitemap_powertools_cli_check' );
+    WP_CLI::add_command( 'ace-sitemap-powertools check', 'acecrawl_sitemap_cli_check' );
 }
 
-function ace_sitemap_powertools_cli_check( $args, $assoc_args ) {
+function acecrawl_sitemap_cli_check( $args, $assoc_args ) {
     if ( function_exists( 'wp_sitemaps_get_server' ) ) {
         wp_sitemaps_get_server();
     }
 
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_news_provider' ) ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_news_provider' ) ) {
         WP_CLI::error( 'News sitemap provider is disabled in settings.' );
     }
 
-    $provider = ace_sitemap_powertools_get_provider();
+    $provider = acecrawl_sitemap_get_provider();
     if ( ! $provider ) {
         WP_CLI::error( 'Sitemaps provider is unavailable. Is WordPress sitemaps enabled?' );
     }
@@ -3953,29 +3953,29 @@ function ace_sitemap_powertools_cli_check( $args, $assoc_args ) {
         WP_CLI::error( 'No sitemap pages found for posts.' );
     }
 
-    $first_url = ace_sitemap_powertools_build_custom_url( 'news', '', 1 );
-    $last_url  = ace_sitemap_powertools_build_custom_url( 'news', '', $max );
+    $first_url = acecrawl_sitemap_build_custom_url( 'news', '', 1 );
+    $last_url  = acecrawl_sitemap_build_custom_url( 'news', '', $max );
 
     if ( ! $first_url || ! $last_url ) {
         $first_url = $provider->get_sitemap_url( '', 1 );
         $last_url  = $provider->get_sitemap_url( '', $max );
     }
 
-    $first_url = apply_filters( 'ace_sitemap_powertools_sanity_url', $first_url, 1, $max, $post_type );
-    $last_url  = apply_filters( 'ace_sitemap_powertools_sanity_url', $last_url, $max, $max, $post_type );
+    $first_url = apply_filters( 'acecrawl_sitemap_sanity_url', $first_url, 1, $max, $post_type );
+    $last_url  = apply_filters( 'acecrawl_sitemap_sanity_url', $last_url, $max, $max, $post_type );
 
-    $first_xml = ace_sitemap_powertools_fetch_xml( $first_url );
-    $last_xml  = ace_sitemap_powertools_fetch_xml( $last_url );
+    $first_xml = acecrawl_sitemap_fetch_xml( $first_url );
+    $last_xml  = acecrawl_sitemap_fetch_xml( $last_url );
 
-    $first_lastmods = ace_sitemap_powertools_extract_lastmods( $first_xml, $count );
-    $last_lastmods  = ace_sitemap_powertools_extract_lastmods( $last_xml, $count );
+    $first_lastmods = acecrawl_sitemap_extract_lastmods( $first_xml, $count );
+    $last_lastmods  = acecrawl_sitemap_extract_lastmods( $last_xml, $count );
 
     if ( empty( $first_lastmods ) || empty( $last_lastmods ) ) {
         WP_CLI::error( 'Could not parse <lastmod> values from one or both sitemaps.' );
     }
 
-    $first_timestamps = ace_sitemap_powertools_to_timestamps( $first_lastmods );
-    $last_timestamps  = ace_sitemap_powertools_to_timestamps( $last_lastmods );
+    $first_timestamps = acecrawl_sitemap_to_timestamps( $first_lastmods );
+    $last_timestamps  = acecrawl_sitemap_to_timestamps( $last_lastmods );
 
     if ( empty( $first_timestamps ) || empty( $last_timestamps ) ) {
         WP_CLI::error( 'Could not parse <lastmod> timestamps.' );
@@ -4008,7 +4008,7 @@ function ace_sitemap_powertools_cli_check( $args, $assoc_args ) {
     WP_CLI::log( 'Page ' . $max . ' lastmod: ' . implode( ', ', $last_lastmods ) );
 }
 
-function ace_sitemap_powertools_fetch_xml( $url ) {
+function acecrawl_sitemap_fetch_xml( $url ) {
     $response = wp_remote_get(
         $url,
         array(
@@ -4028,7 +4028,7 @@ function ace_sitemap_powertools_fetch_xml( $url ) {
     return (string) wp_remote_retrieve_body( $response );
 }
 
-function ace_sitemap_powertools_extract_lastmods( $xml, $limit ) {
+function acecrawl_sitemap_extract_lastmods( $xml, $limit ) {
     $limit = max( 1, (int) $limit );
     $mods  = array();
 
@@ -4055,7 +4055,7 @@ function ace_sitemap_powertools_extract_lastmods( $xml, $limit ) {
     return $mods;
 }
 
-function ace_sitemap_powertools_to_timestamps( $lastmods ) {
+function acecrawl_sitemap_to_timestamps( $lastmods ) {
     $timestamps = array();
 
     foreach ( $lastmods as $lastmod ) {

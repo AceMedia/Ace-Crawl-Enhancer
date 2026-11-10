@@ -24,15 +24,15 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoOrphanReport {
+class AceCrawlOrphanReport {
 
     /** Cached report. Transients land in the persistent object cache (Redis) where one exists. */
-    const TRANSIENT = 'ace_seo_orphan_report';
+    const TRANSIENT = 'acecrawl_orphan_report';
 
     /** Scan progress, so a tick knows what the last one finished. */
-    const PROGRESS_OPTION = 'ace_seo_orphan_scan_progress';
+    const PROGRESS_OPTION = 'acecrawl_orphan_scan_progress';
 
-    const CRON_HOOK = 'ace_seo_orphan_scan';
+    const CRON_HOOK = 'acecrawl_orphan_scan';
 
     /** Report lifetime. Content moves slowly at this scale; a stale day costs nothing. */
     const TTL = DAY_IN_SECONDS;
@@ -49,12 +49,12 @@ class AceSeoOrphanReport {
     /** Above this many archive-less candidates, skip the menu/hierarchy refinement. */
     const REFINE_CAP = 100000;
 
-    const DAILY_HOOK = 'ace_seo_orphan_daily';
+    const DAILY_HOOK = 'acecrawl_orphan_daily';
 
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_scan_tick' ) );
         add_action( self::DAILY_HOOK, array( __CLASS__, 'maybe_refresh' ) );
-        add_action( 'wp_ajax_ace_seo_load_orphan_report', array( __CLASS__, 'ajax_report' ) );
+        add_action( 'wp_ajax_acecrawl_load_orphan_report', array( __CLASS__, 'ajax_report' ) );
 
         if ( ! wp_next_scheduled( self::DAILY_HOOK ) ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::DAILY_HOOK );
@@ -301,7 +301,7 @@ class AceSeoOrphanReport {
          *
          * @param string[] $types
          */
-        return array_values( (array) apply_filters( 'ace_seo_orphan_post_types', $types ) );
+        return array_values( (array) apply_filters( 'acecrawl_orphan_post_types', $types ) );
     }
 
     /**
@@ -323,7 +323,7 @@ class AceSeoOrphanReport {
          * @param string[] $ignored
          * @param string   $post_type
          */
-        $ignored = (array) apply_filters( 'ace_seo_orphan_ignored_taxonomies', array( 'post_format' ), $post_type );
+        $ignored = (array) apply_filters( 'acecrawl_orphan_ignored_taxonomies', array( 'post_format' ), $post_type );
 
         foreach ( get_object_taxonomies( $post_type, 'objects' ) as $taxonomy ) {
             if ( in_array( $taxonomy->name, $ignored, true ) ) {
@@ -584,7 +584,7 @@ class AceSeoOrphanReport {
          * @param int[]  $ids
          * @param string $post_type
          */
-        foreach ( (array) apply_filters( 'ace_seo_orphan_reachable_ids', array(), $post_type ) as $extra ) {
+        foreach ( (array) apply_filters( 'acecrawl_orphan_reachable_ids', array(), $post_type ) as $extra ) {
             $reachable[ (int) $extra ] = true;
         }
 

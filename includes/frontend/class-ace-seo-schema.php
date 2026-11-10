@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class AceSeoSchema {
+class AceCrawlSchema {
     
     public function __construct() {
         $this->init_hooks();
@@ -15,15 +15,15 @@ class AceSeoSchema {
     
     private function init_hooks() {
         // Article enhancements (word count, reading time, section, keywords) —
-        // applied by AceSeoFrontend::generate_article_schema().
-        add_filter('ace_seo_schema_article', [$this, 'enhance_article_schema'], 10, 2);
+        // applied by AceCrawlFrontend::generate_article_schema().
+        add_filter('acecrawl_schema_article', [$this, 'enhance_article_schema'], 10, 2);
 
         // Built-in graph providers (single-emitter: everything goes through the graph).
-        AceSeoSchemaGraph::register_provider('ace-seo/local-business', [$this, 'provide_local_business']);
-        AceSeoSchemaGraph::register_provider('ace-seo/product', [$this, 'provide_product']);
-        AceSeoSchemaGraph::register_provider('ace-seo/faq', [$this, 'provide_faq']);
-        AceSeoSchemaGraph::register_provider('ace-seo/video', [$this, 'provide_video']);
-        AceSeoSchemaGraph::register_provider('ace-seo/archive-items', [$this, 'provide_archive_items']);
+        AceCrawlSchemaGraph::register_provider('ace-seo/local-business', [$this, 'provide_local_business']);
+        AceCrawlSchemaGraph::register_provider('ace-seo/product', [$this, 'provide_product']);
+        AceCrawlSchemaGraph::register_provider('ace-seo/faq', [$this, 'provide_faq']);
+        AceCrawlSchemaGraph::register_provider('ace-seo/video', [$this, 'provide_video']);
+        AceCrawlSchemaGraph::register_provider('ace-seo/archive-items', [$this, 'provide_archive_items']);
     }
 
     /**
@@ -141,7 +141,7 @@ class AceSeoSchema {
             return null;
         }
 
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         if ((($options['organization']['type'] ?? 'organization') === 'person')) {
             return null;
         }
@@ -168,7 +168,7 @@ class AceSeoSchema {
             return null;
         }
 
-        $enabled = apply_filters('ace_seo_product_schema_enabled', !class_exists('WC_Structured_Data'));
+        $enabled = apply_filters('acecrawl_product_schema_enabled', !class_exists('WC_Structured_Data'));
         if (!$enabled) {
             return null;
         }
@@ -187,7 +187,7 @@ class AceSeoSchema {
     /**
      * FAQPage node — opt-in per post (the heading-heuristic detection is too
      * loose to enable everywhere). Enable with the `_ace_seo_faq-schema` post
-     * meta or the `ace_seo_faq_schema_enabled` filter.
+     * meta or the `acecrawl_faq_schema_enabled` filter.
      */
     public function provide_faq($context) {
         if (empty($context['is_singular'])) {
@@ -200,7 +200,7 @@ class AceSeoSchema {
         }
 
         $enabled = (bool) get_post_meta($post->ID, '_ace_seo_faq-schema', true);
-        $enabled = apply_filters('ace_seo_faq_schema_enabled', $enabled, $post);
+        $enabled = apply_filters('acecrawl_faq_schema_enabled', $enabled, $post);
         if (!$enabled) {
             return null;
         }
@@ -220,11 +220,11 @@ class AceSeoSchema {
             return;
         }
         
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $entity = $this->get_site_entity_schema($options);
         
         if (!empty($entity)) {
-            AceSeoSchemaGraph::print_json_ld($entity);
+            AceCrawlSchemaGraph::print_json_ld($entity);
         }
     }
     
@@ -233,7 +233,7 @@ class AceSeoSchema {
             return;
         }
         
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $organization_settings = $options['organization'] ?? [];
         if (($organization_settings['type'] ?? 'organization') === 'person') {
             return;
@@ -242,7 +242,7 @@ class AceSeoSchema {
         $local_business = $this->get_local_business_data();
         
         if (!empty($local_business)) {
-            AceSeoSchemaGraph::print_json_ld($local_business);
+            AceCrawlSchemaGraph::print_json_ld($local_business);
         }
     }
     
@@ -299,7 +299,7 @@ class AceSeoSchema {
          * @param array $organization_settings Saved organization settings.
          * @param array $options            All Ace SEO options.
          */
-        return apply_filters('ace_seo_organization_schema', $organization, $organization_settings, $options);
+        return apply_filters('acecrawl_organization_schema', $organization, $organization_settings, $options);
     }
 
     private function get_person_schema($options) {
@@ -342,7 +342,7 @@ class AceSeoSchema {
          * @param array $person Person settings.
          * @param array $options All Ace SEO options.
          */
-        return apply_filters('ace_seo_person_schema', $schema, $person, $options);
+        return apply_filters('acecrawl_person_schema', $schema, $person, $options);
     }
 
     private function build_logo_schema($organization, $options) {
@@ -533,7 +533,7 @@ class AceSeoSchema {
     }
     
     private function get_local_business_data() {
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $local = $options['local'] ?? [];
         
         // Only output if local business data is available

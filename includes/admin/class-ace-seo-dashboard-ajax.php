@@ -17,11 +17,11 @@ class ACE_SEO_Dashboard_Ajax {
     
     public function __construct() {
         // AJAX handlers for authenticated users
-        add_action('wp_ajax_ace_seo_load_dashboard_stats', array($this, 'ajax_load_dashboard_stats'));
-        add_action('wp_ajax_ace_seo_load_recent_activity', array($this, 'ajax_load_recent_activity'));
-        add_action('wp_ajax_ace_seo_load_content_analysis', array($this, 'ajax_load_content_analysis'));
-        add_action('wp_ajax_ace_seo_load_post_batch', array($this, 'ajax_load_post_batch'));
-        add_action('wp_ajax_ace_seo_load_database_performance', array($this, 'ajax_load_database_performance'));
+        add_action('wp_ajax_acecrawl_load_dashboard_stats', array($this, 'ajax_load_dashboard_stats'));
+        add_action('wp_ajax_acecrawl_load_recent_activity', array($this, 'ajax_load_recent_activity'));
+        add_action('wp_ajax_acecrawl_load_content_analysis', array($this, 'ajax_load_content_analysis'));
+        add_action('wp_ajax_acecrawl_load_post_batch', array($this, 'ajax_load_post_batch'));
+        add_action('wp_ajax_acecrawl_load_database_performance', array($this, 'ajax_load_database_performance'));
         
         // Enqueue dashboard scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_dashboard_scripts'));
@@ -38,9 +38,9 @@ class ACE_SEO_Dashboard_Ajax {
         
         wp_enqueue_script(
             'ace-seo-dashboard-ajax',
-            ACE_SEO_URL . 'assets/js/dashboard-ajax.js',
+            ACECRAWL_URL . 'assets/js/dashboard-ajax.js',
             array('jquery'),
-            ACE_SEO_VERSION,
+            ACECRAWL_VERSION,
             true
         );
         
@@ -437,11 +437,11 @@ class ACE_SEO_Dashboard_Ajax {
         
         try {
             // Check if optimization is pending
-            $optimization_pending = get_option('ace_seo_db_optimization_pending', false);
-            $optimization_completed = get_option('ace_seo_db_optimized', false);
+            $optimization_pending = get_option('acecrawl_db_optimization_pending', false);
+            $optimization_completed = get_option('acecrawl_db_optimized', false);
             
             // Check current progress
-            $progress = get_option('ace_seo_optimization_progress', array(
+            $progress = get_option('acecrawl_optimization_progress', array(
                 'percent' => 0,
                 'message' => 'Not started',
                 'completed' => false,
@@ -455,7 +455,7 @@ class ACE_SEO_Dashboard_Ajax {
             
             // Reset optimization pending if progress shows completed
             if ($optimization_pending && $progress['completed']) {
-                update_option('ace_seo_db_optimization_pending', false, false);
+                update_option('acecrawl_db_optimization_pending', false, false);
                 $optimization_pending = false;
                 if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
                     error_log('ACE SEO: Reset optimization pending flag - optimization completed'); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r -- diagnostic output, written only when WP_DEBUG_LOG is on.

@@ -8,11 +8,11 @@ no need to print your own `<script type="application/ld+json">` blocks.
 
 ```php
 add_action( 'init', function () {
-    if ( ! function_exists( 'ace_seo_register_schema_provider' ) ) {
+    if ( ! function_exists( 'acecrawl_register_schema_provider' ) ) {
         return; // Ace SEO not active
     }
 
-    ace_seo_register_schema_provider( 'my-plugin/event', function ( array $context ) {
+    acecrawl_register_schema_provider( 'my-plugin/event', function ( array $context ) {
         if ( ! is_singular( 'events' ) ) {
             return null; // add nothing on this page
         }
@@ -59,19 +59,19 @@ The provider callback's `$context` array carries `is_front_page`, `is_singular`,
 
 ## Filters
 
-- `ace_seo_schema_graph( array $nodes, array $context )` — the whole graph, last word before
+- `acecrawl_schema_graph( array $nodes, array $context )` — the whole graph, last word before
   de-duplication. Use to remove or rewrite nodes.
-- `ace_seo_schema_article( array $node, WP_Post $post )` — the Article node (word count,
+- `acecrawl_schema_article( array $node, WP_Post $post )` — the Article node (word count,
   reading time, section and keywords are added here by the built-in enhancer).
-- `ace_seo_article_schema_type( string $type, WP_Post $post )` — swap `Article` for
+- `acecrawl_article_schema_type( string $type, WP_Post $post )` — swap `Article` for
   `NewsArticle`, `BlogPosting`, etc. per post or post type.
-- `ace_seo_product_schema_enabled( bool $enabled )` — Ace SEO's Product node on WooCommerce
+- `acecrawl_product_schema_enabled( bool $enabled )` — Ace SEO's Product node on WooCommerce
   singles. Defaults to **off when WooCommerce core already emits Product JSON-LD**
   (`WC_Structured_Data` present); enable to let Ace SEO own it instead (then suppress Woo's).
-- `ace_seo_faq_schema_enabled( bool $enabled, WP_Post $post )` — FAQPage extraction from
+- `acecrawl_faq_schema_enabled( bool $enabled, WP_Post $post )` — FAQPage extraction from
   question-style headings. Opt-in per post via the `_ace_seo_faq-schema` post meta or this
   filter (the heuristic is too loose to force on globally).
-- `ace_seo_publisher_schema` / `ace_seo_publisher_person_schema` — the publisher node (existing).
+- `acecrawl_publisher_schema` / `acecrawl_publisher_person_schema` — the publisher node (existing).
 
 ## Verifying output
 

@@ -25,27 +25,27 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoRetentionReport {
+class AceCrawlRetentionReport {
 
     const META            = '_ace_seo_retention';
-    const PROGRESS_OPTION = 'ace_seo_retention_progress';
-    const HISTORY_OPTION  = 'ace_seo_retention_history';
+    const PROGRESS_OPTION = 'acecrawl_retention_progress';
+    const HISTORY_OPTION  = 'acecrawl_retention_history';
     const HISTORY_KEEP    = 26;
     /** Seconds a cron tick keeps taking batches: a site's cron fires once a minute, a batch at a time is two hours. */
     const TICK_BUDGET     = 40;
-    const SIGNALS_OPTION  = 'ace_seo_retention_signals';
+    const SIGNALS_OPTION  = 'acecrawl_retention_signals';
     /** Shorter windows read against the main one, for trends. Each is its own option: post ID => numbers. */
     const PERIODS         = array( 7, 14, 30, 90 );
-    const PERIOD_OPTION   = 'ace_seo_retention_period_';
+    const PERIOD_OPTION   = 'acecrawl_retention_period_';
     const META_TREND      = '_ace_seo_ret_trend';
     const META_MOMENTUM   = '_ace_seo_ret_momentum';
     const TRENDS          = array( 'rising', 'steady', 'falling', 'gone', 'quiet' );
-    const CRON_HOOK       = 'ace_seo_retention_tick';
+    const CRON_HOOK       = 'acecrawl_retention_tick';
     const BATCH           = 300;
     /** Hourly check that a build still has a worker, in case the tick that should follow it was lost. */
-    const WATCH_HOOK      = 'ace_seo_retention_watch';
+    const WATCH_HOOK      = 'acecrawl_retention_watch';
     /** The lease row: whichever worker holds it is the one allowed to run steps. */
-    const LOCK_OPTION     = 'ace_seo_retention_lock';
+    const LOCK_OPTION     = 'acecrawl_retention_lock';
     /** Seconds a lease lasts without renewal; a batch of 300 takes well under a minute, a tick under 80 s. */
     const LEASE_SECONDS   = 300;
     /** Consecutive failed steps before a build gives up rather than looping on a broken batch. */
@@ -76,9 +76,9 @@ class AceSeoRetentionReport {
     const META_LINKS = '_ace_seo_ret_links';
     const META_BUILT = '_ace_seo_ret_built';
     /** Admin query cache tag (Ace Redis Cache) for the report's counts; bumped wherever the meta is written. */
-    const CACHE_TAG  = 'ace_seo_retention';
+    const CACHE_TAG  = 'acecrawl_retention';
 
-    const WEEKLY_HOOK = 'ace_seo_retention_weekly';
+    const WEEKLY_HOOK = 'acecrawl_retention_weekly';
 
     public static function init() {
         add_action( self::CRON_HOOK, array( __CLASS__, 'run_tick' ) );
@@ -91,9 +91,9 @@ class AceSeoRetentionReport {
             add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
             add_action( 'admin_post_ace_seo_retention_resume', array( __CLASS__, 'handle_resume' ) );
             add_action( 'admin_post_ace_seo_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
-            add_action( 'wp_ajax_ace_seo_retention_progress', array( __CLASS__, 'ajax_progress' ) );
-            add_action( 'wp_ajax_ace_seo_retention_dismiss', array( __CLASS__, 'ajax_dismiss' ) );
-            add_action( 'wp_ajax_ace_seo_retention_rows', array( __CLASS__, 'ajax_rows' ) );
+            add_action( 'wp_ajax_acecrawl_retention_progress', array( __CLASS__, 'ajax_progress' ) );
+            add_action( 'wp_ajax_acecrawl_retention_dismiss', array( __CLASS__, 'ajax_dismiss' ) );
+            add_action( 'wp_ajax_acecrawl_retention_rows', array( __CLASS__, 'ajax_rows' ) );
             add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
             add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
             add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
@@ -112,7 +112,7 @@ class AceSeoRetentionReport {
      */
     public static function settings( array $overrides = array() ) {
         // The cutoffs saved on the Retention screen, so a scheduled rebuild and the build form agree.
-        $saved    = class_exists( 'AceSeoRetentionActions' ) ? AceSeoRetentionActions::options() : array();
+        $saved    = class_exists( 'AceCrawlRetentionActions' ) ? AceCrawlRetentionActions::options() : array();
         $defaults = array(
             'older_than_years'  => (int) ( $saved['report_years'] ?? 3 ),  // posts published before this many years ago are candidates
             'days'              => (int) ( $saved['report_days'] ?? 90 ),  // Search Console and Analytics window
@@ -124,13 +124,13 @@ class AceSeoRetentionReport {
             'refresh_max_pos'   => 20,     // and it has to be within reach: page 1 or 2
             'thin_words'        => (int) ( $saved['thin_words'] ?? 300 ),  // fewer words than this counts as thin
             'retained_views'    => (int) ( $saved['retained_views'] ?? 1 ), // views in the window that count as retained
-            'timing_policy'     => 'strict' === ( $saved['timing_policy'] ?? '' ) ? 'strict' : 'estimate', // see Ace_SEO_Retention_Evidence::timing_hold()
+            'timing_policy'     => 'strict' === ( $saved['timing_policy'] ?? '' ) ? 'strict' : 'estimate', // see AceCrawl_Retention_Evidence::timing_hold()
         );
         $settings = array_merge( $defaults, array_intersect_key( $overrides, $defaults ) );
         if ( ! isset( $overrides['demand_impressions'] ) ) {
             $settings['demand_impressions'] = (int) round( 100 * max( 7, (int) $settings['days'] ) / 90 );
         }
-        return apply_filters( 'ace_seo_retention_settings', $settings );
+        return apply_filters( 'acecrawl_retention_settings', $settings );
     }
 
     /* ---- Build ---------------------------------------------------------------------------------- */
@@ -436,12 +436,12 @@ class AceSeoRetentionReport {
         $gsc     = array();
 
         // A WP-Cron tick is neither admin, REST nor CLI, so the Search Console class may not be loaded.
-        if ( ! class_exists( 'AceSEOSearchConsole' ) && class_exists( 'AceSEOSiteKit' ) && defined( 'ACE_SEO_PATH' ) ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
+        if ( ! class_exists( 'AceCrawlSearchConsole' ) && class_exists( 'AceCrawlSiteKit' ) && defined( 'ACECRAWL_PATH' ) ) {
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-search-console.php';
         }
 
-        if ( class_exists( 'AceSEOSearchConsole' ) && AceSEOSearchConsole::is_ready() ) {
-            $report = AceSEOSearchConsole::pages_report( (int) $p['settings']['days'] );
+        if ( class_exists( 'AceCrawlSearchConsole' ) && AceCrawlSearchConsole::is_ready() ) {
+            $report = AceCrawlSearchConsole::pages_report( (int) $p['settings']['days'] );
             if ( is_wp_error( $report ) ) {
                 $p['notes'][] = 'Search Console: ' . $report->get_error_message() . ' — scored without search data.';
             } else {
@@ -481,7 +481,7 @@ class AceSeoRetentionReport {
         $report = self::ga4_report( gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) ), gmdate( 'Y-m-d', strtotime( '-1 day' ) ) );
         $views  = is_wp_error( $report ) ? $report : $report['rows'];
         if ( is_wp_error( $views ) ) {
-            $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
+            $p['notes'][] = 'Google Analytics: ' . $views->get_error_message() . ( class_exists( 'AceCrawlViewTracker' ) && AceCrawlViewTracker::enabled() ? ' Views come from the plugin\'s own tracking instead.' : ' No views source: tiers lean on search clicks.' );
         } else {
             // Analytics listed every page with a view only if it did not hit its row ceiling. When it did,
             // a page absent from the rows is unknown, not zero, and the scorer treats it that way.
@@ -546,10 +546,10 @@ class AceSeoRetentionReport {
      * hit and the long tail is missing, so a page absent from the rows is not a measured zero.
      */
     public static function ga4_report( $start, $end ) {
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) {
             return new WP_Error( 'ga4_no_sitekit', 'Site Kit is not active.' );
         }
-        $property = AceSEOSiteKit::get_analytics_property_id();
+        $property = AceCrawlSiteKit::get_analytics_property_id();
         if ( '' === $property ) {
             return new WP_Error( 'ga4_no_property', 'Site Kit has no Analytics property connected.' );
         }
@@ -560,7 +560,7 @@ class AceSeoRetentionReport {
             return $cached;
         }
 
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
         if ( is_wp_error( $token ) ) {
             return $token;
         }
@@ -618,10 +618,10 @@ class AceSeoRetentionReport {
      * start earlier. One request a day; the API allows ranges back to 2015.
      */
     public static function ga4_first_day() {
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) {
             return '';
         }
-        $property = AceSEOSiteKit::get_analytics_property_id();
+        $property = AceCrawlSiteKit::get_analytics_property_id();
         if ( '' === $property ) {
             return '';
         }
@@ -630,7 +630,7 @@ class AceSeoRetentionReport {
         if ( is_string( $cached ) ) {
             return $cached;
         }
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
         if ( is_wp_error( $token ) || empty( $token ) ) {
             return '';
         }
@@ -724,15 +724,15 @@ class AceSeoRetentionReport {
 
         // The plugin's own tracking, where Analytics is not connected: human views in the window.
         $tracked = null;
-        if ( null === $ga4 && class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ) {
-            $tracked = AceSeoViewTracker::views_for( $ids, (int) $settings['days'] );
+        if ( null === $ga4 && class_exists( 'AceCrawlViewTracker' ) && AceCrawlViewTracker::enabled() ) {
+            $tracked = AceCrawlViewTracker::views_for( $ids, (int) $settings['days'] );
         }
 
         $words = self::word_counts( $ids );
         // The dates this build's traffic covers, for the timing rule.
         $period = array( 'start' => gmdate( 'Y-m-d', (int) $p['started'] - (int) $settings['days'] * DAY_IN_SECONDS ), 'end' => gmdate( 'Y-m-d', (int) $p['started'] - DAY_IN_SECONDS ) );
-        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) && defined( 'ACE_SEO_PATH' ) ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-retention-evidence-view.php';
+        if ( ! class_exists( 'AceCrawl_Retention_Evidence_View' ) && defined( 'ACECRAWL_PATH' ) ) {
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-retention-evidence-view.php';
         }
 
         /**
@@ -740,9 +740,9 @@ class AceSeoRetentionReport {
          * array( post_id => views ). Takes precedence over Analytics (Site Kit) and the plugin's own
          * tracking; without any of them the signal is absent.
          */
-        $views = apply_filters( 'ace_seo_retention_pageviews', array(), $ids, $settings );
+        $views = apply_filters( 'acecrawl_retention_pageviews', array(), $ids, $settings );
         /** External backlinks per post, array( post_id => count ), if the site has a source. */
-        $backlinks = apply_filters( 'ace_seo_retention_backlinks', array(), $ids, $settings );
+        $backlinks = apply_filters( 'acecrawl_retention_backlinks', array(), $ids, $settings );
 
         foreach ( $ids as $id ) {
             $key = self::path_key( get_permalink( $id ) );
@@ -795,7 +795,7 @@ class AceSeoRetentionReport {
             // Timing: an article is only judged on a period that contained the dates it is about.
             // Editor-set dates, a verified event occurrence or (recurring) the publication anniversary.
             // Readers and clicks still count: a retained article is never held.
-            if ( 'retained' !== $row['tier'] && class_exists( 'Ace_SEO_Retention_Evidence' ) ) {
+            if ( 'retained' !== $row['tier'] && class_exists( 'AceCrawl_Retention_Evidence' ) ) {
                 $hold = '';
                 if ( ! empty( $signals['ga4_from'] ) && $signals['ga4_from'] > $period['start'] ) {
                     $hold = sprintf( 'Google Analytics only has data from %s, so the %d-day window (%s to %s) is not fully covered; a quiet result cannot be trusted yet.', $signals['ga4_from'], (int) $settings['days'], $period['start'], $period['end'] );
@@ -815,7 +815,7 @@ class AceSeoRetentionReport {
                 $p['ranks'][ $row['rank'] ] = ( $p['ranks'][ $row['rank'] ] ?? 0 ) + 1;
             }
 
-            $row = apply_filters( 'ace_seo_retention_row', $row, $id, $settings );
+            $row = apply_filters( 'acecrawl_retention_row', $row, $id, $settings );
             update_post_meta( $id, self::META, $row );
             self::write_flat_meta( $id, $row, (int) $p['started'] );
             $p['counts'][ $row['bucket'] ] = ( $p['counts'][ $row['bucket'] ] ?? 0 ) + 1;
@@ -874,7 +874,7 @@ class AceSeoRetentionReport {
             // Publish completion only after all rows and final progress are durable.
             self::save_progress( $p );
             /** A build has finished and every row is saved; exports that follow the report hook here. */
-            do_action( 'ace_seo_retention_built', $p );
+            do_action( 'acecrawl_retention_built', $p );
             return;
         }
         self::save_progress( $p );
@@ -882,12 +882,12 @@ class AceSeoRetentionReport {
 
     /** Why this build's period cannot judge the post yet ('' when it can). Site knowledge only; no API calls. */
     public static function timing_hold_for( $id, array $period, $strict = false ) {
-        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) ) {
+        if ( ! class_exists( 'AceCrawl_Retention_Evidence_View' ) ) {
             return '';
         }
         try {
-            $context = Ace_SEO_Retention_Evidence_View::base_context( (int) $id, array( 'published' => get_post_time( 'Y-m-d', true, $id ) ), $period, gmdate( 'Y-m-d' ) );
-            return Ace_SEO_Retention_Evidence::timing_hold( Ace_SEO_Retention_Evidence::relevance( $context ), $period, $strict );
+            $context = AceCrawl_Retention_Evidence_View::base_context( (int) $id, array( 'published' => get_post_time( 'Y-m-d', true, $id ) ), $period, gmdate( 'Y-m-d' ) );
+            return AceCrawl_Retention_Evidence::timing_hold( AceCrawl_Retention_Evidence::relevance( $context ), $period, $strict );
         } catch ( Throwable $e ) {
             return '';
         }
@@ -1153,7 +1153,7 @@ class AceSeoRetentionReport {
             if ( $days >= (int) $settings['days'] || ( 'gsc' === $source && $days < 30 ) ) {
                 continue;
             }
-            $data = 'ga4' === $source ? self::ga4_page_views( $days ) : ( class_exists( 'AceSEOSearchConsole' ) ? AceSEOSearchConsole::pages_report( $days ) : null );
+            $data = 'ga4' === $source ? self::ga4_page_views( $days ) : ( class_exists( 'AceCrawlSearchConsole' ) ? AceCrawlSearchConsole::pages_report( $days ) : null );
             if ( ! is_array( $data ) ) {
                 continue;
             }
@@ -1284,7 +1284,7 @@ class AceSeoRetentionReport {
         if ( ! function_exists( 'ace_rc_admin_cache_remember' ) ) {
             return $compute();
         }
-        return ace_rc_admin_cache_remember( 'ace_seo_retention:' . $key, $compute, array( self::CACHE_TAG ), HOUR_IN_SECONDS );
+        return ace_rc_admin_cache_remember( 'acecrawl_retention:' . $key, $compute, array( self::CACHE_TAG ), HOUR_IN_SECONDS );
     }
 
     /** Drop the cached counts after the report's meta changes. */
@@ -1315,7 +1315,7 @@ class AceSeoRetentionReport {
     }
 
     public static function render_message() {
-        $key = 'ace_seo_retention_msg_' . get_current_user_id();
+        $key = 'acecrawl_retention_msg_' . get_current_user_id();
         $msg = get_transient( $key );
         if ( $msg ) {
             delete_transient( $key );
@@ -1350,7 +1350,7 @@ class AceSeoRetentionReport {
 
     /** A weekly rebuild with the saved cutoffs, when switched on. Off by default. */
     public static function sync_weekly_schedule() {
-        $on   = class_exists( 'AceSeoRetentionActions' ) && ! empty( AceSeoRetentionActions::options()['auto_build'] );
+        $on   = class_exists( 'AceCrawlRetentionActions' ) && ! empty( AceCrawlRetentionActions::options()['auto_build'] );
         $next = wp_next_scheduled( self::WEEKLY_HOOK );
         if ( $on && ! $next ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'weekly', self::WEEKLY_HOOK );
@@ -1476,14 +1476,14 @@ class AceSeoRetentionReport {
 
     /**
      * Hosts whose links count as internal: the site's own, plus any a staging or migrated copy still
-     * links to in its content (`ace_seo_retention_internal_hosts`, e.g. the production host on a staging
+     * links to in its content (`acecrawl_retention_internal_hosts`, e.g. the production host on a staging
      * site) — otherwise every inbound link on such a copy would be attributed to nobody.
      */
     private static function internal_hosts() {
         static $hosts = null;
         if ( null === $hosts ) {
             $own   = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
-            $extra = (array) apply_filters( 'ace_seo_retention_internal_hosts', array() );
+            $extra = (array) apply_filters( 'acecrawl_retention_internal_hosts', array() );
             $hosts = array_values( array_unique( array_filter( array_map( function ( $h ) {
                 return strtolower( preg_replace( '/^www\./', '', (string) $h ) );
             }, array_merge( array( $own ), $extra ) ) ) ) );
@@ -1628,7 +1628,7 @@ class AceSeoRetentionReport {
             wp_die( 'Not allowed.' );
         }
         $msg = self::resume() ? 'The build has been queued to continue from where it stopped.' : 'The build did not need resuming.';
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' ) );
         exit;
     }
@@ -1660,21 +1660,21 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_settings_save' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $in = AceSeoInput::post( self::settings_fields() );
-        AceSeoRetentionActions::save_report_settings( $in );
+        $in = AceCrawlInput::post( self::settings_fields() );
+        AceCrawlRetentionActions::save_report_settings( $in );
         $in['settings_section'] = 'notice-lifetimes';
-        AceSeoRetentionActions::save_options( $in );
-        AceSeoRetentionActions::save_front_settings( $in );
+        AceCrawlRetentionActions::save_options( $in );
+        AceCrawlRetentionActions::save_front_settings( $in );
         self::sync_weekly_schedule();
-        if ( class_exists( 'AceSeoViewTracker' ) ) {
-            AceSeoViewTracker::maybe_install();
+        if ( class_exists( 'AceCrawlViewTracker' ) ) {
+            AceCrawlViewTracker::maybe_install();
         }
         $parts = array( 'All retention settings saved.' );
-        if ( class_exists( 'AceSeoSheets' ) && array_key_exists( 'sheet', $in ) ) {
-            $parts[] = 'Google Sheets: ' . AceSeoSheets::save_settings( $in );
+        if ( class_exists( 'AceCrawlSheets' ) && array_key_exists( 'sheet', $in ) ) {
+            $parts[] = 'Google Sheets: ' . AceCrawlSheets::save_settings( $in );
         }
-        if ( class_exists( 'AceSeoSheetsSchedule' ) && array_key_exists( 'frequency', $in ) ) {
-            $schedule = AceSeoSheetsSchedule::save_settings( $in );
+        if ( class_exists( 'AceCrawlSheetsSchedule' ) && array_key_exists( 'frequency', $in ) ) {
+            $schedule = AceCrawlSheetsSchedule::save_settings( $in );
             if ( is_wp_error( $schedule ) ) {
                 $parts[] = 'Report schedule not saved: ' . $schedule->get_error_message() . ' Everything else was saved.';
             }
@@ -1683,7 +1683,7 @@ class AceSeoRetentionReport {
             // The shared save bar posted this; it reloads the tab so accepted rules and the hold table re-render.
             wp_send_json_success( array( 'message' => implode( ' ', $parts ), 'reload' => true ) );
         }
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), implode( ' ', $parts ), 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), implode( ' ', $parts ), 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention' ) );
         exit;
     }
@@ -1692,12 +1692,12 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_report_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_report_settings( AceSeoInput::post( self::settings_fields() ) );
+        AceCrawlRetentionActions::save_report_settings( AceCrawlInput::post( self::settings_fields() ) );
         self::sync_weekly_schedule();
-        if ( class_exists( 'AceSeoViewTracker' ) ) {
-            AceSeoViewTracker::maybe_install();
+        if ( class_exists( 'AceCrawlViewTracker' ) ) {
+            AceCrawlViewTracker::maybe_install();
         }
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Report settings saved.', 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), 'Report settings saved.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) );
         exit;
     }
@@ -1706,8 +1706,8 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_front' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_front_settings( AceSeoInput::post( self::settings_fields() ) );
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Front-end settings for retained posts saved. Cached pages pick them up as they expire or are purged.', 60 );
+        AceCrawlRetentionActions::save_front_settings( AceCrawlInput::post( self::settings_fields() ) );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), 'Front-end settings for retained posts saved. Cached pages pick them up as they expire or are purged.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-readers' ) );
         exit;
     }
@@ -1718,14 +1718,14 @@ class AceSeoRetentionReport {
      */
     public static function shareable_links() {
         $base = admin_url( 'edit.php' );
-        $o    = class_exists( 'AceSeoRetentionActions' ) ? AceSeoRetentionActions::options() : array();
+        $o    = class_exists( 'AceCrawlRetentionActions' ) ? AceCrawlRetentionActions::options() : array();
         $year = (int) gmdate( 'Y' ) - 2;
         $links = array(
             'retained'  => array( __( 'Retained: old posts still being read, most read first', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'retained', 'orderby' => 'ace_seo_ret_views', 'order' => 'desc' ), $base ) ),
             'candidate' => array( __( 'Candidates for review: older posts with no recorded visits and less text', 'ace-crawl-enhancer' ), add_query_arg( array( 'post_type' => 'post', 'ace_ret' => 'candidate' ), $base ) ),
             'before'    => array( /* translators: %d: year. */ sprintf( __( 'Everything published before %d', 'ace-crawl-enhancer' ), $year ), add_query_arg( array( 'post_type' => 'post', 'post_status' => 'publish', 'ace_before' => $year . '-01-01' ), $base ) ),
         );
-        return apply_filters( 'ace_seo_retention_shareable_links', $links, $o );
+        return apply_filters( 'acecrawl_retention_shareable_links', $links, $o );
     }
 
     public static function handle_clear() {
@@ -1754,19 +1754,19 @@ class AceSeoRetentionReport {
         } else {
             $ids = array_map( 'absint', (array) ( $_POST['post_ids'] ?? array() ) );
         }
-        $result = AceSeoRetentionActions::apply( $ids, $action, $args, 'admin' );
-        $msg    = '' !== $result['error'] ? $result['error'] : sprintf( '%s: applied to %s post(s), %s skipped.', AceSeoRetentionActions::ACTIONS[ $action ] ?? $action, number_format_i18n( $result['applied'] ), number_format_i18n( $result['skipped'] ) );
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        $result = AceCrawlRetentionActions::apply( $ids, $action, $args, 'admin' );
+        $msg    = '' !== $result['error'] ? $result['error'] : sprintf( '%s: applied to %s post(s), %s skipped.', AceCrawlRetentionActions::ACTIONS[ $action ] ?? $action, number_format_i18n( $result['applied'] ), number_format_i18n( $result['skipped'] ) );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention' . ( $bucket ? '&bucket=' . $bucket : '' ) ) );
         exit;
     }
 
     public static function handle_options() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_options' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_options' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_options( AceSeoInput::post( self::settings_fields() ) );
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Notice and search expiry rules saved. Cached pages pick them up as they expire or are purged.', 60 );
+        AceCrawlRetentionActions::save_options( AceCrawlInput::post( self::settings_fields() ) );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), 'Notice and search expiry rules saved. Cached pages pick them up as they expire or are purged.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-notice' ) );
         exit;
     }
@@ -1776,25 +1776,25 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_redirect' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $from = isset( $_POST['from'] ) ? AceSeoInput::clean( wp_unslash( $_POST['from'] ), 'target' ) : '';
+        $from = isset( $_POST['from'] ) ? AceCrawlInput::clean( wp_unslash( $_POST['from'] ), 'target' ) : '';
         $id   = ctype_digit( $from ) ? (int) $from : (int) url_to_postid( $from );
-        $to   = isset( $_POST['to'] ) ? AceSeoInput::clean( wp_unslash( $_POST['to'] ), 'target' ) : '';
+        $to   = isset( $_POST['to'] ) ? AceCrawlInput::clean( wp_unslash( $_POST['to'] ), 'target' ) : '';
         if ( ! $id ) {
             $msg = 'That source is not a post on this site (give a post ID or its URL).';
         } elseif ( 'gone' === strtolower( $to ) ) {
-            $r   = AceSeoRetentionActions::apply( array( $id ), 'gone', array(), 'admin' );
+            $r   = AceCrawlRetentionActions::apply( array( $id ), 'gone', array(), 'admin' );
             $msg = $r['applied'] ? 'Now answering 410 for post ' . $id . '.' : 'Not applied (' . ( $r['error'] ?: 'skipped' ) . ').';
         } else {
-            $r   = AceSeoRetentionActions::apply( array( $id ), 'redirect', array( 'url' => $to ), 'admin' );
+            $r   = AceCrawlRetentionActions::apply( array( $id ), 'redirect', array( 'url' => $to ), 'admin' );
             $msg = $r['applied'] ? 'Redirect set for post ' . $id . '.' : 'Not applied (' . ( $r['error'] ?: 'a post cannot redirect to itself' ) . ').';
         }
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-retention#redirects' ) );
         exit;
     }
 
     public static function handle_export() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_export' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_export' ) ) {
             wp_die( 'Not allowed.' );
         }
         $bucket = isset( $_GET['bucket'] ) ? sanitize_key( wp_unslash( $_GET['bucket'] ) ) : '';
@@ -1848,7 +1848,7 @@ class AceSeoRetentionReport {
         $sources = array();
         if ( false === stripos( $notes, 'Google Analytics:' ) && false === stripos( $notes, 'Site Kit is not active' ) ) { $sources[] = 'Google Analytics'; }
         if ( false === stripos( $notes, 'Search Console is not connected' ) ) { $sources[] = 'Search Console'; }
-        if ( class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled() ) { $sources[] = 'the site’s own visitor count'; }
+        if ( class_exists( 'AceCrawlViewTracker' ) && AceCrawlViewTracker::enabled() ) { $sources[] = 'the site’s own visitor count'; }
         $sources  = $sources ? implode( ' and ', $sources ) : 'links between articles only';
         $quiet    = (int) $tiers['dormant'] + (int) $tiers['candidate'];
         $partial  = self::is_building();
@@ -1926,7 +1926,7 @@ class AceSeoRetentionReport {
                     <li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention&bucket=refresh' ) ); ?>">Start with the posts worth updating</a>: they already have an audience in search.</li>
                     <?php if ( $holds['timing'] ) : ?><li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) ); ?>">Accept or set timing rules for categories</a> so the held posts can be judged; the settings tab suggests rules from this site's own data.</li><?php endif; ?>
                     <li>Groups and suggestions overlap: a post can be read weekly and still be worth an update. Decide with the client; this report only describes.</li>
-                    <?php if ( class_exists( 'AceSeoSheets' ) && AceSeoSheets::configured() ) : ?><li><a href="<?php echo esc_url( AceSeoSheets::sheet_url() ); ?>" target="_blank" rel="noopener noreferrer">Open the Google Sheet</a> for the full list with readership bands, timing and reasons.</li><?php endif; ?>
+                    <?php if ( class_exists( 'AceCrawlSheets' ) && AceCrawlSheets::configured() ) : ?><li><a href="<?php echo esc_url( AceCrawlSheets::sheet_url() ); ?>" target="_blank" rel="noopener noreferrer">Open the Google Sheet</a> for the full list with readership bands, timing and reasons.</li><?php endif; ?>
                 </ol>
             </div>
         </div>
@@ -1961,7 +1961,7 @@ class AceSeoRetentionReport {
                 <div class="tablenav top" style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;height:auto;padding:.5em 0">
                     <select name="retention_action" aria-label="Action to apply" required>
                         <option value="">Bulk action…</option>
-                        <?php foreach ( AceSeoRetentionActions::ACTIONS as $k => $label ) : ?>
+                        <?php foreach ( AceCrawlRetentionActions::ACTIONS as $k => $label ) : ?>
                             <option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $label ); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -1981,7 +1981,7 @@ class AceSeoRetentionReport {
                     <?php if ( ! $rows ) : ?>
                         <tr><td colspan="11">No posts match this recommendation.</td></tr>
                     <?php endif; ?>
-                    <?php foreach ( $rows as $r ) : $st = AceSeoRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', AceSeoRedirects::label( $r['id'] ), $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
+                    <?php foreach ( $rows as $r ) : $st = AceCrawlRetentionActions::state( $r['id'] ); $flags = array_filter( array( $st['noindex'] ? 'noindex' : '', $st['unavailable'] ? 'unavailable after ' . $st['unavailable'] : '', AceCrawlRedirects::label( $r['id'] ), $st['news_excl'] ? 'no news sitemap' : '', $st['notice'] ? 'notice: ' . $st['notice'] : '' ) ); ?>
                         <tr>
                             <th scope="row" class="check-column"><input type="checkbox" name="post_ids[]" value="<?php echo esc_attr( $r['id'] ); ?>"></th>
                             <td><a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><?php echo esc_html( $r['title'] ?: '(no title)' ); ?></a><br><a href="<?php echo esc_url( $r['url'] ); ?>" target="_blank" rel="noopener" style="font-size:11px;color:#666"><?php echo esc_html( wp_make_link_relative( $r['url'] ) ); ?></a></td>
@@ -2038,8 +2038,8 @@ class AceSeoRetentionReport {
         $p     = self::progress();
         $state = self::worker_state();
         $sheet = null;
-        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
-            $job = AceSeoSheetsSchedule::record( AceSeoSheetsSchedule::JOB );
+        if ( class_exists( 'AceCrawlSheetsSchedule' ) ) {
+            $job = AceCrawlSheetsSchedule::record( AceCrawlSheetsSchedule::JOB );
             if ( is_array( $job ) && ! empty( $job['status'] ) ) {
                 $sheet = array(
                     'status'  => (string) $job['status'],
@@ -2191,7 +2191,7 @@ class AceSeoRetentionReport {
                 <summary>Previous checks</summary>
                 <div class="ace-retention-acc-body ace-retention-acc-scroll"><?php self::render_history( $labels ); ?></div>
             </details>
-            <?php $log = AceSeoRetentionActions::recent_log( 30 ); ?>
+            <?php $log = AceCrawlRetentionActions::recent_log( 30 ); ?>
             <details class="ace-retention-acc">
                 <summary>Recent actions <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) $log ) ) ); ?></span></summary>
                 <div class="ace-retention-acc-body ace-retention-acc-scroll">
@@ -2229,7 +2229,7 @@ class AceSeoRetentionReport {
         if ( ! empty( $_GET['evidence_preview'] ) ) {
             require_once __DIR__ . '/class-ace-seo-retention-evidence-view.php';
             echo '<div class="wrap"><h1>Retention evidence preview</h1><p><a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ) . '">Back to the saved report</a></p>';
-            Ace_SEO_Retention_Evidence_View::render();
+            AceCrawl_Retention_Evidence_View::render();
             echo '</div>';
             return;
         }
@@ -2252,7 +2252,7 @@ class AceSeoRetentionReport {
 
             <?php
             $live = self::progress_payload();
-            wp_enqueue_script( 'ace-seo-retention-dashboard', ACE_SEO_URL . 'assets/js/retention-dashboard.js', array(), ACE_SEO_VERSION, true );
+            wp_enqueue_script( 'ace-seo-retention-dashboard', ACECRAWL_URL . 'assets/js/retention-dashboard.js', array(), ACECRAWL_VERSION, true );
             wp_localize_script( 'ace-seo-retention-dashboard', 'aceSeoRetentionLive', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ace_seo_retention_live' ), 'labels' => self::phase_labels(), 'states' => array( 'idle' => self::state_label( 'idle' ), 'queued' => self::state_label( 'queued' ), 'running' => self::state_label( 'running' ), 'interrupted' => self::state_label( 'interrupted' ), 'error' => self::state_label( 'error' ), 'done' => self::state_label( 'done' ) ) ) );
             ?>
             <div class="ace-retention-layout">
@@ -2265,7 +2265,7 @@ class AceSeoRetentionReport {
                     <button class="button" <?php disabled( self::is_building() ); ?>><?php echo $built ? 'Check older posts again' : 'Check older posts'; ?></button>
                 </form>
                 <?php if ( $built ) : ?>
-                    <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'ace_seo_retention_export' ) ); ?>">Download as CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ) . ')' : ''; ?></a>
+                    <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=acecrawl_retention_export' . ( $bucket ? '&bucket=' . $bucket : '' ) ), 'acecrawl_retention_export' ) ); ?>">Download as CSV<?php echo $bucket ? ' (' . esc_html( $labels[ $bucket ] ) . ')' : ''; ?></a>
                 <?php endif; ?>
                 <a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ); ?>">Settings</a>
                 <a href="#retention-help">What the words mean</a>
@@ -2277,7 +2277,7 @@ class AceSeoRetentionReport {
             <?php
             if ( $built ) {
                 require_once __DIR__ . '/class-ace-seo-retention-insights.php';
-                Ace_SEO_Retention_Insights::render();
+                AceCrawl_Retention_Insights::render();
             }
             ?>
             <?php if ( $built ) : ?>
@@ -2300,7 +2300,7 @@ class AceSeoRetentionReport {
             <?php endif; ?>
 
             <section class="ace-retention-section" id="redirects">
-            <h2>Redirects and unavailable pages <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) AceSeoRetentionActions::redirects( 500 ) ) ) ); ?></span></h2>
+            <h2>Redirects and unavailable pages <span class="ace-retention-acc-count"><?php echo esc_html( number_format_i18n( count( (array) AceCrawlRetentionActions::redirects( 500 ) ) ) ); ?></span></h2>
             <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Open Redirect Manager</a> to search posts, choose redirect types, set expiry dates, pause rules and review their age. The legacy tools below create permanent redirects; the manager shows their current lifecycle state.</p>
             <details class="ace-retention-detail"><summary>Administrator tools: redirects and unavailable pages</summary>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin-bottom:1em">
@@ -2311,12 +2311,12 @@ class AceSeoRetentionReport {
                 <input type="text" name="to" aria-label="Redirect target URL or gone" placeholder="Target URL, or the word gone" style="width:22em" required>
                 <button class="button">Add</button>
             </form>
-            <?php $map = AceSeoRetentionActions::redirects( 500 ); if ( $map ) : ?>
+            <?php $map = AceCrawlRetentionActions::redirects( 500 ); if ( $map ) : ?>
                 <table class="widefat striped" style="max-width:1100px">
                     <thead><tr><th>From</th><th>To</th><th>Post</th></tr></thead>
                     <tbody>
-                    <?php foreach ( $map as $m ) : $redirect = AceSeoRedirects::settings( $m['id'] ); ?>
-                        <tr><td><a href="<?php echo esc_url( $m['from'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_make_link_relative( $m['from'] ) ); ?></a></td><td><?php echo $m['gone'] ? '<strong>410 Gone</strong>' : (int) $redirect['code'] . ' → ' . esc_html( $m['to'] ); ?><br><?php echo esc_html( AceSeoRedirects::state( $redirect ) ); ?></td><td><a href="<?php echo esc_url( get_edit_post_link( $m['id'] ) ); ?>"><?php echo esc_html( $m['title'] ?: '#' . $m['id'] ); ?></a> <span style="color:#666">(<?php echo esc_html( $m['type'] ); ?> <?php echo (int) $m['id']; ?>)</span></td></tr>
+                    <?php foreach ( $map as $m ) : $redirect = AceCrawlRedirects::settings( $m['id'] ); ?>
+                        <tr><td><a href="<?php echo esc_url( $m['from'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_make_link_relative( $m['from'] ) ); ?></a></td><td><?php echo $m['gone'] ? '<strong>410 Gone</strong>' : (int) $redirect['code'] . ' → ' . esc_html( $m['to'] ); ?><br><?php echo esc_html( AceCrawlRedirects::state( $redirect ) ); ?></td><td><a href="<?php echo esc_url( get_edit_post_link( $m['id'] ) ); ?>"><?php echo esc_html( $m['title'] ?: '#' . $m['id'] ); ?></a> <span style="color:#666">(<?php echo esc_html( $m['type'] ); ?> <?php echo (int) $m['id']; ?>)</span></td></tr>
                     <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -2348,10 +2348,10 @@ class AceSeoRetentionReport {
 
     /** Timing rules the site's own data suggests, per category or tag; --recompute works them out afresh. */
     public static function cli_suggestions( $args, $assoc ) {
-        if ( ! class_exists( 'Ace_SEO_Timing_Suggestions' ) ) {
+        if ( ! class_exists( 'AceCrawl_Timing_Suggestions' ) ) {
             WP_CLI::error( 'Suggestions are not available.' );
         }
-        $s = ! empty( $assoc['recompute'] ) ? Ace_SEO_Timing_Suggestions::recompute() : Ace_SEO_Timing_Suggestions::current();
+        $s = ! empty( $assoc['recompute'] ) ? AceCrawl_Timing_Suggestions::recompute() : AceCrawl_Timing_Suggestions::current();
         if ( ! $s ) {
             WP_CLI::log( 'No category or tag has a clear enough shape yet.' );
             return;
@@ -2493,8 +2493,8 @@ class AceSeoRetentionReport {
      */
     public static function cli_apply( $args, $assoc ) {
         $action = sanitize_key( $args[0] ?? '' );
-        if ( ! isset( AceSeoRetentionActions::ACTIONS[ $action ] ) ) {
-            WP_CLI::error( 'Unknown action. One of: ' . implode( ', ', array_keys( AceSeoRetentionActions::ACTIONS ) ) );
+        if ( ! isset( AceCrawlRetentionActions::ACTIONS[ $action ] ) ) {
+            WP_CLI::error( 'Unknown action. One of: ' . implode( ', ', array_keys( AceCrawlRetentionActions::ACTIONS ) ) );
         }
         if ( ! empty( $assoc['bucket'] ) ) {
             $ids = wp_list_pluck( self::rows( sanitize_key( $assoc['bucket'] ), 0 ), 'id' );
@@ -2507,7 +2507,7 @@ class AceSeoRetentionReport {
             WP_CLI::success( sprintf( 'Would apply "%s" to %s post(s).', $action, number_format_i18n( count( $ids ) ) ) );
             return;
         }
-        $r = AceSeoRetentionActions::apply( $ids, $action, array( 'date' => $assoc['date'] ?? '', 'url' => $assoc['to'] ?? '' ), 'cli' );
+        $r = AceCrawlRetentionActions::apply( $ids, $action, array( 'date' => $assoc['date'] ?? '', 'url' => $assoc['to'] ?? '' ), 'cli' );
         if ( '' !== $r['error'] ) {
             WP_CLI::error( $r['error'] );
         }
@@ -2523,7 +2523,7 @@ class AceSeoRetentionReport {
      * : table, csv or json. Default table.
      */
     public static function cli_redirects( $args, $assoc ) {
-        $rows = array_map( function ( $m ) { $m['to'] = $m['gone'] ? '410' : $m['to']; unset( $m['gone'] ); return $m; }, AceSeoRetentionActions::redirects( 100000 ) );
+        $rows = array_map( function ( $m ) { $m['to'] = $m['gone'] ? '410' : $m['to']; unset( $m['gone'] ); return $m; }, AceCrawlRetentionActions::redirects( 100000 ) );
         WP_CLI\Utils\format_items( $assoc['format'] ?? 'table', $rows, array( 'id', 'type', 'from', 'to', 'title' ) );
     }
 

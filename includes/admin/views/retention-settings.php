@@ -1,14 +1,14 @@
 <?php
 /** Existing retention options, grouped for administrators without changing their storage. */
 defined( 'ABSPATH' ) || exit;
-if ( ! current_user_can( 'manage_options' ) || ! class_exists( 'AceSeoRetentionActions' ) ) {
+if ( ! current_user_can( 'manage_options' ) || ! class_exists( 'AceCrawlRetentionActions' ) ) {
     return;
 }
-$o = AceSeoRetentionActions::options();
+$o = AceCrawlRetentionActions::options();
 ?>
 <div id="retention" class="tab-content ace-retention-settings">
     <h2>Older posts: how we look at them and what readers see</h2>
-    <?php AceSeoRetentionReport::render_message(); ?>
+    <?php AceCrawlRetentionReport::render_message(); ?>
     <p>Five short steps: which posts to look at, when there is enough evidence to judge one, what readers see on older articles, how to lead them to current ones, and where the report goes. Saving here never deletes, redirects or hides a post.</p>
     <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>">Open the retention dashboard</a> · <a href="#retention-help" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-help">What the groups and recommendations mean</a></p>
     <p class="description">Change anything below and use the save bar at the bottom of the screen, the same one as every other Ace settings page. Nothing here auto-saves. Running, stopping or retrying a Google Sheets refresh is separate and never part of a save.</p>
@@ -36,15 +36,15 @@ $o = AceSeoRetentionActions::options();
                     <option value="estimate" <?php selected( $o['timing_policy'] ?? 'estimate', 'estimate' ); ?>>Judge on the traffic window, holding only posts whose known relevant dates fall outside it</option>
                     <option value="strict" <?php selected( $o['timing_policy'] ?? 'estimate', 'strict' ); ?>>Hold every post until its timing is confirmed (evergreen, set dates, or a verified event)</option>
                 </select><p class="description">Posts with readers or search clicks are never held. Under the strict policy, unconfirmed posts are "Not ready to judge" until an editor sets "When this article matters" on them or a rule below covers them; the anniversary estimate is shown but not trusted.</p></td></tr>
-                <tr><th scope="row"><label for="retention-timing-rules">When articles in a category or tag matter</label></th><td><textarea id="retention-timing-rules" name="timing_rules" rows="4" class="large-text code" placeholder="category:guides = evergreen&#10;category:horse-racing-tips = event 3&#10;category:cheltenham-festival-tips = season 03-01 03-20"><?php echo esc_textarea( AceSeoRetentionActions::timing_rules_text( (array) ( $o['timing_rules'] ?? array() ) ) ); ?></textarea><ul class="ace-timing-rules-preview" id="ace-timing-rules-preview" aria-live="polite"></ul><p class="description">One rule per line: <code>taxonomy:slug = evergreen</code>, <code>= event N</code> (relevant for N days from publication, a one-off) or <code>= season MM-DD MM-DD</code> (relevant between those dates every year). A setting on the post itself always wins. An event that is over is judged on its readership since, not held.</p></td></tr>
-                <tr><th scope="row">Suggested rules</th><td><?php if ( class_exists( 'Ace_SEO_Timing_Suggestions' ) ) { Ace_SEO_Timing_Suggestions::render_fields( $o ); } ?></td></tr>
+                <tr><th scope="row"><label for="retention-timing-rules">When articles in a category or tag matter</label></th><td><textarea id="retention-timing-rules" name="timing_rules" rows="4" class="large-text code" placeholder="category:guides = evergreen&#10;category:horse-racing-tips = event 3&#10;category:cheltenham-festival-tips = season 03-01 03-20"><?php echo esc_textarea( AceCrawlRetentionActions::timing_rules_text( (array) ( $o['timing_rules'] ?? array() ) ) ); ?></textarea><ul class="ace-timing-rules-preview" id="ace-timing-rules-preview" aria-live="polite"></ul><p class="description">One rule per line: <code>taxonomy:slug = evergreen</code>, <code>= event N</code> (relevant for N days from publication, a one-off) or <code>= season MM-DD MM-DD</code> (relevant between those dates every year). A setting on the post itself always wins. An event that is over is judged on its readership since, not held.</p></td></tr>
+                <tr><th scope="row">Suggested rules</th><td><?php if ( class_exists( 'AceCrawl_Timing_Suggestions' ) ) { AceCrawl_Timing_Suggestions::render_fields( $o ); } ?></td></tr>
             </tbody></table>
             <details class="ace-retention-detail"><summary>Developer details: weekly checks and visitor tracking</summary>
                 <p><label><input type="checkbox" name="auto_build" value="1" <?php checked( ! empty( $o['auto_build'] ) ); ?>> Recheck the report every week</label></p>
                 <p class="description">Uses WordPress cron and the saved settings. It updates recommendations; it does not apply actions.</p>
                 <p><label><input type="checkbox" name="track_views" value="1" <?php checked( ! empty( $o['track_views'] ) ); ?>> Count visitors to older posts on this site</label></p>
                 <p class="description">Adds a small visitor beacon and stores daily counts and referrers for eligible older posts. Google Analytics is used for report views when connected; local counts are the fallback. Tracking starts when enabled, so earlier missing data is not a measured zero.</p>
-                <p>Bots are counted only when WordPress renders the page. A cached response can bypass that count. The report keeps the last <?php echo esc_html( AceSeoRetentionReport::HISTORY_KEEP ); ?> completed builds, including manual rebuilds; that does not guarantee a full year of seasonal evidence.</p>
+                <p>Bots are counted only when WordPress renders the page. A cached response can bypass that count. The report keeps the last <?php echo esc_html( AceCrawlRetentionReport::HISTORY_KEEP ); ?> completed builds, including manual rebuilds; that does not guarantee a full year of seasonal evidence.</p>
             </details>
     </section>
 
@@ -68,12 +68,12 @@ $o = AceSeoRetentionActions::options();
                         <?php endforeach; ?>
                         <tr><th scope="row"><label for="retention-rules">Rules for categories or tags</label></th><td><textarea id="retention-rules" name="lifetime_rules" rows="4" class="large-text" placeholder="category:announcements=30"><?php foreach ( (array) $o['lifetime_rules'] as $k => $d ) { echo esc_html( $k . '=' . $d ) . "\n"; } ?></textarea><p class="description">One per line: <code>taxonomy:slug=days</code>.</p></td></tr>
                     </tbody></table>
-                    <?php $lc = AceSeoRetentionActions::lifetime_counts(); if ( $lc ) : ?>
+                    <?php $lc = AceCrawlRetentionActions::lifetime_counts(); if ( $lc ) : ?>
                     <div class="ace-retention-table"><table class="widefat striped"><thead><tr><th>Rule</th><th>Days</th><th>Posts</th><th>Past the expiry date</th></tr></thead><tbody>
                         <?php foreach ( $lc as $c ) : ?><tr><td><?php echo esc_html( $c['label'] ); ?></td><td><?php echo esc_html( number_format_i18n( $c['days'] ) ); ?></td><td><?php echo esc_html( number_format_i18n( $c['total'] ) ); ?></td><td><?php echo esc_html( number_format_i18n( $c['expired'] ) ); ?></td></tr><?php endforeach; ?>
                     </tbody></table></div>
                     <?php endif; ?>
-                    <p>The notice markup can be changed with <code>ace_seo_retention_notice_html</code>.</p>
+                    <p>The notice markup can be changed with <code>acecrawl_retention_notice_html</code>.</p>
                 </details>
             </div>
                 </section>
@@ -103,17 +103,17 @@ $o = AceSeoRetentionActions::options();
     <section class="ace-retention-section">
         <h3><span class="ace-step">5</span>Where the report goes: Google Sheets</h3>
         <p class="ace-section-lead">Connect a spreadsheet to export filtered post lists as separate tabs and to keep the main report tab up to date after each check.</p>
-        <?php if ( class_exists( 'AceSeoSheets' ) ) { AceSeoSheets::render_fields(); } ?>
+        <?php if ( class_exists( 'AceCrawlSheets' ) ) { AceCrawlSheets::render_fields(); } ?>
     </section>
     </form>
-    <?php if ( class_exists( 'Ace_SEO_Timing_Suggestions' ) ) { Ace_SEO_Timing_Suggestions::render_modal( $o ); } ?>
+    <?php if ( class_exists( 'AceCrawl_Timing_Suggestions' ) ) { AceCrawl_Timing_Suggestions::render_modal( $o ); } ?>
     <section class="ace-retention-section">
         <h3>Google Sheets report: run, stop or retry</h3>
         <p class="ace-section-lead">These act now, using the saved settings above. They are not settings and are never part of a save.</p>
-        <?php if ( class_exists( 'AceSeoSheetsSchedule' ) ) { AceSeoSheetsSchedule::render_controls(); } ?>
+        <?php if ( class_exists( 'AceCrawlSheetsSchedule' ) ) { AceCrawlSheetsSchedule::render_controls(); } ?>
     </section>
     <section id="retention-help" class="ace-retention-section">
-        <?php AceSeoRetentionReport::render_help(); ?>
+        <?php AceCrawlRetentionReport::render_help(); ?>
     </section>
 </div>
-<?php AceSeoAssets::style( 'ace-seo-retention-noscript', 'assets/css/ace-seo-retention-noscript.css' ); ?>
+<?php AceCrawlAssets::style( 'ace-seo-retention-noscript', 'assets/css/ace-seo-retention-noscript.css' ); ?>

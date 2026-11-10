@@ -2,9 +2,9 @@
 /** Per-post redirect lifecycle. Existing target meta and legacy 301s remain compatible. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-class AceSeoRedirects {
+class AceCrawlRedirects {
     const META = '_ace_seo_redirect_settings';
-    const HOOK = 'ace_seo_redirect_expire';
+    const HOOK = 'acecrawl_redirect_expire';
 
     public static function init() {
         add_action( self::HOOK, array( __CLASS__, 'expire' ), 10, 2 );
@@ -16,14 +16,14 @@ class AceSeoRedirects {
         add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
         require_once __DIR__ . '/admin/class-ace-seo-redirect-discovery.php';
-        add_action( 'wp_ajax_ace_seo_redirect_destinations', array( 'AceSeoRedirectDiscovery', 'ajax_destinations' ) );
+        add_action( 'wp_ajax_acecrawl_redirect_destinations', array( 'AceCrawlRedirectDiscovery', 'ajax_destinations' ) );
         require_once __DIR__ . '/class-ace-seo-retention-prototype.php';
-        AceSeoRetentionPrototype::init();
+        AceCrawlRetentionPrototype::init();
     }
 
     public static function settings( $id ) {
         $saved = get_post_meta( $id, self::META, true );
-        $target = (string) get_post_meta( $id, AceSeoRetentionActions::META_REDIRECT, true );
+        $target = (string) get_post_meta( $id, AceCrawlRetentionActions::META_REDIRECT, true );
         // A legacy writer changing the target must never inherit an old destructive schedule.
         if ( ! is_array( $saved ) || ( $saved['target'] ?? '' ) !== $target ) { $saved = array(); }
         return array_merge( array( 'target' => $target, 'code' => 301, 'created' => 0, 'expires' => 0, 'source_url' => '',
@@ -53,7 +53,7 @@ class AceSeoRedirects {
     }
 
     public static function validate_target( $id, $raw ) {
-        $target = AceSeoRetentionActions::normalise_target( $raw );
+        $target = AceCrawlRetentionActions::normalise_target( $raw );
         if ( ! $target || 'gone' === $target || preg_match( '/[\x00-\x20\\\\]/', $raw ) || preg_match( '/%0[ad]/i', $raw ) ) {
             return new WP_Error( 'target', 'Enter a valid http(s) destination URL or a path on this site.' );
         }
@@ -93,7 +93,7 @@ class AceSeoRedirects {
         if ( 'clear' === $operation || ( 'save' === $operation && '' === trim( (string) ( $input['target'] ?? '' ) ) ) ) {
             self::purge( $id );
             wp_clear_scheduled_hook( self::HOOK, array( (int) $id, (int) $old['expires'] ) );
-            delete_post_meta( $id, AceSeoRetentionActions::META_REDIRECT );
+            delete_post_meta( $id, AceCrawlRetentionActions::META_REDIRECT );
             delete_post_meta( $id, self::META );
             self::record( $id, 'redirect-clear', $old );
             self::purge( $id );
@@ -146,14 +146,14 @@ class AceSeoRedirects {
         }
         // Store settings first so the target-change hook recognises this managed update.
         update_post_meta( $id, self::META, $next );
-        update_post_meta( $id, AceSeoRetentionActions::META_REDIRECT, $target );
+        update_post_meta( $id, AceCrawlRetentionActions::META_REDIRECT, $target );
         self::record( $id, 'redirect-' . $operation, array( 'before' => $old, 'after' => $next ) );
         self::purge( $id );
         return true;
     }
 
     public static function target_changed( $meta_id, $id, $key, $value ) {
-        if ( AceSeoRetentionActions::META_REDIRECT !== $key ) { return; }
+        if ( AceCrawlRetentionActions::META_REDIRECT !== $key ) { return; }
         $saved = get_post_meta( $id, self::META, true );
         $target = (string) get_post_meta( $id, $key, true );
         if ( is_array( $saved ) && ( $saved['target'] ?? '' ) !== $target ) {
@@ -178,7 +178,7 @@ class AceSeoRedirects {
     }
 
     private static function record( $id, $action, $value ) {
-        AceSeoRetentionActions::log( $id, $action, $value, 'redirect-manager' );
+        AceCrawlRetentionActions::log( $id, $action, $value, 'redirect-manager' );
     }
 
     public static function purge( $id ) {
@@ -196,12 +196,12 @@ class AceSeoRedirects {
 
     public static function assets( $hook ) {
         if ( false === strpos( $hook, 'ace-seo-redirects' ) && ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) { return; }
-        wp_enqueue_style( 'ace-seo-redirects', ACE_SEO_URL . 'assets/css/redirects.css', array(), ACE_SEO_VERSION );
-        wp_enqueue_script( 'ace-seo-redirects', ACE_SEO_URL . 'assets/js/redirects.js', array(), ACE_SEO_VERSION, true );
+        wp_enqueue_style( 'ace-seo-redirects', ACECRAWL_URL . 'assets/css/redirects.css', array(), ACECRAWL_VERSION );
+        wp_enqueue_script( 'ace-seo-redirects', ACECRAWL_URL . 'assets/js/redirects.js', array(), ACECRAWL_VERSION, true );
     }
 
     public static function notice() {
-        $key = 'ace_seo_redirect_notice_' . get_current_user_id();
+        $key = 'acecrawl_redirect_notice_' . get_current_user_id();
         $message = get_transient( $key );
         if ( ! $message ) { return; }
         delete_transient( $key );
@@ -210,8 +210,8 @@ class AceSeoRedirects {
 
     public static function handle_save() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'You do not have permission to manage redirects.', '', array( 'response' => 403 ) ); }
-        check_admin_referer( 'ace_seo_redirect_save' );
-        $input = AceSeoInput::post( array( 'ids' => 'ids', 'operation' => 'key', 'target' => 'target', 'code' => 'int', 'expires' => 'text', 'trash' => 'bool', 'paused' => 'bool' ) );
+        check_admin_referer( 'acecrawl_redirect_save' );
+        $input = AceCrawlInput::post( array( 'ids' => 'ids', 'operation' => 'key', 'target' => 'target', 'code' => 'int', 'expires' => 'text', 'trash' => 'bool', 'paused' => 'bool' ) );
         $ids = array_slice( array_unique( array_map( 'absint', (array) ( $input['ids'] ?? array() ) ) ), 0, 50 );
         $count = 0; $errors = array();
         foreach ( $ids as $id ) {
@@ -219,19 +219,19 @@ class AceSeoRedirects {
             if ( is_wp_error( $result ) ) { $errors[] = '#' . $id . ': ' . $result->get_error_message(); } else { $count++; }
         }
         if ( ! $ids ) { $errors[] = 'Select at least one source post.'; }
-        set_transient( 'ace_seo_redirect_notice_' . get_current_user_id(), array( 'error' => (bool) $errors, 'text' => $count . ' redirect(s) updated. ' . implode( ' ', $errors ) ), 120 );
+        set_transient( 'acecrawl_redirect_notice_' . get_current_user_id(), array( 'error' => (bool) $errors, 'text' => $count . ' redirect(s) updated. ' . implode( ' ', $errors ) ), 120 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-redirects' ) );
         exit;
     }
 
     public static function render() {
         if ( ! current_user_can( 'manage_options' ) ) { return; }
-        include ACE_SEO_PATH . 'includes/admin/views/redirects.php';
+        include ACECRAWL_PATH . 'includes/admin/views/redirects.php';
     }
 
     /** Shared controls inside either the manager form or the existing post editor form. */
     public static function fields( $id = 0, $prefix = '' ) {
         $s = self::settings( $id );
-        include ACE_SEO_PATH . 'includes/admin/views/redirect-fields.php';
+        include ACECRAWL_PATH . 'includes/admin/views/redirect-fields.php';
     }
 }

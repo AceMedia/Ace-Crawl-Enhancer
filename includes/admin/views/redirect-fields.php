@@ -1,10 +1,10 @@
 <?php if ( ! defined( 'ABSPATH' ) ) { exit; } ?>
 <div class="ace-redirect-fields">
-    <details class="ace-destination-search" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'ace_seo_redirect_destinations' ) ); ?>" data-target="<?php echo esc_attr( $prefix ); ?>target">
+    <details class="ace-destination-search" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'acecrawl_redirect_destinations' ) ); ?>" data-target="<?php echo esc_attr( $prefix ); ?>target">
         <summary>Search for a destination</summary>
         <p class="description">Find published content or an archive by title or name. Tick only the types you need for a quicker search.</p>
         <fieldset class="ace-destination-types"><legend>Search these types</legend>
-        <?php foreach ( AceSeoRedirectDiscovery::types() as $key => $label ) : ?>
+        <?php foreach ( AceCrawlRedirectDiscovery::types() as $key => $label ) : ?>
             <label><input type="checkbox" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, array( 'post:post', 'post:page', 'term:category' ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
         <?php endforeach; ?>
         </fieldset>

@@ -19,7 +19,7 @@ function get_transient($key){return $GLOBALS['transients'][$key]??false;}
 function set_transient($key,$value,$ttl){$GLOBALS['transients'][$key]=$value;}
 function delete_transient($key){unset($GLOBALS['transients'][$key]);}
 function apply_filters($key,$value){return $value;}
-function do_action($key,...$args){if('ace_seo_retention_built'===$key){$GLOBALS['completion_seen']=get_option(AceSeoRetentionReport::PROGRESS_OPTION);}}
+function do_action($key,...$args){if('acecrawl_retention_built'===$key){$GLOBALS['completion_seen']=get_option(AceCrawlRetentionReport::PROGRESS_OPTION);}}
 function current_user_can($cap){return $GLOBALS['admin'];}
 function check_admin_referer($action){return $GLOBALS['nonce_ok'];}
 function wp_die($message){throw new RuntimeException($message);}
@@ -47,7 +47,7 @@ require $root.'/includes/class-ace-seo-retention-actions.php';
 require $root.'/includes/admin/class-ace-seo-retention-report.php';
 
 /** The real class with the lease rows and the build steps replaced by scripted stand-ins. */
-class WorkerStub extends AceSeoRetentionReport {
+class WorkerStub extends AceCrawlRetentionReport {
     public static $lock = null;
     public static $script = array();
     public static $steps = 0;
@@ -206,7 +206,7 @@ $reset();
 WorkerStub::start(); unset( $GLOBALS['cron'][ WorkerStub::CRON_HOOK ] );
 $p = $progress(); $p['started'] = time() - 3600; update_option( WorkerStub::PROGRESS_OPTION, $p );
 try { WorkerStub::handle_resume(); $check( 'resume handler redirects', false ); } catch ( WorkerRedirect $r ) { $check( 'resume handler queues the tick and redirects to the dashboard', false !== wp_next_scheduled( WorkerStub::CRON_HOOK ) && false !== strpos( $r->url, 'ace-seo-retention' ) ); }
-$check( 'resume handler leaves a message', false !== strpos( (string) get_transient( 'ace_seo_retention_msg_1' ), 'continue from where it stopped' ) );
+$check( 'resume handler leaves a message', false !== strpos( (string) get_transient( 'acecrawl_retention_msg_1' ), 'continue from where it stopped' ) );
 $GLOBALS['nonce_ok'] = false;
 try { WorkerStub::handle_resume(); $check( 'resume refuses a bad nonce', false ); } catch ( RuntimeException $e ) { $check( 'resume refuses a bad nonce', 'Not allowed.' === $e->getMessage() ); }
 $GLOBALS['nonce_ok'] = true;
@@ -226,7 +226,7 @@ $check( 'run_all leaves no lease or tick behind', null === WorkerStub::$lock && 
 /* The actual final scoring path publishes durable completion before notifying consumers. */
 $reset(); WorkerStub::start(); $p = $progress(); $p['phase'] = 'score';
 $generation = $p['generation'];
-$method = new ReflectionMethod( AceSeoRetentionReport::class, 'phase_score' ); $method->setAccessible( true ); $method->invoke( null, $p );
+$method = new ReflectionMethod( AceCrawlRetentionReport::class, 'phase_score' ); $method->setAccessible( true ); $method->invoke( null, $p );
 $seen = $GLOBALS['completion_seen'] ?? array();
 $check( 'completion hook observes saved done generation', 'done' === ( $seen['phase'] ?? '' ) && $generation === ( $seen['generation'] ?? '' ) && ! empty( $seen['finished'] ) );
 WorkerStub::start();

@@ -2,14 +2,14 @@
 /** Scheduled, resumable Sheets snapshots. No report rebuilds or article changes. */
 defined( 'ABSPATH' ) || exit;
 
-class AceSeoSheetsSchedule {
-    const OPTION = 'ace_seo_sheets_schedule';
-    const JOB = 'ace_seo_sheets_export_job';
-    const HISTORY = 'ace_seo_sheets_export_history';
-    const TARGETS = 'ace_seo_sheets_report_targets';
-    const LOCK = 'ace_seo_sheets_export_lock';
-    const START = 'ace_seo_sheets_schedule_start';
-    const TICK = 'ace_seo_sheets_schedule_tick';
+class AceCrawlSheetsSchedule {
+    const OPTION = 'acecrawl_sheets_schedule';
+    const JOB = 'acecrawl_sheets_export_job';
+    const HISTORY = 'acecrawl_sheets_export_history';
+    const TARGETS = 'acecrawl_sheets_report_targets';
+    const LOCK = 'acecrawl_sheets_export_lock';
+    const START = 'acecrawl_sheets_schedule_start';
+    const TICK = 'acecrawl_sheets_schedule_tick';
     const BATCH = 250;
     const LEASE = 300;
     const MAX_FAILURES = 5;
@@ -28,7 +28,7 @@ class AceSeoSheetsSchedule {
         if ( wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
             add_action( 'wp_loaded', array( __CLASS__, 'sync_schedule' ) );
         }
-        add_action( 'ace_seo_retention_built', array( __CLASS__, 'after_build' ) );
+        add_action( 'acecrawl_retention_built', array( __CLASS__, 'after_build' ) );
     }
 
     /** Opt-in: a completed retention build refreshes the main report, so the sheet never lags the assessment. */
@@ -153,14 +153,14 @@ class AceSeoSheetsSchedule {
     }
 
     public static function handle_settings() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_schedule' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_sheets_schedule' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $saved = self::save_settings( AceSeoInput::post( array( 'frequency' => 'key', 'post_types' => 'key', 'after_build' => 'bool', 'include_unpublished' => 'bool' ) ) );
+        $saved = self::save_settings( AceCrawlInput::post( array( 'frequency' => 'key', 'post_types' => 'key', 'after_build' => 'bool', 'include_unpublished' => 'bool' ) ) );
         if ( is_wp_error( $saved ) ) {
             wp_die( esc_html( $saved->get_error_message() ) );
         }
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Snapshot schedule saved. The Google connection and retention settings have not changed.', 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), 'Snapshot schedule saved. The Google connection and retention settings have not changed.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets-schedule' ) );
         exit;
     }
@@ -173,12 +173,12 @@ class AceSeoSheetsSchedule {
         if ( ! isset( self::frequencies()[ $frequency ] ) ) {
             return new WP_Error( 'ace_sheets_frequency', 'Choose a recognised refresh frequency.' );
         }
-        $types = array_values( array_intersect( AceSeoExport::post_types(), array_map( 'sanitize_key', (array) ( $input['post_types'] ?? array() ) ) ) );
-        if ( 'off' !== $frequency && ( ! $types || ! AceSeoSheets::configured() ) ) {
+        $types = array_values( array_intersect( AceCrawlExport::post_types(), array_map( 'sanitize_key', (array) ( $input['post_types'] ?? array() ) ) ) );
+        if ( 'off' !== $frequency && ( ! $types || ! AceCrawlSheets::configured() ) ) {
             return new WP_Error( 'ace_sheets_requirements', 'Choose at least one content type and save a Google Sheets connection before switching automatic refreshes on.' );
         }
         $after_build = empty( $input['after_build'] ) ? 0 : 1;
-        if ( $after_build && ( ! $types || ! AceSeoSheets::configured() ) ) {
+        if ( $after_build && ( ! $types || ! AceCrawlSheets::configured() ) ) {
             return new WP_Error( 'ace_sheets_requirements', 'Choose at least one content type and save a Google Sheets connection before refreshing after each check.' );
         }
         $new = array_merge( $old, array( 'frequency' => $frequency, 'post_types' => $types ?: array( 'post' ), 'include_unpublished' => empty( $input['include_unpublished'] ) ? 0 : 1, 'after_build' => $after_build, 'stop_generation' => (int) $old['stop_generation'], 'auto_stop_generation' => (int) $old['auto_stop_generation'] + ( 'off' === $frequency && 'off' !== $old['frequency'] ? 1 : 0 ) ) );
@@ -211,14 +211,14 @@ class AceSeoSheetsSchedule {
             }
             if ( $job && 'complete' !== ( $job['status'] ?? '' ) && 'not-started' !== ( $job['phase'] ?? '' ) ) {
                 if ( ! self::stopped( $job ) && 'failed' === ( $job['status'] ?? '' ) ) { return; }
-                $removed = AceSeoSheets::discard_snapshot_tab( $job['destination'], $job['tab_id'], $job['tab'] );
+                $removed = AceCrawlSheets::discard_snapshot_tab( $job['destination'], $job['tab_id'], $job['tab'] );
                 if ( is_wp_error( $removed ) ) { self::fail( $job, $removed, $lease ); return; }
             }
             $settings = self::settings();
-            $types = array_values( array_intersect( (array) $settings['post_types'], AceSeoExport::post_types() ) );
+            $types = array_values( array_intersect( (array) $settings['post_types'], AceCrawlExport::post_types() ) );
             $statuses = empty( $settings['include_unpublished'] ) ? array( 'publish' ) : array( 'publish', 'future', 'draft', 'pending', 'private' );
             $id = wp_generate_uuid4();
-            $job = array( 'manual' => (bool) $manual, 'id' => $id, 'status' => 'queued', 'started' => time(), 'updated' => time(), 'destination' => AceSeoSheets::settings()['sheet_id'], 'tab' => '_Ace SEO working ' . wp_date( 'Y-m-d H.i.s' ) . ' ' . substr( $id, 0, 8 ), 'tab_id' => random_int( 1, 2147483646 ), 'types' => $types, 'statuses' => $statuses, 'stop_generation' => $settings['stop_generation'], 'auto_stop_generation' => $settings['auto_stop_generation'], 'cursor' => 0, 'written' => 0, 'skipped' => 0, 'failures' => 0, 'phase' => 'not-started', 'header' => array(), 'ids' => array(), 'total' => 0 );
+            $job = array( 'manual' => (bool) $manual, 'id' => $id, 'status' => 'queued', 'started' => time(), 'updated' => time(), 'destination' => AceCrawlSheets::settings()['sheet_id'], 'tab' => '_Ace SEO working ' . wp_date( 'Y-m-d H.i.s' ) . ' ' . substr( $id, 0, 8 ), 'tab_id' => random_int( 1, 2147483646 ), 'types' => $types, 'statuses' => $statuses, 'stop_generation' => $settings['stop_generation'], 'auto_stop_generation' => $settings['auto_stop_generation'], 'cursor' => 0, 'written' => 0, 'skipped' => 0, 'failures' => 0, 'phase' => 'not-started', 'header' => array(), 'ids' => array(), 'total' => 0 );
             $targets = self::record( self::TARGETS );
             $target = $targets[ $job['destination'] ] ?? array();
             $job['report_id'] = isset( $target['sheet_id'] ) ? (int) $target['sheet_id'] : random_int( 1, 2147483646 );
@@ -226,8 +226,8 @@ class AceSeoSheetsSchedule {
             $job['previous_rows'] = (int) ( $target['rows'] ?? 0 );
             $job['previous_columns'] = (int) ( $target['columns'] ?? 0 );
             $job['create_report'] = ! isset( $target['sheet_id'] );
-            $job['header'] = AceSeoExport::header();
-            if ( ! $types || ! AceSeoSheets::configured() ) {
+            $job['header'] = AceCrawlExport::header();
+            if ( ! $types || ! AceCrawlSheets::configured() ) {
                 $job['status'] = 'failed';
                 $job['error'] = 'The selected content types or Google Sheets connection are unavailable. No tab was created.';
             } else {
@@ -297,7 +297,7 @@ class AceSeoSheetsSchedule {
             }
             $job['status'] = 'running';
             if ( 'publish' === $job['phase'] ) {
-                $result = AceSeoSheets::publish_snapshot( $job['destination'], $job['tab_id'], $job['tab'], $job['report_id'], $job['id'], $job['written'] + 1, count( $job['header'] ), $job['create_report'], $job['previous_rows'], $job['previous_columns'], static function () use ( $job, $lease ) { return self::owns( $lease ) && ! self::stopped( $job ); } );
+                $result = AceCrawlSheets::publish_snapshot( $job['destination'], $job['tab_id'], $job['tab'], $job['report_id'], $job['id'], $job['written'] + 1, count( $job['header'] ), $job['create_report'], $job['previous_rows'], $job['previous_columns'], static function () use ( $job, $lease ) { return self::owns( $lease ) && ! self::stopped( $job ); } );
                 if ( is_wp_error( $result ) ) { self::fail( $job, $result, $lease ); return; }
                 $targets = self::record( self::TARGETS );
                 $targets[ $job['destination'] ] = array( 'sheet_id' => $job['report_id'], 'title' => 'Ace SEO report', 'rows' => $job['written'] + 1, 'columns' => count( $job['header'] ) );
@@ -314,7 +314,7 @@ class AceSeoSheetsSchedule {
                 return;
             }
             // Verify tab identity every tick; never recreate a removed partially filled working tab.
-            $confirmed = AceSeoSheets::ensure_snapshot_tab( $job['destination'], $job['tab'], $job['tab_id'], $job['total'] + 1, count( $job['header'] ), 'tab' === $job['phase'], static function () use ( $job, $lease ) { return self::owns( $lease ) && ! self::stopped( $job ); } );
+            $confirmed = AceCrawlSheets::ensure_snapshot_tab( $job['destination'], $job['tab'], $job['tab_id'], $job['total'] + 1, count( $job['header'] ), 'tab' === $job['phase'], static function () use ( $job, $lease ) { return self::owns( $lease ) && ! self::stopped( $job ); } );
             if ( is_wp_error( $confirmed ) ) { self::fail( $job, $confirmed, $lease ); return; }
             if ( 'tab' === $job['phase'] ) {
                 $job['phase'] = 'header';
@@ -322,7 +322,7 @@ class AceSeoSheetsSchedule {
             }
             if ( self::stopped( $job ) || ! self::owns( $lease ) ) { $job['status'] = 'cancelled'; self::store( self::JOB, $job, $lease ); return; }
             if ( 'header' === $job['phase'] ) {
-                $result = AceSeoSheets::write_snapshot_rows( $job['destination'], $job['tab_id'], 1, array( $job['header'] ) );
+                $result = AceCrawlSheets::write_snapshot_rows( $job['destination'], $job['tab_id'], 1, array( $job['header'] ) );
                 if ( is_wp_error( $result ) ) {
                     self::fail( $job, $result, $lease );
                     return;
@@ -344,7 +344,7 @@ class AceSeoSheetsSchedule {
                         $eligible[] = $id;
                     }
                 }
-                $rows = AceSeoExport::rows( $eligible );
+                $rows = AceCrawlExport::rows( $eligible );
                 foreach ( $rows as $row ) {
                     if ( count( $row ) !== count( $job['header'] ) ) {
                         throw new RuntimeException( 'The export row and header filters produced different column counts.' );
@@ -356,7 +356,7 @@ class AceSeoSheetsSchedule {
             }
             if ( self::stopped( $job ) || ! self::owns( $lease ) ) { $job['status'] = 'cancelled'; self::store( self::JOB, $job, $lease ); return; }
             if ( isset( $job['pending'] ) ) {
-                $result = AceSeoSheets::write_snapshot_rows( $job['destination'], $job['tab_id'], $job['pending']['first_row'], $job['pending']['rows'] );
+                $result = AceCrawlSheets::write_snapshot_rows( $job['destination'], $job['tab_id'], $job['pending']['first_row'], $job['pending']['rows'] );
                 if ( is_wp_error( $result ) ) {
                     self::fail( $job, $result, $lease );
                     return;
@@ -389,14 +389,14 @@ class AceSeoSheetsSchedule {
     }
 
     public static function handle_run() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_run' ) ) { wp_die( 'Not allowed.' ); }
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_sheets_run' ) ) { wp_die( 'Not allowed.' ); }
         self::start( true );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets-schedule' ) );
         exit;
     }
 
     public static function handle_stop() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_stop' ) ) { wp_die( 'Not allowed.' ); }
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_sheets_stop' ) ) { wp_die( 'Not allowed.' ); }
         $settings = self::settings();
         $settings['stop_generation'] = (int) $settings['stop_generation'] + 1;
         wp_cache_delete( self::OPTION, 'options' );
@@ -410,7 +410,7 @@ class AceSeoSheetsSchedule {
     }
 
     public static function handle_retry() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_retry' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_sheets_retry' ) ) {
             wp_die( 'Not allowed.' );
         }
         $lease = self::acquire();
@@ -445,8 +445,8 @@ class AceSeoSheetsSchedule {
             return;
         }
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-        wp_nonce_field( 'ace_seo_sheets_schedule' );
-        echo '<input type="hidden" name="action" value="ace_seo_sheets_schedule">';
+        wp_nonce_field( 'acecrawl_sheets_schedule' );
+        echo '<input type="hidden" name="action" value="acecrawl_sheets_schedule">';
         self::render_fields();
         echo '<p><button class="button button-primary">Save report schedule</button></p></form>';
         self::render_controls();
@@ -467,7 +467,7 @@ class AceSeoSheetsSchedule {
                     <?php foreach ( self::frequencies() as $value => $label ) : ?><option value="<?php echo esc_attr( $value ); ?>" <?php selected( $settings['frequency'], $value ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
                 </select></p>
                 <fieldset><legend>Which content to include</legend>
-                    <?php foreach ( AceSeoExport::post_types() as $type ) : $object = get_post_type_object( $type ); if ( ! $object ) { continue; } ?>
+                    <?php foreach ( AceCrawlExport::post_types() as $type ) : $object = get_post_type_object( $type ); if ( ! $object ) { continue; } ?>
                         <label style="display:block"><input type="checkbox" name="post_types[]" value="<?php echo esc_attr( $type ); ?>" <?php checked( in_array( $type, $settings['post_types'], true ) ); ?>> <?php echo esc_html( $object->labels->name ); ?></label>
                     <?php endforeach; ?>
                 </fieldset>
@@ -491,15 +491,15 @@ class AceSeoSheetsSchedule {
         $last = $history ? end( $history ) : array();
         ?>
         <section id="retention-sheets-controls" class="ace-retention-section">
-            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ace_seo_sheets_run' ); ?><input type="hidden" name="action" value="ace_seo_sheets_run"><p><button class="button">Refresh main report now</button></p><p class="description">Uses the saved content choices above. This one-off refresh works while automatic refreshes are off.</p></form>
-            <?php if ( ( self::active( $job ) || 'failed' === ( $job['status'] ?? '' ) ) && ! self::stopped( $job ) ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ace_seo_sheets_stop' ); ?><input type="hidden" name="action" value="ace_seo_sheets_stop"><button class="button">Stop this refresh</button></form><?php endif; ?>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'acecrawl_sheets_run' ); ?><input type="hidden" name="action" value="acecrawl_sheets_run"><p><button class="button">Refresh main report now</button></p><p class="description">Uses the saved content choices above. This one-off refresh works while automatic refreshes are off.</p></form>
+            <?php if ( ( self::active( $job ) || 'failed' === ( $job['status'] ?? '' ) ) && ! self::stopped( $job ) ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'acecrawl_sheets_stop' ); ?><input type="hidden" name="action" value="acecrawl_sheets_stop"><button class="button">Stop this refresh</button></form><?php endif; ?>
             <p><?php echo 'off' === $settings['frequency'] ? 'Automatic refreshes are off.' : ( $next ? 'Next refresh due: ' . esc_html( wp_date( 'j F Y, H:i', $next ) ) . '.' : 'No refresh is scheduled. Check that WordPress cron is working.' ); ?> Times use the site timezone. WordPress runs the job when its scheduler next runs, so a due time is not a guaranteed completion time.</p>
             <?php if ( $job ) : ?>
                 <p><strong>Current or latest refresh:</strong> <?php echo esc_html( self::stopped( $job ) && self::active( $job ) ? 'Stopped' : ( array( 'queued' => 'Waiting to start', 'running' => 'Preparing the report', 'retrying' => 'Waiting to try again', 'failed' => 'Needs attention', 'complete' => 'Complete', 'cancelled' => 'Stopped' )[ $job['status'] ] ?? $job['status'] ) ); ?> · <?php echo esc_html( number_format_i18n( $job['written'] ) ); ?> of <?php echo esc_html( number_format_i18n( $job['total'] ) ); ?> items written<?php echo ! empty( $job['skipped'] ) ? ' · ' . esc_html( number_format_i18n( $job['skipped'] ) ) . ' no longer in scope' : ''; ?>.</p>
                 <p><a href="<?php echo esc_url( 'https://docs.google.com/spreadsheets/d/' . rawurlencode( $job['destination'] ) . '/edit#gid=' . $job['report_id'] ); ?>" target="_blank" rel="noopener noreferrer">Open the main report</a> · Started <?php echo esc_html( wp_date( 'j F Y, H:i', $job['started'] ) ); ?>.</p>
                 <?php if ( ! empty( $job['error'] ) ) : ?><p role="status"><strong>This refresh is incomplete.</strong> <?php echo esc_html( $job['error'] ); ?> Retry checks whether Google has already finished before writing again.</p><?php endif; ?>
                 <?php if ( 'failed' === $job['status'] && ! self::stopped( $job ) ) : ?>
-                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ace_seo_sheets_retry' ); ?><input type="hidden" name="action" value="ace_seo_sheets_retry"><button class="button">Retry this incomplete refresh</button></form>
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'acecrawl_sheets_retry' ); ?><input type="hidden" name="action" value="acecrawl_sheets_retry"><button class="button">Retry this incomplete refresh</button></form>
                 <?php endif; ?>
             <?php endif; ?>
             <?php if ( $last ) : ?><p>Last completed refresh: <?php echo esc_html( wp_date( 'j F Y, H:i', $last['finished'] ) ); ?> · <?php echo esc_html( number_format_i18n( $last['written'] ) ); ?> items.</p><?php endif; ?>

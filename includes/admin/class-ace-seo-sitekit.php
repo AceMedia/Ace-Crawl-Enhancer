@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOSiteKit {
+class AceCrawlSiteKit {
 
     const SCOPE_ANALYTICS = 'https://www.googleapis.com/auth/analytics.readonly';
     const SCOPE_SEARCH_CONSOLE = 'https://www.googleapis.com/auth/webmasters.readonly';
@@ -59,7 +59,7 @@ class AceSEOSiteKit {
         $search_property = $active ? self::get_search_console_property_id() : '';
         // PageSpeed needs no OAuth token (Site Kit grants no pagespeedonline scope); it is usable
         // whenever a manual key is set or the Site Kit PageSpeed module is active (anonymous quota).
-        $pagespeed_key   = (string) ( ( get_option( 'ace_seo_options', array() )['performance']['pagespeed_api_key'] ?? '' ) );
+        $pagespeed_key   = (string) ( ( get_option( 'acecrawl_options', array() )['performance']['pagespeed_api_key'] ?? '' ) );
         $pagespeed_ready = ( '' !== trim( $pagespeed_key ) ) || ( $active && in_array( 'pagespeed-insights', (array) get_option( 'googlesitekit_active_modules', array() ), true ) );
 
         return array(
@@ -254,7 +254,7 @@ class AceSEOSiteKit {
      * Refresh a Site Kit token using Site Kit's own OAuth client.
      */
     private static function refresh_user_token( $user_id ) {
-        if ( get_transient( 'ace_seo_sitekit_refresh_fail_' . $user_id ) ) {
+        if ( get_transient( 'acecrawl_sitekit_refresh_fail_' . $user_id ) ) {
             return;
         }
 
@@ -287,13 +287,13 @@ class AceSEOSiteKit {
 
             $stored = $oauth->get_token();
             if ( empty( $stored['refresh_token'] ) ) {
-                set_transient( 'ace_seo_sitekit_refresh_fail_' . $user_id, 1, 10 * MINUTE_IN_SECONDS );
+                set_transient( 'acecrawl_sitekit_refresh_fail_' . $user_id, 1, 10 * MINUTE_IN_SECONDS );
                 return;
             }
 
             $oauth->refresh_token();
         } catch ( \Throwable $e ) {
-            set_transient( 'ace_seo_sitekit_refresh_fail_' . $user_id, 1, 10 * MINUTE_IN_SECONDS );
+            set_transient( 'acecrawl_sitekit_refresh_fail_' . $user_id, 1, 10 * MINUTE_IN_SECONDS );
         }
     }
 

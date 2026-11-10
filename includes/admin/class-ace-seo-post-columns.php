@@ -22,11 +22,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once dirname( __DIR__ ) . '/class-ace-seo-export.php';
 
-class AceSeoPostColumns {
+class AceCrawlPostColumns {
 
     /**
      * Above this many posts of a type, meta-backed sorting is withheld.
-     * Filter ace_seo_admin_sort_max_posts to override per site.
+     * Filter acecrawl_admin_sort_max_posts to override per site.
      */
     const SORT_MAX_POSTS = 20000;
 
@@ -36,9 +36,9 @@ class AceSeoPostColumns {
             'ace_seo_index'     => __( 'Indexable', 'ace-crawl-enhancer' ),
             'ace_seo_title_set' => __( 'SEO title', 'ace-crawl-enhancer' ),
             'ace_seo_desc'      => __( 'Meta description', 'ace-crawl-enhancer' ),
-            'ace_seo_canonical' => __( 'Canonical', 'ace-crawl-enhancer' ),
-            'ace_seo_social'    => __( 'Social image', 'ace-crawl-enhancer' ),
-            'ace_seo_retention' => __( 'Retention', 'ace-crawl-enhancer' ),
+            'acecrawl_canonical' => __( 'Canonical', 'ace-crawl-enhancer' ),
+            'acecrawl_social'    => __( 'Social image', 'ace-crawl-enhancer' ),
+            'acecrawl_retention' => __( 'Retention', 'ace-crawl-enhancer' ),
             'ace_seo_ret_views'   => __( 'Views', 'ace-crawl-enhancer' ),
             'ace_seo_last_viewed' => __( 'Last viewed', 'ace-crawl-enhancer' ),
             'ace_seo_ret_links'   => __( 'Links in', 'ace-crawl-enhancer' ),
@@ -48,12 +48,12 @@ class AceSeoPostColumns {
     }
 
     private static function whitehat_on() {
-        return class_exists( 'AceSeoWhiteHat' ) && AceSeoWhiteHat::enabled();
+        return class_exists( 'AceCrawlWhiteHat' ) && AceCrawlWhiteHat::enabled();
     }
 
     /** Retention columns, shown without Screen Options on a list filtered or sorted by retention. */
     private static function retention_columns() {
-        return array( 'ace_seo_retention', 'ace_seo_ret_views', 'ace_seo_last_viewed', 'ace_seo_ret_links', 'ace_seo_people', 'ace_seo_bot_pct' );
+        return array( 'acecrawl_retention', 'ace_seo_ret_views', 'ace_seo_last_viewed', 'ace_seo_ret_links', 'ace_seo_people', 'ace_seo_bot_pct' );
     }
 
     /**
@@ -66,7 +66,7 @@ class AceSeoPostColumns {
             'ace_seo_ret_views'   => array( '_ace_seo_ret_views', 'NUMERIC' ),
             'ace_seo_last_viewed' => array( '_ace_seo_last_viewed', 'CHAR' ),
             'ace_seo_ret_links'   => array( '_ace_seo_ret_links', 'NUMERIC' ),
-            'ace_seo_retention'   => array( '_ace_seo_ret_tier', 'CHAR' ),
+            'acecrawl_retention'   => array( '_ace_seo_ret_tier', 'CHAR' ),
             'ace_seo_people'      => array( '_ace_seo_humans', 'NUMERIC' ),
             'ace_seo_bot_pct'     => array( '_ace_seo_bot_pct', 'NUMERIC' ),
             'ace_seo_whitehat'    => array( '_ace_seo_whitehat', 'CHAR' ),
@@ -85,7 +85,7 @@ class AceSeoPostColumns {
         // types register at, so iterating post types here would silently miss any
         // CPT whose plugin or theme happened to load later.
         add_action( 'current_screen', array( __CLASS__, 'register_for_screen' ) );
-        add_action( 'wp_ajax_ace_seo_list_export', array( __CLASS__, 'ajax_export' ) );
+        add_action( 'wp_ajax_acecrawl_list_export', array( __CLASS__, 'ajax_export' ) );
     }
 
     /** Rows per export request: small enough to finish well inside a request's time limit. */
@@ -99,7 +99,7 @@ class AceSeoPostColumns {
      * @return void
      */
     public static function ajax_export() {
-        check_ajax_referer( 'ace_seo_list_export' );
+        check_ajax_referer( 'acecrawl_list_export' );
 
         $params = array();
         // The list screen's own query string: parsed, then every value cleaned before use.
@@ -150,30 +150,30 @@ class AceSeoPostColumns {
         remove_action( 'pre_get_posts', $apply );
 
         $ids = array_map( 'intval', $query->posts );
-        $header = AceSeoExport::header();
-        $rows   = AceSeoExport::rows( $ids );
+        $header = AceCrawlExport::header();
+        $rows   = AceCrawlExport::rows( $ids );
 
         // To Google Sheets: the first batch opens a new tab and writes the header, every batch appends
         // its own rows server-side, and the browser only carries the tab name between requests.
         if ( 'sheets' === sanitize_key( wp_unslash( $_POST['dest'] ?? '' ) ) ) {
-            if ( ! class_exists( 'AceSeoSheets' ) || ! AceSeoSheets::configured() ) {
+            if ( ! class_exists( 'AceCrawlSheets' ) || ! AceCrawlSheets::configured() ) {
                 wp_send_json_error( __( 'Google Sheets is not set up (Ace SEO, Retention report).', 'ace-crawl-enhancer' ), 400 );
             }
             $tab = sanitize_text_field( wp_unslash( $_POST['tab'] ?? '' ) );
             if ( 1 === $batch || '' === $tab ) {
-                $tab = AceSeoSheets::add_tab( $type_obj->labels->name . ' ' . wp_date( 'Y-m-d H:i:s' ) );
+                $tab = AceCrawlSheets::add_tab( $type_obj->labels->name . ' ' . wp_date( 'Y-m-d H:i:s' ) );
                 if ( is_wp_error( $tab ) ) {
                     wp_send_json_error( $tab->get_error_message(), 502 );
                 }
                 array_unshift( $rows, $header );
             }
-            $done = AceSeoSheets::append( $tab, $rows );
+            $done = AceCrawlSheets::append( $tab, $rows );
             if ( is_wp_error( $done ) ) {
                 wp_send_json_error( $done->get_error_message(), 502 );
             }
             wp_send_json_success( array(
                 'tab'   => $tab,
-                'url'   => AceSeoSheets::sheet_url(),
+                'url'   => AceCrawlSheets::sheet_url(),
                 'count' => count( $ids ),
                 'total' => (int) $query->found_posts,
                 'pages' => (int) $query->max_num_pages,
@@ -200,14 +200,14 @@ class AceSeoPostColumns {
         if ( ! $screen instanceof WP_Screen || 'edit' !== $screen->base || ! in_array( $screen->post_type, self::post_types(), true ) ) {
             return;
         }
-        $sheets = class_exists( 'AceSeoSheets' ) && AceSeoSheets::configured();
+        $sheets = class_exists( 'AceCrawlSheets' ) && AceCrawlSheets::configured();
         ?>
-        <?php AceSeoAssets::style( 'ace-seo-post-columns-style-1', 'assets/css/ace-seo-post-columns-style-1.css' ); ?>
-        <?php AceSeoAssets::inline_script( 'ace-seo-post-columns-script-1', '
+        <?php AceCrawlAssets::style( 'ace-seo-post-columns-style-1', 'assets/css/ace-seo-post-columns-style-1.css' ); ?>
+        <?php AceCrawlAssets::inline_script( 'ace-seo-post-columns-script-1', '
         (function () {
             var bar = document.querySelector(\'.tablenav.top .actions:not(.bulkactions)\');
             if (!bar || !window.fetch || !window.Blob) { return; }
-            var nonce = ' . (wp_json_encode( wp_create_nonce( 'ace_seo_list_export' ) )) . ';
+            var nonce = ' . (wp_json_encode( wp_create_nonce( 'acecrawl_list_export' ) )) . ';
             var mk = function (id, label, title) {
                 var b = document.createElement(\'button\');
                 b.type = \'button\'; b.className = \'button\'; b.id = id; b.textContent = label; b.title = title;
@@ -247,7 +247,7 @@ class AceSeoPostColumns {
                 var next = function () {
                     if (stopped) { throw new Error(\'cancelled\'); }
                     var fd = new FormData();
-                    fd.append(\'action\', \'ace_seo_list_export\');
+                    fd.append(\'action\', \'acecrawl_list_export\');
                     fd.append(\'_ajax_nonce\', nonce);
                     fd.append(\'q\', q);
                     fd.append(\'batch\', String(page));
@@ -366,7 +366,7 @@ class AceSeoPostColumns {
      * @return string[]
      */
     private static function post_types() {
-        return AceSeoExport::post_types();
+        return AceCrawlExport::post_types();
     }
 
     /**
@@ -463,7 +463,7 @@ class AceSeoPostColumns {
          * @param string $post_type
          * @param int    $total
          */
-        $max = (int) apply_filters( 'ace_seo_admin_sort_max_posts', self::SORT_MAX_POSTS, $post_type, $total );
+        $max = (int) apply_filters( 'acecrawl_admin_sort_max_posts', self::SORT_MAX_POSTS, $post_type, $total );
 
         return $total <= $max;
     }
@@ -501,7 +501,7 @@ class AceSeoPostColumns {
                 self::render_presence( AceCrawlEnhancer::get_meta_value( $post_id, 'title' ) );
                 break;
 
-            case 'ace_seo_retention':
+            case 'acecrawl_retention':
                 self::render_retention_cell( $post_id );
                 break;
 
@@ -522,7 +522,7 @@ class AceSeoPostColumns {
 
             case 'ace_seo_whitehat':
                 $status = (string) get_post_meta( $post_id, '_ace_seo_whitehat', true );
-                if ( '' === $status || ! class_exists( 'AceSeoWhiteHat' ) ) {
+                if ( '' === $status || ! class_exists( 'AceCrawlWhiteHat' ) ) {
                     echo wp_kses_post( self::dash() );
                     break;
                 }
@@ -532,7 +532,7 @@ class AceSeoPostColumns {
                     '<span style="color:%s;font-weight:600" title="%s">%s</span>',
                     esc_attr( $colour[ $status ] ?? '#646970' ),
                     esc_attr( is_array( $data ) ? implode( ' ', (array) ( $data['reasons'] ?? array() ) ) . ( ! empty( $data['checked'] ) ? ' (' . wp_date( 'Y-m-d H:i', (int) $data['checked'] ) . ', ' . ( $data['method'] ?? '' ) . ')' : '' ) : '' ),
-                    esc_html( AceSeoWhiteHat::labels()[ $status ] ?? $status )
+                    esc_html( AceCrawlWhiteHat::labels()[ $status ] ?? $status )
                 );
                 break;
 
@@ -576,11 +576,11 @@ class AceSeoPostColumns {
                 );
                 break;
 
-            case 'ace_seo_canonical':
+            case 'acecrawl_canonical':
                 self::render_presence( AceCrawlEnhancer::get_meta_value( $post_id, 'canonical' ) );
                 break;
 
-            case 'ace_seo_social':
+            case 'acecrawl_social':
                 $image = AceCrawlEnhancer::get_meta_value( $post_id, 'opengraph-image' );
 
                 if ( '' === (string) $image ) {
@@ -600,7 +600,7 @@ class AceSeoPostColumns {
      * @return void
      */
     private static function render_index_cell( $post_id ) {
-        if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged() ) {
+        if ( function_exists( 'acecrawl_site_is_discouraged' ) && acecrawl_site_is_discouraged() ) {
             printf(
                 '<span style="color:#b32d2e;font-weight:600" title="%s">%s</span>',
                 esc_attr__( 'The whole site is set to discourage search engines, in Settings → Reading.', 'ace-crawl-enhancer' ),
@@ -639,7 +639,7 @@ class AceSeoPostColumns {
     }
 
     private static function render_retention_cell( $post_id ) {
-        $row = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $post_id, AceSeoRetentionReport::META, true ) : '';
+        $row = class_exists( 'AceCrawlRetentionReport' ) ? get_post_meta( $post_id, AceCrawlRetentionReport::META, true ) : '';
 
         if ( is_array( $row ) && ! empty( $row['tier'] ) ) {
             $tiers = array(
@@ -651,13 +651,13 @@ class AceSeoPostColumns {
         }
 
         if ( is_array( $row ) && ! empty( $row['trend'] ) && 'quiet' !== $row['trend'] ) {
-            $trends = AceSeoRetentionReport::trend_labels();
+            $trends = AceCrawlRetentionReport::trend_labels();
             echo '<span style="display:block;font-size:11px;color:#50575e">' . esc_html( $trends[ $row['trend'] ] ?? $row['trend'] )
                 . ( isset( $row['momentum'] ) && null !== $row['momentum'] ? ' (' . esc_html( number_format_i18n( (float) $row['momentum'], 2 ) ) . '×)' : '' ) . '</span>';
         }
 
         if ( is_array( $row ) && ! empty( $row['bucket'] ) ) {
-            $labels = AceSeoRetentionReport::recommendation_labels();
+            $labels = AceCrawlRetentionReport::recommendation_labels();
             printf(
                 '<strong title="%s">%s</strong>',
                 esc_attr( (string) ( $row['reason'] ?? '' ) ),
@@ -668,15 +668,15 @@ class AceSeoPostColumns {
                 . esc_html__( 'not scored', 'ace-crawl-enhancer' ) . '</span>';
         }
 
-        if ( ! class_exists( 'AceSeoRetentionActions' ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionActions' ) ) {
             return;
         }
 
-        $st    = AceSeoRetentionActions::state( $post_id );
+        $st    = AceCrawlRetentionActions::state( $post_id );
         $flags = array_filter( array(
             $st['noindex'] ? __( 'noindex', 'ace-crawl-enhancer' ) : '',
             $st['unavailable'] ? sprintf( /* translators: %s: name or value. */ __( 'until %s', 'ace-crawl-enhancer' ), $st['unavailable'] ) : '',
-            class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::label( $post_id ) : ( 'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ) ),
+            class_exists( 'AceCrawlRedirects' ) ? AceCrawlRedirects::label( $post_id ) : ( 'gone' === $st['redirect'] ? '410' : ( $st['redirect'] ? '301 → ' . wp_make_link_relative( $st['redirect'] ) : '' ) ),
             $st['news_excl'] ? __( 'no news sitemap', 'ace-crawl-enhancer' ) : '',
             $st['notice'] ? sprintf( /* translators: %s: name or value. */ __( 'notice: %s', 'ace-crawl-enhancer' ), $st['notice'] ) : '',
         ) );
@@ -687,7 +687,7 @@ class AceSeoPostColumns {
     }
 
     private static function post_is_noindex( $post_id ) {
-        return AceSeoExport::post_is_noindex( $post_id );
+        return AceCrawlExport::post_is_noindex( $post_id );
     }
 
     /**
@@ -732,7 +732,7 @@ class AceSeoPostColumns {
 
     /** @return array bucket => label, keyed with a hyphen as the report stores it. */
     private static function retention_buckets() {
-        return class_exists( 'AceSeoRetentionReport' ) ? AceSeoRetentionReport::recommendation_labels() : array();
+        return class_exists( 'AceCrawlRetentionReport' ) ? AceCrawlRetentionReport::recommendation_labels() : array();
     }
 
     /**
@@ -808,10 +808,10 @@ class AceSeoPostColumns {
 
         self::render_retention_filters( $post_type );
 
-        if ( self::whitehat_on() && in_array( $post_type, (array) AceSeoWhiteHat::options()['post_types'], true ) ) {
+        if ( self::whitehat_on() && in_array( $post_type, (array) AceCrawlWhiteHat::options()['post_types'], true ) ) {
             $wh = isset( $_GET['ace_wh'] ) ? sanitize_key( wp_unslash( $_GET['ace_wh'] ) ) : '';
             echo '<select name="ace_wh" aria-label="' . esc_attr__( 'White hat status', 'ace-crawl-enhancer' ) . '"><option value="">' . esc_html__( 'Any white hat status', 'ace-crawl-enhancer' ) . '</option>';
-            foreach ( AceSeoWhiteHat::labels() as $value => $label ) {
+            foreach ( AceCrawlWhiteHat::labels() as $value => $label ) {
                 printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $wh, $value, false ), esc_html( $label ) );
             }
             echo '</select>';
@@ -820,10 +820,10 @@ class AceSeoPostColumns {
 
     /** Is the retention report about this post type? */
     private static function is_report_type( $post_type ) {
-        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionReport' ) ) {
             return false;
         }
-        return in_array( $post_type, (array) AceSeoRetentionReport::settings()['post_types'], true );
+        return in_array( $post_type, (array) AceCrawlRetentionReport::settings()['post_types'], true );
     }
 
     /**
@@ -844,10 +844,10 @@ class AceSeoPostColumns {
 
         echo '<select name="ace_ret" aria-label="' . esc_attr__( 'Retention group', 'ace-crawl-enhancer' ) . '"><option value="">'
             . esc_html__( 'Any retention group', 'ace-crawl-enhancer' ) . '</option>';
-        foreach ( AceSeoRetentionReport::tier_labels() + array( 'scored' => __( 'Any reviewed older post', 'ace-crawl-enhancer' ) ) as $value => $label ) {
+        foreach ( AceCrawlRetentionReport::tier_labels() + array( 'scored' => __( 'Any reviewed older post', 'ace-crawl-enhancer' ) ) as $value => $label ) {
             printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $current, $value, false ), esc_html( $label ) );
             if ( 'retained' === $value ) {
-                foreach ( AceSeoRetentionReport::rank_labels() as $rank => $rank_label ) {
+                foreach ( AceCrawlRetentionReport::rank_labels() as $rank => $rank_label ) {
                     printf( '<option value="%s"%s>&nbsp;&nbsp;%s</option>', esc_attr( $rank ), selected( $current, $rank, false ), esc_html( $rank_label ) );
                 }
             }
@@ -857,7 +857,7 @@ class AceSeoPostColumns {
         $trend = sanitize_key( $get( 'ace_trend' ) );
         echo '<select name="ace_trend" aria-label="' . esc_attr__( 'Trend', 'ace-crawl-enhancer' ) . '"><option value="">'
             . esc_html__( 'Any trend', 'ace-crawl-enhancer' ) . '</option>';
-        foreach ( AceSeoRetentionReport::trend_labels() as $value => $label ) {
+        foreach ( AceCrawlRetentionReport::trend_labels() as $value => $label ) {
             printf( '<option value="%s"%s>%s</option>', esc_attr( $value ), selected( $trend, $value, false ), esc_html( $label ) );
         }
         echo '</select>';
@@ -882,7 +882,7 @@ class AceSeoPostColumns {
         echo '<details style="clear:both;max-width:70em;padding:8px 0;white-space:normal"><summary style="cursor:pointer">'
             . esc_html__( 'How to use these retention filters', 'ace-crawl-enhancer' ) . '</summary>';
         echo '<p>' . esc_html__( 'Combine a recommendation, a retention group, a publication date and a view range, then press Filter. Views belong to the latest report window. A dash in a data column means no data is available, rather than zero visits. Exports use the same filters and sorting as this list.', 'ace-crawl-enhancer' ) . '</p>';
-        AceSeoRetentionReport::render_help();
+        AceCrawlRetentionReport::render_help();
         if ( current_user_can( 'manage_options' ) ) {
             echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-settings#retention' ) ) . '">' . esc_html__( 'Retention settings', 'ace-crawl-enhancer' ) . '</a> · <a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-retention#retention-help' ) ) . '">' . esc_html__( 'Retention dashboard and status explanations', 'ace-crawl-enhancer' ) . '</a></p>';
         }
@@ -946,22 +946,22 @@ class AceSeoPostColumns {
      * @return void
      */
     public static function apply_retention_filters( $query, array $params ) {
-        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionReport' ) ) {
             return;
         }
         $clauses = array();
         $tier    = isset( $params['ace_ret'] ) ? sanitize_key( wp_unslash( $params['ace_ret'] ) ) : '';
         if ( 'scored' === $tier ) {
-            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'compare' => 'EXISTS' );
-        } elseif ( in_array( $tier, AceSeoRetentionReport::TIERS, true ) ) {
-            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TIER, 'value' => $tier );
-        } elseif ( in_array( $tier, AceSeoRetentionReport::RANKS, true ) ) {
-            $clauses[] = array( 'key' => AceSeoRetentionReport::META_RANK, 'value' => $tier );
+            $clauses[] = array( 'key' => AceCrawlRetentionReport::META_TIER, 'compare' => 'EXISTS' );
+        } elseif ( in_array( $tier, AceCrawlRetentionReport::TIERS, true ) ) {
+            $clauses[] = array( 'key' => AceCrawlRetentionReport::META_TIER, 'value' => $tier );
+        } elseif ( in_array( $tier, AceCrawlRetentionReport::RANKS, true ) ) {
+            $clauses[] = array( 'key' => AceCrawlRetentionReport::META_RANK, 'value' => $tier );
         }
 
         $trend = isset( $params['ace_trend'] ) ? sanitize_key( wp_unslash( $params['ace_trend'] ) ) : '';
-        if ( in_array( $trend, AceSeoRetentionReport::TRENDS, true ) ) {
-            $clauses[] = array( 'key' => AceSeoRetentionReport::META_TREND, 'value' => $trend );
+        if ( in_array( $trend, AceCrawlRetentionReport::TRENDS, true ) ) {
+            $clauses[] = array( 'key' => AceCrawlRetentionReport::META_TREND, 'value' => $trend );
         }
 
         $wh = isset( $params['ace_wh'] ) ? sanitize_key( wp_unslash( $params['ace_wh'] ) ) : '';
@@ -972,7 +972,7 @@ class AceSeoPostColumns {
         foreach ( array( 'ace_views_min' => '>=', 'ace_views_max' => '<=' ) as $param => $compare ) {
             if ( isset( $params[ $param ] ) && '' !== $params[ $param ] && is_numeric( $params[ $param ] ) ) {
                 $clauses[] = array(
-                    'key'     => AceSeoRetentionReport::META_VIEWS,
+                    'key'     => AceCrawlRetentionReport::META_VIEWS,
                     'value'   => max( 0, (int) $params[ $param ] ),
                     'compare' => $compare,
                     'type'    => 'NUMERIC',
@@ -1017,11 +1017,11 @@ class AceSeoPostColumns {
             return;
         }
 
-        if ( 0 === strpos( $filter, 'retention_' ) && class_exists( 'AceSeoRetentionReport' ) ) {
+        if ( 0 === strpos( $filter, 'retention_' ) && class_exists( 'AceCrawlRetentionReport' ) ) {
             $bucket = substr( $filter, strlen( 'retention_' ) );
 
             if ( 'acted' === $bucket ) {
-                $query->set( 'meta_query', array( array( 'key' => AceSeoRetentionActions::META_REDIRECT, 'value' => '', 'compare' => '!=' ) ) );
+                $query->set( 'meta_query', array( array( 'key' => AceCrawlRetentionActions::META_REDIRECT, 'value' => '', 'compare' => '!=' ) ) );
                 return;
             }
 
@@ -1032,7 +1032,7 @@ class AceSeoPostColumns {
                     'meta_query',
                     array(
                         array(
-                            'key'     => AceSeoRetentionReport::META,
+                            'key'     => AceCrawlRetentionReport::META,
                             'value'   => 's:6:"bucket";s:' . strlen( $bucket ) . ':"' . $bucket . '";',
                             'compare' => 'LIKE',
                         ),

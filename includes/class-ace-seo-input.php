@@ -8,7 +8,7 @@
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-final class AceSeoInput {
+final class AceCrawlInput {
     /**
      * Read the named fields from $_POST. Fields that were not sent are left out, so callers keep
      * their own defaults for them.

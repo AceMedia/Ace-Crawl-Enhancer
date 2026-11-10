@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoRetentionActions {
+class AceCrawlRetentionActions {
 
     const META_NOINDEX     = '_ace_seo_meta-robots-noindex';
     const META_UNAVAILABLE = '_ace_seo_unavailable_after';
@@ -28,8 +28,8 @@ class AceSeoRetentionActions {
     const META_NEWS_EXCL   = '_ace_seo_news_exclude';
     const META_NOTICE      = '_ace_seo_archive_notice';
     const META_LOG         = '_ace_seo_retention_log';
-    const OPTION           = 'ace_seo_retention_options';
-    const LOG_OPTION       = 'ace_seo_retention_actions_log';
+    const OPTION           = 'acecrawl_retention_options';
+    const LOG_OPTION       = 'acecrawl_retention_actions_log';
 
     const ACTIONS = array(
         'noindex'           => 'Noindex (keep serving it)',
@@ -47,11 +47,11 @@ class AceSeoRetentionActions {
     );
 
     public static function init() {
-        add_filter( 'ace_seo_robots_directives', array( __CLASS__, 'robots_unavailable_after' ) );
+        add_filter( 'acecrawl_robots_directives', array( __CLASS__, 'robots_unavailable_after' ) );
         add_action( 'template_redirect', array( __CLASS__, 'maybe_redirect' ), 2 );
         add_filter( 'the_content', array( __CLASS__, 'dated_content_notice' ), 5 );
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_notice_style' ) );
-        add_filter( 'ace_sitemap_powertools_news_query_args', array( __CLASS__, 'news_sitemap_exclusions' ) );
+        add_filter( 'acecrawl_sitemap_news_query_args', array( __CLASS__, 'news_sitemap_exclusions' ) );
         add_action( 'updated_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
         add_action( 'added_post_meta', array( __CLASS__, 'tidy_saved_field' ), 10, 4 );
     }
@@ -80,7 +80,7 @@ class AceSeoRetentionActions {
             'timing_ignored' => array(),
             'auto_build'     => 0,
             'track_views'    => 0,
-            // Retained posts on the front end (AceSeoRetentionFront). All off until switched on.
+            // Retained posts on the front end (AceCrawlRetentionFront). All off until switched on.
             'retained_notice'      => 0,
             'retained_notice_text' => 'This is an older article, published {date}, and it has not been updated in a while.',
             'light_enabled'        => 0,
@@ -89,7 +89,7 @@ class AceSeoRetentionActions {
             'light_continue'       => 'card',
         );
         $saved = get_option( self::OPTION, array() );
-        return apply_filters( 'ace_seo_retention_options', array_merge( $defaults, is_array( $saved ) ? array_intersect_key( $saved, $defaults ) : array() ) );
+        return apply_filters( 'acecrawl_retention_options', array_merge( $defaults, is_array( $saved ) ? array_intersect_key( $saved, $defaults ) : array() ) );
     }
 
     public static function save_options( array $input ) {
@@ -343,7 +343,7 @@ class AceSeoRetentionActions {
     /** Is this post in the retained tier of the last report? */
     public static function is_retained( $post_id ) {
         $retained = 'retained' === (string) get_post_meta( (int) $post_id, '_ace_seo_ret_tier', true );
-        return (bool) apply_filters( 'ace_seo_retention_is_retained', $retained, (int) $post_id );
+        return (bool) apply_filters( 'acecrawl_retention_is_retained', $retained, (int) $post_id );
     }
 
     /* ---- Applying actions ------------------------------------------------------------------------ */
@@ -432,10 +432,10 @@ class AceSeoRetentionActions {
             if ( class_exists( 'ACE_SEO_Frontend_Performance' ) ) {
                 ACE_SEO_Frontend_Performance::clear_post_cache( $id );
             }
-            do_action( 'ace_seo_retention_post_changed', $id );
+            do_action( 'acecrawl_retention_post_changed', $id );
 
             self::log( $id, $action, $date ?: $url, $source );
-            do_action( 'ace_seo_retention_action_applied', $id, $action, $args, $source );
+            do_action( 'acecrawl_retention_action_applied', $id, $action, $args, $source );
             $applied++;
         }
 
@@ -486,7 +486,7 @@ class AceSeoRetentionActions {
             }
         }
         $days = $rule_days > 0 ? $rule_days : $type_days;
-        return (int) apply_filters( 'ace_seo_retention_lifetime_days', $days, $post );
+        return (int) apply_filters( 'acecrawl_retention_lifetime_days', $days, $post );
     }
 
     /**
@@ -656,8 +656,8 @@ class AceSeoRetentionActions {
         $id  = get_queried_object_id();
         if ( 'publish' !== get_post_status( $id ) ) { return; }
         $url = (string) get_post_meta( $id, self::META_REDIRECT, true );
-        $redirect = class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::settings( $id ) : null;
-        if ( $redirect && ! AceSeoRedirects::active( $redirect ) ) {
+        $redirect = class_exists( 'AceCrawlRedirects' ) ? AceCrawlRedirects::settings( $id ) : null;
+        if ( $redirect && ! AceCrawlRedirects::active( $redirect ) ) {
             return;
         }
         if ( '' === $url ) {
@@ -669,13 +669,13 @@ class AceSeoRetentionActions {
             status_header( 410 );
             nocache_headers();
             header( 'X-Robots-Tag: noindex' );
-            $message = apply_filters( 'ace_seo_retention_gone_message', '<p>This page has been retired and is no longer available.</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></p>', $id );
+            $message = apply_filters( 'acecrawl_retention_gone_message', '<p>This page has been retired and is no longer available.</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></p>', $id );
             wp_die( wp_kses_post( $message ), esc_html__( 'Gone', 'ace-crawl-enhancer' ), array( 'response' => 410 ) );
         }
-        if ( class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::url_key( $url ) === AceSeoRedirects::url_key( get_permalink( $id ) ) : self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
+        if ( class_exists( 'AceCrawlRedirects' ) ? AceCrawlRedirects::url_key( $url ) === AceCrawlRedirects::url_key( get_permalink( $id ) ) : self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
             return;
         }
-        $url = apply_filters( 'ace_seo_retention_redirect_url', $url, $id );
+        $url = apply_filters( 'acecrawl_retention_redirect_url', $url, $id );
         if ( $url ) {
             // A browser/CDN must not retain a redirect beyond its stop date or after a pause.
             if ( $redirect && $redirect['created'] ) { nocache_headers(); }
@@ -710,7 +710,7 @@ class AceSeoRetentionActions {
             return true;
         }
         $o     = self::options();
-        $types = apply_filters( 'ace_seo_retention_notice_post_types', array( 'post' ) );
+        $types = apply_filters( 'acecrawl_retention_notice_post_types', array( 'post' ) );
         if ( ! in_array( $post->post_type, (array) $types, true ) ) {
             return false;
         }
@@ -735,7 +735,7 @@ class AceSeoRetentionActions {
         $html = '<div class="ace-seo-dated-notice" role="note">'
             . '<time datetime="' . esc_attr( get_the_date( 'c', $post ) ) . '">' . esc_html( $text ) . '</time>'
             . '</div>';
-        return apply_filters( 'ace_seo_retention_notice_html', $html, $post, $text );
+        return apply_filters( 'acecrawl_retention_notice_html', $html, $post, $text );
     }
 
     /** Queue the notice stylesheet before the document head is printed. */
@@ -745,7 +745,7 @@ class AceSeoRetentionActions {
         }
         $post = get_post( get_queried_object_id() );
         if ( $post && self::notice_applies( $post ) ) {
-            AceSeoAssets::style( 'ace-seo-dated-notice', 'assets/css/ace-seo-dated-notice.css' );
+            AceCrawlAssets::style( 'ace-seo-dated-notice', 'assets/css/ace-seo-dated-notice.css' );
         }
     }
 

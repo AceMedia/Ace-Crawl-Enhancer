@@ -11,7 +11,7 @@ require_once dirname( __DIR__ ) . '/includes/class-ace-seo-seasonal-window.php';
 $as_of = $args[0] ?? wp_date( 'Y-m-d' );
 $timezone = wp_timezone();
 try {
-    Ace_SEO_Seasonal_Window::preview( $as_of, $as_of, $timezone );
+    AceCrawl_Seasonal_Window::preview( $as_of, $as_of, $timezone );
 } catch ( InvalidArgumentException $error ) {
     WP_CLI::error( $error->getMessage() );
 }
@@ -31,7 +31,7 @@ do {
         $cursor = (int) $row->ID;
         $published = substr( $row->post_date, 0, 10 );
         try {
-            $window = Ace_SEO_Seasonal_Window::preview( $published, $as_of, $timezone );
+            $window = AceCrawl_Seasonal_Window::preview( $published, $as_of, $timezone );
             fputcsv( $stream, array( $cursor, $published, $as_of, $timezone->getName(), $window['anniversary'], $window['season_start'], $window['season_end'], $window['in_season'] ? 'in_season' : 'hold_out_of_season', $window['reason'], $window['rule'] ), ',', '"', '' );
         } catch ( InvalidArgumentException $error ) {
             fputcsv( $stream, array( $cursor, $published, $as_of, $timezone->getName(), '', '', '', 'needs_date_review', $error->getMessage(), 'publication-anniversary-v1-preview' ), ',', '"', '' );

@@ -2,8 +2,8 @@
 /** Run: php tests/assets-buffer-test.php */
 if ( PHP_SAPI !== 'cli' ) { exit; }
 define( 'ABSPATH', __DIR__ . '/' );
-define( 'ACE_SEO_URL', 'https://example.test/wp-content/plugins/ace-crawl-enhancer/' );
-define( 'ACE_SEO_VERSION', 'test' );
+define( 'ACECRAWL_URL', 'https://example.test/wp-content/plugins/ace-crawl-enhancer/' );
+define( 'ACECRAWL_VERSION', 'test' );
 $GLOBALS['scripts'] = $GLOBALS['styles'] = $GLOBALS['hooks'] = $GLOBALS['printed'] = array();
 $GLOBALS['head_done'] = false;
 function wp_enqueue_script( $handle, $url = '', $deps = array(), $version = '', $footer = false ) { $GLOBALS['scripts'][$handle] = array( 'url' => $url, 'deps' => $deps, 'footer' => $footer ); }
@@ -31,27 +31,27 @@ require dirname( __DIR__ ) . '/includes/class-ace-seo-assets.php';
 require dirname( __DIR__ ) . '/includes/frontend/class-ace-seo-frontend.php';
 require dirname( __DIR__ ) . '/includes/admin/class-ace-seo-post-columns.php';
 ob_start();
-AceSeoAssets::script( 'ace-test', 'assets/js/admin.js', array( 'jquery' ) );
-AceSeoAssets::inline_script( 'ace-inline', 'window.test=true;' );
-AceSeoAssets::inline_script( 'ace-inline', 'window.test=true;' );
-AceSeoAssets::style( 'ace-css', 'assets/css/admin.css' );
+AceCrawlAssets::script( 'ace-test', 'assets/js/admin.js', array( 'jquery' ) );
+AceCrawlAssets::inline_script( 'ace-inline', 'window.test=true;' );
+AceCrawlAssets::inline_script( 'ace-inline', 'window.test=true;' );
+AceCrawlAssets::style( 'ace-css', 'assets/css/admin.css' );
 $output = ob_get_clean();
 asset_check( '' === $output, 'Asset registration does not inject raw markup.' );
 asset_check( true === $GLOBALS['scripts']['ace-test']['footer'], 'Scripts are queued in the footer.' );
 asset_check( 1 === count( $GLOBALS['inline']['ace-inline'] ), 'Repeated components do not duplicate inline handlers.' );
 asset_check( empty( $GLOBALS['printed'] ), 'Early styles stay queued for the document head.' );
 $GLOBALS['head_done'] = true;
-AceSeoAssets::style( 'ace-late', 'assets/css/admin.css' );
+AceCrawlAssets::style( 'ace-late', 'assets/css/admin.css' );
 asset_check( isset( $GLOBALS['printed']['ace-late'] ), 'Late metabox styles use WordPress style printing.' );
 $GLOBALS['scripts'] = array();
-AceSeoPostColumns::print_export_script();
+AceCrawlPostColumns::print_export_script();
 asset_check( empty( $GLOBALS['scripts'] ), 'Export scripts are absent from unrelated screens.' );
 $GLOBALS['screen'] = new WP_Screen();
-ob_start(); AceSeoPostColumns::print_export_script(); $export_output = ob_get_clean();
+ob_start(); AceCrawlPostColumns::print_export_script(); $export_output = ob_get_clean();
 asset_check( '' === trim( $export_output ), 'Export control queues assets without raw script tags.' );
 asset_check( isset( $GLOBALS['inline']['ace-seo-post-columns-script-1'] ), 'Post list export behaviour is queued on supported screens.' );
 file_put_contents( sys_get_temp_dir() . '/ace-review-export-script.js', $GLOBALS['inline']['ace-seo-post-columns-script-1'][0] );
-$frontend = new AceSeoFrontend();
+$frontend = new AceCrawlFrontend();
 asset_check( isset( $GLOBALS['hooks']['wp_template_enhancement_output_buffer'] ) && ! isset( $GLOBALS['hooks']['template_redirect'] ), 'Core owns the template buffer lifecycle.' );
 $before = ob_get_level();
 $html = '<html><head><meta property="og:title" content="old"><meta data-ace-seo="1" property="og:title" content="$1 canonical"><meta property="og:description" content="keep"></head><body><meta property="og:title" content="body"></body></html>';

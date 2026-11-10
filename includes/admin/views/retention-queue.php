@@ -1,10 +1,10 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return; }
+if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return; }
 global $wpdb;
-$control = AceSeoRetentionQueue::control();
-$jobs = $wpdb->get_results( 'SELECT * FROM ' . AceSeoRetentionQueue::table( 'jobs' ) . ' ORDER BY updated DESC,plan_id DESC LIMIT 20', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query; table() returns the WordPress prefix plus a constant suffix, no user input.
-$events = $wpdb->get_results( 'SELECT plan_id,kind,recorded,actor FROM ' . AceSeoRetentionQueue::table( 'events' ) . ' ORDER BY id DESC LIMIT 20', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query; table() returns the WordPress prefix plus a constant suffix, no user input.
+$control = AceCrawlRetentionQueue::control();
+$jobs = $wpdb->get_results( 'SELECT * FROM ' . AceCrawlRetentionQueue::table( 'jobs' ) . ' ORDER BY updated DESC,plan_id DESC LIMIT 20', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query; table() returns the WordPress prefix plus a constant suffix, no user input.
+$events = $wpdb->get_results( 'SELECT plan_id,kind,recorded,actor FROM ' . AceCrawlRetentionQueue::table( 'events' ) . ' ORDER BY id DESC LIMIT 20', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query; table() returns the WordPress prefix plus a constant suffix, no user input.
 $notice = is_string( $_GET['queue_notice'] ?? null ) ? sanitize_key( wp_unslash( $_GET['queue_notice'] ) ) : '';
 ?>
 <section class="ace-redirect-card" id="retention-approved-queue">

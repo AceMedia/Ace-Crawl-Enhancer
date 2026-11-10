@@ -3,7 +3,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 require_once __DIR__ . '/class-ace-seo-retention-fresh.php';
 
-final class AceSeoRetentionPrototype {
+final class AceCrawlRetentionPrototype {
     const TYPE = 'ace_retention_plan';
     const KEEP = '_ace_seo_retention_automation_keep';
     const VERSION = 'review-3';
@@ -20,20 +20,20 @@ final class AceSeoRetentionPrototype {
             'rewrite' => false, 'query_var' => false, 'supports' => array() ) );
         add_action( 'admin_post_ace_retention_preview', array( __CLASS__, 'handle' ) );
         require_once __DIR__ . '/class-ace-seo-retention-queue.php';
-        AceSeoRetentionQueue::init();
+        AceCrawlRetentionQueue::init();
     }
 
     private static function hash( $value ) { return hash( 'sha256', wp_json_encode( $value ) ); }
 
     public static function facts( $id ) {
-        $post = AceSeoRetentionFresh::post( $id );
+        $post = AceCrawlRetentionFresh::post( $id );
         if ( ! $post ) { return array( 'id' => (int) $id, 'missing' => true ); }
         global $wpdb;
         $terms = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( "SELECT term_taxonomy_id FROM {$wpdb->term_relationships} WHERE object_id=%d", $id ) ) );
         if ( $wpdb->last_error ) { throw new RuntimeException( 'Could not read article terms.' ); }
         sort( $terms );
         $meta = array();
-        foreach ( array( self::KEEP, AceSeoRetentionActions::META_NOINDEX, AceSeoRetentionActions::META_UNAVAILABLE,
+        foreach ( array( self::KEEP, AceCrawlRetentionActions::META_NOINDEX, AceCrawlRetentionActions::META_UNAVAILABLE,
             '_ace_seo_canonical', '_ace_seo_retention_timing', '_ace_seo_relevant_from', '_ace_seo_relevant_to' ) as $key ) {
             $meta[ $key ] = get_post_meta( $id, $key, true );
         }
@@ -41,14 +41,14 @@ final class AceSeoRetentionPrototype {
             'type' => $post->post_type, 'status' => $post->post_status, 'password' => '' !== $post->post_password,
             'published' => $post->post_date_gmt, 'modified' => $post->post_modified_gmt,
             'content_hash' => self::hash( array( $post->post_title, $post->post_content, $post->post_excerpt ) ),
-            'terms' => $terms, 'meta' => $meta, 'redirect' => AceSeoRedirects::settings( $id ),
+            'terms' => $terms, 'meta' => $meta, 'redirect' => AceCrawlRedirects::settings( $id ),
             'protected' => in_array( (int) $id, array( (int) get_option( 'page_on_front' ), (int) get_option( 'page_for_posts' ) ), true ) );
     }
 
     public static function fingerprint( $source, $target ) {
-        return AceSeoRetentionFresh::run( array( (int) $source, (int) $target ), static function() use ( $source, $target ) { return self::hash( array( self::facts( $source ), self::facts( $target ),
-            get_post_meta( $source, AceSeoRetentionReport::META, true ), AceSeoRetentionActions::options(),
-            AceSeoRetentionReport::settings(), get_option( 'blog_public' ), AceSeoRetentionFresh::generation( $source ), self::VERSION ) ); } );
+        return AceCrawlRetentionFresh::run( array( (int) $source, (int) $target ), static function() use ( $source, $target ) { return self::hash( array( self::facts( $source ), self::facts( $target ),
+            get_post_meta( $source, AceCrawlRetentionReport::META, true ), AceCrawlRetentionActions::options(),
+            AceCrawlRetentionReport::settings(), get_option( 'blog_public' ), AceCrawlRetentionFresh::generation( $source ), self::VERSION ) ); } );
     }
 
     /** Pure response checks; a challenge page or a redirect is not a verified replacement. */
@@ -80,7 +80,7 @@ final class AceSeoRetentionPrototype {
         foreach ( $doc->getElementsByTagName( 'link' ) as $link ) {
             if ( in_array( 'canonical', preg_split( '/\s+/', strtolower( trim( $link->getAttribute( 'rel' ) ) ) ), true ) ) { $canonicals[] = $link->getAttribute( 'href' ); }
         }
-        if ( 1 !== count( $canonicals ) || AceSeoRedirects::url_key( $canonicals[0] ) !== AceSeoRedirects::url_key( $url )
+        if ( 1 !== count( $canonicals ) || AceCrawlRedirects::url_key( $canonicals[0] ) !== AceCrawlRedirects::url_key( $url )
             || wp_parse_url( $canonicals[0], PHP_URL_SCHEME ) !== wp_parse_url( $url, PHP_URL_SCHEME ) ) {
             $holds[] = 'Destination must declare exactly one canonical matching its URL.';
         }
@@ -104,7 +104,7 @@ final class AceSeoRetentionPrototype {
             if ( ! empty( $f['meta'][ self::KEEP ] ) ) { $holds[] = ucfirst( $side ) . ' has a manual keep exclusion.'; }
         }
         if ( ! empty( $s['source']['protected'] ) ) { $holds[] = 'Homepage and posts-index sources are protected.'; }
-        if ( ! empty( $s['target']['meta'][ AceSeoRetentionActions::META_NOINDEX ] ) || ! empty( $s['target']['meta'][ AceSeoRetentionActions::META_UNAVAILABLE ] ) ) { $holds[] = 'Destination has a search exclusion or expiry setting.'; }
+        if ( ! empty( $s['target']['meta'][ AceCrawlRetentionActions::META_NOINDEX ] ) || ! empty( $s['target']['meta'][ AceCrawlRetentionActions::META_UNAVAILABLE ] ) ) { $holds[] = 'Destination has a search exclusion or expiry setting.'; }
         $published = strtotime( ( $s['source']['published'] ?? '' ) . ' UTC' );
         if ( ! $published || $published > strtotime( '-' . max( 1, (int) $s['settings']['older_than_years'] ) . ' years', $now ) ) { $holds[] = 'Source is younger than the configured retention age.'; }
         $c = $s['context']; $r = $s['row'];
@@ -134,31 +134,31 @@ final class AceSeoRetentionPrototype {
     }
 
     public static function capture( $source, $url, $start, $end, $confirmed, $reason, array $links = array() ) {
-        return AceSeoRetentionFresh::run( array( (int) $source, (int) url_to_postid( $url ) ), static function() use ( $source, $url, $start, $end, $confirmed, $reason, $links ) {
+        return AceCrawlRetentionFresh::run( array( (int) $source, (int) url_to_postid( $url ) ), static function() use ( $source, $url, $start, $end, $confirmed, $reason, $links ) {
             return self::capture_fresh( $source, $url, $start, $end, $confirmed, $reason, $links );
         } );
     }
 
     private static function capture_fresh( $source, $url, $start, $end, $confirmed, $reason, array $links ) {
         if ( ! self::enabled() || ! current_user_can( 'manage_options' ) || ! current_user_can( 'edit_post', $source ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
-        if ( ! Ace_SEO_Retention_Evidence::date( $start ) || ! Ace_SEO_Retention_Evidence::date( $end )
+        if ( ! AceCrawl_Retention_Evidence::date( $start ) || ! AceCrawl_Retention_Evidence::date( $end )
             || $start > $end || $end >= wp_date( 'Y-m-d' ) || strtotime( $end ) - strtotime( $start ) > 366 * DAY_IN_SECONDS ) { return new WP_Error( 'dates', 'Use a finished observation period of at most 367 days.' ); }
-        $url = AceSeoRetentionActions::normalise_target( $url );
+        $url = AceCrawlRetentionActions::normalise_target( $url );
         $parts = wp_parse_url( $url );
         if ( ! $url || wp_parse_url( home_url(), PHP_URL_HOST ) !== ( $parts['host'] ?? '' ) || isset( $parts['user'] ) || isset( $parts['pass'] )
             || isset( $parts['query'] ) || isset( $parts['fragment'] ) || ! in_array( $parts['scheme'] ?? '', array( 'http', 'https' ), true ) ) { return new WP_Error( 'target', 'Choose a post or page on this site without query parameters or fragments.' ); }
         $target = url_to_postid( $url );
-        if ( ! $target || ! current_user_can( 'edit_post', $target ) || AceSeoRedirects::url_key( $url ) !== AceSeoRedirects::url_key( get_permalink( $target ) ) ) { return new WP_Error( 'target', 'Choose the canonical URL of an editable post or page. Use Existing redirects for archive or external destinations.' ); }
+        if ( ! $target || ! current_user_can( 'edit_post', $target ) || AceCrawlRedirects::url_key( $url ) !== AceCrawlRedirects::url_key( get_permalink( $target ) ) ) { return new WP_Error( 'target', 'Choose the canonical URL of an editable post or page. Use Existing redirects for archive or external destinations.' ); }
         $before = self::fingerprint( $source, $target );
-        $was_building = AceSeoRetentionReport::is_building();
-        $row = get_post_meta( $source, AceSeoRetentionReport::META, true );
+        $was_building = AceCrawlRetentionReport::is_building();
+        $row = get_post_meta( $source, AceCrawlRetentionReport::META, true );
         $row = is_array( $row ) ? $row : array();
         $row['published'] = get_post_time( 'Y-m-d', true, $source );
-        $settings = AceSeoRetentionReport::settings();
-        $context = Ace_SEO_Retention_Evidence_View::context( $source, $row, array( 'start' => $start, 'end' => $end ), wp_date( 'Y-m-d' ) );
+        $settings = AceCrawlRetentionReport::settings();
+        $context = AceCrawl_Retention_Evidence_View::context( $source, $row, array( 'start' => $start, 'end' => $end ), wp_date( 'Y-m-d' ) );
         $context['overlap_verified'] = (bool) $confirmed && strlen( $reason ) >= 30;
         // A provider must attest provenance and freshness; an absent backlink row is never zero.
-        $context['link_evidence'] = (array) apply_filters( 'ace_seo_retention_link_evidence', array(), (int) $source, $row );
+        $context['link_evidence'] = (array) apply_filters( 'acecrawl_retention_link_evidence', array(), (int) $source, $row );
         // An explicit, attributed review can supply missing link evidence. Provider data wins.
         foreach ( array( 'backlinks', 'internal' ) as $kind ) {
             if ( ! isset( $context['link_evidence'][ $kind ] ) && ! empty( $links['confirmed'] ) && strlen( $links['source'] ?? '' ) >= 10
@@ -169,13 +169,13 @@ final class AceSeoRetentionPrototype {
             $field = 'internal' === $kind ? 'links_in' : 'backlinks';
             if ( isset( $context['link_evidence'][ $kind ]['count'] ) && empty( $row[ $field ] ) ) { $row[ $field ] = $context['link_evidence'][ $kind ]['count']; }
         }
-        $prepared = Ace_SEO_Retention_Evidence_View::prepare( $row, $context );
+        $prepared = AceCrawl_Retention_Evidence_View::prepare( $row, $context );
         $response = wp_safe_remote_get( get_permalink( $target ), array( 'timeout' => 8, 'redirection' => 0, 'limit_response_size' => 1048576, 'cookies' => array() ) );
         $s = array( 'version' => self::VERSION, 'created' => time(), 'by' => get_current_user_id(), 'fingerprint' => $before,
-            'source' => self::facts( $source ), 'target' => self::facts( $target ), 'settings' => $settings, 'generation' => AceSeoRetentionFresh::generation( $source ),
-            'site_discouraged' => '0' === (string) get_option( 'blog_public' ), 'building' => $was_building || AceSeoRetentionReport::is_building(),
+            'source' => self::facts( $source ), 'target' => self::facts( $target ), 'settings' => $settings, 'generation' => AceCrawlRetentionFresh::generation( $source ),
+            'site_discouraged' => '0' === (string) get_option( 'blog_public' ), 'building' => $was_building || AceCrawlRetentionReport::is_building(),
             'review' => array( 'confirmed' => (bool) $confirmed, 'reason' => $reason, 'links' => $links ), 'row' => $prepared, 'context' => $context,
-            'assessment' => Ace_SEO_Retention_Evidence::assess( $prepared, $context, $settings ),
+            'assessment' => AceCrawl_Retention_Evidence::assess( $prepared, $context, $settings ),
             'target_holds' => self::inspect_response( $response, get_permalink( $target ) ) );
         $s['holds'] = self::holds( $s, time() );
         if ( $before !== self::fingerprint( $source, $target ) ) { $s['holds'][] = 'Article, settings or saved assessment changed during capture. Run a new preview.'; }
@@ -198,7 +198,7 @@ final class AceSeoRetentionPrototype {
     public static function handle() {
         if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_retention_preview' );
-        $input = AceSeoInput::post( array( 'source' => 'text', 'target' => 'target', 'start' => 'text', 'end' => 'text', 'reason' => 'textarea', 'operation' => 'key', 'confirmed' => 'text', 'links_confirmed' => 'text', 'links_source' => 'text' ) );
+        $input = AceCrawlInput::post( array( 'source' => 'text', 'target' => 'target', 'start' => 'text', 'end' => 'text', 'reason' => 'textarea', 'operation' => 'key', 'confirmed' => 'text', 'links_confirmed' => 'text', 'links_source' => 'text' ) );
         foreach ( array( 'source', 'target', 'start', 'end', 'reason', 'operation', 'confirmed', 'links_confirmed', 'links_source' ) as $key ) {
             if ( isset( $input[ $key ] ) && ! is_scalar( $input[ $key ] ) ) { wp_die( 'Invalid form data.' ); }
         }

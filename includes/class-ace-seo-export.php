@@ -2,10 +2,10 @@
 /** Shared CSV/Sheets row format; no admin hooks or external writes. */
 defined( 'ABSPATH' ) || exit;
 
-class AceSeoExport {
+class AceCrawlExport {
     public static function header() {
         $header = array( 'ID', 'Title', 'URL', 'Status', 'Published', 'Modified', 'Tier', 'Bucket', 'Views', 'Last viewed', 'Links in', 'Words', 'Search clicks', 'Search impressions', 'People (30 days)', 'Bots %', 'White hat', 'Indexable', 'Trend', 'Momentum', 'Views (7 days)', 'Views (30 days)', 'Views (90 days)', 'Search clicks (30 days)', 'Recommended next step', 'Why', 'Assessed at (site time)', 'Applied retention settings', 'When it matters', 'Relevant window', 'Timing basis', 'Linked events', 'Assessed in season?', 'Readership' );
-        return array_values( (array) apply_filters( 'ace_seo_list_export_header', $header ) );
+        return array_values( (array) apply_filters( 'acecrawl_list_export_header', $header ) );
     }
 
     public static function rows( array $ids ) {
@@ -14,7 +14,7 @@ class AceSeoExport {
         foreach ( $ids as $id ) {
             $post = get_post( $id );
             if ( ! $post ) { continue; }
-            $row  = class_exists( 'AceSeoRetentionReport' ) ? get_post_meta( $id, AceSeoRetentionReport::META, true ) : '';
+            $row  = class_exists( 'AceCrawlRetentionReport' ) ? get_post_meta( $id, AceCrawlRetentionReport::META, true ) : '';
             $row  = is_array( $row ) ? $row : array();
             $line = array(
                 $id,
@@ -44,13 +44,13 @@ class AceSeoExport {
             );
 
             /**
-             * Filter one exported row; add a value and a matching header with ace_seo_list_export_header.
+             * Filter one exported row; add a value and a matching header with acecrawl_list_export_header.
              *
              * @param array $line
              * @param int   $id
              */
             $line = array_merge( $line, self::retention_context( $id, $row ), self::timing_context( $id, $row ), array( self::readership( $id, $row ) ) );
-            $rows[] = array_values( (array) apply_filters( 'ace_seo_list_export_row', $line, $id ) );
+            $rows[] = array_values( (array) apply_filters( 'acecrawl_list_export_row', $line, $id ) );
         }
 
         return $rows;
@@ -85,8 +85,8 @@ class AceSeoExport {
         $assessed = ! empty( $row['built'] ) && is_numeric( $row['built'] ) && (int) $row['built'] > 0
             ? wp_date( 'Y-m-d H:i:s T', (int) $row['built'] ) : '';
         $applied = array();
-        if ( class_exists( 'AceSeoRetentionActions' ) ) {
-            $state = AceSeoRetentionActions::state( $id );
+        if ( class_exists( 'AceCrawlRetentionActions' ) ) {
+            $state = AceCrawlRetentionActions::state( $id );
             if ( ! empty( $state['noindex'] ) ) { $applied[] = 'Search exclusion set (noindex)'; }
             if ( ! empty( $state['unavailable'] ) ) { $applied[] = 'Search expiry date: ' . $state['unavailable']; }
             if ( 'gone' === ( $state['redirect'] ?? '' ) ) { $applied[] = '410 response set; kept in WordPress'; }
@@ -103,15 +103,15 @@ class AceSeoExport {
 
     /** The readership band for a retained post, else its group, in plain words. */
     public static function readership( $id, array $row ) {
-        if ( ! class_exists( 'AceSeoRetentionReport' ) || empty( $row['tier'] ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionReport' ) || empty( $row['tier'] ) ) {
             return '';
         }
         static $labels = null, $tiers = null;
         if ( null === $labels ) {
-            $labels = AceSeoRetentionReport::rank_labels();
-            $tiers  = AceSeoRetentionReport::tier_labels();
+            $labels = AceCrawlRetentionReport::rank_labels();
+            $tiers  = AceCrawlRetentionReport::tier_labels();
         }
-        $rank = (string) get_post_meta( $id, AceSeoRetentionReport::META_RANK, true );
+        $rank = (string) get_post_meta( $id, AceCrawlRetentionReport::META_RANK, true );
         if ( 'retained' === $row['tier'] && '' !== $rank ) {
             return $labels[ $rank ] ?? $rank;
         }
@@ -123,15 +123,15 @@ class AceSeoExport {
      * only (editor fields, linked events, anniversary estimate): an export never calls an analytics API.
      */
     public static function timing_context( $id, array $row ) {
-        if ( ! class_exists( 'AceSeoRetentionReport' ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionReport' ) ) {
             return array( '', '', '', '', '' );
         }
-        if ( ! class_exists( 'Ace_SEO_Retention_Evidence_View' ) ) {
+        if ( ! class_exists( 'AceCrawl_Retention_Evidence_View' ) ) {
             require_once __DIR__ . '/admin/class-ace-seo-retention-evidence-view.php';
         }
         $row['published'] = $row['published'] ?? get_post_time( 'Y-m-d', false, $id );
         try {
-            return Ace_SEO_Retention_Evidence_View::timing_columns( $id, $row, wp_date( 'Y-m-d' ) );
+            return AceCrawl_Retention_Evidence_View::timing_columns( $id, $row, wp_date( 'Y-m-d' ) );
         } catch ( Throwable $e ) {
             return array( 'Unavailable', '', 'Timing could not be worked out: ' . $e->getMessage(), '', '' );
         }
@@ -153,11 +153,11 @@ class AceSeoExport {
          *
          * @param string[] $types
          */
-        return (array) apply_filters( 'ace_seo_admin_column_post_types', $types );
+        return (array) apply_filters( 'acecrawl_admin_column_post_types', $types );
     }
 
     public static function post_is_noindex( $post_id ) {
-        if ( function_exists( 'ace_seo_site_is_discouraged' ) && ace_seo_site_is_discouraged() ) { return true; }
+        if ( function_exists( 'acecrawl_site_is_discouraged' ) && acecrawl_site_is_discouraged() ) { return true; }
         if ( '1' === (string) AceCrawlEnhancer::get_meta_value( $post_id, 'meta-robots-noindex' ) ) {
             return true;
         }

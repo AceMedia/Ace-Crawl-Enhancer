@@ -2,8 +2,8 @@
 defined( 'ABSPATH' ) || exit;
 
 /** Additional Google reports: independent failures must not hide working integrations. */
-class AceSeoTrackingGoogle {
-    const CACHE = 'ace_seo_tracking_google';
+class AceCrawlTrackingGoogle {
+    const CACHE = 'acecrawl_tracking_google';
 
     public static function channel( $channel, $source ) {
         $host = strtolower( rtrim( (string) $source, '.' ) );
@@ -87,9 +87,9 @@ class AceSeoTrackingGoogle {
     }
 
     public static function search( $dates ) {
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE ) );
         if ( is_wp_error( $token ) || ! $token ) { return array( 'ok' => false, 'error' => 'Connect Search Console in Site Kit to read search performance.' ); }
-        $property = AceSEOSiteKit::get_search_console_property_id();
+        $property = AceCrawlSiteKit::get_search_console_property_id();
         $response = wp_remote_post( 'https://www.googleapis.com/webmasters/v3/sites/' . rawurlencode( $property ) . '/searchAnalytics/query', array(
             'timeout' => 20, 'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
             'body' => wp_json_encode( array( 'startDate' => reset( $dates ), 'endDate' => end( $dates ), 'dimensions' => array( 'date' ), 'type' => 'web', 'dataState' => 'final', 'rowLimit' => 25000 ) ),
@@ -110,12 +110,12 @@ class AceSeoTrackingGoogle {
 
     public static function series( $dates, $force = false ) {
         $out = array( 'days' => array_fill_keys( $dates, array() ), 'definitions' => array(), 'status' => array(), 'at' => time() );
-        if ( ! $dates || ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) { return $out; }
-        $property = AceSEOSiteKit::get_analytics_property_id();
-        $key = md5( wp_json_encode( array( $dates, $property, AceSEOSiteKit::get_search_console_property_id() ) ) );
+        if ( ! $dates || ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) { return $out; }
+        $property = AceCrawlSiteKit::get_analytics_property_id();
+        $key = md5( wp_json_encode( array( $dates, $property, AceCrawlSiteKit::get_search_console_property_id() ) ) );
         $cache = get_transient( self::CACHE );
         if ( ! $force && is_array( $cache ) && ( $cache['key'] ?? '' ) === $key ) { return $cache; }
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
         $reports = array();
         if ( $property && ! is_wp_error( $token ) && $token ) {
             $reports['Traffic sources'] = self::sources( self::report( $property, $token, $dates, array( 'date', 'sessionDefaultChannelGroup', 'sessionSource' ), array( 'sessions' ) ), $dates );

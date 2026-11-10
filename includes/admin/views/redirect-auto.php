@@ -1,6 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-term-redirect.php';
+require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-term-redirect.php';
 $taxonomies = get_taxonomies( array( 'public' => true ) );
 $terms = $taxonomies ? get_terms( array( 'taxonomy' => array_values( $taxonomies ), 'hide_empty' => false, 'number' => 31,
     'offset' => ( $page - 1 ) * 30, 'orderby' => 'term_id', 'order' => 'ASC',
@@ -9,7 +9,7 @@ $resolver = new ACE_SEO_Term_Redirect();
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
     <h2>Auto redirects</h2>
-    <?php if ( class_exists( 'AceSeoRetentionPrototype' ) && AceSeoRetentionPrototype::enabled() ) : ?>
+    <?php if ( class_exists( 'AceCrawlRetentionPrototype' ) && AceCrawlRetentionPrototype::enabled() ) : ?>
     <p><strong>Review and schedule approved retention redirects below.</strong> A report recommendation cannot authorise a redirect. Every pair needs a fresh assessment, explicit approval and all safeguards to pass.</p>
     <?php else : ?>
     <p>Retention review is unavailable. Check that the plugin installation is complete.</p>
@@ -32,8 +32,8 @@ $resolver = new ACE_SEO_Term_Redirect();
     <?php endforeach; ?>
     <?php if ( ! $terms ) : ?><tr><td colspan="3">No configured archive redirects.</td></tr><?php endif; ?>
     </tbody></table></div>
-    <?php AceSeoRedirectDiscovery::pagination( 'auto', $page, count( $terms ) > 30 ); ?>
+    <?php AceCrawlRedirectDiscovery::pagination( 'auto', $page, count( $terms ) > 30 ); ?>
     <?php endif; ?>
     <p class="description">Post redirects approved through the retention report are listed under Existing redirects. This view lists saved Ace SEO archive rules; redirects supplied only by custom code or the web server are not inventoried here.</p>
 </section>
-<?php if ( class_exists( 'AceSeoRetentionPrototype' ) ) { AceSeoRetentionPrototype::render(); } ?>
+<?php if ( class_exists( 'AceCrawlRetentionPrototype' ) ) { AceCrawlRetentionPrototype::render(); } ?>

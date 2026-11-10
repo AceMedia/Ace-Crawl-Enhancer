@@ -16,7 +16,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
  * Clean up plugin data on uninstall
  * Note: We preserve Yoast-compatible meta data so users can switch back or to other Yoast-compatible plugins
  */
-class AceSEOUninstaller {
+class AceCrawlUninstaller {
     
     /**
      * Run uninstall process
@@ -61,30 +61,30 @@ class AceSEOUninstaller {
      */
     private static function remove_options() {
         $options_to_remove = array(
-            'ace_seo_settings',
-            'ace_seo_social_settings', 
-            'ace_seo_advanced_settings',
-            'ace_seo_compatibility_settings',
+            'acecrawl_settings',
+            'acecrawl_social_settings', 
+            'acecrawl_advanced_settings',
+            'acecrawl_compatibility_settings',
             'ace_seo_sitemap_settings',
             'ace_seo_dashboard_settings',
-            'ace_seo_version',
-            'ace_seo_activation_date',
+            'acecrawl_version',
+            'acecrawl_activation_date',
             'ace_seo_usage_stats',
             'ace_seo_wizard_completed',
-            'ace_seo_options',
-            'ace_seo_db_optimized',
-            'ace_seo_db_optimization_results',
-            'ace_seo_db_optimization_pending',
-            'ace_seo_db_optimization_scheduled',
-            'ace_seo_optimization_progress',
-            'ace_seo_performance_monitoring',
-            'ace_sitemap_powertools_options',
-            'ace_seo_hits_db_version',
-            'ace_seo_whitehat_options',
-            'ace_sitemap_powertools_purge_notice',
-            'ace_sitemap_powertools_large_site_notice',
-            'ace_sitemap_powertools_legacy_cache_purged',
-            'ace_sitemap_cache_version'
+            'acecrawl_options',
+            'acecrawl_db_optimized',
+            'acecrawl_db_optimization_results',
+            'acecrawl_db_optimization_pending',
+            'acecrawl_db_optimization_scheduled',
+            'acecrawl_optimization_progress',
+            'acecrawl_performance_monitoring',
+            'acecrawl_sitemap_options',
+            'acecrawl_hits_db_version',
+            'acecrawl_whitehat_options',
+            'acecrawl_sitemap_purge_notice',
+            'acecrawl_sitemap_large_site_notice',
+            'acecrawl_sitemap_legacy_cache_purged',
+            'acecrawl_sitemap_cache_version'
         );
         
         global $wpdb;
@@ -137,4 +137,4 @@ class AceSEOUninstaller {
 }
 
 // Run the uninstaller.
-AceSEOUninstaller::uninstall();
+AceCrawlUninstaller::uninstall();

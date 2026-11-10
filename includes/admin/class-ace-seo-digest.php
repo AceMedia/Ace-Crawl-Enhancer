@@ -2,24 +2,24 @@
 /**
  * Nightly Search Console digest.
  *
- * Once a day (cron `ace_seo_digest`, 04:20 site time) this pulls from Search Console
+ * Once a day (cron `acecrawl_digest`, 04:20 site time) this pulls from Search Console
  * through the Site Kit bridge: site totals for the last 7 days against the 7 before,
  * the top pages and queries by impressions, and the pages whose clicks moved most.
- * Stored in `ace_seo_digest_latest` with a 12-week history in `ace_seo_digest_history`,
+ * Stored in `acecrawl_digest_latest` with a 12-week history in `acecrawl_digest_history`,
  * shown at Ace SEO > Search digest, and emailed to the admin address in plain text
- * when `ace_seo_digest_email` is on (off by default). Nothing here knows which site
+ * when `acecrawl_digest_email` is on (off by default). Nothing here knows which site
  * it is on: the site name comes from the blog name and the property from Site Kit.
  *
- * WP-CLI: `wp eval 'AceSeoDigest::run();'`
+ * WP-CLI: `wp eval 'AceCrawlDigest::run();'`
  */
 if (!defined('ABSPATH')) exit;
 
-class AceSeoDigest {
+class AceCrawlDigest {
 
-    const OPT_LATEST  = 'ace_seo_digest_latest';
-    const OPT_HISTORY = 'ace_seo_digest_history';
-    const OPT_EMAIL   = 'ace_seo_digest_email';
-    const CRON        = 'ace_seo_digest';
+    const OPT_LATEST  = 'acecrawl_digest_latest';
+    const OPT_HISTORY = 'acecrawl_digest_history';
+    const OPT_EMAIL   = 'acecrawl_digest_email';
+    const CRON        = 'acecrawl_digest';
     const SLUG        = 'ace-seo-digest';
     const TOP         = 30;
     const MOVERS      = 10;
@@ -44,12 +44,12 @@ class AceSeoDigest {
 
     /** True when Site Kit has a Search Console property to read. */
     public static function ready() {
-        return class_exists('AceSEOSearchConsole') && AceSEOSearchConsole::is_ready();
+        return class_exists('AceCrawlSearchConsole') && AceCrawlSearchConsole::is_ready();
     }
 
     /** Site totals for one inclusive date range. */
     private static function totals($start, $end) {
-        $r = AceSEOSearchConsole::report(['startDate' => $start, 'endDate' => $end, 'rowLimit' => 1]);
+        $r = AceCrawlSearchConsole::report(['startDate' => $start, 'endDate' => $end, 'rowLimit' => 1]);
         if (is_wp_error($r)) return $r;
         $row = $r['rows'][0] ?? [];
         return [
@@ -91,8 +91,8 @@ class AceSeoDigest {
         $steps = [
             'totals'      => function () use ($start, $end) { return self::totals($start, $end); },
             'totals_prev' => function () use ($prev_start, $prev_end) { return self::totals($prev_start, $prev_end); },
-            'pages'       => function () use ($start, $end) { return AceSEOSearchConsole::top_rows('page', $start, $end, self::TOP); },
-            'queries'     => function () use ($start, $end) { return AceSEOSearchConsole::top_rows('query', $start, $end, self::TOP); },
+            'pages'       => function () use ($start, $end) { return AceCrawlSearchConsole::top_rows('page', $start, $end, self::TOP); },
+            'queries'     => function () use ($start, $end) { return AceCrawlSearchConsole::top_rows('query', $start, $end, self::TOP); },
         ];
         foreach ($steps as $k => $fn) {
             $v = $fn();
@@ -105,8 +105,8 @@ class AceSeoDigest {
         }
 
         // Movers: clicks per page this week against last week over a wider net than the top 30.
-        $this_w = AceSEOSearchConsole::top_rows('page', $start, $end, 250);
-        $last_w = AceSEOSearchConsole::top_rows('page', $prev_start, $prev_end, 250);
+        $this_w = AceCrawlSearchConsole::top_rows('page', $start, $end, 250);
+        $last_w = AceCrawlSearchConsole::top_rows('page', $prev_start, $prev_end, 250);
         if (!is_wp_error($this_w) && !is_wp_error($last_w)) {
             $digest['movers'] = self::movers($this_w, $last_w);
         } else {
@@ -210,16 +210,16 @@ class AceSeoDigest {
 
     public static function admin_run() {
         if (!current_user_can('manage_options')) wp_die('No.');
-        check_admin_referer('ace_seo_digest_run');
+        check_admin_referer('acecrawl_digest_run');
         self::run();
-        if (class_exists('AceSeoTrending') && isset($_GET['trending'])) AceSeoTrending::run();
+        if (class_exists('AceCrawlTrending') && isset($_GET['trending'])) AceCrawlTrending::run();
         wp_safe_redirect(admin_url('admin.php?page=' . self::SLUG . '&ran=1'));
         exit;
     }
 
     public static function admin_email_toggle() {
         if (!current_user_can('manage_options')) wp_die('No.');
-        check_admin_referer('ace_seo_digest_email');
+        check_admin_referer('acecrawl_digest_email');
         update_option(self::OPT_EMAIL, empty($_POST['on']) ? 0 : 1, false);
         wp_safe_redirect(admin_url('admin.php?page=' . self::SLUG));
         exit;
@@ -256,11 +256,11 @@ class AceSeoDigest {
         echo 'Built: ' . esc_html(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '.</p>';
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block;margin-right:1em">';
-        wp_nonce_field('ace_seo_digest_run');
-        echo '<input type="hidden" name="action" value="ace_seo_digest_run"><button class="button">Rebuild now</button></form>';
+        wp_nonce_field('acecrawl_digest_run');
+        echo '<input type="hidden" name="action" value="acecrawl_digest_run"><button class="button">Rebuild now</button></form>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:inline-block">';
-        wp_nonce_field('ace_seo_digest_email');
-        echo '<input type="hidden" name="action" value="ace_seo_digest_email"><label><input type="checkbox" name="on" value="1"' . checked((bool) get_option(self::OPT_EMAIL), true, false) . '> Email this digest to ' . esc_html(get_option('admin_email')) . ' each night</label> <button class="button">Save</button></form>';
+        wp_nonce_field('acecrawl_digest_email');
+        echo '<input type="hidden" name="action" value="acecrawl_digest_email"><label><input type="checkbox" name="on" value="1"' . checked((bool) get_option(self::OPT_EMAIL), true, false) . '> Email this digest to ' . esc_html(get_option('admin_email')) . ' each night</label> <button class="button">Save</button></form>';
 
         if (!$d) {
             echo '<p>No digest yet. The first one lands tonight, or press Rebuild now.</p>';
@@ -294,7 +294,7 @@ class AceSeoDigest {
             self::table($rows, ['week' => 'Week', 'range' => 'Range', 'clicks' => 'Clicks', 'impressions' => 'Impressions', 'ctr' => 'CTR (%)', 'position' => 'Position', 'top' => 'Top query']);
         }
 
-        if (class_exists('AceSeoTrending')) AceSeoTrending::render_section();
+        if (class_exists('AceCrawlTrending')) AceCrawlTrending::render_section();
         echo '</div>';
     }
 }

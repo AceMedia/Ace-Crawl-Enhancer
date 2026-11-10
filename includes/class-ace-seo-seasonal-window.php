@@ -1,6 +1,6 @@
 <?php
 /** Calendar-only retention preview. This class does not change report or crawl state. */
-final class Ace_SEO_Seasonal_Window {
+final class AceCrawl_Seasonal_Window {
     /** Clamp a date to the final valid day of its target month; PHP's overflow is unsuitable here. */
     private static function date( $year, $month, $day, DateTimeZone $timezone ) {
         $first = new DateTimeImmutable( sprintf( '%04d-%02d-01', $year, $month ), $timezone );

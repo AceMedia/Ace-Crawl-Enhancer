@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Ace_SEO_Retention_Dated_Traffic {
+class AceCrawl_Retention_Dated_Traffic {
 
     /** Search Console keeps 16 months; anything earlier cannot be covered. */
     const GSC_MONTHS = 16;
@@ -36,7 +36,7 @@ class Ace_SEO_Retention_Dated_Traffic {
     }
 
     public static function init() {
-        add_filter( 'ace_seo_retention_evidence_context', array( static::class, 'context' ), 10, 3 );
+        add_filter( 'acecrawl_retention_evidence_context', array( static::class, 'context' ), 10, 3 );
     }
 
     /**
@@ -47,14 +47,14 @@ class Ace_SEO_Retention_Dated_Traffic {
         $context = (array) $context;
         $period  = isset( $context['period'] ) && is_array( $context['period'] ) ? $context['period'] : array();
         $as_of   = isset( $context['as_of'] ) ? (string) $context['as_of'] : '';
-        if ( ! self::is_period( $period ) || ! Ace_SEO_Retention_Evidence::date( $as_of ) || $period['end'] >= $as_of ) {
+        if ( ! self::is_period( $period ) || ! AceCrawl_Retention_Evidence::date( $as_of ) || $period['end'] >= $as_of ) {
             return $context; // An unfinished period has no complete traffic yet; the rules say so.
         }
         $feed = static::feed( $period );
         if ( empty( $feed['sources'] ) ) {
             return $context;
         }
-        $key = AceSeoRetentionReport::path_key( get_permalink( (int) $post_id ) );
+        $key = AceCrawlRetentionReport::path_key( get_permalink( (int) $post_id ) );
         $id  = (int) $post_id;
 
         $metrics = array( 'views' => null, 'clicks' => 0, 'impressions' => 0, 'position' => 0.0 );
@@ -155,16 +155,16 @@ class Ace_SEO_Retention_Dated_Traffic {
 
     /** Google Analytics page views for the exact dates, keyed by path. null when Analytics is not connected. */
     protected static function analytics( array $period ) {
-        if ( ! method_exists( 'AceSeoRetentionReport', 'ga4_report' ) ) {
+        if ( ! method_exists( 'AceCrawlRetentionReport', 'ga4_report' ) ) {
             return null;
         }
-        $report = AceSeoRetentionReport::ga4_report( $period['start'], $period['end'] );
+        $report = AceCrawlRetentionReport::ga4_report( $period['start'], $period['end'] );
         if ( is_wp_error( $report ) ) {
             return null;
         }
         $complete = ! $report['capped'];
         $note     = '';
-        $from     = method_exists( 'AceSeoRetentionReport', 'ga4_first_day' ) ? (string) AceSeoRetentionReport::ga4_first_day() : '';
+        $from     = method_exists( 'AceCrawlRetentionReport', 'ga4_first_day' ) ? (string) AceCrawlRetentionReport::ga4_first_day() : '';
         if ( '' !== $from && $from > $period['start'] ) {
             $complete = false;
             $note     = sprintf( 'Google Analytics only has data from %s, after the chosen period began.', $from );
@@ -179,16 +179,16 @@ class Ace_SEO_Retention_Dated_Traffic {
 
     /** The plugin's own human-view rows for the exact dates, keyed by post ID. null when tracking is off. */
     protected static function own_tracking( array $period ) {
-        if ( ! class_exists( 'AceSeoViewTracker' ) || ! AceSeoViewTracker::enabled() ) {
+        if ( ! class_exists( 'AceCrawlViewTracker' ) || ! AceCrawlViewTracker::enabled() ) {
             return null;
         }
-        $since = AceSeoViewTracker::coverage_start();
+        $since = AceCrawlViewTracker::coverage_start();
         if ( '' === $since ) {
             return null; // Switched on, but nothing recorded yet.
         }
         $complete = $since <= $period['start'];
         return array(
-            'rows'     => AceSeoViewTracker::views_between( $period['start'], $period['end'] ),
+            'rows'     => AceCrawlViewTracker::views_between( $period['start'], $period['end'] ),
             'complete' => $complete,
             'note'     => $complete ? '' : sprintf( 'Own tracking only starts on %s, after the chosen period began.', $since ),
         );
@@ -196,19 +196,19 @@ class Ace_SEO_Retention_Dated_Traffic {
 
     /** Search Console rows for the exact dates, keyed by path. null when Search Console is not connected. */
     protected static function search_console( array $period ) {
-        if ( ! class_exists( 'AceSEOSearchConsole' ) && class_exists( 'AceSEOSiteKit' ) && defined( 'ACE_SEO_PATH' ) ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
+        if ( ! class_exists( 'AceCrawlSearchConsole' ) && class_exists( 'AceCrawlSiteKit' ) && defined( 'ACECRAWL_PATH' ) ) {
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-search-console.php';
         }
-        if ( ! class_exists( 'AceSEOSearchConsole' ) || ! AceSEOSearchConsole::is_ready() ) {
+        if ( ! class_exists( 'AceCrawlSearchConsole' ) || ! AceCrawlSearchConsole::is_ready() ) {
             return null;
         }
-        $report = AceSEOSearchConsole::pages_between( $period['start'], $period['end'] );
+        $report = AceCrawlSearchConsole::pages_between( $period['start'], $period['end'] );
         if ( is_wp_error( $report ) ) {
             return null;
         }
         $rows = array();
         foreach ( $report['rows'] as $url => $r ) {
-            $rows[ AceSeoRetentionReport::path_key( $url ) ] = $r;
+            $rows[ AceCrawlRetentionReport::path_key( $url ) ] = $r;
         }
         $oldest   = gmdate( 'Y-m-d', strtotime( '-' . self::GSC_MONTHS . ' months' ) );
         $complete = ! $report['capped'] && $period['start'] >= $oldest;
@@ -221,6 +221,6 @@ class Ace_SEO_Retention_Dated_Traffic {
     }
 
     public static function is_period( $period ) {
-        return is_array( $period ) && Ace_SEO_Retention_Evidence::date( $period['start'] ?? null ) && Ace_SEO_Retention_Evidence::date( $period['end'] ?? null ) && $period['start'] <= $period['end'];
+        return is_array( $period ) && AceCrawl_Retention_Evidence::date( $period['start'] ?? null ) && AceCrawl_Retention_Evidence::date( $period['end'] ?? null ) && $period['start'] <= $period['end'];
     }
 }

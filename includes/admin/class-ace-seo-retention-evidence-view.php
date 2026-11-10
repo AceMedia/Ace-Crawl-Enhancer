@@ -5,7 +5,7 @@ require_once dirname( __DIR__ ) . '/class-ace-seo-retention-evidence.php';
 require_once dirname( __DIR__ ) . '/class-ace-seo-seasonal-window.php';
 require_once dirname( __DIR__ ) . '/class-ace-seo-retention-actions.php';
 
-final class Ace_SEO_Retention_Evidence_View {
+final class AceCrawl_Retention_Evidence_View {
     const LIMIT = 100;
     /** Per-post editorial timing (Advanced tab): auto, evergreen, or explicit dates. */
     const META_TIMING = '_ace_seo_retention_timing';
@@ -30,7 +30,7 @@ final class Ace_SEO_Retention_Evidence_View {
     /** Generic provider contract; third-party adapters can supply edition-bound occurrences. */
     public static function context( $id, array $row, array $period, $as_of ) {
         /** Supply coverage, explicit editorial context and verified occurrence IDs here, in batches/cache where possible. */
-        return (array) apply_filters( 'ace_seo_retention_evidence_context', self::base_context( $id, $row, $period, $as_of ), (int) $id, $row );
+        return (array) apply_filters( 'acecrawl_retention_evidence_context', self::base_context( $id, $row, $period, $as_of ), (int) $id, $row );
     }
 
     /**
@@ -46,16 +46,16 @@ final class Ace_SEO_Retention_Evidence_View {
         } elseif ( 'dates' === $timing ) {
             $from = (string) get_post_meta( $id, self::META_FROM, true );
             $to   = (string) get_post_meta( $id, self::META_TO, true );
-            if ( Ace_SEO_Retention_Evidence::date( $from ) && Ace_SEO_Retention_Evidence::date( $to ) && $from <= $to ) {
+            if ( AceCrawl_Retention_Evidence::date( $from ) && AceCrawl_Retention_Evidence::date( $to ) && $from <= $to ) {
                 $context['override'] = array( 'start' => $from, 'end' => $to );
             } else {
                 $context['timing_note'] = 'Editorial dates are set but incomplete or invalid, so they are ignored.';
             }
         }
         // Then a timing rule for one of its categories or tags: the way to classify an archive in bulk.
-        if ( ! isset( $context['content_type'], $context['override'] ) && '' === $timing && class_exists( 'AceSeoRetentionActions' ) && method_exists( 'AceSeoRetentionActions', 'timing_rule_for' ) ) {
-            $rule = AceSeoRetentionActions::timing_rule_for( $id );
-            if ( $rule && Ace_SEO_Retention_Evidence::date( $row['published'] ?? null ) ) {
+        if ( ! isset( $context['content_type'], $context['override'] ) && '' === $timing && class_exists( 'AceCrawlRetentionActions' ) && method_exists( 'AceCrawlRetentionActions', 'timing_rule_for' ) ) {
+            $rule = AceCrawlRetentionActions::timing_rule_for( $id );
+            if ( $rule && AceCrawl_Retention_Evidence::date( $row['published'] ?? null ) ) {
                 $context['timing_rule'] = $rule;
                 if ( 'evergreen' === $rule['type'] ) {
                     $context['content_type'] = 'evergreen';
@@ -68,7 +68,7 @@ final class Ace_SEO_Retention_Evidence_View {
             }
         }
         try {
-            $anniversary = Ace_SEO_Seasonal_Window::preview( $row['published'], $as_of, wp_timezone() );
+            $anniversary = AceCrawl_Seasonal_Window::preview( $row['published'], $as_of, wp_timezone() );
             $context['anniversary'] = array( 'start' => $anniversary['season_start'], 'end' => $anniversary['season_end'] );
         } catch ( InvalidArgumentException $e ) { /* Unknown dates remain unknown. */ }
         // Ace Teams & Events currently stores mutable term dates, not an article-to-edition binding.
@@ -83,8 +83,8 @@ final class Ace_SEO_Retention_Evidence_View {
                     $legacy_end = (string) get_term_meta( $term->term_id, 'ace_event_end_date', true );
                     $context['events'][] = array(
                         'label' => $term->name, 'provider' => 'ace-teams-events', 'term_id' => (int) $term->term_id,
-                        'start' => $start > 0 ? wp_date( 'Y-m-d', $start, wp_timezone() ) : ( Ace_SEO_Retention_Evidence::date( $legacy_start ) ? $legacy_start : '' ),
-                        'end' => $end > 0 ? wp_date( 'Y-m-d', $end, wp_timezone() ) : ( Ace_SEO_Retention_Evidence::date( $legacy_end ) ? $legacy_end : '' ),
+                        'start' => $start > 0 ? wp_date( 'Y-m-d', $start, wp_timezone() ) : ( AceCrawl_Retention_Evidence::date( $legacy_start ) ? $legacy_start : '' ),
+                        'end' => $end > 0 ? wp_date( 'Y-m-d', $end, wp_timezone() ) : ( AceCrawl_Retention_Evidence::date( $legacy_end ) ? $legacy_end : '' ),
                         'verified' => false, 'occurrence_id' => '',
                         'reason' => 'Linked event; the article’s edition has not been verified against these mutable dates.',
                     );
@@ -104,7 +104,7 @@ final class Ace_SEO_Retention_Evidence_View {
         $window = ! empty( $row['window'] ) ? (int) $row['window'] : 0;
         $period = $built && $window ? array( 'start' => gmdate( 'Y-m-d', $built - $window * DAY_IN_SECONDS ), 'end' => gmdate( 'Y-m-d', $built ) ) : array();
         $c      = self::base_context( $id, $row, $period, $as_of );
-        $r      = Ace_SEO_Retention_Evidence::relevance( $c );
+        $r      = AceCrawl_Retention_Evidence::relevance( $c );
 
         $timing = (string) get_post_meta( $id, self::META_TIMING, true );
         $set    = 'evergreen' === $timing ? 'Evergreen (editor)' : ( 'dates' === $timing ? ( isset( $c['override'] ) ? 'Set dates (editor)' : 'Set dates (editor) — incomplete, ignored' ) : 'Automatic (anniversary estimate)' );
@@ -114,7 +114,7 @@ final class Ace_SEO_Retention_Evidence_View {
 
         $events = array();
         foreach ( (array) ( $c['events'] ?? array() ) as $e ) {
-            $dates    = Ace_SEO_Retention_Evidence::date( $e['start'] ?? null ) ? ( $e['start'] . ( ! empty( $e['end'] ) && $e['end'] !== $e['start'] ? ' to ' . $e['end'] : '' ) ) : 'dates unknown';
+            $dates    = AceCrawl_Retention_Evidence::date( $e['start'] ?? null ) ? ( $e['start'] . ( ! empty( $e['end'] ) && $e['end'] !== $e['start'] ? ' to ' . $e['end'] : '' ) ) : 'dates unknown';
             $events[] = $e['label'] . ' (' . $dates . ( empty( $e['verified'] ) ? ', edition unverified' : ', verified' ) . ')';
         }
 
@@ -149,22 +149,22 @@ final class Ace_SEO_Retention_Evidence_View {
         $start = current_datetime()->modify( '-90 days' )->format( 'Y-m-d' );
         foreach ( array( 'start', 'end' ) as $key ) {
             $value = isset( $_GET['evidence_' . $key] ) ? sanitize_text_field( wp_unslash( $_GET['evidence_' . $key] ) ) : '';
-            if ( Ace_SEO_Retention_Evidence::date( $value ) ) { ${$key} = $value; }
+            if ( AceCrawl_Retention_Evidence::date( $value ) ) { ${$key} = $value; }
         }
         if ( $start > $end ) { echo '<p role="alert">Choose an end date on or after the start date.</p>'; return; }
         $page = max( 1, absint( wp_unslash( $_GET['evidence_page'] ?? 1 ) ) );
-        $rows = AceSeoRetentionReport::rows( '', self::LIMIT, ( $page - 1 ) * self::LIMIT );
+        $rows = AceCrawlRetentionReport::rows( '', self::LIMIT, ( $page - 1 ) * self::LIMIT );
         _prime_post_caches( array_column( $rows, 'id' ), true, true );
         $records = array();
         foreach ( $rows as $row ) {
             $context = self::context( $row['id'], $row, array( 'start' => $start, 'end' => $end ), $as_of );
-            $records[] = array( 'id' => $row['id'], 'row' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( self::prepare( $row, $context ), $context, AceSeoRetentionReport::settings() ) );
+            $records[] = array( 'id' => $row['id'], 'row' => $row, 'context' => $context, 'assessment' => AceCrawl_Retention_Evidence::assess( self::prepare( $row, $context ), $context, AceCrawlRetentionReport::settings() ) );
         }
-        $labels = Ace_SEO_Retention_Evidence::recommendations();
-        $tiers = array_merge( AceSeoRetentionReport::tier_labels(), array( 'unknown' => 'Not ready to judge' ) );
+        $labels = AceCrawl_Retention_Evidence::recommendations();
+        $tiers = array_merge( AceCrawlRetentionReport::tier_labels(), array( 'unknown' => 'Not ready to judge' ) );
         $action_tools = array( 'consolidate' => 'redirect', 'noindex' => 'noindex' );
         ?>
-        <?php AceSeoAssets::style( 'ace-seo-retention-evidence-view-style-1', 'assets/css/ace-seo-retention-evidence-view-style-1.css' ); ?>
+        <?php AceCrawlAssets::style( 'ace-seo-retention-evidence-view-style-1', 'assets/css/ace-seo-retention-evidence-view-style-1.css' ); ?>
         <section id="retention-evidence"><h2>Which next steps fit?</h2>
         <p>The group tells us what we know about an article. The next step tells us what might help. Use this guide to see how they fit together.</p>
         <div class="ace-evidence-legend" aria-label="Reference table key"><span style="background:#f0f0f1">— No change needed / not a good fit</span><span style="background:#edf5ee">✓ Still useful</span><span style="background:#fff8e5">△ Worth a look</span><span style="background:#ffdfb8">! A confirmed problem needs attention</span><span style="background:#f6f7f7">? We need more information</span></div>
@@ -173,10 +173,10 @@ final class Ace_SEO_Retention_Evidence_View {
         <?php foreach ( $tiers as $tier => $label ) : ?><th scope="col"><?php echo esc_html( $label ); ?><small><?php echo esc_html( $group_meanings[$tier] ); ?></small></th><?php endforeach; ?>
         </tr></thead><tbody>
         <?php foreach ( $labels as $key => $label ) : ?><tr><th scope="row"><?php echo esc_html( $label ); ?>
-            <?php if ( isset( $action_tools[$key], AceSeoRetentionActions::ACTIONS[$action_tools[$key]] ) ) : ?><span class="ace-evidence-badge">Action tool available after review</span><?php endif; ?>
+            <?php if ( isset( $action_tools[$key], AceCrawlRetentionActions::ACTIONS[$action_tools[$key]] ) ) : ?><span class="ace-evidence-badge">Action tool available after review</span><?php endif; ?>
             <?php if ( 'consolidate' === $key ) : ?><a class="ace-evidence-badge" href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects&tab=auto' ) ); ?>">Review and approve a redirect</a><?php endif; ?>
             </th>
-            <?php foreach ( $tiers as $tier => $group_label ) : $cell = Ace_SEO_Retention_Evidence::reference_cell( $tier, $key ); ?>
+            <?php foreach ( $tiers as $tier => $group_label ) : $cell = AceCrawl_Retention_Evidence::reference_cell( $tier, $key ); ?>
                 <td class="ace-evidence-<?php echo esc_attr( $cell['status'] ); ?>"><strong><?php echo esc_html( $cell['label'] ); ?></strong><small><?php echo esc_html( $cell['why'] ); ?></small></td>
             <?php endforeach; ?></tr><?php endforeach; ?>
         </tbody></table></div>
@@ -213,9 +213,9 @@ final class Ace_SEO_Retention_Evidence_View {
         <?php foreach ( $records as $record ) : $row = $record['row']; $assessment = $record['assessment']; ?>
             <details id="evidence-post-<?php echo (int) $record['id']; ?>" style="margin:1em 0;scroll-margin-top:40px">
                 <summary><?php echo esc_html( $row['title'] ?: '(no title)' ); ?> — <?php echo esc_html( $labels[$assessment['primary']] ); ?></summary>
-                <p>Saved assessment: <?php echo esc_html( ( AceSeoRetentionReport::tier_labels()[$row['tier'] ?? ''] ?? 'Unknown group' ) . ' / ' . ( AceSeoRetentionReport::recommendation_labels()[$row['bucket'] ?? ''] ?? 'Unknown recommendation' ) ); ?>. Preview: <?php echo esc_html( $tiers[$assessment['tier']] ); ?>.</p>
+                <p>Saved assessment: <?php echo esc_html( ( AceCrawlRetentionReport::tier_labels()[$row['tier'] ?? ''] ?? 'Unknown group' ) . ' / ' . ( AceCrawlRetentionReport::recommendation_labels()[$row['bucket'] ?? ''] ?? 'Unknown recommendation' ) ); ?>. Preview: <?php echo esc_html( $tiers[$assessment['tier']] ); ?>.</p>
                 <p>Suggestions: <?php echo esc_html( implode( '; ', array_map( static function ( $key ) use ( $labels ) { return $labels[$key]; }, $assessment['suggestions'] ) ) ); ?>.</p>
-                <p><span class="ace-evidence-status ace-evidence-<?php echo esc_attr( $assessment['attention'] ); ?>"><?php echo esc_html( Ace_SEO_Retention_Evidence::attention_labels()[$assessment['attention']] ); ?></span> <strong>Evidence:</strong> <?php echo esc_html( $assessment['confidence'] ); ?>. <?php echo esc_html( $assessment['activity'] ); ?>.</p>
+                <p><span class="ace-evidence-status ace-evidence-<?php echo esc_attr( $assessment['attention'] ); ?>"><?php echo esc_html( AceCrawl_Retention_Evidence::attention_labels()[$assessment['attention']] ); ?></span> <strong>Evidence:</strong> <?php echo esc_html( $assessment['confidence'] ); ?>. <?php echo esc_html( $assessment['activity'] ); ?>.</p>
                 <?php if ( ! empty( $record['context']['metrics'] ) ) : $m = $record['context']['metrics']; ?><p>For these dates: <?php echo esc_html( null === $m['views'] ? 'views unknown' : number_format_i18n( (int) $m['views'] ) . ' views' ); ?>, <?php echo esc_html( number_format_i18n( (int) $m['clicks'] ) ); ?> search clicks, <?php echo esc_html( number_format_i18n( (int) $m['impressions'] ) ); ?> impressions.</p><?php endif; ?>
                 <?php if ( ! empty( $record['context']['timing_note'] ) ) : ?><p><?php echo esc_html( $record['context']['timing_note'] ); ?></p><?php endif; ?>
                 <?php foreach ( $assessment['reasons'] as $reason ) : ?><p><?php echo esc_html( $reason ); ?></p><?php endforeach; ?>
@@ -235,13 +235,13 @@ final class Ace_SEO_Retention_Evidence_View {
         if ( isset( $a['relevance']['start'], $a['relevance']['end'] ) ) { $intervals[] = array_merge( $a['relevance'], array( 'label' => $a['relevance']['source'] ) ); }
         foreach ( $context['events'] as $event ) { $event['label'] .= empty( $event['verified'] ) ? ' (edition unverified)' : ' (verified occurrence)'; $intervals[] = $event; }
         if ( ! empty( $a['coverage'] ) ) { $intervals[] = array_merge( $a['coverage'], array( 'label' => 'Recorded coverage — ' . ( ! empty( $a['coverage']['complete'] ) ? 'complete' : 'partial' ) ) ); }
-        $valid = array_filter( $intervals, static function ( $range ) { return Ace_SEO_Retention_Evidence::date( $range['start'] ?? null ) && Ace_SEO_Retention_Evidence::date( $range['end'] ?? null ) && $range['start'] <= $range['end']; } );
+        $valid = array_filter( $intervals, static function ( $range ) { return AceCrawl_Retention_Evidence::date( $range['start'] ?? null ) && AceCrawl_Retention_Evidence::date( $range['end'] ?? null ) && $range['start'] <= $range['end']; } );
         $min = $valid ? min( array_column( $valid, 'start' ) ) : ''; $max = $valid ? max( array_column( $valid, 'end' ) ) : '';
         $span = $min ? max( 86400, strtotime( $max . ' UTC' ) - strtotime( $min . ' UTC' ) + 86400 ) : 86400;
         echo '<details><summary>Event, traffic and snapshot timeline</summary><p>' . esc_html( $a['relevance']['source'] ) . '</p>';
         echo '<div style="overflow-x:auto"><table class="widefat"><caption>Dates supporting this preview; bars share the same date scale.</caption><thead><tr><th scope="col">Evidence</th><th scope="col">Dates</th><th scope="col">Relative period</th></tr></thead><tbody>';
         foreach ( $intervals as $range ) {
-            $ok = Ace_SEO_Retention_Evidence::date( $range['start'] ?? null ) && Ace_SEO_Retention_Evidence::date( $range['end'] ?? null ) && $range['start'] <= $range['end'];
+            $ok = AceCrawl_Retention_Evidence::date( $range['start'] ?? null ) && AceCrawl_Retention_Evidence::date( $range['end'] ?? null ) && $range['start'] <= $range['end'];
             echo '<tr><th scope="row">' . esc_html( $range['label'] ) . '</th><td>' . esc_html( $ok ? $range['start'] . ' to ' . $range['end'] : 'Dates not established' ) . '</td><td style="min-width:150px">';
             if ( $ok ) {
                 $left = 100 * ( strtotime( $range['start'] . ' UTC' ) - strtotime( $min . ' UTC' ) ) / $span;

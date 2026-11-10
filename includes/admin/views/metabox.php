@@ -87,7 +87,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
                        value="<?php echo esc_attr($focus_keyword); ?>" 
                        class="ace-seo-input"
                        placeholder="Enter your focus keyword">
-                <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('keyword') ); ?>
+                <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('keyword') ); ?>
             </div>
             <div class="ace-seo-description">
                 Choose the main keyword you want this content to rank for in search engines.
@@ -124,7 +124,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
                     placeholder="<?php echo esc_attr($post->post_title); ?>"
                     maxlength="60"
                 >
-                <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('title') ); ?>
+                <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('title') ); ?>
             </div>
             <div class="ace-seo-progress-bar">
                 <div class="ace-seo-progress-fill" id="title-progress"></div>
@@ -136,7 +136,7 @@ $robots_adv = AceCrawlEnhancer::get_meta_value($post_id, 'meta-robots-adv');
 
 <?php
 // Helper function to create safe placeholder text under character limit
-function ace_seo_safe_placeholder($content, $max_chars = 155) {
+function acecrawl_safe_placeholder($content, $max_chars = 155) {
     $trimmed = wp_trim_words(wp_strip_all_tags($content), 15); // Use fewer words
     if (strlen($trimmed) > $max_chars) {
         $trimmed = substr($trimmed, 0, $max_chars - 3) . '...';
@@ -156,12 +156,12 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                     id="yoast_wpseo_metadesc" 
                     name="yoast_wpseo_metadesc" 
                     class="ace-seo-textarea"
-                    placeholder="<?php echo esc_attr(ace_seo_safe_placeholder($post->post_content, 155)); ?>"
+                    placeholder="<?php echo esc_attr(acecrawl_safe_placeholder($post->post_content, 155)); ?>"
                     maxlength="160"
                     rows="3"
                 ><?php echo esc_textarea($meta_description); ?></textarea>
                 <div class="ace-seo-textarea-buttons">
-                    <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('description') ); ?>
+                    <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('description') ); ?>
                 </div>
             </div>
             <div class="ace-seo-progress-bar">
@@ -271,7 +271,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         placeholder="<?php echo esc_attr($seo_title ?: $post->post_title); ?>"
                         maxlength="95"
                     >
-                    <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('facebook_title') ); ?>
+                    <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('facebook_title') ); ?>
                 </div>
             </div>
 
@@ -285,12 +285,12 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         id="yoast_wpseo_opengraph-description" 
                         name="yoast_wpseo_opengraph-description" 
                         class="ace-seo-textarea"
-                        placeholder="<?php echo esc_attr($meta_description ?: ace_seo_safe_placeholder($post->post_content, 295)); ?>"
+                        placeholder="<?php echo esc_attr($meta_description ?: acecrawl_safe_placeholder($post->post_content, 295)); ?>"
                         maxlength="300"
                         rows="3"
                     ><?php echo esc_textarea($og_description); ?></textarea>
                     <div class="ace-seo-textarea-buttons">
-                        <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('facebook_description') ); ?>
+                        <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('facebook_description') ); ?>
                     </div>
                 </div>
             </div>
@@ -317,7 +317,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_opengraph-image">
                                 Select Image
                             </button>
-                            <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('facebook_image') ); ?>
+                            <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('facebook_image') ); ?>
                         </div>
                     </div>
                 </div>
@@ -365,7 +365,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         placeholder="<?php echo esc_attr($og_title ?: $seo_title ?: $post->post_title); ?>"
                         maxlength="70"
                     >
-                    <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('twitter_title') ); ?>
+                    <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('twitter_title') ); ?>
                 </div>
             </div>
 
@@ -379,12 +379,12 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                         id="yoast_wpseo_twitter-description" 
                         name="yoast_wpseo_twitter-description" 
                         class="ace-seo-textarea"
-                        placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: ace_seo_safe_placeholder($post->post_content, 195)); ?>"
+                        placeholder="<?php echo esc_attr($og_description ?: $meta_description ?: acecrawl_safe_placeholder($post->post_content, 195)); ?>"
                         maxlength="200"
                         rows="3"
                     ><?php echo esc_textarea($twitter_description); ?></textarea>
                     <div class="ace-seo-textarea-buttons">
-                        <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('twitter_description') ); ?>
+                        <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('twitter_description') ); ?>
                     </div>
                 </div>
             </div>
@@ -417,7 +417,7 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
                             <button type="button" class="ace-seo-button ace-seo-image-button" data-target="yoast_wpseo_twitter-image">
                                 Select Image
                             </button>
-                            <?php echo wp_kses_post( AceSEOAiAssistant::render_ai_buttons('twitter_image') ); ?>
+                            <?php echo wp_kses_post( AceCrawlAiAssistant::render_ai_buttons('twitter_image') ); ?>
                         </div>
                     </div>
                 </div>
@@ -506,11 +506,11 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
             </p>
         </div>
 
-        <?php if ( current_user_can( 'manage_options' ) && class_exists( 'AceSeoRedirects' ) ) : ?>
+        <?php if ( current_user_can( 'manage_options' ) && class_exists( 'AceCrawlRedirects' ) ) : ?>
         <div class="ace-seo-field">
             <h3>Redirect this post</h3>
             <input type="hidden" name="ace_redirect_present" value="1">
-            <?php AceSeoRedirects::fields( $post_id, 'ace_redirect_' ); ?>
+            <?php AceCrawlRedirects::fields( $post_id, 'ace_redirect_' ); ?>
             <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Manage all redirects</a></p>
         </div>
         <?php endif; ?>
@@ -693,5 +693,5 @@ function ace_seo_safe_placeholder($content, $max_chars = 155) {
 
 <?php 
 // Render AI suggestions modal
-AceSEOAiAssistant::render_suggestions_modal(); 
+AceCrawlAiAssistant::render_suggestions_modal(); 
 ?>

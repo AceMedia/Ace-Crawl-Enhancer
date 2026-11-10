@@ -2,10 +2,10 @@
 /** Explicitly approved redirect queue. Durable state never depends on transients. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-class AceSeoRetentionQueue {
-    const HOOK = 'ace_seo_retention_approved_tick';
-    const CONTROL = 'ace_seo_retention_queue_control';
-    const LOCK = 'ace_seo_retention_queue_lock';
+class AceCrawlRetentionQueue {
+    const HOOK = 'acecrawl_retention_approved_tick';
+    const CONTROL = 'acecrawl_retention_queue_control';
+    const LOCK = 'acecrawl_retention_queue_lock';
     const TTL = DAY_IN_SECONDS;
 
     public static function init() {
@@ -17,9 +17,9 @@ class AceSeoRetentionQueue {
     public static function table( $kind ) { global $wpdb; return $wpdb->prefix . 'ace_retention_' . $kind; }
 
     public static function install() {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return; }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return; }
         global $wpdb;
-        if ( '1' === (string) AceSeoRetentionFresh::option( 'ace_retention_queue_schema', '' ) ) { return; }
+        if ( '1' === (string) AceCrawlRetentionFresh::option( 'acecrawl_retention_queue_schema', '' ) ) { return; }
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         $charset = $wpdb->get_charset_collate();
         $jobs = self::table( 'jobs' ); $events = self::table( 'events' );
@@ -45,21 +45,21 @@ class AceSeoRetentionQueue {
             KEY plan_id (plan_id),
             KEY kind_recorded (kind,recorded)
         ) ENGINE=InnoDB $charset;" );
-        if ( ! $wpdb->last_error ) { update_option( 'ace_retention_queue_schema', '1', false ); }
+        if ( ! $wpdb->last_error ) { update_option( 'acecrawl_retention_queue_schema', '1', false ); }
     }
 
     public static function control() {
-        $c = AceSeoRetentionFresh::option( self::CONTROL );
+        $c = AceCrawlRetentionFresh::option( self::CONTROL );
         $c = array_merge( array( 'enabled' => false, 'scope' => array(), 'daily_cap' => 3, 'revision' => '', 'by' => 0, 'site' => '' ), is_array( $c ) ? $c : array() );
         // A restored or cloned database cannot carry active approvals into another site.
         if ( $c['site'] !== self::site() ) { $c['enabled'] = false; $c['scope'] = array(); }
         return $c;
     }
 
-    public static function site() { return hash( 'sha256', AceSeoRetentionFresh::option( 'home', '' ) . '|' . get_current_blog_id() ); }
+    public static function site() { return hash( 'sha256', AceCrawlRetentionFresh::option( 'home', '' ) . '|' . get_current_blog_id() ); }
 
     public static function configure( $enabled, array $scope, $cap ) {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
         $scope = array_values( array_filter( $scope, static function( $id ) { return '' !== (string) $id; } ) );
         foreach ( $scope as $id ) { if ( ! is_scalar( $id ) || ! preg_match( '/^[1-9][0-9]*$/D', (string) $id ) ) { return new WP_Error( 'scope', 'Source IDs must be positive whole numbers.' ); } }
         $scope = array_values( array_unique( array_map( 'absint', $scope ) ) );
@@ -111,7 +111,7 @@ class AceSeoRetentionQueue {
     }
 
     protected static function preflight( array $s ) {
-        return AceSeoRetentionPrototype::capture( $s['source']['id'], $s['target']['url'], $s['context']['period']['start'], $s['context']['period']['end'], $s['review']['confirmed'], $s['review']['reason'], $s['review']['links'] ?? array() );
+        return AceCrawlRetentionPrototype::capture( $s['source']['id'], $s['target']['url'], $s['context']['period']['start'], $s['context']['period']['end'], $s['review']['confirmed'], $s['review']['reason'], $s['review']['links'] ?? array() );
     }
 
     private static function evidence_key( array $s ) {
@@ -121,12 +121,12 @@ class AceSeoRetentionQueue {
     }
 
     public static function approve( $plan ) {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
-        $post = AceSeoRetentionFresh::post( $plan );
-        $s = $post && AceSeoRetentionPrototype::TYPE === $post->post_type ? AceSeoRetentionPrototype::read( $post ) : null;
-        if ( ! $s || AceSeoRetentionPrototype::VERSION !== ( $s['version'] ?? '' ) || ! empty( $s['holds'] ) || time() - $s['created'] > self::TTL ) { return new WP_Error( 'held', 'Create a fresh assessment with no holds before approving.' ); }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
+        $post = AceCrawlRetentionFresh::post( $plan );
+        $s = $post && AceCrawlRetentionPrototype::TYPE === $post->post_type ? AceCrawlRetentionPrototype::read( $post ) : null;
+        if ( ! $s || AceCrawlRetentionPrototype::VERSION !== ( $s['version'] ?? '' ) || ! empty( $s['holds'] ) || time() - $s['created'] > self::TTL ) { return new WP_Error( 'held', 'Create a fresh assessment with no holds before approving.' ); }
         $control = self::control();
-        if ( ! AceSeoRetentionFresh::authorised( get_current_user_id(), array( (int) $s['source']['id'], (int) $s['target']['id'] ) ) ) { return new WP_Error( 'permission', 'Current edit and administrator permissions are required.' ); }
+        if ( ! AceCrawlRetentionFresh::authorised( get_current_user_id(), array( (int) $s['source']['id'], (int) $s['target']['id'] ) ) ) { return new WP_Error( 'permission', 'Current edit and administrator permissions are required.' ); }
         if ( ! in_array( (int) $s['source']['id'], $control['scope'], true ) ) { return new WP_Error( 'scope', 'Add this source to the explicit scope first.' ); }
         $fresh = static::preflight( $s );
         if ( is_wp_error( $fresh ) || ! empty( $fresh['holds'] ) || $fresh['fingerprint'] !== $s['fingerprint'] || self::evidence_key( $fresh ) !== self::evidence_key( $s ) ) { return new WP_Error( 'changed', 'Fresh preflight is held or inputs changed. Save a new assessment.' ); }
@@ -146,7 +146,7 @@ class AceSeoRetentionQueue {
         global $wpdb;
         $owner = wp_generate_uuid4(); $value = $owner . '|' . ( time() + 300 );
         if ( 1 === $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name,option_value,autoload) VALUES (%s,%s,'no')", self::LOCK, $value ) ) ) { return $value; }
-        $old = AceSeoRetentionFresh::option( self::LOCK, '' ); $parts = explode( '|', $old );
+        $old = AceCrawlRetentionFresh::option( self::LOCK, '' ); $parts = explode( '|', $old );
         if ( 2 === count( $parts ) && (int) $parts[1] < time()
             && 1 === $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s", $value, self::LOCK, $old ) ) ) { return $value; }
         return false;
@@ -175,13 +175,13 @@ class AceSeoRetentionQueue {
             foreach ( array( "SELECT ID FROM {$wpdb->users} WHERE ID=%d FOR UPDATE", "SELECT umeta_id FROM {$wpdb->usermeta} WHERE user_id=%d FOR UPDATE" ) as $sql ) {
                 if ( false === $wpdb->query( $wpdb->prepare( $sql, get_current_user_id() ) ) ) { throw new RuntimeException( 'Permission locks unavailable.' ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             }
-            $names = array( self::CONTROL, self::LOCK, AceSeoRetentionReport::PROGRESS_OPTION, AceSeoRetentionActions::OPTION, 'blog_public', 'home', 'siteurl', 'page_on_front', 'page_for_posts', 'permalink_structure', $wpdb->prefix . 'user_roles' );
+            $names = array( self::CONTROL, self::LOCK, AceCrawlRetentionReport::PROGRESS_OPTION, AceCrawlRetentionActions::OPTION, 'blog_public', 'home', 'siteurl', 'page_on_front', 'page_for_posts', 'permalink_structure', $wpdb->prefix . 'user_roles' );
             foreach ( $names as $key ) { if ( false === $wpdb->query( $wpdb->prepare( "SELECT option_id FROM {$wpdb->options} WHERE option_name=%s FOR UPDATE", $key ) ) ) { throw new RuntimeException( 'Settings locks unavailable.' ); } }
         }
     }
 
     public static function tick() {
-        if ( ! AceSeoRetentionPrototype::enabled() ) { return; }
+        if ( ! AceCrawlRetentionPrototype::enabled() ) { return; }
         $lease = static::acquire(); if ( ! $lease ) { return; }
         $old_user = get_current_user_id();
         try {
@@ -205,34 +205,34 @@ class AceSeoRetentionQueue {
         wp_cache_delete( $j['actor'], 'user_meta' ); wp_set_current_user( 0 ); wp_set_current_user( $j['actor'] );
         $c = self::control();
         if ( $j['expires'] <= time() || $c['revision'] !== $p['control'] || ! in_array( $ids[0], $c['scope'], true ) ) { self::state( $plan, 'expired', array_merge( $p, array( 'reason' => 'Approval expired, scope changed or queue configuration changed.' ) ) ); return; }
-        if ( ! AceSeoRetentionFresh::authorised( $j['actor'], $ids ) ) { self::state( $plan, 'held', array_merge( $p, array( 'reason' => 'Approver no longer has the required permissions.' ) ) ); return; }
+        if ( ! AceCrawlRetentionFresh::authorised( $j['actor'], $ids ) ) { self::state( $plan, 'held', array_merge( $p, array( 'reason' => 'Approver no longer has the required permissions.' ) ) ); return; }
         $fresh = static::preflight( $s );
-        $saved = AceSeoRetentionFresh::post( $plan );
+        $saved = AceCrawlRetentionFresh::post( $plan );
         if ( is_wp_error( $fresh ) || ! empty( $fresh['holds'] ) || $s['fingerprint'] !== $fresh['fingerprint'] || self::evidence_key( $s ) !== self::evidence_key( $fresh )
-            || ! $saved || $p['digest'] !== hash( 'sha256', wp_json_encode( AceSeoRetentionPrototype::read( $saved ) ) ) ) {
+            || ! $saved || $p['digest'] !== hash( 'sha256', wp_json_encode( AceCrawlRetentionPrototype::read( $saved ) ) ) ) {
             self::state( $plan, 'held', array_merge( $p, array( 'reason' => 'Fresh evidence, destination or snapshot validation failed.', 'preflight' => is_wp_error( $fresh ) ? $fresh->get_error_message() : $fresh ) ) ); return;
         }
         $committed = false;
         try {
             self::transaction( array_merge( $ids, array( $plan ) ) );
             $c = self::control();
-            if ( ! $c['enabled'] || $c['revision'] !== $p['control'] || $j['expires'] <= time() || AceSeoRetentionFresh::option( self::LOCK, '' ) !== $lease || (int) explode( '|', $lease )[1] <= time() || ! AceSeoRetentionPrototype::enabled() ) { throw new RuntimeException( 'Queue paused, configuration changed or lease/approval expired.' ); }
-            if ( ! AceSeoRetentionFresh::authorised( $j['actor'], $ids ) ) { throw new RuntimeException( 'Permissions changed during preflight.' ); }
-            $saved = AceSeoRetentionFresh::post( $plan );
-            if ( ! $saved || $p['digest'] !== hash( 'sha256', wp_json_encode( AceSeoRetentionPrototype::read( $saved ) ) ) ) { throw new RuntimeException( 'Assessment changed during preflight.' ); }
+            if ( ! $c['enabled'] || $c['revision'] !== $p['control'] || $j['expires'] <= time() || AceCrawlRetentionFresh::option( self::LOCK, '' ) !== $lease || (int) explode( '|', $lease )[1] <= time() || ! AceCrawlRetentionPrototype::enabled() ) { throw new RuntimeException( 'Queue paused, configuration changed or lease/approval expired.' ); }
+            if ( ! AceCrawlRetentionFresh::authorised( $j['actor'], $ids ) ) { throw new RuntimeException( 'Permissions changed during preflight.' ); }
+            $saved = AceCrawlRetentionFresh::post( $plan );
+            if ( ! $saved || $p['digest'] !== hash( 'sha256', wp_json_encode( AceCrawlRetentionPrototype::read( $saved ) ) ) ) { throw new RuntimeException( 'Assessment changed during preflight.' ); }
             $attempts = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::table( 'events' ) . ' WHERE kind=%s AND recorded >= %d', 'apply-intent', strtotime( 'today UTC' ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; table() returns the WordPress prefix plus a constant suffix, values are bound by prepare().
             if ( $wpdb->last_error ) { throw new RuntimeException( 'Cannot verify the daily cap.' ); }
             if ( $attempts >= $c['daily_cap'] ) { $wpdb->query( 'ROLLBACK' ); return; }
-            AceSeoRetentionFresh::run( $ids, static function() use ( $ids, $plan, $s, &$p, $fresh ) {
-                if ( AceSeoRetentionPrototype::fingerprint( $ids[0], $ids[1] ) !== $s['fingerprint'] ) { throw new RuntimeException( 'Inputs changed during preflight.' ); }
-                $p['before'] = AceSeoRedirects::settings( $ids[0] ); $p['preflight'] = $fresh;
+            AceCrawlRetentionFresh::run( $ids, static function() use ( $ids, $plan, $s, &$p, $fresh ) {
+                if ( AceCrawlRetentionPrototype::fingerprint( $ids[0], $ids[1] ) !== $s['fingerprint'] ) { throw new RuntimeException( 'Inputs changed during preflight.' ); }
+                $p['before'] = AceCrawlRedirects::settings( $ids[0] ); $p['preflight'] = $fresh;
                 if ( $p['before']['target'] ) { throw new RuntimeException( 'Source already has a rule.' ); }
                 self::state( $plan, 'applying', $p ); self::event( $plan, 'apply-intent', $p );
-                $ok = AceSeoRedirects::save( $ids[0], array( 'target' => $s['target']['url'], 'code' => 301 ) );
+                $ok = AceCrawlRedirects::save( $ids[0], array( 'target' => $s['target']['url'], 'code' => 301 ) );
                 if ( is_wp_error( $ok ) ) { throw new RuntimeException( esc_html( $ok->get_error_message() ) ); }
-                $p['after'] = AceSeoRedirects::settings( $ids[0] );
+                $p['after'] = AceCrawlRedirects::settings( $ids[0] );
                 if ( $p['after']['target'] !== $s['target']['url'] || 301 !== $p['after']['code'] || $p['after']['paused'] || $p['after']['expires'] || $p['after']['trash'] ) { throw new RuntimeException( 'Redirect write could not be verified.' ); }
-                $p['after_fingerprint'] = AceSeoRetentionPrototype::fingerprint( $ids[0], $ids[1] );
+                $p['after_fingerprint'] = AceCrawlRetentionPrototype::fingerprint( $ids[0], $ids[1] );
                 $p['cache_pending'] = true;
                 self::state( $plan, 'applied', $p );
             } );
@@ -242,21 +242,21 @@ class AceSeoRetentionQueue {
         } catch ( Throwable $e ) {
             if ( $committed ) { self::event( $plan, 'cache-pending', array( 'reason' => 'Application committed; cache purge will retry.' ) ); return; }
             $wpdb->query( 'ROLLBACK' );
-            AceSeoRedirects::purge( $ids[0] );
+            AceCrawlRedirects::purge( $ids[0] );
             self::state( $plan, 'held', array_merge( $p, array( 'reason' => $e->getMessage() ) ) );
         }
     }
 
     private static function finish_purge( $plan, $source, array $payload ) {
         global $wpdb;
-        AceSeoRedirects::purge( $source );
+        AceCrawlRedirects::purge( $source );
         $payload['cache_pending'] = false;
         if ( false === $wpdb->update( self::table( 'jobs' ), array( 'payload' => wp_json_encode( $payload ) ), array( 'plan_id' => $plan ) ) ) { throw new RuntimeException( 'Cache completion could not be recorded.' ); }
         self::event( $plan, 'cache-purged', array( 'source' => (int) $source ) );
     }
 
     public static function undo( $plan ) {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
         $lease = static::acquire(); if ( ! $lease ) { return new WP_Error( 'busy', 'A queue operation is already running.' ); }
         global $wpdb;
         $committed = false;
@@ -266,30 +266,30 @@ class AceSeoRetentionQueue {
             $p = $j['payload']; $s = $p['snapshot']; $ids = array( (int) $s['source']['id'], (int) $s['target']['id'] );
             if ( ! current_user_can( 'edit_post', $ids[0] ) ) { return new WP_Error( 'permission', 'Source edit permission required.' ); }
             self::transaction( $ids );
-            if ( ! AceSeoRetentionFresh::authorised( get_current_user_id(), array( $ids[0] ) ) ) { throw new RuntimeException( 'Current permissions do not allow undo.' ); }
-            AceSeoRetentionFresh::run( $ids, static function() use ( $ids, $p, $plan ) {
-                if ( ! empty( $p['before']['target'] ) || AceSeoRetentionPrototype::fingerprint( $ids[0], $ids[1] ) !== $p['after_fingerprint'] || AceSeoRedirects::settings( $ids[0] ) !== $p['after'] ) { throw new RuntimeException( 'Article, settings or rule changed after application. Manual review required; nothing overwritten.' ); }
-                $ok = AceSeoRedirects::save( $ids[0], array( 'operation' => 'clear' ) );
-                if ( is_wp_error( $ok ) || AceSeoRedirects::settings( $ids[0] ) !== $p['before'] ) { throw new RuntimeException( 'Undo could not be verified.' ); }
+            if ( ! AceCrawlRetentionFresh::authorised( get_current_user_id(), array( $ids[0] ) ) ) { throw new RuntimeException( 'Current permissions do not allow undo.' ); }
+            AceCrawlRetentionFresh::run( $ids, static function() use ( $ids, $p, $plan ) {
+                if ( ! empty( $p['before']['target'] ) || AceCrawlRetentionPrototype::fingerprint( $ids[0], $ids[1] ) !== $p['after_fingerprint'] || AceCrawlRedirects::settings( $ids[0] ) !== $p['after'] ) { throw new RuntimeException( 'Article, settings or rule changed after application. Manual review required; nothing overwritten.' ); }
+                $ok = AceCrawlRedirects::save( $ids[0], array( 'operation' => 'clear' ) );
+                if ( is_wp_error( $ok ) || AceCrawlRedirects::settings( $ids[0] ) !== $p['before'] ) { throw new RuntimeException( 'Undo could not be verified.' ); }
                 $p['cache_pending'] = true;
                 self::state( $plan, 'undone', $p );
             } );
             if ( false === $wpdb->query( 'COMMIT' ) ) { throw new RuntimeException( 'Undo commit failed.' ); }
             $committed = true;
             self::finish_purge( $plan, $ids[0], self::job( $plan )['payload'] ); return true;
-        } catch ( Throwable $e ) { if ( $committed ) { self::event( $plan, 'cache-pending', array( 'reason' => 'Undo committed; cache purge will retry.' ) ); return true; } $wpdb->query( 'ROLLBACK' ); if ( ! empty( $ids[0] ) ) { AceSeoRedirects::purge( $ids[0] ); } self::event( $plan, 'undo-refused', array( 'reason' => $e->getMessage() ) ); return new WP_Error( 'undo', $e->getMessage() ); }
+        } catch ( Throwable $e ) { if ( $committed ) { self::event( $plan, 'cache-pending', array( 'reason' => 'Undo committed; cache purge will retry.' ) ); return true; } $wpdb->query( 'ROLLBACK' ); if ( ! empty( $ids[0] ) ) { AceCrawlRedirects::purge( $ids[0] ); } self::event( $plan, 'undo-refused', array( 'reason' => $e->getMessage() ) ); return new WP_Error( 'undo', $e->getMessage() ); }
         finally { static::release( $lease ); }
     }
 
     public static function cancel( $plan ) {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { return new WP_Error( 'permission', 'Administrator permission required.' ); }
         $lease = static::acquire(); if ( ! $lease ) { return new WP_Error( 'busy', 'A queue operation is already running.' ); }
         try { $j = self::job( $plan ); if ( ! $j || 'approved' !== $j['state'] ) { return new WP_Error( 'state', 'Only pending approvals can be cancelled.' ); } self::state( $plan, 'cancelled', $j['payload'] ); return true; }
         finally { static::release( $lease ); }
     }
 
     public static function handle() {
-        if ( ! AceSeoRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
+        if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_retention_queue' );
         foreach ( array( 'operation', 'plan', 'scope', 'cap', 'enabled' ) as $k ) { if ( isset( $_POST[ $k ] ) && ! is_scalar( $_POST[ $k ] ) ) { wp_die( 'Invalid form.' ); } }
         $op = sanitize_key( wp_unslash( $_POST['operation'] ?? '' ) ); $plan = absint( $_POST['plan'] ?? 0 );

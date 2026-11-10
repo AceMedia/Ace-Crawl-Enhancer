@@ -2,8 +2,8 @@
 defined( 'ABSPATH' ) || exit;
 
 /** Read orders through WooCommerce's storage API (legacy tables and HPOS). */
-class AceSeoTrackingCommerce {
-    const CACHE = 'ace_seo_tracking_commerce';
+class AceCrawlTrackingCommerce {
+    const CACHE = 'acecrawl_tracking_commerce';
 
     public static function series( $dates, $force = false ) {
         if ( ! function_exists( 'wc_get_orders' ) ) {

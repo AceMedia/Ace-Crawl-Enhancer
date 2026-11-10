@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.95
+Stable tag: 1.0.98
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,22 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.98 =
+* Every function, class, constant, hook, option and AJAX action now uses the acecrawl prefix (acemedia_ai for the shared AI connection library).
+* Posted form data is sanitised as it is read, and each form accepts only the fields it sends.
+* JSON-LD and inline scripts and styles cannot be closed early by their content, and generated admin markup is escaped where it is printed.
+* The term edit Yoast migration uses the edit form's own term and checks the user can edit it.
+* The discouraged robots.txt works out the admin path instead of assuming wp-admin.
+
+= 1.0.97 =
+* Retention report counts are cached in Ace Redis Cache's admin query cache when it is active, and cleared whenever the report changes.
+* A page of a block query loop names itself as canonical.
+
+= 1.0.96 =
+* Titles built by WordPress use the separator and site name from the settings, with an optional setting to capitalise lower-case term names.
+* The homepage and archives fall back to the Default Social Image.
+* Breadcrumbs no longer link to a Tags archive WordPress never serves, and a plugin's own route wins over a tag with the same slug.
 
 = 1.0.95 =
 * Keep password-protected, private and preview content out of public descriptions, social metadata and structured data.

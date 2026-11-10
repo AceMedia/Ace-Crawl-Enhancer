@@ -15,11 +15,11 @@ class ACE_SEO_Database_Optimizer {
      */
     public function __construct() {
         // Hook into plugin activation
-        register_activation_hook(ACE_SEO_FILE, array($this, 'create_indexes'));
+        register_activation_hook(ACECRAWL_FILE, array($this, 'create_indexes'));
         
         // Add admin actions for manual optimization
-        add_action('wp_ajax_ace_seo_optimize_database', array($this, 'ajax_optimize_database'));
-        add_action('wp_ajax_ace_seo_get_optimization_progress', array($this, 'ajax_get_optimization_progress'));
+        add_action('wp_ajax_acecrawl_optimize_database', array($this, 'ajax_optimize_database'));
+        add_action('wp_ajax_acecrawl_get_optimization_progress', array($this, 'ajax_get_optimization_progress'));
     }
     
     /**
@@ -27,7 +27,7 @@ class ACE_SEO_Database_Optimizer {
      */
     public function create_indexes() {
         // Mark optimization as pending for activation scenario
-        update_option('ace_seo_db_optimization_pending', true, false);
+        update_option('acecrawl_db_optimization_pending', true, false);
         
         // Use the progress-enabled version
         $results = $this->create_indexes_with_progress();
@@ -147,7 +147,7 @@ class ACE_SEO_Database_Optimizer {
             wp_die('Unauthorized');
         }
         
-        $progress = get_option('ace_seo_optimization_progress', array(
+        $progress = get_option('acecrawl_optimization_progress', array(
             'percent' => 0,
             'message' => 'Not started',
             'completed' => false,
@@ -169,7 +169,7 @@ class ACE_SEO_Database_Optimizer {
             'timestamp' => current_time('timestamp')
         );
         
-        update_option('ace_seo_optimization_progress', $progress, false);
+        update_option('acecrawl_optimization_progress', $progress, false);
     }
     
     /**
@@ -212,8 +212,8 @@ class ACE_SEO_Database_Optimizer {
         $this->set_optimization_progress(100, 'Database optimization completed successfully!', true);
         
         // Update completion timestamp
-        update_option('ace_seo_db_optimized', current_time('mysql'), false);
-        delete_option('ace_seo_db_optimization_pending');
+        update_option('acecrawl_db_optimized', current_time('mysql'), false);
+        delete_option('acecrawl_db_optimization_pending');
         
         // Log results
         if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {

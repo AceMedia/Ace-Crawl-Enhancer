@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
 class ACE_SEO_Dashboard_Cache {
     
     const CACHE_DURATION = 3600; // 1 hour
-    const STATS_TRANSIENT = 'ace_seo_dashboard_stats';
-    const RECENT_POSTS_TRANSIENT = 'ace_seo_recent_posts';
+    const STATS_TRANSIENT = 'acecrawl_dashboard_stats';
+    const RECENT_POSTS_TRANSIENT = 'acecrawl_recent_posts';
     
     /**
      * Read a cached dashboard payload.
@@ -29,7 +29,7 @@ class ACE_SEO_Dashboard_Cache {
      * @return mixed|false
      */
     public static function payload_get( $key ) {
-        return get_transient( 'ace_seo_dash_' . $key );
+        return get_transient( 'acecrawl_dash_' . $key );
     }
 
     /**
@@ -41,7 +41,7 @@ class ACE_SEO_Dashboard_Cache {
      * @return void
      */
     public static function payload_set( $key, $value, $ttl = self::CACHE_DURATION ) {
-        set_transient( 'ace_seo_dash_' . $key, $value, $ttl );
+        set_transient( 'acecrawl_dash_' . $key, $value, $ttl );
     }
 
     /**
@@ -53,7 +53,7 @@ class ACE_SEO_Dashboard_Cache {
         global $wpdb;
 
         foreach ( array( 'stats', 'recent_activity', 'content_analysis', 'database_performance' ) as $key ) {
-            delete_transient( 'ace_seo_dash_' . $key );
+            delete_transient( 'acecrawl_dash_' . $key );
         }
     }
 

@@ -15,19 +15,19 @@ $term_id = $term['term_id'];
 $checks = 0;
 $check = static function ( $ok, $message ) use ( &$checks ) { if ( ! $ok ) { throw new RuntimeException( $message ); } ++$checks; echo "PASS $message\n"; };
 try {
-    $editor = ( new ReflectionClass( 'AceSEOMetabox' ) )->newInstanceWithoutConstructor();
+    $editor = ( new ReflectionClass( 'AceCrawlMetabox' ) )->newInstanceWithoutConstructor();
     wp_set_current_user( $user_id );
     $_POST = array( 'ace_seo_taxonomy_nonce' => wp_create_nonce( 'ace_seo_taxonomy_save' ), 'ace_seo_title' => 'Changed title' );
     $editor->save_taxonomy_fields( $term_id );
-    $check( '' === get_term_meta( $term_id, ACE_SEO_META_PREFIX . 'title', true ), 'Category managers cannot edit a separately protected taxonomy.' );
+    $check( '' === get_term_meta( $term_id, ACECRAWL_META_PREFIX . 'title', true ), 'Category managers cannot edit a separately protected taxonomy.' );
     $user = get_user_by( 'id', $user_id );
     $user->add_cap( 'ace_review_edit_terms' );
     wp_set_current_user( 0 ); wp_set_current_user( $user_id );
     $editor->save_taxonomy_fields( $term_id );
-    $check( 'Changed title' === get_term_meta( $term_id, ACE_SEO_META_PREFIX . 'title', true ), 'The taxonomy editor can save its own SEO fields.' );
+    $check( 'Changed title' === get_term_meta( $term_id, ACECRAWL_META_PREFIX . 'title', true ), 'The taxonomy editor can save its own SEO fields.' );
     $_POST['ace_seo_taxonomy_nonce'] = 'invalid'; $_POST['ace_seo_title'] = 'Invalid change';
     $editor->save_taxonomy_fields( $term_id );
-    $check( 'Changed title' === get_term_meta( $term_id, ACE_SEO_META_PREFIX . 'title', true ), 'A valid capability does not bypass the nonce.' );
+    $check( 'Changed title' === get_term_meta( $term_id, ACECRAWL_META_PREFIX . 'title', true ), 'A valid capability does not bypass the nonce.' );
 } finally {
     $_POST = $original_post;
     wp_set_current_user( $original_user );

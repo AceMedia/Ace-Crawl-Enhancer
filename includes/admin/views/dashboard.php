@@ -175,7 +175,7 @@ if (!defined('ABSPATH')) {
                     <h3>🔗 Search Console</h3>
                 </div>
                 <div class="ace-seo-card-body">
-<?php if ( class_exists( 'AceSEOSearchConsole' ) && AceSEOSearchConsole::is_ready() ) : ?>
+<?php if ( class_exists( 'AceCrawlSearchConsole' ) && AceCrawlSearchConsole::is_ready() ) : ?>
                     <div id="ace-gsc-panel" data-rest="<?php echo esc_url( rest_url( 'ace-seo/v1/google/search-console/' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>">
                         <div class="ace-gsc-totals" id="ace-gsc-totals">
                             <div class="ace-loading"><div class="ace-spinner"></div><p>Loading search performance...</p></div>
@@ -206,9 +206,9 @@ if (!defined('ABSPATH')) {
     </div>
 </div>
 
-<?php AceSeoAssets::style( 'ace-seo-dashboard-style-1', 'assets/css/ace-seo-dashboard-style-1.css' ); ?>
+<?php AceCrawlAssets::style( 'ace-seo-dashboard-style-1', 'assets/css/ace-seo-dashboard-style-1.css' ); ?>
 
-<?php AceSeoAssets::inline_script( 'ace-seo-dashboard-script-1', '
+<?php AceCrawlAssets::inline_script( 'ace-seo-dashboard-script-1', '
 jQuery(document).ready(function($) {
     $(\'#ace-optimize-database\').on(\'click\', function() {
         var $btn = $(this);
@@ -221,7 +221,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_optimize_database\',
+                action: \'acecrawl_optimize_database\',
                 nonce: \'' . (esc_js( wp_create_nonce('ace_seo_optimize_db') )) . '\'
             },
             success: function(response) {
@@ -261,4 +261,4 @@ jQuery(document).ready(function($) {
 });
 ' ); ?>
 
-<?php AceSeoAssets::script( 'ace-seo-dashboard-script-2', 'assets/js/ace-seo-dashboard-script-2.js' ); ?>
+<?php AceCrawlAssets::script( 'ace-seo-dashboard-script-2', 'assets/js/ace-seo-dashboard-script-2.js' ); ?>

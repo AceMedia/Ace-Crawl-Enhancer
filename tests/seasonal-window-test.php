@@ -6,7 +6,7 @@ require_once dirname( __DIR__ ) . '/includes/class-ace-seo-seasonal-window.php';
 $checks = 0;
 function check_window( $publication, $as_of, $expected ) {
     global $checks;
-    $actual = Ace_SEO_Seasonal_Window::preview( $publication, $as_of, new DateTimeZone( 'Europe/London' ) );
+    $actual = AceCrawl_Seasonal_Window::preview( $publication, $as_of, new DateTimeZone( 'Europe/London' ) );
     foreach ( $expected as $key => $value ) {
         ++$checks;
         if ( $actual[$key] !== $value ) {
@@ -25,7 +25,7 @@ check_window( '2020-02-29', '2028-02-29', array( 'anniversary' => '2028-02-29', 
 check_window( '2020-08-31', '2026-10-07', array( 'season_start' => '2026-06-30', 'season_end' => '2026-10-31', 'timezone' => 'Europe/London' ) );
 foreach ( array( array( '2026-02-30', '2026-10-07' ), array( '2027-01-01', '2026-10-07' ), array( '2020-01-01', 'tomorrow' ), array( '0000-00-00', '2026-10-07' ) ) as $invalid ) {
     try {
-        Ace_SEO_Seasonal_Window::preview( $invalid[0], $invalid[1], new DateTimeZone( 'UTC' ) );
+        AceCrawl_Seasonal_Window::preview( $invalid[0], $invalid[1], new DateTimeZone( 'UTC' ) );
         throw new RuntimeException( 'Invalid date accepted.' );
     } catch ( InvalidArgumentException $expected ) {
         ++$checks;

@@ -14,7 +14,7 @@ require_once dirname( __DIR__ ) . '/includes/class-ace-seo-retention-snapshot.ph
 try {
     $directory = $args[0] ?? '';
     $start = $args[1] ?? ''; $end = $args[2] ?? ''; $as_of = $args[3] ?? wp_date( 'Y-m-d' );
-    if ( ! Ace_SEO_Retention_Evidence::date( $start ) || ! Ace_SEO_Retention_Evidence::date( $end ) || ! Ace_SEO_Retention_Evidence::date( $as_of ) || $start > $end || $end >= $as_of ) {
+    if ( ! AceCrawl_Retention_Evidence::date( $start ) || ! AceCrawl_Retention_Evidence::date( $end ) || ! AceCrawl_Retention_Evidence::date( $as_of ) || $start > $end || $end >= $as_of ) {
         throw new InvalidArgumentException( 'Choose valid start/end dates for a finished observation period, followed by the assessment date.' );
     }
     if ( ! $directory || '/' !== $directory[0] ) { throw new InvalidArgumentException( 'Use an absolute path to a new private directory outside the web root.' ); }
@@ -32,16 +32,16 @@ try {
     }
     if ( ! $parent ) { throw new InvalidArgumentException( 'The private parent directory does not exist.' ); }
     if ( ! is_dir( $directory ) && ! mkdir( $directory, 0700 ) ) { throw new RuntimeException( 'Could not create the private snapshot directory.' ); }
-    $store = new Ace_SEO_Retention_Snapshot( $directory );
+    $store = new AceCrawl_Retention_Snapshot( $directory );
     global $wpdb;
     $period = array( 'start' => $start, 'end' => $end );
     if ( ! $store->state() ) {
-        $ids = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT p.ID FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID AND pm.meta_key=%s WHERE p.post_status='publish' ORDER BY p.ID", AceSeoRetentionReport::META ) );
+        $ids = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT p.ID FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID AND pm.meta_key=%s WHERE p.post_status='publish' ORDER BY p.ID", AceCrawlRetentionReport::META ) );
         if ( $wpdb->last_error ) { throw new RuntimeException( 'Could not freeze the assessment scope.' ); }
-        $store->begin( $ids, array( 'rule_version' => Ace_SEO_Retention_Evidence::VERSION, 'scope' => 'Published posts with an existing saved assessment; fixed post IDs', 'as_of' => $as_of, 'period' => $period, 'timezone' => wp_timezone()->getName(), 'settings' => AceSeoRetentionReport::settings(), 'source_capture' => 'Per-batch read of existing assessments; each row records its capture time. This is not a transaction-wide database backup.' ) );
+        $store->begin( $ids, array( 'rule_version' => AceCrawl_Retention_Evidence::VERSION, 'scope' => 'Published posts with an existing saved assessment; fixed post IDs', 'as_of' => $as_of, 'period' => $period, 'timezone' => wp_timezone()->getName(), 'settings' => AceCrawlRetentionReport::settings(), 'source_capture' => 'Per-batch read of existing assessments; each row records its capture time. This is not a transaction-wide database backup.' ) );
     }
     $state = $store->state();
-    if ( $state['provenance']['period'] !== $period || $state['provenance']['as_of'] !== $as_of || $state['provenance']['rule_version'] !== Ace_SEO_Retention_Evidence::VERSION ) { throw new RuntimeException( 'The dates or rule version differ from this frozen run. Start a new directory instead.' ); }
+    if ( $state['provenance']['period'] !== $period || $state['provenance']['as_of'] !== $as_of || $state['provenance']['rule_version'] !== AceCrawl_Retention_Evidence::VERSION ) { throw new RuntimeException( 'The dates or rule version differ from this frozen run. Start a new directory instead.' ); }
     if ( 'complete' === $state['status'] ) {
         if ( ! is_file( rtrim( $directory, '/' ) . '/assessment-comparison.csv' ) ) { $store->export_csv( rtrim( $directory, '/' ) . '/assessment-comparison.csv' ); }
         WP_CLI::success( 'This snapshot is already complete and remains unchanged.' );
@@ -52,7 +52,7 @@ try {
         $ids = array_slice( $state['ids'], $state['offset'], 200 );
         if ( ! $ids ) { break; }
         _prime_post_caches( $ids, true, true );
-        $sql = $wpdb->prepare( "SELECT p.ID,p.post_title,p.post_date,pm.meta_value FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID AND pm.meta_key=%s WHERE p.ID IN (" . implode( ',', array_map( 'intval', $ids ) ) . ') ORDER BY p.ID,pm.meta_id', AceSeoRetentionReport::META );
+        $sql = $wpdb->prepare( "SELECT p.ID,p.post_title,p.post_date,pm.meta_value FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID AND pm.meta_key=%s WHERE p.ID IN (" . implode( ',', array_map( 'intval', $ids ) ) . ') ORDER BY p.ID,pm.meta_id', AceCrawlRetentionReport::META );
         $source_rows = $wpdb->get_results( $sql );
         if ( $wpdb->last_error ) { throw new RuntimeException( 'Could not read the next snapshot batch. The completed batches are resumable.' ); }
         $by_id = array();
@@ -65,8 +65,8 @@ try {
         foreach ( $ids as $id ) {
             if ( ! isset( $by_id[$id] ) ) { throw new RuntimeException( 'A scoped assessment disappeared or became invalid. Preserve this run and start a new snapshot after reviewing the source change.' ); }
             $row = $by_id[$id];
-            $context = Ace_SEO_Retention_Evidence_View::context( $id, $row, $period, $as_of );
-            $records[] = array( 'id' => $id, 'captured_at' => gmdate( 'c' ), 'baseline' => $row, 'context' => $context, 'assessment' => Ace_SEO_Retention_Evidence::assess( Ace_SEO_Retention_Evidence_View::prepare( $row, $context ), $context, $state['provenance']['settings'] ) );
+            $context = AceCrawl_Retention_Evidence_View::context( $id, $row, $period, $as_of );
+            $records[] = array( 'id' => $id, 'captured_at' => gmdate( 'c' ), 'baseline' => $row, 'context' => $context, 'assessment' => AceCrawl_Retention_Evidence::assess( AceCrawl_Retention_Evidence_View::prepare( $row, $context ), $context, $state['provenance']['settings'] ) );
         }
         $store->append( $records );
         WP_CLI::log( 'Saved ' . $store->state()['offset'] . ' of ' . count( $state['ids'] ) . ' scoped posts.' );

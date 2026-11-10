@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoRetentionFront {
+class AceCrawlRetentionFront {
 
     private static $active = false;
     private static $drop   = array();
@@ -33,7 +33,7 @@ class AceSeoRetentionFront {
     }
 
     private static function options() {
-        return AceSeoRetentionActions::options();
+        return AceCrawlRetentionActions::options();
     }
 
     /** Is the current request a retained post that gets the light treatment? */
@@ -46,7 +46,7 @@ class AceSeoRetentionFront {
             return false;
         }
         $post = get_queried_object();
-        if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, (array) AceSeoRetentionReport::settings()['post_types'], true ) ) {
+        if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, (array) AceCrawlRetentionReport::settings()['post_types'], true ) ) {
             return false;
         }
 
@@ -56,7 +56,7 @@ class AceSeoRetentionFront {
          * @param bool    $applies
          * @param WP_Post $post
          */
-        return (bool) apply_filters( 'ace_seo_retention_light_applies', AceSeoRetentionActions::is_retained( $post->ID ), $post );
+        return (bool) apply_filters( 'acecrawl_retention_light_applies', AceCrawlRetentionActions::is_retained( $post->ID ), $post );
     }
 
     public static function setup() {
@@ -85,7 +85,7 @@ class AceSeoRetentionFront {
          *
          * @param int $post_id
          */
-        do_action( 'ace_seo_retention_light_request', get_queried_object_id() );
+        do_action( 'acecrawl_retention_light_request', get_queried_object_id() );
     }
 
     public static function body_class( $classes ) {
@@ -134,7 +134,7 @@ class AceSeoRetentionFront {
     }
 
     public static function print_style() {
-        AceSeoAssets::inline_style( 'ace-seo-light', 'body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
+        AceCrawlAssets::inline_style( 'ace-seo-light', 'body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
             . '.ace-seo-continue{margin:2em 0 0;padding:1em 1.25em;border:1px solid rgba(127,127,127,.35);border-radius:.4em}'
             . '.ace-seo-continue__label{margin:0 0 .25em;font-size:.85em;text-transform:uppercase;letter-spacing:.04em;opacity:.75}'
             . '.ace-seo-continue a{font-weight:600}' );
@@ -150,7 +150,7 @@ class AceSeoRetentionFront {
         $next    = 0;
         if ( ! empty( $cats ) ) {
             $cat    = (int) $cats[0]->term_id;
-            $latest = wp_cache_get( 'latest_' . $cat, 'ace_seo_retention' );
+            $latest = wp_cache_get( 'latest_' . $cat, 'acecrawl_retention' );
             if ( false === $latest ) {
                 $latest = get_posts( array(
                     'post_type'           => 'post',
@@ -164,7 +164,7 @@ class AceSeoRetentionFront {
                     'no_found_rows'       => true,
                     'ignore_sticky_posts' => true,
                 ) );
-                wp_cache_set( 'latest_' . $cat, $latest, 'ace_seo_retention', 10 * MINUTE_IN_SECONDS );
+                wp_cache_set( 'latest_' . $cat, $latest, 'acecrawl_retention', 10 * MINUTE_IN_SECONDS );
             }
             foreach ( (array) $latest as $id ) {
                 if ( (int) $id !== $post_id && self::is_public_post( get_post( $id ) ) ) {
@@ -180,7 +180,7 @@ class AceSeoRetentionFront {
          * @param int $next    Post ID, 0 for nowhere.
          * @param int $post_id The retained post.
          */
-        $next = (int) apply_filters( 'ace_seo_retention_next_post_id', $next, $post_id );
+        $next = (int) apply_filters( 'acecrawl_retention_next_post_id', $next, $post_id );
         return $next !== $post_id && self::is_public_post( get_post( $next ) ) ? $next : 0;
     }
 
@@ -204,7 +204,7 @@ class AceSeoRetentionFront {
             . '<p class="ace-seo-continue__label">' . esc_html( $label ) . '</p>'
             . '<a href="' . esc_url( get_permalink( $next ) ) . '">' . esc_html( get_the_title( $next ) ) . '</a>'
             . '</aside>';
-        return $content . apply_filters( 'ace_seo_retention_continue_html', $html, $next, get_queried_object_id() );
+        return $content . apply_filters( 'acecrawl_retention_continue_html', $html, $next, get_queried_object_id() );
     }
 
     /**
@@ -213,7 +213,7 @@ class AceSeoRetentionFront {
      */
     public static function print_continue_script() {
         ?>
-        <?php AceSeoAssets::script( 'ace-seo-retention-front-script-1', 'assets/js/ace-seo-retention-front-script-1.js', array() ); ?>
+        <?php AceCrawlAssets::script( 'ace-seo-retention-front-script-1', 'assets/js/ace-seo-retention-front-script-1.js', array() ); ?>
         <?php
     }
 
@@ -244,7 +244,7 @@ class AceSeoRetentionFront {
         }
         $next = self::next_post_id( $post->ID );
         return rest_ensure_response( array(
-            'retained' => AceSeoRetentionActions::is_retained( $post->ID ),
+            'retained' => AceCrawlRetentionActions::is_retained( $post->ID ),
             'next'     => $next ? array( 'id' => $next, 'url' => get_permalink( $next ), 'title' => get_the_title( $next ) ) : null,
         ) );
     }

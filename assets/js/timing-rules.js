@@ -229,7 +229,7 @@
 
     function loadSamples(key) {
         var data = new FormData();
-        data.append('action', 'ace_seo_timing_detail');
+        data.append('action', 'acecrawl_timing_detail');
         data.append('nonce', cfg.nonce || '');
         data.append('key', key);
         fetch(cfg.ajaxUrl || window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: data })
@@ -304,7 +304,7 @@
 
     document.getElementById('ace-timing-save').addEventListener('click', function () {
         var btn = this, data = new FormData(), bad = [];
-        data.append('action', 'ace_seo_timing_rules');
+        data.append('action', 'acecrawl_timing_rules');
         data.append('nonce', cfg.nonce || '');
         items.forEach(function (it) {
             var st = state[it.key], text = ruleText(st);

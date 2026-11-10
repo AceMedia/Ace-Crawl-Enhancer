@@ -8,10 +8,10 @@ if (!defined('ABSPATH')) {
 }
 
 // Get current settings
-$options = get_option('ace_seo_options', []);
-$sitemap_options = function_exists('ace_sitemap_powertools_get_options') ? ace_sitemap_powertools_get_options() : [];
-$redis_cache_present = function_exists('ace_sitemap_powertools_has_redis_cache_plugin') ? ace_sitemap_powertools_has_redis_cache_plugin() : false;
-$redis_cache_available = function_exists('ace_sitemap_powertools_redis_cache_available') ? ace_sitemap_powertools_redis_cache_available() : false;
+$options = get_option('acecrawl_options', []);
+$sitemap_options = function_exists('acecrawl_sitemap_get_options') ? acecrawl_sitemap_get_options() : [];
+$redis_cache_present = function_exists('acecrawl_sitemap_has_redis_cache_plugin') ? acecrawl_sitemap_has_redis_cache_plugin() : false;
+$redis_cache_available = function_exists('acecrawl_sitemap_redis_cache_available') ? acecrawl_sitemap_redis_cache_available() : false;
 global $wpdb;
 $has_yoast_data = false;
 if ($wpdb) {
@@ -577,35 +577,35 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <div class="setting-row">
                             <div class="setting-label"><label for="sitemap_enable_custom_routes">Clean sitemap URLs</label></div>
                             <div class="setting-field">
-                                <input type="checkbox" name="ace_sitemap_powertools_options[enable_custom_routes]" id="sitemap_enable_custom_routes" value="1" <?php checked(!empty($sitemap_options['enable_custom_routes'])); ?> />
+                                <input type="checkbox" name="acecrawl_sitemap_options[enable_custom_routes]" id="sitemap_enable_custom_routes" value="1" <?php checked(!empty($sitemap_options['enable_custom_routes'])); ?> />
                                 <p class="description">Enable clean sitemap URLs (e.g. /sitemap.xml, /news-1.xml).</p>
-                                <?php if (function_exists('ace_sitemap_powertools_clean_urls_description')) : ?>
-                                    <?php echo wp_kses_post(ace_sitemap_powertools_clean_urls_description()); ?>
+                                <?php if (function_exists('acecrawl_sitemap_clean_urls_description')) : ?>
+                                    <?php echo wp_kses_post(acecrawl_sitemap_clean_urls_description()); ?>
                                 <?php endif; ?>
                             </div>
                         </div>
 
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_serve_custom_routes">Serve clean routes</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[serve_custom_routes]" id="sitemap_serve_custom_routes" value="1" <?php checked(!empty($sitemap_options['serve_custom_routes'])); ?> /><p class="description">Serve clean routes directly (fallback if rewrites fail).</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_legacy_redirects">Legacy redirects</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_legacy_redirects]" id="sitemap_enable_legacy_redirects" value="1" <?php checked(!empty($sitemap_options['enable_legacy_redirects'])); ?> /><p class="description">Redirect legacy wp-sitemap URLs to clean URLs.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_disable_canonical_redirects">Disable canonical redirects</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[disable_canonical_redirects]" id="sitemap_disable_canonical_redirects" value="1" <?php checked(!empty($sitemap_options['disable_canonical_redirects'])); ?> /><p class="description">Prevent canonical redirects for sitemap URLs.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_archive_fallback">Root tag archive fallback</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_root_tag_archive_fallback]" id="sitemap_enable_root_tag_archive_fallback" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_archive_fallback'])); ?> /><p class="description">Allow root-level tag archives like <code>/slug/</code> when there is no slug collision.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_links">Root tag links</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_root_tag_links]" id="sitemap_enable_root_tag_links" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_links'])); ?> /><p class="description">Generate root-level tag links when a tag slug is safe to use.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_tag_base_redirect">Tag base redirect</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_tag_base_redirect]" id="sitemap_enable_tag_base_redirect" value="1" <?php checked(!empty($sitemap_options['enable_tag_base_redirect'])); ?> /><p class="description">Redirect legacy <code>/tag/slug/</code> requests to root-level tag URLs. Default off for crawl-audit friendliness.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_serve_custom_routes">Serve clean routes</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[serve_custom_routes]" id="sitemap_serve_custom_routes" value="1" <?php checked(!empty($sitemap_options['serve_custom_routes'])); ?> /><p class="description">Serve clean routes directly (fallback if rewrites fail).</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_legacy_redirects">Legacy redirects</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_legacy_redirects]" id="sitemap_enable_legacy_redirects" value="1" <?php checked(!empty($sitemap_options['enable_legacy_redirects'])); ?> /><p class="description">Redirect legacy wp-sitemap URLs to clean URLs.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_disable_canonical_redirects">Disable canonical redirects</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[disable_canonical_redirects]" id="sitemap_disable_canonical_redirects" value="1" <?php checked(!empty($sitemap_options['disable_canonical_redirects'])); ?> /><p class="description">Prevent canonical redirects for sitemap URLs.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_archive_fallback">Root tag archive fallback</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_root_tag_archive_fallback]" id="sitemap_enable_root_tag_archive_fallback" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_archive_fallback'])); ?> /><p class="description">Allow root-level tag archives like <code>/slug/</code> when there is no slug collision.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_root_tag_links">Root tag links</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_root_tag_links]" id="sitemap_enable_root_tag_links" value="1" <?php checked(!empty($sitemap_options['enable_root_tag_links'])); ?> /><p class="description">Generate root-level tag links when a tag slug is safe to use.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_tag_base_redirect">Tag base redirect</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_tag_base_redirect]" id="sitemap_enable_tag_base_redirect" value="1" <?php checked(!empty($sitemap_options['enable_tag_base_redirect'])); ?> /><p class="description">Redirect legacy <code>/tag/slug/</code> requests to root-level tag URLs. Default off for crawl-audit friendliness.</p></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-providers" class="ace-settings-group">
                             <legend><span class="dashicons dashicons-admin-links" aria-hidden="true"></span>Provider URLs</legend>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_news_provider">News URL</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_news_provider]" id="sitemap_enable_news_provider" value="1" <?php checked(!empty($sitemap_options['enable_news_provider'])); ?> /><p class="description">Rename the posts sitemap URL to /news-*.xml.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_authors_provider">Authors URL</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_authors_provider]" id="sitemap_enable_authors_provider" value="1" <?php checked(!empty($sitemap_options['enable_authors_provider'])); ?> /><p class="description">Rename the users sitemap URL to /authors-*.xml.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_categories_route">Categories URL</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_categories_route]" id="sitemap_enable_categories_route" value="1" <?php checked(!empty($sitemap_options['enable_categories_route'])); ?> /><p class="description">Rename the categories sitemap URL to /categories-*.xml.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_tags_route">Tags URL</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_tags_route]" id="sitemap_enable_tags_route" value="1" <?php checked(!empty($sitemap_options['enable_tags_route'])); ?> /><p class="description">Rename the tags sitemap URL to /tags-*.xml.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_news_provider">News URL</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_news_provider]" id="sitemap_enable_news_provider" value="1" <?php checked(!empty($sitemap_options['enable_news_provider'])); ?> /><p class="description">Rename the posts sitemap URL to /news-*.xml.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_authors_provider">Authors URL</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_authors_provider]" id="sitemap_enable_authors_provider" value="1" <?php checked(!empty($sitemap_options['enable_authors_provider'])); ?> /><p class="description">Rename the users sitemap URL to /authors-*.xml.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_categories_route">Categories URL</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_categories_route]" id="sitemap_enable_categories_route" value="1" <?php checked(!empty($sitemap_options['enable_categories_route'])); ?> /><p class="description">Rename the categories sitemap URL to /categories-*.xml.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_tags_route">Tags URL</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_tags_route]" id="sitemap_enable_tags_route" value="1" <?php checked(!empty($sitemap_options['enable_tags_route'])); ?> /><p class="description">Rename the tags sitemap URL to /tags-*.xml.</p></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-display" class="ace-settings-group">
                             <legend><span class="dashicons dashicons-visibility" aria-hidden="true"></span>Display</legend>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_custom_header">Header branding</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_custom_header]" id="sitemap_enable_custom_header" value="1" <?php checked(!empty($sitemap_options['enable_custom_header'])); ?> /><p class="description">Show logo, title, and description in the XSL header.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_link">Index link</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_index_link]" id="sitemap_enable_index_link" value="1" <?php checked(!empty($sitemap_options['enable_index_link'])); ?> /><p class="description">Show a link back to the sitemap index on sub-sitemaps.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_recent_marker">Most recent marker</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_recent_marker]" id="sitemap_enable_recent_marker" value="1" <?php checked(!empty($sitemap_options['enable_recent_marker'])); ?> /><p class="description">Highlight page 1 as “most recent” when a sitemap has 5+ pages.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_custom_header">Header branding</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_custom_header]" id="sitemap_enable_custom_header" value="1" <?php checked(!empty($sitemap_options['enable_custom_header'])); ?> /><p class="description">Show logo, title, and description in the XSL header.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_link">Index link</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_index_link]" id="sitemap_enable_index_link" value="1" <?php checked(!empty($sitemap_options['enable_index_link'])); ?> /><p class="description">Show a link back to the sitemap index on sub-sitemaps.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_recent_marker">Most recent marker</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_recent_marker]" id="sitemap_enable_recent_marker" value="1" <?php checked(!empty($sitemap_options['enable_recent_marker'])); ?> /><p class="description">Highlight page 1 as “most recent” when a sitemap has 5+ pages.</p></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-cache" class="ace-settings-group">
@@ -617,21 +617,21 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <?php else : ?>
                         <div class="notice notice-info inline"><p>Sitemap cache storage and warming are handled by <strong>Ace Redis Cache</strong>. These options act as sitemap-specific inputs for the Redis-backed cache layer.</p></div>
                         <?php endif; ?>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_post_max_urls">Post URLs per sitemap</label></div><div class="setting-field"><input type="number" name="ace_sitemap_powertools_options[post_max_urls]" id="sitemap_post_max_urls" min="0" value="<?php echo esc_attr((int)($sitemap_options['post_max_urls'] ?? 0)); ?>" class="small-text" /><p class="description">Max URLs per posts sitemap (0 = WordPress default).</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_sitemap_cache">Enable sitemap cache</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_sitemap_cache]" id="sitemap_enable_sitemap_cache" value="1" <?php checked(!empty($sitemap_options['enable_sitemap_cache']) && $redis_cache_present); ?> <?php disabled(!$redis_cache_present); ?> /><p class="description">Use Ace Redis Cache for sitemap object-cache storage and keep sitemap URLs out of Redis full-page cache.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_lastmod">Index lastmod</label></div><div class="setting-field"><input type="checkbox" name="ace_sitemap_powertools_options[enable_index_lastmod]" id="sitemap_enable_index_lastmod" value="1" <?php checked(!empty($sitemap_options['enable_index_lastmod'])); ?> /><p class="description">Adds <code>lastmod</code> to the sitemap index for posts/pages/news entries only. Disabling reduces heavy cold-load queries on large sites while keeping per-URL <code>lastmod</code> in the actual post sitemaps.</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_cache_ttl">Sitemap cache TTL (seconds)</label></div><div class="setting-field"><input type="number" name="ace_sitemap_powertools_options[sitemap_cache_ttl]" id="sitemap_cache_ttl" min="60" value="<?php echo esc_attr((int)($sitemap_options['sitemap_cache_ttl'] ?? 600)); ?>" class="small-text" <?php disabled(!$redis_cache_present); ?> /><p class="description">TTL for Redis-backed sitemap object cache and sitemap cache headers (minimum 60 seconds).</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_purge_cache">Purge sitemap cache</label></div><div class="setting-field"><?php wp_nonce_field('ace_sitemap_purge_cache', 'ace_sitemap_powertools_purge_cache_nonce'); ?><button type="button" name="ace_sitemap_powertools_purge_cache" id="sitemap_purge_cache" class="button" <?php disabled(!$redis_cache_present); ?>>Purge sitemap cache</button><p class="description">Bumps the sitemap cache version so Ace Redis Cache rebuilds sitemap objects on the next request.</p><p class="description"><?php $cache_version = function_exists('ace_sitemap_powertools_get_cache_version') ? (int) ace_sitemap_powertools_get_cache_version() : 0; $cache_ttl = isset($sitemap_options['sitemap_cache_ttl']) ? (int) $sitemap_options['sitemap_cache_ttl'] : 0; if ($cache_ttl < 60) { $cache_ttl = 60; } echo 'Cache version: <code>' . esc_html($cache_version) . '</code> · TTL: <code>' . esc_html($cache_ttl) . 's</code> · Index lastmod: <code>' . esc_html(!empty($sitemap_options['enable_index_lastmod']) ? 'on' : 'off') . '</code>'; ?></p><div id="sitemap-purge-result" class="ace-optimization-result" style="display: none; margin-top: 10px;"></div></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_post_max_urls">Post URLs per sitemap</label></div><div class="setting-field"><input type="number" name="acecrawl_sitemap_options[post_max_urls]" id="sitemap_post_max_urls" min="0" value="<?php echo esc_attr((int)($sitemap_options['post_max_urls'] ?? 0)); ?>" class="small-text" /><p class="description">Max URLs per posts sitemap (0 = WordPress default).</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_sitemap_cache">Enable sitemap cache</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_sitemap_cache]" id="sitemap_enable_sitemap_cache" value="1" <?php checked(!empty($sitemap_options['enable_sitemap_cache']) && $redis_cache_present); ?> <?php disabled(!$redis_cache_present); ?> /><p class="description">Use Ace Redis Cache for sitemap object-cache storage and keep sitemap URLs out of Redis full-page cache.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_lastmod">Index lastmod</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_index_lastmod]" id="sitemap_enable_index_lastmod" value="1" <?php checked(!empty($sitemap_options['enable_index_lastmod'])); ?> /><p class="description">Adds <code>lastmod</code> to the sitemap index for posts/pages/news entries only. Disabling reduces heavy cold-load queries on large sites while keeping per-URL <code>lastmod</code> in the actual post sitemaps.</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_cache_ttl">Sitemap cache TTL (seconds)</label></div><div class="setting-field"><input type="number" name="acecrawl_sitemap_options[sitemap_cache_ttl]" id="sitemap_cache_ttl" min="60" value="<?php echo esc_attr((int)($sitemap_options['sitemap_cache_ttl'] ?? 600)); ?>" class="small-text" <?php disabled(!$redis_cache_present); ?> /><p class="description">TTL for Redis-backed sitemap object cache and sitemap cache headers (minimum 60 seconds).</p></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_purge_cache">Purge sitemap cache</label></div><div class="setting-field"><?php wp_nonce_field('acecrawl_sitemap_purge_cache', 'ace_sitemap_powertools_purge_cache_nonce'); ?><button type="button" name="acecrawl_sitemap_purge_cache" id="sitemap_purge_cache" class="button" <?php disabled(!$redis_cache_present); ?>>Purge sitemap cache</button><p class="description">Bumps the sitemap cache version so Ace Redis Cache rebuilds sitemap objects on the next request.</p><p class="description"><?php $cache_version = function_exists('acecrawl_sitemap_get_cache_version') ? (int) acecrawl_sitemap_get_cache_version() : 0; $cache_ttl = isset($sitemap_options['sitemap_cache_ttl']) ? (int) $sitemap_options['sitemap_cache_ttl'] : 0; if ($cache_ttl < 60) { $cache_ttl = 60; } echo 'Cache version: <code>' . esc_html($cache_version) . '</code> · TTL: <code>' . esc_html($cache_ttl) . 's</code> · Index lastmod: <code>' . esc_html(!empty($sitemap_options['enable_index_lastmod']) ? 'on' : 'off') . '</code>'; ?></p><div id="sitemap-purge-result" class="ace-optimization-result" style="display: none; margin-top: 10px;"></div></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-detected" class="ace-settings-group">
                             <legend><span class="dashicons dashicons-search" aria-hidden="true"></span>Detected Plugin Sitemaps</legend>
                             <?php
-                            $detected_provider_choices = function_exists('ace_sitemap_powertools_detected_custom_providers') ? ace_sitemap_powertools_detected_custom_providers() : [];
-                            $detected_taxonomy_choices = function_exists('ace_sitemap_powertools_detected_sitemap_taxonomies') ? ace_sitemap_powertools_detected_sitemap_taxonomies() : [];
-                            $recommended_excluded_taxonomies = function_exists('ace_sitemap_powertools_recommended_excluded_taxonomies') ? ace_sitemap_powertools_recommended_excluded_taxonomies() : [];
+                            $detected_provider_choices = function_exists('acecrawl_sitemap_detected_custom_providers') ? acecrawl_sitemap_detected_custom_providers() : [];
+                            $detected_taxonomy_choices = function_exists('acecrawl_sitemap_detected_sitemap_taxonomies') ? acecrawl_sitemap_detected_sitemap_taxonomies() : [];
+                            $recommended_excluded_taxonomies = function_exists('acecrawl_sitemap_recommended_excluded_taxonomies') ? acecrawl_sitemap_recommended_excluded_taxonomies() : [];
                             $taxonomy_min_posts = isset($sitemap_options['sitemap_taxonomy_min_posts']) && is_array($sitemap_options['sitemap_taxonomy_min_posts']) ? $sitemap_options['sitemap_taxonomy_min_posts'] : [];
-                            $detected_post_type_choices = function_exists('ace_sitemap_powertools_detected_custom_post_types') ? ace_sitemap_powertools_detected_custom_post_types() : [];
+                            $detected_post_type_choices = function_exists('acecrawl_sitemap_detected_custom_post_types') ? acecrawl_sitemap_detected_custom_post_types() : [];
                             $excluded_providers = isset($sitemap_options['excluded_sitemap_providers']) && is_array($sitemap_options['excluded_sitemap_providers']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_providers']) : [];
                             $excluded_taxonomies = isset($sitemap_options['excluded_sitemap_taxonomies']) && is_array($sitemap_options['excluded_sitemap_taxonomies']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_taxonomies']) : [];
                             $excluded_post_types = isset($sitemap_options['excluded_sitemap_post_types']) && is_array($sitemap_options['excluded_sitemap_post_types']) ? array_map('sanitize_key', $sitemap_options['excluded_sitemap_post_types']) : [];
@@ -644,9 +644,9 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                         <p class="description">No third-party sitemap providers detected.</p>
                                     <?php else : ?>
                                         <?php foreach ($detected_provider_choices as $value => $choice) : ?>
-                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" />
+                                            <input type="hidden" name="acecrawl_sitemap_options[detected_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" />
                                             <label style="display:block;margin-bottom:8px;">
-                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_providers, true)); ?> />
+                                                <input type="checkbox" name="acecrawl_sitemap_options[enabled_sitemap_providers][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_providers, true)); ?> />
                                                 <?php echo esc_html($choice['label']); ?>
                                                 <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
                                             </label>
@@ -668,14 +668,14 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                             <?php foreach ($detected_taxonomy_choices as $value => $choice) : ?>
                                                 <tr>
                                                     <td>
-                                                        <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" />
+                                                        <input type="hidden" name="acecrawl_sitemap_options[detected_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" />
                                                         <label>
-                                                            <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" data-recommended="<?php echo in_array($value, $recommended_excluded_taxonomies, true) ? '0' : '1'; ?>" <?php checked(!in_array(sanitize_key($value), $excluded_taxonomies, true)); ?> />
+                                                            <input type="checkbox" name="acecrawl_sitemap_options[enabled_sitemap_taxonomies][]" value="<?php echo esc_attr($value); ?>" data-recommended="<?php echo in_array($value, $recommended_excluded_taxonomies, true) ? '0' : '1'; ?>" <?php checked(!in_array(sanitize_key($value), $excluded_taxonomies, true)); ?> />
                                                             <?php echo esc_html($choice['label']); ?>
                                                         </label>
                                                         <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
                                                     </td>
-                                                    <td><input type="number" min="0" step="1" class="small-text" name="ace_sitemap_powertools_options[sitemap_taxonomy_min_posts][<?php echo esc_attr($value); ?>]" value="<?php echo esc_attr((int) ($taxonomy_min_posts[$value] ?? 0) ?: ''); ?>" placeholder="1" aria-label="<?php echo esc_attr(sprintf('Minimum posts per term for %s', $choice['label'])); ?>" /></td>
+                                                    <td><input type="number" min="0" step="1" class="small-text" name="acecrawl_sitemap_options[sitemap_taxonomy_min_posts][<?php echo esc_attr($value); ?>]" value="<?php echo esc_attr((int) ($taxonomy_min_posts[$value] ?? 0) ?: ''); ?>" placeholder="1" aria-label="<?php echo esc_attr(sprintf('Minimum posts per term for %s', $choice['label'])); ?>" /></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             </tbody>
@@ -694,9 +694,9 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                         <p class="description">No custom public post types detected.</p>
                                     <?php else : ?>
                                         <?php foreach ($detected_post_type_choices as $value => $choice) : ?>
-                                            <input type="hidden" name="ace_sitemap_powertools_options[detected_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" />
+                                            <input type="hidden" name="acecrawl_sitemap_options[detected_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" />
                                             <label style="display:block;margin-bottom:8px;">
-                                                <input type="checkbox" name="ace_sitemap_powertools_options[enabled_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_post_types, true)); ?> />
+                                                <input type="checkbox" name="acecrawl_sitemap_options[enabled_sitemap_post_types][]" value="<?php echo esc_attr($value); ?>" <?php checked(!in_array(sanitize_key($value), $excluded_post_types, true)); ?> />
                                                 <?php echo esc_html($choice['label']); ?>
                                                 <span class="description">(<?php echo esc_html($choice['description']); ?>)</span>
                                             </label>
@@ -860,8 +860,8 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <fieldset id="performance-pagespeed" class="ace-settings-group">
                             <legend><span class="dashicons dashicons-performance" aria-hidden="true"></span>PageSpeed</legend>
                         <?php
-                        $pagespeed_status = class_exists('AceSEOApiHelper')
-                            ? AceSEOApiHelper::get_pagespeed_connection_status()
+                        $pagespeed_status = class_exists('AceCrawlApiHelper')
+                            ? AceCrawlApiHelper::get_pagespeed_connection_status()
                             : ['connected' => false, 'source' => 'none', 'message' => 'PageSpeed connection status is unavailable.'];
                         ?>
                         <div class="setting-row">
@@ -909,7 +909,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                                     return strpos($index, 'ace_seo') === 0;
                                 })) . '</li>';
 
-                                $last_optimized = get_option('ace_seo_db_optimized', false);
+                                $last_optimized = get_option('acecrawl_db_optimized', false);
                                 if ($last_optimized) {
                                     echo '<li>Last Optimized: ' . esc_html( human_time_diff(strtotime($last_optimized), current_time('timestamp')) ) . ' ago</li>';
                                 }
@@ -948,7 +948,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
 
                             <?php
                             if (!class_exists('ACE_SEO_Dashboard_Cache')) {
-                                require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+                                require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
                             }
 
                             $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
@@ -1081,28 +1081,28 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             </p>
                             <p class="description">Recreate will remove existing Yoast keys first, then rebuild from ACE meta.</p>
                         </fieldset>
-                        <?php AceSeoAssets::script( 'ace-seo-settings-script-1', 'assets/js/ace-seo-settings-script-1.js' ); ?>
+                        <?php AceCrawlAssets::script( 'ace-seo-settings-script-1', 'assets/js/ace-seo-settings-script-1.js' ); ?>
                     </div>
                 </div>
                 <?php endif; ?>
 
             </form>
-            <?php include ACE_SEO_PATH . 'includes/admin/views/retention-settings.php'; ?>
+            <?php include ACECRAWL_PATH . 'includes/admin/views/retention-settings.php'; ?>
         </div> <!-- .ace-seo-content -->
     </div> <!-- .ace-seo-container -->
 </div>
 
-<?php AceSeoAssets::style( 'ace-seo-settings-style-1', 'assets/css/ace-seo-settings-style-1.css' ); ?>
+<?php AceCrawlAssets::style( 'ace-seo-settings-style-1', 'assets/css/ace-seo-settings-style-1.css' ); ?>
 
-<?php AceSeoAssets::inline_script( 'ace-seo-settings-script-2', '
+<?php AceCrawlAssets::inline_script( 'ace-seo-settings-script-2', '
 jQuery(document).ready(function($) {
-    var ajaxurl = window.ajaxurl || (window.ace_seo_admin && ace_seo_admin.ajax_url) || "' . (esc_js(admin_url('admin-ajax.php'))) . '";
+    var ajaxurl = window.ajaxurl || (window.acecrawl_admin && acecrawl_admin.ajax_url) || "' . (esc_js(admin_url('admin-ajax.php'))) . '";
     var yoastNonce = \'' . (esc_js( wp_create_nonce('ace_seo_yoast_tools') )) . '\';
     var migrationStatsNonce = \'' . (esc_js( wp_create_nonce('ace_seo_migration_stats') )) . '\';
     var migrationBatchNonce = \'' . (esc_js( wp_create_nonce('ace_seo_batch_migrate') )) . '\';
     var optimizeDbNonce = \'' . (esc_js( wp_create_nonce('ace_seo_optimize_db_manual') )) . '\';
-    var adminNonce = \'' . (esc_js( wp_create_nonce('ace_seo_admin') )) . '\';
-    var sitemapPurgeNonce = \'' . (esc_js( wp_create_nonce('ace_sitemap_purge_cache') )) . '\';
+    var adminNonce = \'' . (esc_js( wp_create_nonce('acecrawl_admin') )) . '\';
+    var sitemapPurgeNonce = \'' . (esc_js( wp_create_nonce('acecrawl_sitemap_purge_cache') )) . '\';
 
     var migrationState = {
         isRunning: false,
@@ -1177,7 +1177,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_get_migration_stats\',
+                action: \'acecrawl_get_migration_stats\',
                 nonce: migrationStatsNonce
             }
         }).done(function(response) {
@@ -1230,7 +1230,7 @@ jQuery(document).ready(function($) {
             return $.Deferred().reject().promise();
         }
         return $.post(ajaxurl, {
-            action: \'ace_seo_get_yoast_key_counts\',
+            action: \'acecrawl_get_yoast_key_counts\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
@@ -1255,7 +1255,7 @@ jQuery(document).ready(function($) {
             return;
         }
         $.post(ajaxurl, {
-            action: \'ace_seo_delete_yoast_keys\',
+            action: \'acecrawl_delete_yoast_keys\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
@@ -1272,7 +1272,7 @@ jQuery(document).ready(function($) {
             return;
         }
         $.post(ajaxurl, {
-            action: \'ace_seo_recreate_yoast_keys\',
+            action: \'acecrawl_recreate_yoast_keys\',
             nonce: yoastNonce
         }).done(function(resp) {
             if (resp && resp.success) {
@@ -1322,7 +1322,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_batch_migrate_yoast\',
+                action: \'acecrawl_batch_migrate_yoast\',
                 batch: migrationState.currentBatch,
                 batch_size: migrationState.batchSize,
                 nonce: migrationBatchNonce
@@ -1378,7 +1378,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_get_migration_stats\',
+                action: \'acecrawl_get_migration_stats\',
                 nonce: migrationStatsNonce
             }
         }).done(function(response) {
@@ -1480,7 +1480,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_optimize_database_manual\',
+                action: \'acecrawl_optimize_database_manual\',
                 nonce: optimizeDbNonce
             }
         }).done(function(response) {
@@ -1532,7 +1532,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_refresh_dashboard_cache\',
+                action: \'acecrawl_refresh_dashboard_cache\',
                 nonce: adminNonce
             }
         }).done(function(response) {
@@ -1565,7 +1565,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_seo_clear_dashboard_cache\',
+                action: \'acecrawl_clear_dashboard_cache\',
                 nonce: adminNonce
             }
         }).done(function(response) {
@@ -1594,7 +1594,7 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: \'POST\',
             data: {
-                action: \'ace_sitemap_purge_cache\',
+                action: \'acecrawl_sitemap_purge_cache\',
                 nonce: sitemapPurgeNonce
             }
         }).done(function(response) {
@@ -1651,4 +1651,4 @@ jQuery(document).ready(function($) {
 });
 ' ); ?>
 
-<?php AceSeoAssets::script( 'ace-seo-settings-script-3', 'assets/js/ace-seo-settings-script-3.js' ); ?>
+<?php AceCrawlAssets::script( 'ace-seo-settings-script-3', 'assets/js/ace-seo-settings-script-3.js' ); ?>

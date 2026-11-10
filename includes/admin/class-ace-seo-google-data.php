@@ -9,15 +9,15 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOGoogleData {
+class AceCrawlGoogleData {
 
     /**
      * Register hooks.
      */
     public function __construct() {
         add_action( 'rest_api_init', array( $this, 'register_routes' ) );
-        add_action( 'wp_ajax_ace_seo_clear_sitekit_cache', array( $this, 'ajax_clear_sitekit_cache' ) );
-        add_action( 'wp_ajax_ace_seo_load_google_signals', array( $this, 'ajax_load_google_signals' ) );
+        add_action( 'wp_ajax_acecrawl_clear_sitekit_cache', array( $this, 'ajax_clear_sitekit_cache' ) );
+        add_action( 'wp_ajax_acecrawl_load_google_signals', array( $this, 'ajax_load_google_signals' ) );
     }
 
     /**
@@ -111,8 +111,8 @@ class AceSEOGoogleData {
             wp_send_json_error( 'Forbidden', 403 );
         }
 
-        if ( class_exists( 'AceSEOSiteKit' ) ) {
-            AceSEOSiteKit::clear_token_cache();
+        if ( class_exists( 'AceCrawlSiteKit' ) ) {
+            AceCrawlSiteKit::clear_token_cache();
         }
 
         wp_send_json_success( array( 'cleared' => true ) );
@@ -130,7 +130,7 @@ class AceSEOGoogleData {
             wp_die( 'Insufficient permissions' );
         }
 
-        $status = AceSEOSiteKit::get_status();
+        $status = AceCrawlSiteKit::get_status();
         $summary = null;
 
         if ( ! empty( $status['modules']['analytics_4']['connected'] ) ) {
@@ -153,8 +153,8 @@ class AceSEOGoogleData {
      */
     public function rest_sitekit_status() {
         return rest_ensure_response(
-            class_exists( 'AceSEOSiteKit' )
-                ? AceSEOSiteKit::get_status()
+            class_exists( 'AceCrawlSiteKit' )
+                ? AceCrawlSiteKit::get_status()
                 : array( 'plugin_active' => false, 'modules' => array() )
         );
     }
@@ -163,7 +163,7 @@ class AceSEOGoogleData {
      * REST: GA4 summary.
      */
     public function rest_ga4_summary() {
-        $property_id = AceSEOSiteKit::get_analytics_property_id();
+        $property_id = AceCrawlSiteKit::get_analytics_property_id();
         if ( $property_id === '' ) {
             return rest_ensure_response(
                 array(
@@ -223,7 +223,7 @@ class AceSEOGoogleData {
      * REST: GA4 top pages.
      */
     public function rest_ga4_top_pages( $request ) {
-        $property_id = AceSEOSiteKit::get_analytics_property_id();
+        $property_id = AceCrawlSiteKit::get_analytics_property_id();
         if ( $property_id === '' ) {
             return rest_ensure_response( array( 'connected' => false, 'pages' => array() ) );
         }
@@ -291,7 +291,7 @@ class AceSEOGoogleData {
     public function rest_search_console_query( $request ) {
         $days = (int) $request->get_param( 'days' );
         $url = esc_url_raw( (string) $request->get_param( 'url' ) );
-        $property_id = AceSEOSiteKit::get_search_console_property_id();
+        $property_id = AceCrawlSiteKit::get_search_console_property_id();
 
         $dimension_filter = array();
         if ( $url !== '' ) {
@@ -344,7 +344,7 @@ class AceSEOGoogleData {
      * REST: module audit.
      */
     public function rest_modules_audit() {
-        $status = AceSEOSiteKit::get_status();
+        $status = AceCrawlSiteKit::get_status();
         $modules = $status['modules'] ?? array();
 
         return rest_ensure_response(
@@ -386,7 +386,7 @@ class AceSEOGoogleData {
             return $cached;
         }
 
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
         if ( is_wp_error( $token ) ) {
             return $token;
         }
@@ -422,7 +422,7 @@ class AceSEOGoogleData {
             return $cached;
         }
 
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE ) );
         if ( is_wp_error( $token ) ) {
             return $token;
         }

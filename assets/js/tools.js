@@ -32,7 +32,7 @@
                 url: ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_optimize_database',
+                    action: 'acecrawl_optimize_database',
                     nonce: aceToolsData.nonce
                 },
                 success: (response) => {
@@ -56,7 +56,7 @@
                 url: ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_get_optimization_progress',
+                    action: 'acecrawl_get_optimization_progress',
                     nonce: aceToolsData.dashboardNonce
                 },
                 success: (response) => {

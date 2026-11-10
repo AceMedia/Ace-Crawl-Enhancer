@@ -46,7 +46,7 @@
 
     function poll() {
         var data = new FormData();
-        data.append('action', 'ace_seo_retention_progress');
+        data.append('action', 'acecrawl_retention_progress');
         data.append('nonce', cfg.nonce || '');
         fetch(cfg.ajaxUrl || window.ajaxurl, { method: 'POST', credentials: 'same-origin', body: data })
             .then(function (r) { return r.json(); })
@@ -83,7 +83,7 @@
         var btn = document.getElementById('ace-retention-rows-load');
         if (btn) { btn.disabled = true; btn.textContent = 'Loading the posts…'; }
         var data = new FormData();
-        data.append('action', 'ace_seo_retention_rows');
+        data.append('action', 'acecrawl_retention_rows');
         data.append('nonce', cfg.nonce || '');
         data.append('bucket', rows.dataset.bucket || '');
         data.append('paged', rows.dataset.paged || '1');
@@ -112,7 +112,7 @@
         var undo = btn.classList.contains('ace-retention-undismiss');
         var note = btn.closest('.ace-retention-note');
         var data = new FormData();
-        data.append('action', 'ace_seo_retention_dismiss');
+        data.append('action', 'acecrawl_retention_dismiss');
         data.append('nonce', cfg.nonce || '');
         if (undo) { data.append('undo', '1'); } else { data.append('hash', note ? note.dataset.hash : ''); }
         btn.disabled = true;

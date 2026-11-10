@@ -9,7 +9,7 @@ Blue badges identify existing administrator-triggered 301/noindex tools, not ena
 ## Rules implemented in the preview
 
 - Explicit editorial dates take precedence, then one verified event occurrence with a stable occurrence identifier. Evergreen content uses its chosen observation period. A publication-anniversary window remains a labelled estimate.
-- A generic `ace_seo_retention_evidence_context` filter allows integrations to supply exact occurrence, coverage and metric-period provenance. The optional Ace Teams & Events reader discovers linked event terms and modern or legacy date fields. Those mutable term dates **do not prove which edition an old article covered**, so they are surfaced as unverified until an editor or a provider binds an occurrence.
+- A generic `acecrawl_retention_evidence_context` filter allows integrations to supply exact occurrence, coverage and metric-period provenance. The optional Ace Teams & Events reader discovers linked event terms and modern or legacy date fields. Those mutable term dates **do not prove which edition an old article covered**, so they are surfaced as unverified until an editor or a provider binds an occurrence.
 - Several verified events remain ambiguous until explicitly resolved; a mutable next-event date cannot silently replace an old edition.
 - Adverse suggestions require a finished relevant period, explicit complete uncapped coverage, and traffic totals for exactly the chosen dates. Missing visitor data is unknown, not zero. Positive evidence can still justify keeping or refreshing an article while a negative judgement waits.
 - Combining articles additionally needs verified editorial overlap. Neither a low click count nor an AI match chooses a redirect target.

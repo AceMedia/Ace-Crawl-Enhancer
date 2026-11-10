@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 $page = max( 1, absint( $_GET['preview_page'] ?? 1 ) );
-$plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'post_status' => 'private', 'posts_per_page' => 21,
+$plans = new WP_Query( array( 'post_type' => AceCrawlRetentionPrototype::TYPE, 'post_status' => 'private', 'posts_per_page' => 21,
     'offset' => ( $page - 1 ) * 20, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true ) );
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
@@ -25,7 +25,7 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
         <?php wp_nonce_field( 'ace_retention_preview' ); ?>
         <input type="hidden" name="action" value="ace_retention_preview">
         <p><label for="retention-source">Source article ID</label><br><input id="retention-source" name="source" type="number" min="1" required></p>
-        <details class="ace-destination-search" data-target="retention-destination" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'ace_seo_redirect_destinations' ) ); ?>">
+        <details class="ace-destination-search" data-target="retention-destination" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'acecrawl_redirect_destinations' ) ); ?>">
             <summary>Find a replacement post or page</summary>
             <fieldset class="ace-destination-types"><legend>Search these types</legend>
                 <label><input type="checkbox" value="post:post" checked> Posts</label>
@@ -50,11 +50,11 @@ $plans = new WP_Query( array( 'post_type' => AceSeoRetentionPrototype::TYPE, 'po
     </form>
     <h3>Frozen assessments</h3>
     <p>“Passes evidence checks” is a dry-run result, not approval to apply. A changed article, rule or report invalidates a snapshot. No 301 is removed just because a later recommendation changes.</p>
-    <?php foreach ( array_slice( $plans->posts, 0, 20 ) as $plan ) : $s = AceSeoRetentionPrototype::read( $plan ); ?>
+    <?php foreach ( array_slice( $plans->posts, 0, 20 ) as $plan ) : $s = AceCrawlRetentionPrototype::read( $plan ); ?>
         <details class="ace-redirect-card">
         <summary><?php echo esc_html( '#' . $plan->ID . ' — ' . ( $s ? $s['source']['title'] . ' → ' . $s['target']['title'] : 'Snapshot integrity check failed' ) ); ?></summary>
         <?php if ( $s ) :
-            $stale = $s['fingerprint'] !== AceSeoRetentionPrototype::fingerprint( $s['source']['id'], $s['target']['id'] );
+            $stale = $s['fingerprint'] !== AceCrawlRetentionPrototype::fingerprint( $s['source']['id'], $s['target']['id'] );
             $old = empty( $s['context']['collected_at'] ) || time() - $s['context']['collected_at'] > DAY_IN_SECONDS; ?>
             <p><strong><?php echo $stale ? 'Changed since capture — reassess' : ( $old ? 'Traffic freshness needs reassessment' : ( $s['holds'] ? 'On hold' : 'Ready for approval' ) ); ?></strong><br>
                 Captured <?php echo esc_html( wp_date( 'j M Y, H:i T', $s['created'] ) ); ?> by user #<?php echo (int) $s['by']; ?> · Rule <?php echo esc_html( $s['version'] ); ?></p>

@@ -2,22 +2,22 @@
 /**
  * Weekly trending topics from Wikipedia pageviews, for content ideas.
  *
- * Every Monday (cron `ace_seo_trending_weekly`) each watched article's daily views
+ * Every Monday (cron `acecrawl_trending_weekly`) each watched article's daily views
  * for the last 14 days are fetched from the Wikimedia REST API, this week is compared
  * with last, and the risers are ranked above a view floor. Titles are resolved
  * through the summary endpoint first, so redirects count on their canonical article
  * and disambiguation pages are dropped. Calls are sequential with a pause and a
  * descriptive User-Agent, and each title is cached for a day. The list of articles
- * is a per-site setting plus the `ace_seo_trending_topics` filter; this file names
+ * is a per-site setting plus the `acecrawl_trending_topics` filter; this file names
  * no place. Shown as "Content ideas" on the Search digest page.
  */
 if (!defined('ABSPATH')) exit;
 
-class AceSeoTrending {
+class AceCrawlTrending {
 
-    const OPT        = 'ace_seo_trending_latest';
-    const OPT_TOPICS = 'ace_seo_trending_topics';
-    const CRON       = 'ace_seo_trending_weekly';
+    const OPT        = 'acecrawl_trending_latest';
+    const OPT_TOPICS = 'acecrawl_trending_topics';
+    const CRON       = 'acecrawl_trending_weekly';
     const SUMMARY    = 'https://en.wikipedia.org/api/rest_v1/page/summary/%s';
     const VIEWS      = 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/%s/daily/%s/%s';
     const PAUSE_US   = 300000;
@@ -27,13 +27,13 @@ class AceSeoTrending {
 
     /**
      * The articles to watch, as English Wikipedia titles in URL form. The list is a
-     * setting (`ace_seo_trending_topics`, one per line) so each site names its own
+     * setting (`acecrawl_trending_topics`, one per line) so each site names its own
      * places and people, and a filter so a plugin that knows the area can supply them.
      */
     public static function topics() {
         $raw = (string) get_option(self::OPT_TOPICS, '');
         $list = array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', $raw))));
-        $list = (array) apply_filters('ace_seo_trending_topics', $list);
+        $list = (array) apply_filters('acecrawl_trending_topics', $list);
         return array_values(array_unique(array_filter(array_map(static function ($t) { return str_replace(' ', '_', trim((string) $t)); }, $list))));
     }
 
@@ -152,10 +152,10 @@ class AceSeoTrending {
         echo '<h2>Content ideas: trending topics on Wikipedia</h2>';
         echo '<p>Weekly on Monday 05:30 from Wikimedia pageviews (this week against last, articles under ' . (int) self::MIN_VIEWS . ' views this week are held back). Next run: ' . esc_html($next ? wp_date('D j M H:i', $next) : 'not scheduled') . '. ';
         echo 'Built: ' . esc_html(!empty($d['built']) ? wp_date('D j M H:i', $d['built']) : 'never') . '. ';
-        echo '<a href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=ace_seo_digest_run&trending=1'), 'ace_seo_digest_run')) . '">Rebuild with the digest</a>.</p>';
+        echo '<a href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=acecrawl_digest_run&trending=1'), 'acecrawl_digest_run')) . '">Rebuild with the digest</a>.</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin:0 0 1em">';
-        wp_nonce_field('ace_seo_trending_topics');
-        echo '<input type="hidden" name="action" value="ace_seo_trending_topics"><p><label>Articles to watch, one English Wikipedia title per line' . (has_filter('ace_seo_trending_topics') ? ' (a plugin adds more)' : '') . '<br><textarea name="topics" rows="6" cols="60" style="max-width:100%">' . esc_html((string) get_option(self::OPT_TOPICS, '')) . '</textarea></label></p><button class="button">Save topics</button></form>';
+        wp_nonce_field('acecrawl_trending_topics');
+        echo '<input type="hidden" name="action" value="acecrawl_trending_topics"><p><label>Articles to watch, one English Wikipedia title per line' . (has_filter('acecrawl_trending_topics') ? ' (a plugin adds more)' : '') . '<br><textarea name="topics" rows="6" cols="60" style="max-width:100%">' . esc_html((string) get_option(self::OPT_TOPICS, '')) . '</textarea></label></p><button class="button">Save topics</button></form>';
         if (!self::topics()) { echo '<p>No topics yet: add some above.</p>'; return; }
         if (empty($d['rows'])) {
             echo '<p>Nothing yet' . (!empty($d['dropped']) ? ' (dropped: ' . esc_html(implode(', ', $d['dropped'])) . ')' : '') . '.</p>';
@@ -163,7 +163,7 @@ class AceSeoTrending {
         }
         echo '<table class="widefat striped" style="max-width:1100px"><thead><tr><th>Article</th><th>This week</th><th>Last week</th><th>Rise</th><th>Draft</th></tr></thead><tbody>';
         foreach ($d['rows'] as $r) {
-            $post = admin_url('post-new.php?post_title=' . rawurlencode((string) apply_filters('ace_seo_trending_post_title', $r['label'], $r)));
+            $post = admin_url('post-new.php?post_title=' . rawurlencode((string) apply_filters('acecrawl_trending_post_title', $r['label'], $r)));
             echo '<tr><td><a href="' . esc_url($r['url']) . '" target="_blank" rel="noopener">' . esc_html($r['label']) . '</a></td>';
             echo '<td>' . (int) $r['this'] . '</td><td>' . (int) $r['last'] . '</td>';
             echo '<td>' . ($r['pct'] > 0 ? '+' : '') . (int) $r['pct'] . '%</td>';
@@ -175,7 +175,7 @@ class AceSeoTrending {
 
     public static function admin_topics() {
         if (!current_user_can('manage_options')) wp_die('No.');
-        check_admin_referer('ace_seo_trending_topics');
+        check_admin_referer('acecrawl_trending_topics');
         update_option(self::OPT_TOPICS, sanitize_textarea_field(wp_unslash((string) ($_POST['topics'] ?? ''))), false);
         wp_safe_redirect(admin_url('admin.php?page=ace-seo-digest'));
         exit;

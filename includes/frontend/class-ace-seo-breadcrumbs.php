@@ -36,7 +36,7 @@ class ACE_SEO_Breadcrumbs {
          * @param array $items   Breadcrumb items.
          * @param array $context Rendering context.
          */
-        return apply_filters('ace_seo_breadcrumb_items', $items, $context);
+        return apply_filters('acecrawl_breadcrumb_items', $items, $context);
     }
 
     /**
@@ -661,7 +661,7 @@ class ACE_SEO_Breadcrumbs {
                 $link      = ($base_page && 'publish' === $base_page->post_status) ? get_permalink($base_page) : '';
             }
 
-            if (!apply_filters('ace_seo_breadcrumb_taxonomy_base', '' !== $link, $taxonomy, $link)) {
+            if (!apply_filters('acecrawl_breadcrumb_taxonomy_base', '' !== $link, $taxonomy, $link)) {
                 return null;
             }
         } else {
@@ -689,7 +689,7 @@ class ACE_SEO_Breadcrumbs {
      */
     private static function format_item($label, $url = '', $is_current = false) {
         return [
-            'label' => function_exists('ace_seo_display_name') ? ace_seo_display_name(wp_strip_all_tags($label)) : wp_strip_all_tags($label),
+            'label' => function_exists('acecrawl_display_name') ? acecrawl_display_name(wp_strip_all_tags($label)) : wp_strip_all_tags($label),
             'url' => $url ? esc_url_raw($url) : '',
             'is_current' => (bool) $is_current,
         ];

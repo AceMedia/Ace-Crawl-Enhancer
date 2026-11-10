@@ -17,16 +17,16 @@
  * - Urgent removals (unpublish, trash, delete, noindex) are withheld from served lists at
  *   once, whatever the age of the artifact.
  * - Keyed dirtiness: a provider whose pages have stable membership (a post always lives on
- *   the same page) can track a scope per page through `ace_sitemap_generation_keyed_scopes`
- *   and `ace_sitemap_generation_post_key`, so one edit rebuilds one page rather than every
+ *   the same page) can track a scope per page through `acecrawl_sitemap_generation_keyed_scopes`
+ *   and `acecrawl_sitemap_generation_post_key`, so one edit rebuilds one page rather than every
  *   page of the type. Without that, a site that publishes all day keeps every page stale
  *   and the worker never catches up.
  * - Fairness and a safety net: the worker rebuilds the oldest artifacts first, so no page
- *   starves, and anything older than `ace_sitemap_generation_max_age` counts as stale, which
+ *   starves, and anything older than `acecrawl_sitemap_generation_max_age` counts as stale, which
  *   catches changes that fire no hook (exclusion filters fed by a site's own rules).
  *
  * Nothing here knows about any particular site. Providers declare what they depend on with
- * the `ace_sitemap_generation_provider_scopes` filter; unknown providers rebuild on any change.
+ * the `acecrawl_sitemap_generation_provider_scopes` filter; unknown providers rebuild on any change.
  *
  * @package AceCrawlEnhancer
  */
@@ -35,11 +35,11 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-const ACE_SITEMAP_GEN_HOOK        = 'ace_sitemap_regenerate';
-const ACE_SITEMAP_GEN_SEQ_OPTION  = 'seq';
-const ACE_SITEMAP_GEN_STATE       = 'state';
-const ACE_SITEMAP_GEN_WITHHELD    = 'withheld';
-const ACE_SITEMAP_GEN_FORMAT      = 1;
+const ACECRAWL_SITEMAP_GEN_HOOK        = 'acecrawl_sitemap_regenerate';
+const ACECRAWL_SITEMAP_GEN_SEQ_OPTION  = 'seq';
+const ACECRAWL_SITEMAP_GEN_STATE       = 'state';
+const ACECRAWL_SITEMAP_GEN_WITHHELD    = 'withheld';
+const ACECRAWL_SITEMAP_GEN_FORMAT      = 1;
 
 /* ------------------------------------------------------------------ Store */
 
@@ -47,17 +47,17 @@ const ACE_SITEMAP_GEN_FORMAT      = 1;
  * Directory holding this site's artifacts, or '' when no usable store exists.
  *
  * Defaults to uploads, which normally survives deploys. On multi-webhead hosting local disk
- * is not shared: point `ace_sitemap_generation_dir` at shared storage or return '' to fall
+ * is not shared: point `acecrawl_sitemap_generation_dir` at shared storage or return '' to fall
  * back to the previous object-cache behaviour.
  */
-function ace_sitemap_gen_dir() {
+function acecrawl_sitemap_gen_dir() {
     static $dir = null;
     if ( null !== $dir ) {
         return $dir;
     }
 
     $dir = '';
-    if ( ! ace_sitemap_powertools_is_enabled( 'enable_sitemap_cache' ) ) {
+    if ( ! acecrawl_sitemap_is_enabled( 'enable_sitemap_cache' ) ) {
         return $dir;
     }
 
@@ -65,7 +65,7 @@ function ace_sitemap_gen_dir() {
     $default = empty( $uploads['error'] ) && ! empty( $uploads['basedir'] )
         ? trailingslashit( $uploads['basedir'] ) . 'ace-sitemaps/' . get_current_blog_id()
         : '';
-    $path    = (string) apply_filters( 'ace_sitemap_generation_dir', $default );
+    $path    = (string) apply_filters( 'acecrawl_sitemap_generation_dir', $default );
 
     if ( '' === $path ) {
         return $dir;
@@ -90,17 +90,17 @@ function ace_sitemap_gen_dir() {
     return $dir;
 }
 
-function ace_sitemap_gen_enabled() {
-    return '' !== ace_sitemap_gen_dir();
+function acecrawl_sitemap_gen_enabled() {
+    return '' !== acecrawl_sitemap_gen_dir();
 }
 
 /** Artifacts are keyed by home URL too, so a site answering on several hosts never mixes them. */
-function ace_sitemap_gen_file( $key, $home = null ) {
+function acecrawl_sitemap_gen_file( $key, $home = null ) {
     $home = null === $home ? home_url( '/' ) : $home;
-    return ace_sitemap_gen_dir() . '/' . sha1( $home . '|' . $key ) . '.json';
+    return acecrawl_sitemap_gen_dir() . '/' . sha1( $home . '|' . $key ) . '.json';
 }
 
-function ace_sitemap_gen_read_file( $file ) {
+function acecrawl_sitemap_gen_read_file( $file ) {
     if ( ! is_readable( $file ) ) {
         return null;
     }
@@ -111,7 +111,7 @@ function ace_sitemap_gen_read_file( $file ) {
     }
 
     $artifact = json_decode( $raw, true );
-    if ( ! is_array( $artifact ) || ( $artifact['format'] ?? 0 ) !== ACE_SITEMAP_GEN_FORMAT || ! isset( $artifact['data'] ) || ! is_array( $artifact['data'] ) ) {
+    if ( ! is_array( $artifact ) || ( $artifact['format'] ?? 0 ) !== ACECRAWL_SITEMAP_GEN_FORMAT || ! isset( $artifact['data'] ) || ! is_array( $artifact['data'] ) ) {
         return null;
     }
 
@@ -122,7 +122,7 @@ function ace_sitemap_gen_read_file( $file ) {
  * Just the small fields of an artifact, without decoding its list. `data` is always written
  * last, so everything before it is a complete JSON object once closed.
  */
-function ace_sitemap_gen_read_header( $file ) {
+function acecrawl_sitemap_gen_read_header( $file ) {
     $fh = @fopen( $file, 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
     if ( ! $fh ) {
         return null;
@@ -136,14 +136,14 @@ function ace_sitemap_gen_read_header( $file ) {
     }
 
     $header = json_decode( substr( $head, 0, $cut ) . '}', true );
-    if ( ! is_array( $header ) || ( $header['format'] ?? 0 ) !== ACE_SITEMAP_GEN_FORMAT || ! isset( $header['key'], $header['meta'], $header['home'] ) ) {
+    if ( ! is_array( $header ) || ( $header['format'] ?? 0 ) !== ACECRAWL_SITEMAP_GEN_FORMAT || ! isset( $header['key'], $header['meta'], $header['home'] ) ) {
         return null;
     }
     return $header;
 }
 
-function ace_sitemap_gen_read( $key ) {
-    return ace_sitemap_gen_read_file( ace_sitemap_gen_file( $key ) );
+function acecrawl_sitemap_gen_read( $key ) {
+    return acecrawl_sitemap_gen_read_file( acecrawl_sitemap_gen_file( $key ) );
 }
 
 /**
@@ -152,9 +152,9 @@ function ace_sitemap_gen_read( $key ) {
  *
  * Callers must hold the key lock.
  */
-function ace_sitemap_gen_write( array $artifact ) {
-    $file     = ace_sitemap_gen_file( $artifact['key'], $artifact['home'] );
-    $existing = ace_sitemap_gen_read_file( $file );
+function acecrawl_sitemap_gen_write( array $artifact ) {
+    $file     = acecrawl_sitemap_gen_file( $artifact['key'], $artifact['home'] );
+    $existing = acecrawl_sitemap_gen_read_file( $file );
     if ( $existing && (int) $existing['seq'] > (int) $artifact['seq'] ) {
         return false;
     }
@@ -175,7 +175,7 @@ function ace_sitemap_gen_write( array $artifact ) {
         return false;
     }
 
-    do_action( 'ace_sitemap_generation_published', $artifact['key'], $artifact['meta'] );
+    do_action( 'acecrawl_sitemap_generation_published', $artifact['key'], $artifact['meta'] );
     return true;
 }
 
@@ -183,8 +183,8 @@ function ace_sitemap_gen_write( array $artifact ) {
  * Take a non-blocking exclusive lock. Returns the handle (keep it to hold the lock) or false.
  * The kernel releases it if the process dies, so a crashed builder never wedges the key.
  */
-function ace_sitemap_gen_lock( $name, $path = null ) {
-    $path = $path ? $path : ace_sitemap_gen_dir() . '/.lock-' . sanitize_key( $name );
+function acecrawl_sitemap_gen_lock( $name, $path = null ) {
+    $path = $path ? $path : acecrawl_sitemap_gen_dir() . '/.lock-' . sanitize_key( $name );
     // flock() works on a read-only handle too, so a lock file created by another system user
     // (web server vs WP-CLI) can still be locked.
     $fh = @fopen( $path, 'c' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
@@ -203,7 +203,7 @@ function ace_sitemap_gen_lock( $name, $path = null ) {
     return $fh;
 }
 
-function ace_sitemap_gen_unlock( $fh ) {
+function acecrawl_sitemap_gen_unlock( $fh ) {
     if ( $fh ) {
         flock( $fh, LOCK_UN );
         fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
@@ -216,8 +216,8 @@ function ace_sitemap_gen_unlock( $fh ) {
  * object caches (or none), and a cached option in one process would never see the other's
  * write. Files in the shared store are coherent for both.
  */
-function ace_sitemap_gen_meta_get( $name ) {
-    $dir = ace_sitemap_gen_dir();
+function acecrawl_sitemap_gen_meta_get( $name ) {
+    $dir = acecrawl_sitemap_gen_dir();
     if ( '' === $dir ) {
         return array();
     }
@@ -227,8 +227,8 @@ function ace_sitemap_gen_meta_get( $name ) {
 }
 
 /** Read-modify-write a record under a blocking lock, so concurrent writers never lose updates. */
-function ace_sitemap_gen_meta_update( $name, callable $mutate ) {
-    $dir = ace_sitemap_gen_dir();
+function acecrawl_sitemap_gen_meta_update( $name, callable $mutate ) {
+    $dir = acecrawl_sitemap_gen_dir();
     if ( '' === $dir ) {
         return array();
     }
@@ -242,7 +242,7 @@ function ace_sitemap_gen_meta_update( $name, callable $mutate ) {
     }
 
     try {
-        $value = (array) $mutate( ace_sitemap_gen_meta_get( $name ) );
+        $value = (array) $mutate( acecrawl_sitemap_gen_meta_get( $name ) );
         $file  = $dir . '/' . $name . '.meta';
         $tmp   = $dir . '/.' . $name . '.' . wp_generate_password( 8, false ) . '.tmp';
         if ( false !== @file_put_contents( $tmp, wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) ) ) {
@@ -260,8 +260,8 @@ function ace_sitemap_gen_meta_update( $name, callable $mutate ) {
 
 /* ------------------------------------------------------------ Dirty tracking */
 
-function ace_sitemap_gen_seqs() {
-    $seqs = ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_SEQ_OPTION );
+function acecrawl_sitemap_gen_seqs() {
+    $seqs = acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_SEQ_OPTION );
     $seqs['seq']    = (int) ( $seqs['seq'] ?? 0 );
     $seqs['scopes'] = isset( $seqs['scopes'] ) && is_array( $seqs['scopes'] ) ? $seqs['scopes'] : array();
     // Scope-wide marks only (a mark that named a key is partial), and per-key marks.
@@ -282,12 +282,12 @@ function ace_sitemap_gen_seqs() {
  * @param bool        $flush_now Write now instead of at shutdown.
  * @param string|null $key       Artifact key the change is confined to.
  */
-function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = null ) {
+function acecrawl_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = null ) {
     static $pending = array(); // scope => true for a scope-wide mark, false for partial.
     static $keys    = array();
     static $hooked  = false;
 
-    if ( ! ace_sitemap_gen_enabled() ) {
+    if ( ! acecrawl_sitemap_gen_enabled() ) {
         return;
     }
 
@@ -305,7 +305,7 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = 
         if ( ! $hooked ) {
             $hooked = true;
             add_action( 'shutdown', function () {
-                ace_sitemap_gen_mark_dirty( null, true );
+                acecrawl_sitemap_gen_mark_dirty( null, true );
             }, 1 );
         }
         return;
@@ -320,8 +320,8 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = 
     $pending   = array();
     $keys      = array();
 
-    ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_SEQ_OPTION, function () use ( $names, $key_names ) {
-        $seqs = ace_sitemap_gen_seqs();
+    acecrawl_sitemap_gen_meta_update( ACECRAWL_SITEMAP_GEN_SEQ_OPTION, function () use ( $names, $key_names ) {
+        $seqs = acecrawl_sitemap_gen_seqs();
         // Millisecond clock as a floor keeps the sequence moving forward even if this record
         // is lost while older artifacts survive, so they can never look current by accident.
         $seqs['seq'] = max( $seqs['seq'] + 1, (int) floor( microtime( true ) * 1000 ) );
@@ -343,7 +343,7 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = 
         // Keys are bounded by the number of pages, but cap them anyway. Dropping a key mark
         // must never let its artifact look current, so the newest dropped mark becomes a
         // floor every keyed artifact has to reach.
-        $max_keys = (int) apply_filters( 'ace_sitemap_generation_max_keys', 5000 );
+        $max_keys = (int) apply_filters( 'acecrawl_sitemap_generation_max_keys', 5000 );
         if ( count( $seqs['keys'] ) > $max_keys ) {
             arsort( $seqs['keys'] );
             $dropped           = array_slice( $seqs['keys'], $max_keys, null, true );
@@ -352,14 +352,14 @@ function ace_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = 
         }
         return $seqs;
     } );
-    ace_sitemap_gen_schedule();
+    acecrawl_sitemap_gen_schedule();
 }
 
 /**
  * The scopes a provider's lists depend on. Core providers are mapped exactly; anything else
  * is assumed to depend on everything unless its owner says otherwise through the filter.
  */
-function ace_sitemap_gen_scopes_for( $provider, $subtype ) {
+function acecrawl_sitemap_gen_scopes_for( $provider, $subtype ) {
     if ( 'index' === $provider ) {
         $scopes = array( '*' );
     } elseif ( 'posts' === $provider ) {
@@ -374,7 +374,7 @@ function ace_sitemap_gen_scopes_for( $provider, $subtype ) {
         $scopes = array( '*' );
     }
 
-    $scopes   = (array) apply_filters( 'ace_sitemap_generation_provider_scopes', $scopes, $provider, $subtype );
+    $scopes   = (array) apply_filters( 'acecrawl_sitemap_generation_provider_scopes', $scopes, $provider, $subtype );
     $scopes[] = 'all';
     return array_values( array_unique( $scopes ) );
 }
@@ -382,10 +382,10 @@ function ace_sitemap_gen_scopes_for( $provider, $subtype ) {
 /**
  * Scopes this provider tracks per key rather than as a whole. A provider opts in when each
  * of its items always lands on the same key (stable page membership), and then reports the
- * key an item lives on through `ace_sitemap_generation_post_key`.
+ * key an item lives on through `acecrawl_sitemap_generation_post_key`.
  */
-function ace_sitemap_gen_keyed_scopes( $provider, $subtype ) {
-    return array_values( (array) apply_filters( 'ace_sitemap_generation_keyed_scopes', array(), (string) $provider, (string) $subtype ) );
+function acecrawl_sitemap_gen_keyed_scopes( $provider, $subtype ) {
+    return array_values( (array) apply_filters( 'acecrawl_sitemap_generation_keyed_scopes', array(), (string) $provider, (string) $subtype ) );
 }
 
 /**
@@ -397,8 +397,8 @@ function ace_sitemap_gen_keyed_scopes( $provider, $subtype ) {
  * @param array      $keyed  Scopes tracked per key: only scope-wide marks and this key's
  *                           own marks count for them.
  */
-function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null, $key = '', array $keyed = array() ) {
-    $seqs = $seqs ? $seqs : ace_sitemap_gen_seqs();
+function acecrawl_sitemap_gen_required_seq( array $scopes, ?array $seqs = null, $key = '', array $keyed = array() ) {
+    $seqs = $seqs ? $seqs : acecrawl_sitemap_gen_seqs();
     if ( in_array( '*', $scopes, true ) ) {
         return $seqs['seq'];
     }
@@ -415,12 +415,12 @@ function ace_sitemap_gen_required_seq( array $scopes, ?array $seqs = null, $key 
 }
 
 /** The sequence a stored artifact must have reached, from its key and meta. */
-function ace_sitemap_gen_artifact_required_seq( $key, array $meta, ?array $seqs = null ) {
-    return ace_sitemap_gen_required_seq(
-        ace_sitemap_gen_scopes_for( $meta['provider'], $meta['subtype'] ),
+function acecrawl_sitemap_gen_artifact_required_seq( $key, array $meta, ?array $seqs = null ) {
+    return acecrawl_sitemap_gen_required_seq(
+        acecrawl_sitemap_gen_scopes_for( $meta['provider'], $meta['subtype'] ),
         $seqs,
         (string) $key,
-        ace_sitemap_gen_keyed_scopes( $meta['provider'], $meta['subtype'] )
+        acecrawl_sitemap_gen_keyed_scopes( $meta['provider'], $meta['subtype'] )
     );
 }
 
@@ -429,16 +429,16 @@ function ace_sitemap_gen_artifact_required_seq( $key, array $meta, ?array $seqs 
  * The age rule catches changes that fire no hook at all, such as a site's own exclusion
  * filter starting to drop an item, and the worker's oldest-first order spreads it out.
  */
-function ace_sitemap_gen_is_stale( array $artifact, ?array $seqs = null ) {
-    if ( (int) $artifact['seq'] < ace_sitemap_gen_artifact_required_seq( $artifact['key'], $artifact['meta'], $seqs ) ) {
+function acecrawl_sitemap_gen_is_stale( array $artifact, ?array $seqs = null ) {
+    if ( (int) $artifact['seq'] < acecrawl_sitemap_gen_artifact_required_seq( $artifact['key'], $artifact['meta'], $seqs ) ) {
         return true;
     }
-    $max_age = (int) apply_filters( 'ace_sitemap_generation_max_age', DAY_IN_SECONDS, $artifact['meta']['provider'], $artifact['meta']['subtype'] );
+    $max_age = (int) apply_filters( 'acecrawl_sitemap_generation_max_age', DAY_IN_SECONDS, $artifact['meta']['provider'], $artifact['meta']['subtype'] );
     return $max_age > 0 && (int) ( $artifact['built'] ?? 0 ) < time() - $max_age;
 }
 
 /** True while a generation build runs, so lower cache layers can step aside. */
-function ace_sitemap_gen_is_building() {
+function acecrawl_sitemap_gen_is_building() {
     return ! empty( $GLOBALS['ace_sitemap_gen_building'] );
 }
 
@@ -446,25 +446,25 @@ function ace_sitemap_gen_is_building() {
  * Mark a post's sitemap dirty: just the page it lives on when its provider tracks pages,
  * otherwise the whole post type.
  */
-function ace_sitemap_gen_mark_post_dirty( $post ) {
+function acecrawl_sitemap_gen_mark_post_dirty( $post ) {
     if ( ! ( $post instanceof WP_Post ) ) {
         return;
     }
-    $key = apply_filters( 'ace_sitemap_generation_post_key', null, $post );
-    ace_sitemap_gen_mark_dirty( 'posts:' . $post->post_type, false, is_string( $key ) && '' !== $key ? $key : null );
+    $key = apply_filters( 'acecrawl_sitemap_generation_post_key', null, $post );
+    acecrawl_sitemap_gen_mark_dirty( 'posts:' . $post->post_type, false, is_string( $key ) && '' !== $key ? $key : null );
 }
 
 /* --------------------------------------------------------- Urgent removals */
 
 /** Remove a URL from every served list straight away, stale or not. */
-function ace_sitemap_gen_withhold( $url ) {
-    $url = ace_sitemap_gen_normalise_loc( $url );
-    if ( '' === $url || ! ace_sitemap_gen_enabled() ) {
+function acecrawl_sitemap_gen_withhold( $url ) {
+    $url = acecrawl_sitemap_gen_normalise_loc( $url );
+    if ( '' === $url || ! acecrawl_sitemap_gen_enabled() ) {
         return;
     }
 
-    ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $url ) {
-        $withheld[ $url ] = ace_sitemap_gen_seqs()['seq'] + 1;
+    acecrawl_sitemap_gen_meta_update( ACECRAWL_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $url ) {
+        $withheld[ $url ] = acecrawl_sitemap_gen_seqs()['seq'] + 1;
         if ( count( $withheld ) > 2000 ) {
             asort( $withheld );
             $withheld = array_slice( $withheld, -2000, null, true );
@@ -473,64 +473,64 @@ function ace_sitemap_gen_withhold( $url ) {
     } );
 }
 
-function ace_sitemap_gen_release( $url ) {
-    $url = ace_sitemap_gen_normalise_loc( $url );
-    if ( '' !== $url && ace_sitemap_gen_enabled() && isset( ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_WITHHELD )[ $url ] ) ) {
-        ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $url ) {
+function acecrawl_sitemap_gen_release( $url ) {
+    $url = acecrawl_sitemap_gen_normalise_loc( $url );
+    if ( '' !== $url && acecrawl_sitemap_gen_enabled() && isset( acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_WITHHELD )[ $url ] ) ) {
+        acecrawl_sitemap_gen_meta_update( ACECRAWL_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $url ) {
             unset( $withheld[ $url ] );
             return $withheld;
         } );
     }
 }
 
-function ace_sitemap_gen_normalise_loc( $url ) {
+function acecrawl_sitemap_gen_normalise_loc( $url ) {
     $url = trim( (string) $url );
     return '' === $url ? '' : untrailingslashit( strtolower( preg_replace( '~^https?://~i', '', $url ) ) );
 }
 
-function ace_sitemap_gen_filter_withheld( array $list ) {
-    $withheld = ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_WITHHELD );
+function acecrawl_sitemap_gen_filter_withheld( array $list ) {
+    $withheld = acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_WITHHELD );
     if ( empty( $withheld ) ) {
         return $list;
     }
 
     return array_values( array_filter( $list, function ( $entry ) use ( $withheld ) {
-        return ! isset( $entry['loc'], $withheld[ ace_sitemap_gen_normalise_loc( $entry['loc'] ) ] );
+        return ! isset( $entry['loc'], $withheld[ acecrawl_sitemap_gen_normalise_loc( $entry['loc'] ) ] );
     } ) );
 }
 
 /** A post's public URL as it was while published (works after the status has changed). */
-function ace_sitemap_gen_published_permalink( $post ) {
+function acecrawl_sitemap_gen_published_permalink( $post ) {
     $copy              = clone $post;
     $copy->post_status = 'publish';
     $copy->post_name   = preg_replace( '/__trashed(-\d+)?$/', '', (string) $copy->post_name );
     return get_permalink( $copy );
 }
 
-function ace_sitemap_gen_on_transition( $new_status, $old_status, $post ) {
-    if ( ! ( $post instanceof WP_Post ) || $new_status === $old_status || ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+function acecrawl_sitemap_gen_on_transition( $new_status, $old_status, $post ) {
+    if ( ! ( $post instanceof WP_Post ) || $new_status === $old_status || ! acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
         return;
     }
 
     if ( 'publish' === $old_status ) {
-        ace_sitemap_gen_withhold( ace_sitemap_gen_published_permalink( $post ) );
+        acecrawl_sitemap_gen_withhold( acecrawl_sitemap_gen_published_permalink( $post ) );
     } elseif ( 'publish' === $new_status ) {
-        ace_sitemap_gen_release( get_permalink( $post ) );
+        acecrawl_sitemap_gen_release( get_permalink( $post ) );
     }
 }
-add_action( 'transition_post_status', 'ace_sitemap_gen_on_transition', 5, 3 );
+add_action( 'transition_post_status', 'acecrawl_sitemap_gen_on_transition', 5, 3 );
 
-function ace_sitemap_gen_on_before_delete( $post_id ) {
+function acecrawl_sitemap_gen_on_before_delete( $post_id ) {
     $post = get_post( $post_id );
-    if ( $post && 'publish' === $post->post_status && ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
-        ace_sitemap_gen_withhold( get_permalink( $post ) );
-        ace_sitemap_gen_mark_post_dirty( $post );
+    if ( $post && 'publish' === $post->post_status && acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
+        acecrawl_sitemap_gen_withhold( get_permalink( $post ) );
+        acecrawl_sitemap_gen_mark_post_dirty( $post );
     }
 }
-add_action( 'before_delete_post', 'ace_sitemap_gen_on_before_delete', 5 );
-add_action( 'wp_trash_post', 'ace_sitemap_gen_on_before_delete', 5 );
+add_action( 'before_delete_post', 'acecrawl_sitemap_gen_on_before_delete', 5 );
+add_action( 'wp_trash_post', 'acecrawl_sitemap_gen_on_before_delete', 5 );
 
-function ace_sitemap_gen_on_noindex_meta( $meta_id, $post_id, $meta_key, $meta_value ) {
+function acecrawl_sitemap_gen_on_noindex_meta( $meta_id, $post_id, $meta_key, $meta_value ) {
     if ( ! in_array( $meta_key, array( '_ace_seo_meta-robots-noindex', '_yoast_wpseo_meta-robots-noindex' ), true ) ) {
         return;
     }
@@ -542,63 +542,63 @@ function ace_sitemap_gen_on_noindex_meta( $meta_id, $post_id, $meta_key, $meta_v
 
     $noindex = 'deleted_post_meta' !== current_action() && '1' === (string) $meta_value;
     if ( $noindex ) {
-        ace_sitemap_gen_withhold( get_permalink( $post ) );
+        acecrawl_sitemap_gen_withhold( get_permalink( $post ) );
     } else {
-        ace_sitemap_gen_release( get_permalink( $post ) );
+        acecrawl_sitemap_gen_release( get_permalink( $post ) );
     }
-    ace_sitemap_gen_mark_post_dirty( $post );
+    acecrawl_sitemap_gen_mark_post_dirty( $post );
 }
-add_action( 'added_post_meta', 'ace_sitemap_gen_on_noindex_meta', 10, 4 );
-add_action( 'updated_post_meta', 'ace_sitemap_gen_on_noindex_meta', 10, 4 );
-add_action( 'deleted_post_meta', 'ace_sitemap_gen_on_noindex_meta', 10, 4 );
+add_action( 'added_post_meta', 'acecrawl_sitemap_gen_on_noindex_meta', 10, 4 );
+add_action( 'updated_post_meta', 'acecrawl_sitemap_gen_on_noindex_meta', 10, 4 );
+add_action( 'deleted_post_meta', 'acecrawl_sitemap_gen_on_noindex_meta', 10, 4 );
 
-function ace_sitemap_gen_on_pre_delete_term( $term_id, $taxonomy ) {
+function acecrawl_sitemap_gen_on_pre_delete_term( $term_id, $taxonomy ) {
     $link = get_term_link( (int) $term_id, $taxonomy );
     if ( ! is_wp_error( $link ) ) {
-        ace_sitemap_gen_withhold( $link );
+        acecrawl_sitemap_gen_withhold( $link );
     }
-    ace_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
+    acecrawl_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
 }
-add_action( 'pre_delete_term', 'ace_sitemap_gen_on_pre_delete_term', 5, 2 );
+add_action( 'pre_delete_term', 'acecrawl_sitemap_gen_on_pre_delete_term', 5, 2 );
 
-function ace_sitemap_gen_on_term_change( $term_id, $tt_id, $taxonomy ) {
-    ace_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
+function acecrawl_sitemap_gen_on_term_change( $term_id, $tt_id, $taxonomy ) {
+    acecrawl_sitemap_gen_mark_dirty( 'taxonomies:' . $taxonomy );
 }
-add_action( 'created_term', 'ace_sitemap_gen_on_term_change', 20, 3 );
-add_action( 'edited_term', 'ace_sitemap_gen_on_term_change', 20, 3 );
+add_action( 'created_term', 'acecrawl_sitemap_gen_on_term_change', 20, 3 );
+add_action( 'edited_term', 'acecrawl_sitemap_gen_on_term_change', 20, 3 );
 
-function ace_sitemap_gen_on_post_change( $post_id, $post = null ) {
+function acecrawl_sitemap_gen_on_post_change( $post_id, $post = null ) {
     $post = $post instanceof WP_Post ? $post : get_post( $post_id );
-    if ( ! $post || wp_is_post_revision( $post ) || wp_is_post_autosave( $post ) || ! ace_sitemap_powertools_is_public_sitemap_post( $post ) ) {
+    if ( ! $post || wp_is_post_revision( $post ) || wp_is_post_autosave( $post ) || ! acecrawl_sitemap_is_public_sitemap_post( $post ) ) {
         return;
     }
-    ace_sitemap_gen_mark_post_dirty( $post );
+    acecrawl_sitemap_gen_mark_post_dirty( $post );
 }
 
-function ace_sitemap_gen_on_post_transition( $new_status, $old_status, $post ) {
+function acecrawl_sitemap_gen_on_post_transition( $new_status, $old_status, $post ) {
     if ( $new_status !== $old_status && ( 'publish' === $new_status || 'publish' === $old_status ) ) {
-        ace_sitemap_gen_on_post_change( $post->ID, $post );
+        acecrawl_sitemap_gen_on_post_change( $post->ID, $post );
     }
 }
-add_action( 'transition_post_status', 'ace_sitemap_gen_on_post_transition', 20, 3 );
+add_action( 'transition_post_status', 'acecrawl_sitemap_gen_on_post_transition', 20, 3 );
 
-function ace_sitemap_gen_on_post_save( $post_id, $post, $update ) {
+function acecrawl_sitemap_gen_on_post_save( $post_id, $post, $update ) {
     if ( $update && $post instanceof WP_Post && 'publish' === $post->post_status ) {
-        ace_sitemap_gen_on_post_change( $post_id, $post );
+        acecrawl_sitemap_gen_on_post_change( $post_id, $post );
     }
 }
-add_action( 'save_post', 'ace_sitemap_gen_on_post_save', 20, 3 );
+add_action( 'save_post', 'acecrawl_sitemap_gen_on_post_save', 20, 3 );
 
-function ace_sitemap_gen_on_user_change() {
-    ace_sitemap_gen_mark_dirty( 'users' );
+function acecrawl_sitemap_gen_on_user_change() {
+    acecrawl_sitemap_gen_mark_dirty( 'users' );
 }
-add_action( 'user_register', 'ace_sitemap_gen_on_user_change', 20, 0 );
-add_action( 'profile_update', 'ace_sitemap_gen_on_user_change', 20, 0 );
-add_action( 'deleted_user', 'ace_sitemap_gen_on_user_change', 20, 0 );
+add_action( 'user_register', 'acecrawl_sitemap_gen_on_user_change', 20, 0 );
+add_action( 'profile_update', 'acecrawl_sitemap_gen_on_user_change', 20, 0 );
+add_action( 'deleted_user', 'acecrawl_sitemap_gen_on_user_change', 20, 0 );
 
 // Settings or permalink changes alter every URL.
-add_action( 'update_option_permalink_structure', function () { ace_sitemap_gen_mark_dirty( 'all' ); } );
-add_action( 'update_option_ace_sitemap_powertools_options', function () { ace_sitemap_gen_mark_dirty( 'all' ); } );
+add_action( 'update_option_permalink_structure', function () { acecrawl_sitemap_gen_mark_dirty( 'all' ); } );
+add_action( 'update_option_acecrawl_sitemap_options', function () { acecrawl_sitemap_gen_mark_dirty( 'all' ); } );
 
 /* ------------------------------------------------------------------ Reading */
 
@@ -615,95 +615,95 @@ add_action( 'update_option_ace_sitemap_powertools_options', function () { ace_si
  * @param callable $builder Builds the list.
  * @return array|null
  */
-function ace_sitemap_gen_get( $key, array $meta, callable $builder ) {
-    $artifact = ace_sitemap_gen_read( $key );
+function acecrawl_sitemap_gen_get( $key, array $meta, callable $builder ) {
+    $artifact = acecrawl_sitemap_gen_read( $key );
 
     if ( $artifact ) {
-        $grace = (int) apply_filters( 'ace_sitemap_generation_gone_grace', HOUR_IN_SECONDS );
+        $grace = (int) apply_filters( 'acecrawl_sitemap_generation_gone_grace', HOUR_IN_SECONDS );
         if ( ! empty( $artifact['gone'] ) && time() - (int) $artifact['gone'] > $grace ) {
-            ace_sitemap_gen_note( 'gone' );
+            acecrawl_sitemap_gen_note( 'gone' );
             return array();
         }
 
-        if ( ace_sitemap_gen_is_stale( $artifact ) ) {
-            ace_sitemap_gen_note( 'stale' );
-            $worker_home = ace_sitemap_gen_state()['worker_home'] ?? home_url( '/' );
+        if ( acecrawl_sitemap_gen_is_stale( $artifact ) ) {
+            acecrawl_sitemap_gen_note( 'stale' );
+            $worker_home = acecrawl_sitemap_gen_state()['worker_home'] ?? home_url( '/' );
             if ( $worker_home === home_url( '/' ) ) {
-                ace_sitemap_gen_schedule();
+                acecrawl_sitemap_gen_schedule();
             } else {
                 // This host's lists are not the worker's to rebuild (it runs under the main
                 // home URL), so one request refreshes it; the rest keep getting the stale copy.
-                $lock = ace_sitemap_gen_lock( 'key-' . md5( $key ) );
+                $lock = acecrawl_sitemap_gen_lock( 'key-' . md5( $key ) );
                 if ( $lock ) {
                     try {
-                        $artifact = ace_sitemap_gen_build( $key, $meta, $builder ) ?: $artifact;
+                        $artifact = acecrawl_sitemap_gen_build( $key, $meta, $builder ) ?: $artifact;
                     } finally {
-                        ace_sitemap_gen_unlock( $lock );
+                        acecrawl_sitemap_gen_unlock( $lock );
                     }
                 }
             }
         } else {
-            ace_sitemap_gen_note( 'fresh' );
+            acecrawl_sitemap_gen_note( 'fresh' );
         }
 
-        return ace_sitemap_gen_filter_withheld( $artifact['data'] );
+        return acecrawl_sitemap_gen_filter_withheld( $artifact['data'] );
     }
 
     // Never built: one foreground builder, everyone else waits briefly for its result.
-    $lock = ace_sitemap_gen_lock( 'key-' . md5( $key ) );
+    $lock = acecrawl_sitemap_gen_lock( 'key-' . md5( $key ) );
     if ( ! $lock ) {
         for ( $i = 0; $i < 12; $i++ ) {
             usleep( 250000 );
             clearstatcache();
-            $artifact = ace_sitemap_gen_read( $key );
+            $artifact = acecrawl_sitemap_gen_read( $key );
             if ( $artifact ) {
-                ace_sitemap_gen_note( 'waited' );
-                return ace_sitemap_gen_filter_withheld( $artifact['data'] );
+                acecrawl_sitemap_gen_note( 'waited' );
+                return acecrawl_sitemap_gen_filter_withheld( $artifact['data'] );
             }
         }
-        ace_sitemap_gen_note( 'unavailable' );
+        acecrawl_sitemap_gen_note( 'unavailable' );
         return null;
     }
 
     try {
         clearstatcache();
-        $artifact = ace_sitemap_gen_read( $key );
+        $artifact = acecrawl_sitemap_gen_read( $key );
         if ( ! $artifact ) {
-            $artifact = ace_sitemap_gen_build( $key, $meta, $builder );
+            $artifact = acecrawl_sitemap_gen_build( $key, $meta, $builder );
         }
     } finally {
-        ace_sitemap_gen_unlock( $lock );
+        acecrawl_sitemap_gen_unlock( $lock );
     }
 
-    ace_sitemap_gen_note( 'cold' );
-    return $artifact ? ace_sitemap_gen_filter_withheld( $artifact['data'] ) : null;
+    acecrawl_sitemap_gen_note( 'cold' );
+    return $artifact ? acecrawl_sitemap_gen_filter_withheld( $artifact['data'] ) : null;
 }
 
 /**
  * Build and publish one artifact. Callers hold the key lock. Returns the artifact now in
  * place (which may be the previous one when the build failed) or null.
  */
-function ace_sitemap_gen_build( $key, array $meta, callable $builder ) {
-    $seqs     = ace_sitemap_gen_seqs();
-    $previous = ace_sitemap_gen_read( $key );
+function acecrawl_sitemap_gen_build( $key, array $meta, callable $builder ) {
+    $seqs     = acecrawl_sitemap_gen_seqs();
+    $previous = acecrawl_sitemap_gen_read( $key );
     $started  = microtime( true );
     $queries  = function_exists( 'get_num_queries' ) ? get_num_queries() : 0;
 
     // Lower cache layers (the powertools object cache) must not hand a rebuild the list it
     // is replacing: that stored a stale list under a current sequence.
-    $was_building                       = ace_sitemap_gen_is_building();
+    $was_building                       = acecrawl_sitemap_gen_is_building();
     $GLOBALS['ace_sitemap_gen_building'] = true;
     try {
         $data = call_user_func( $builder );
     } catch ( Throwable $e ) {
-        ace_sitemap_gen_record_failure( $key, 'exception', get_class( $e ) );
+        acecrawl_sitemap_gen_record_failure( $key, 'exception', get_class( $e ) );
         return $previous;
     } finally {
         $GLOBALS['ace_sitemap_gen_building'] = $was_building;
     }
 
-    if ( ! ace_sitemap_gen_is_valid_list( $data, $meta ) ) {
-        ace_sitemap_gen_record_failure( $key, 'invalid' );
+    if ( ! acecrawl_sitemap_gen_is_valid_list( $data, $meta ) ) {
+        acecrawl_sitemap_gen_record_failure( $key, 'invalid' );
         return $previous;
     }
 
@@ -714,7 +714,7 @@ function ace_sitemap_gen_build( $key, array $meta, callable $builder ) {
     }
 
     $artifact = array(
-        'format' => ACE_SITEMAP_GEN_FORMAT,
+        'format' => ACECRAWL_SITEMAP_GEN_FORMAT,
         'seq'    => $seqs['seq'],
         'key'    => $key,
         'home'   => home_url( '/' ),
@@ -733,24 +733,24 @@ function ace_sitemap_gen_build( $key, array $meta, callable $builder ) {
         $artifact['data'] = $previous['data'];
     }
 
-    if ( ! ace_sitemap_gen_write( $artifact ) ) {
-        ace_sitemap_gen_record_failure( $key, 'write' );
+    if ( ! acecrawl_sitemap_gen_write( $artifact ) ) {
+        acecrawl_sitemap_gen_record_failure( $key, 'write' );
         clearstatcache();
-        return ace_sitemap_gen_read( $key );
+        return acecrawl_sitemap_gen_read( $key );
     }
 
-    ace_sitemap_gen_clear_failure( $key );
+    acecrawl_sitemap_gen_clear_failure( $key );
 
     // Page caches in front of the site keep the XML they served from the old list until
     // told otherwise. Only a change in what is served needs them dropped.
     if ( ! $previous || ( $previous['data'] ?? null ) !== $artifact['data'] ) {
-        ace_sitemap_gen_purge_downstream( $key, $meta );
+        acecrawl_sitemap_gen_purge_downstream( $key, $meta );
     }
 
     return $artifact;
 }
 
-function ace_sitemap_gen_is_valid_list( $data, array $meta ) {
+function acecrawl_sitemap_gen_is_valid_list( $data, array $meta ) {
     if ( ! is_array( $data ) ) {
         return false;
     }
@@ -765,16 +765,16 @@ function ace_sitemap_gen_is_valid_list( $data, array $meta ) {
     return ! ( 'index' === $meta['provider'] && empty( $data ) );
 }
 
-function ace_sitemap_gen_index_key() {
+function acecrawl_sitemap_gen_index_key() {
     return 'index';
 }
 
-function ace_sitemap_gen_url_key( $provider, $subtype, $page ) {
+function acecrawl_sitemap_gen_url_key( $provider, $subtype, $page ) {
     return sprintf( 'url|%s|%s|%d', sanitize_key( (string) $provider ), sanitize_key( (string) $subtype ), (int) $page );
 }
 
 /** Build a list for stored meta. Used by the worker, which has no request context. */
-function ace_sitemap_gen_builder_for( array $meta ) {
+function acecrawl_sitemap_gen_builder_for( array $meta ) {
     $server = wp_sitemaps_get_server();
     if ( 'index' === $meta['provider'] ) {
         return function () use ( $server ) {
@@ -798,7 +798,7 @@ function ace_sitemap_gen_builder_for( array $meta ) {
  * Every public URL that serves an artifact. Page caches key on the URL, so the legacy core
  * name and the clean Powertools route are separate copies and both have to go.
  */
-function ace_sitemap_gen_public_urls( $key, array $meta ) {
+function acecrawl_sitemap_gen_public_urls( $key, array $meta ) {
     $urls = array();
 
     if ( 'index' === $meta['provider'] ) {
@@ -810,14 +810,14 @@ function ace_sitemap_gen_public_urls( $key, array $meta ) {
             $page   = max( 1, (int) $meta['page'] );
             $core   = $provider->get_sitemap_url( (string) $meta['subtype'], $page );
             $urls[] = $core;
-            if ( function_exists( 'ace_sitemap_powertools_custom_loc_for_entry' ) ) {
-                $entry  = ace_sitemap_powertools_custom_loc_for_entry( array( 'loc' => $core ), $meta['provider'], $meta['subtype'], $page );
+            if ( function_exists( 'acecrawl_sitemap_custom_loc_for_entry' ) ) {
+                $entry  = acecrawl_sitemap_custom_loc_for_entry( array( 'loc' => $core ), $meta['provider'], $meta['subtype'], $page );
                 $urls[] = is_array( $entry ) ? ( $entry['loc'] ?? '' ) : '';
             }
         }
     }
 
-    $urls = (array) apply_filters( 'ace_sitemap_generation_public_urls', $urls, $key, $meta );
+    $urls = (array) apply_filters( 'acecrawl_sitemap_generation_public_urls', $urls, $key, $meta );
 
     return array_values( array_unique( array_filter( $urls, function ( $url ) {
         return is_string( $url ) && '' !== $url;
@@ -827,41 +827,41 @@ function ace_sitemap_gen_public_urls( $key, array $meta ) {
 /**
  * Drop downstream copies of an artifact that changed. Ace Redis Cache purges its page cache
  * through its public action and mirrors that to Varnish when one sits in front of the site;
- * any other cache layer can listen for ace_sitemap_generation_artifact_changed.
+ * any other cache layer can listen for acecrawl_sitemap_generation_artifact_changed.
  */
-function ace_sitemap_gen_purge_downstream( $key, array $meta ) {
-    $urls = ace_sitemap_gen_public_urls( $key, $meta );
+function acecrawl_sitemap_gen_purge_downstream( $key, array $meta ) {
+    $urls = acecrawl_sitemap_gen_public_urls( $key, $meta );
     foreach ( $urls as $url ) {
         do_action( 'ace_redis_cache_purge_url', $url );
     }
-    do_action( 'ace_sitemap_generation_artifact_changed', $key, $meta, $urls );
+    do_action( 'acecrawl_sitemap_generation_artifact_changed', $key, $meta, $urls );
 }
 
 /* ------------------------------------------------------------------- Worker */
 
-function ace_sitemap_gen_schedule( $delay = null ) {
-    if ( wp_next_scheduled( ACE_SITEMAP_GEN_HOOK ) ) {
+function acecrawl_sitemap_gen_schedule( $delay = null ) {
+    if ( wp_next_scheduled( ACECRAWL_SITEMAP_GEN_HOOK ) ) {
         return;
     }
 
     // Coalesce a burst of edits into one pass. The first dirty mark sets the time and later
     // ones never push it back, so continuous edits cannot starve publication.
-    $delay = null === $delay ? (int) apply_filters( 'ace_sitemap_generation_delay', MINUTE_IN_SECONDS ) : (int) $delay;
-    wp_schedule_single_event( time() + max( 1, $delay ), ACE_SITEMAP_GEN_HOOK );
+    $delay = null === $delay ? (int) apply_filters( 'acecrawl_sitemap_generation_delay', MINUTE_IN_SECONDS ) : (int) $delay;
+    wp_schedule_single_event( time() + max( 1, $delay ), ACECRAWL_SITEMAP_GEN_HOOK );
 }
 
-function ace_sitemap_gen_state() {
-    return ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_STATE );
+function acecrawl_sitemap_gen_state() {
+    return acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_STATE );
 }
 
 /** Apply a change to the worker state under the meta lock. */
-function ace_sitemap_gen_update_state( callable $mutate ) {
-    return ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_STATE, $mutate );
+function acecrawl_sitemap_gen_update_state( callable $mutate ) {
+    return acecrawl_sitemap_gen_meta_update( ACECRAWL_SITEMAP_GEN_STATE, $mutate );
 }
 
-function ace_sitemap_gen_record_failure( $key, $category, $detail = '' ) {
+function acecrawl_sitemap_gen_record_failure( $key, $category, $detail = '' ) {
     $wait = 0;
-    ace_sitemap_gen_update_state( function ( $state ) use ( $key, $category, $detail, &$wait ) {
+    acecrawl_sitemap_gen_update_state( function ( $state ) use ( $key, $category, $detail, &$wait ) {
         $failures = isset( $state['failures'] ) && is_array( $state['failures'] ) ? $state['failures'] : array();
         $count    = (int) ( $failures[ $key ]['n'] ?? 0 ) + 1;
         // Exponential backoff with jitter, capped at an hour.
@@ -883,9 +883,9 @@ function ace_sitemap_gen_record_failure( $key, $category, $detail = '' ) {
     }
 }
 
-function ace_sitemap_gen_clear_failure( $key ) {
-    if ( isset( ace_sitemap_gen_state()['failures'][ $key ] ) ) {
-        ace_sitemap_gen_update_state( function ( $state ) use ( $key ) {
+function acecrawl_sitemap_gen_clear_failure( $key ) {
+    if ( isset( acecrawl_sitemap_gen_state()['failures'][ $key ] ) ) {
+        acecrawl_sitemap_gen_update_state( function ( $state ) use ( $key ) {
             unset( $state['failures'][ $key ] );
             return $state;
         } );
@@ -897,17 +897,17 @@ function ace_sitemap_gen_clear_failure( $key ) {
  *
  * @return array{dirty: array, total: int, min_seq: int}
  */
-function ace_sitemap_gen_scan() {
-    $seqs     = ace_sitemap_gen_seqs();
-    $state    = ace_sitemap_gen_state();
+function acecrawl_sitemap_gen_scan() {
+    $seqs     = acecrawl_sitemap_gen_seqs();
+    $state    = acecrawl_sitemap_gen_state();
     $home     = home_url( '/' );
     $dirty    = array();
     $total    = 0;
     $min_seq  = PHP_INT_MAX;
-    $grace    = (int) apply_filters( 'ace_sitemap_generation_gone_grace', HOUR_IN_SECONDS );
+    $grace    = (int) apply_filters( 'acecrawl_sitemap_generation_gone_grace', HOUR_IN_SECONDS );
 
-    foreach ( (array) glob( ace_sitemap_gen_dir() . '/*.json' ) as $file ) {
-        $artifact = ace_sitemap_gen_read_header( $file );
+    foreach ( (array) glob( acecrawl_sitemap_gen_dir() . '/*.json' ) as $file ) {
+        $artifact = acecrawl_sitemap_gen_read_header( $file );
         if ( ! $artifact ) {
             continue;
         }
@@ -924,17 +924,17 @@ function ace_sitemap_gen_scan() {
         $total++;
         $min_seq  = min( $min_seq, (int) $artifact['seq'] );
         $meta     = $artifact['meta'];
-        if ( ! ace_sitemap_gen_is_stale( $artifact, $seqs ) ) {
+        if ( ! acecrawl_sitemap_gen_is_stale( $artifact, $seqs ) ) {
             continue;
         }
 
         // The index depends on every change, and on some sites it is the costliest list to
         // build, so it is refreshed at most every few minutes however busy the site is. Other
-        // expensive providers can ask for the same through ace_sitemap_generation_min_age.
+        // expensive providers can ask for the same through acecrawl_sitemap_generation_min_age.
         $min_age = 'index' === $meta['provider']
-            ? (int) apply_filters( 'ace_sitemap_generation_index_min_age', 5 * MINUTE_IN_SECONDS )
+            ? (int) apply_filters( 'acecrawl_sitemap_generation_index_min_age', 5 * MINUTE_IN_SECONDS )
             : 0;
-        $min_age    = (int) apply_filters( 'ace_sitemap_generation_min_age', $min_age, $meta['provider'], $meta['subtype'] );
+        $min_age    = (int) apply_filters( 'acecrawl_sitemap_generation_min_age', $min_age, $meta['provider'], $meta['subtype'] );
         $not_before = $min_age > 0 ? (int) $artifact['built'] + $min_age : 0;
 
         $failure = $state['failures'][ $artifact['key'] ] ?? null;
@@ -969,21 +969,21 @@ function ace_sitemap_gen_scan() {
  *
  * @return array Summary of the pass.
  */
-function ace_sitemap_gen_run( $args = array() ) {
+function acecrawl_sitemap_gen_run( $args = array() ) {
     $summary = array( 'built' => 0, 'failed' => 0, 'remaining' => 0, 'skipped' => '' );
 
-    if ( ! ace_sitemap_gen_enabled() ) {
+    if ( ! acecrawl_sitemap_gen_enabled() ) {
         $summary['skipped'] = 'disabled';
         return $summary;
     }
 
-    $state = ace_sitemap_gen_state();
+    $state = acecrawl_sitemap_gen_state();
     if ( ! empty( $state['paused'] ) && empty( $args['force'] ) ) {
         $summary['skipped'] = 'paused';
         return $summary;
     }
 
-    $worker = ace_sitemap_gen_lock( 'worker' );
+    $worker = acecrawl_sitemap_gen_lock( 'worker' );
     if ( ! $worker ) {
         $summary['skipped'] = 'busy';
         return $summary;
@@ -991,30 +991,30 @@ function ace_sitemap_gen_run( $args = array() ) {
 
     // Optional host-wide budget: an operator points every site at one shared lock file.
     $shared      = null;
-    $shared_path = (string) apply_filters( 'ace_sitemap_generation_shared_lock', defined( 'ACE_SITEMAP_SHARED_LOCK' ) ? ACE_SITEMAP_SHARED_LOCK : '' );
+    $shared_path = (string) apply_filters( 'acecrawl_sitemap_generation_shared_lock', defined( 'ACECRAWL_SITEMAP_SHARED_LOCK' ) ? ACECRAWL_SITEMAP_SHARED_LOCK : '' );
     if ( '' !== $shared_path ) {
-        $shared = ace_sitemap_gen_lock( 'shared', $shared_path );
+        $shared = acecrawl_sitemap_gen_lock( 'shared', $shared_path );
         if ( ! $shared ) {
-            ace_sitemap_gen_unlock( $worker );
-            ace_sitemap_gen_schedule( wp_rand( 30, 90 ) );
+            acecrawl_sitemap_gen_unlock( $worker );
+            acecrawl_sitemap_gen_schedule( wp_rand( 30, 90 ) );
             $summary['skipped'] = 'host-busy';
             return $summary;
         }
     }
 
     $next_due     = 0;
-    $time_budget  = (float) apply_filters( 'ace_sitemap_generation_time_budget', 20 );
-    $max_builds   = (int) apply_filters( 'ace_sitemap_generation_batch_size', 50 );
+    $time_budget  = (float) apply_filters( 'acecrawl_sitemap_generation_time_budget', 20 );
+    $max_builds   = (int) apply_filters( 'acecrawl_sitemap_generation_batch_size', 50 );
     $memory_limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
     $started      = microtime( true );
 
     try {
         // Providers keep their own bookkeeping current first (stable page maps split or
         // rebalance here), so the scan sees the marks that produces.
-        do_action( 'ace_sitemap_generation_before_pass' );
-        ace_sitemap_gen_mark_dirty( null, true );
+        do_action( 'acecrawl_sitemap_generation_before_pass' );
+        acecrawl_sitemap_gen_mark_dirty( null, true );
 
-        $scan = ace_sitemap_gen_scan();
+        $scan = acecrawl_sitemap_gen_scan();
         foreach ( $scan['dirty'] as $item ) {
             if ( $item['waiting'] && empty( $args['force'] ) ) {
                 $next_due = $next_due ? min( $next_due, $item['not_before'] ) : $item['not_before'];
@@ -1029,21 +1029,21 @@ function ace_sitemap_gen_run( $args = array() ) {
                 continue;
             }
 
-            $builder = ace_sitemap_gen_builder_for( $item['meta'] );
+            $builder = acecrawl_sitemap_gen_builder_for( $item['meta'] );
             if ( ! $builder ) {
-                wp_delete_file( ace_sitemap_gen_file( $item['key'] ) ); // Provider gone or disabled.
+                wp_delete_file( acecrawl_sitemap_gen_file( $item['key'] ) ); // Provider gone or disabled.
                 continue;
             }
 
-            $lock = ace_sitemap_gen_lock( 'key-' . md5( $item['key'] ) );
+            $lock = acecrawl_sitemap_gen_lock( 'key-' . md5( $item['key'] ) );
             if ( ! $lock ) {
                 $summary['remaining']++;
                 continue;
             }
 
             try {
-                $before = ace_sitemap_gen_read( $item['key'] );
-                $after  = ace_sitemap_gen_build( $item['key'], $item['meta'], $builder );
+                $before = acecrawl_sitemap_gen_read( $item['key'] );
+                $after  = acecrawl_sitemap_gen_build( $item['key'], $item['meta'], $builder );
                 // A max-age rebuild with no new marks keeps its sequence, so a newer build time counts too.
                 if ( $after && ( ! $before || (int) $after['seq'] > (int) $before['seq'] || (int) ( $after['built'] ?? 0 ) > (int) ( $before['built'] ?? 0 ) ) ) {
                     $summary['built']++;
@@ -1051,14 +1051,14 @@ function ace_sitemap_gen_run( $args = array() ) {
                     $summary['failed']++;
                 }
             } finally {
-                ace_sitemap_gen_unlock( $lock );
+                acecrawl_sitemap_gen_unlock( $lock );
             }
         }
 
         // Withheld URLs can go once every artifact was rebuilt after they were withheld.
-        if ( ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_WITHHELD ) && 0 === $summary['remaining'] && 0 === $summary['failed'] && empty( $summary['deferred'] ) ) {
-            $min_seq = ace_sitemap_gen_scan()['min_seq'];
-            ace_sitemap_gen_meta_update( ACE_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $min_seq ) {
+        if ( acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_WITHHELD ) && 0 === $summary['remaining'] && 0 === $summary['failed'] && empty( $summary['deferred'] ) ) {
+            $min_seq = acecrawl_sitemap_gen_scan()['min_seq'];
+            acecrawl_sitemap_gen_meta_update( ACECRAWL_SITEMAP_GEN_WITHHELD, function ( $withheld ) use ( $min_seq ) {
                 return array_filter( $withheld, function ( $seq ) use ( $min_seq ) {
                     return (int) $seq >= $min_seq;
                 } );
@@ -1066,13 +1066,13 @@ function ace_sitemap_gen_run( $args = array() ) {
         }
 
         // Tidy temp files left by a process that died mid-write.
-        foreach ( (array) glob( ace_sitemap_gen_dir() . '/.*.tmp' ) as $tmp ) {
+        foreach ( (array) glob( acecrawl_sitemap_gen_dir() . '/.*.tmp' ) as $tmp ) {
             if ( @filemtime( $tmp ) < time() - HOUR_IN_SECONDS ) {
                 wp_delete_file( $tmp );
             }
         }
     } finally {
-        $state = ace_sitemap_gen_update_state( function ( $state ) use ( $summary, $started ) {
+        $state = acecrawl_sitemap_gen_update_state( function ( $state ) use ( $summary, $started ) {
             $state['worker_home'] = home_url( '/' );
             $state['last_run'] = array(
                 'at'        => time(),
@@ -1088,15 +1088,15 @@ function ace_sitemap_gen_run( $args = array() ) {
             return $state;
         } );
 
-        ace_sitemap_gen_unlock( $shared );
-        ace_sitemap_gen_unlock( $worker );
+        acecrawl_sitemap_gen_unlock( $shared );
+        acecrawl_sitemap_gen_unlock( $worker );
     }
 
     if ( $summary['remaining'] > 0 ) {
-        ace_sitemap_gen_schedule( (int) apply_filters( 'ace_sitemap_generation_yield', 30 ) );
+        acecrawl_sitemap_gen_schedule( (int) apply_filters( 'acecrawl_sitemap_generation_yield', 30 ) );
     } elseif ( $next_due ) {
         // Only held-back work (index minimum age, retry backoff): come back when it is due.
-        ace_sitemap_gen_schedule( max( 1, $next_due - time() ) );
+        acecrawl_sitemap_gen_schedule( max( 1, $next_due - time() ) );
     }
 
     if ( $summary['built'] > 0 || $summary['failed'] > 0 ) {
@@ -1105,12 +1105,12 @@ function ace_sitemap_gen_run( $args = array() ) {
 
     return $summary;
 }
-add_action( ACE_SITEMAP_GEN_HOOK, 'ace_sitemap_gen_run' );
+add_action( ACECRAWL_SITEMAP_GEN_HOOK, 'acecrawl_sitemap_gen_run' );
 
 /* ------------------------------------------------------------- Diagnostics */
 
 /** Per-request serve outcome, as a response header and an object-cache counter. */
-function ace_sitemap_gen_note( $outcome ) {
+function acecrawl_sitemap_gen_note( $outcome ) {
     if ( ! headers_sent() ) {
         header( 'X-Ace-Sitemap: ' . $outcome, false );
     }
@@ -1121,10 +1121,10 @@ function ace_sitemap_gen_note( $outcome ) {
     }
 }
 
-function ace_sitemap_gen_status() {
-    $state = ace_sitemap_gen_state();
-    $scan  = ace_sitemap_gen_enabled() ? ace_sitemap_gen_scan() : array( 'dirty' => array(), 'total' => 0 );
-    $seqs  = ace_sitemap_gen_seqs();
+function acecrawl_sitemap_gen_status() {
+    $state = acecrawl_sitemap_gen_state();
+    $scan  = acecrawl_sitemap_gen_enabled() ? acecrawl_sitemap_gen_scan() : array( 'dirty' => array(), 'total' => 0 );
+    $seqs  = acecrawl_sitemap_gen_seqs();
 
     $counts = array();
     foreach ( array( 'fresh', 'stale', 'cold', 'waited', 'unavailable', 'gone' ) as $outcome ) {
@@ -1132,62 +1132,62 @@ function ace_sitemap_gen_status() {
     }
 
     $worker_busy = false;
-    if ( ace_sitemap_gen_enabled() ) {
-        $probe = ace_sitemap_gen_lock( 'worker' );
+    if ( acecrawl_sitemap_gen_enabled() ) {
+        $probe = acecrawl_sitemap_gen_lock( 'worker' );
         $worker_busy = ! $probe;
-        ace_sitemap_gen_unlock( $probe );
+        acecrawl_sitemap_gen_unlock( $probe );
     }
 
     return array(
-        'enabled'      => ace_sitemap_gen_enabled(),
-        'store'        => ace_sitemap_gen_enabled() ? 'uploads/' . basename( dirname( ace_sitemap_gen_dir() ) ) . '/' . basename( ace_sitemap_gen_dir() ) : 'unavailable (object cache fallback)',
+        'enabled'      => acecrawl_sitemap_gen_enabled(),
+        'store'        => acecrawl_sitemap_gen_enabled() ? 'uploads/' . basename( dirname( acecrawl_sitemap_gen_dir() ) ) . '/' . basename( acecrawl_sitemap_gen_dir() ) : 'unavailable (object cache fallback)',
         'paused'       => ! empty( $state['paused'] ),
         'sequence'     => $seqs['seq'],
         'artifacts'    => $scan['total'],
         'stale'        => count( $scan['dirty'] ),
         'backing_off'  => count( array_filter( $scan['dirty'], function ( $d ) { return $d['waiting']; } ) ),
-        'withheld'     => count( ace_sitemap_gen_meta_get( ACE_SITEMAP_GEN_WITHHELD ) ),
+        'withheld'     => count( acecrawl_sitemap_gen_meta_get( ACECRAWL_SITEMAP_GEN_WITHHELD ) ),
         'worker_busy'  => $worker_busy,
-        'next_run'     => wp_next_scheduled( ACE_SITEMAP_GEN_HOOK ),
+        'next_run'     => wp_next_scheduled( ACECRAWL_SITEMAP_GEN_HOOK ),
         'last_run'     => $state['last_run'] ?? null,
         'last_success' => $state['last_success'] ?? null,
         'last_failure' => $state['last_failure'] ?? null,
-        'host_lock'    => (string) apply_filters( 'ace_sitemap_generation_shared_lock', defined( 'ACE_SITEMAP_SHARED_LOCK' ) ? ACE_SITEMAP_SHARED_LOCK : '' ) !== '' ? 'configured' : 'off (per-site only)',
+        'host_lock'    => (string) apply_filters( 'acecrawl_sitemap_generation_shared_lock', defined( 'ACECRAWL_SITEMAP_SHARED_LOCK' ) ? ACECRAWL_SITEMAP_SHARED_LOCK : '' ) !== '' ? 'configured' : 'off (per-site only)',
         'served'       => $counts,
     );
 }
 
-function ace_sitemap_gen_set_paused( $paused ) {
-    ace_sitemap_gen_update_state( function ( $state ) use ( $paused ) {
+function acecrawl_sitemap_gen_set_paused( $paused ) {
+    acecrawl_sitemap_gen_update_state( function ( $state ) use ( $paused ) {
         $state['paused'] = (bool) $paused;
         return $state;
     } );
     if ( ! $paused ) {
-        ace_sitemap_gen_schedule( 1 );
+        acecrawl_sitemap_gen_schedule( 1 );
     }
 }
 
-function ace_sitemap_gen_retry_failures() {
-    ace_sitemap_gen_update_state( function ( $state ) {
+function acecrawl_sitemap_gen_retry_failures() {
+    acecrawl_sitemap_gen_update_state( function ( $state ) {
         $state['failures'] = array();
         return $state;
     } );
-    ace_sitemap_gen_schedule( 1 );
+    acecrawl_sitemap_gen_schedule( 1 );
 }
 
-function ace_sitemap_gen_render_status_panel() {
+function acecrawl_sitemap_gen_render_status_panel() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
 
-    $s    = ace_sitemap_gen_status();
+    $s    = acecrawl_sitemap_gen_status();
     $when = function ( $ts ) {
         return $ts ? esc_html( human_time_diff( (int) $ts ) . ( $ts > time() ? ' from now' : ' ago' ) ) : '&ndash;';
     };
 
     echo '<h2>Background regeneration</h2>';
     if ( ! $s['enabled'] ) {
-        echo '<p>No writable sitemap store, so sitemaps use the object cache only. Check that uploads is writable or set <code>ace_sitemap_generation_dir</code>.</p>';
+        echo '<p>No writable sitemap store, so sitemaps use the object cache only. Check that uploads is writable or set <code>acecrawl_sitemap_generation_dir</code>.</p>';
         return;
     }
 
@@ -1220,7 +1220,7 @@ function ace_sitemap_gen_render_status_panel() {
     echo '</form>';
 }
 
-function ace_sitemap_gen_handle_admin_action() {
+function acecrawl_sitemap_gen_handle_admin_action() {
     if ( empty( $_POST['ace_sitemap_gen_do'] ) || ! current_user_can( 'manage_options' ) ) {
         return;
     }
@@ -1229,19 +1229,19 @@ function ace_sitemap_gen_handle_admin_action() {
     $requested = map_deep( (array) wp_unslash( $_POST['ace_sitemap_gen_do'] ), 'sanitize_text_field' );
     $action    = sanitize_key( (string) key( $requested ) );
     if ( 'pause' === $action ) {
-        ace_sitemap_gen_set_paused( true );
+        acecrawl_sitemap_gen_set_paused( true );
     } elseif ( 'resume' === $action ) {
-        ace_sitemap_gen_set_paused( false );
+        acecrawl_sitemap_gen_set_paused( false );
     } elseif ( 'rebuild' === $action ) {
-        ace_sitemap_gen_mark_dirty( 'all', true );
+        acecrawl_sitemap_gen_mark_dirty( 'all', true );
     } elseif ( 'retry' === $action ) {
-        ace_sitemap_gen_retry_failures();
+        acecrawl_sitemap_gen_retry_failures();
     }
 
     wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url() );
     exit;
 }
-add_action( 'admin_init', 'ace_sitemap_gen_handle_admin_action' );
+add_action( 'admin_init', 'acecrawl_sitemap_gen_handle_admin_action' );
 
 /* -------------------------------------------------- Redis Cache integration */
 
@@ -1250,8 +1250,8 @@ add_action( 'admin_init', 'ace_sitemap_gen_handle_admin_action' );
  * store active that request would only duplicate the queued rebuild, so sitemap URLs are
  * taken out of its queue through its public filter. Other warm-up URLs are untouched.
  */
-function ace_sitemap_gen_filter_redis_prime_urls( $urls ) {
-    if ( ! ace_sitemap_gen_enabled() ) {
+function acecrawl_sitemap_gen_filter_redis_prime_urls( $urls ) {
+    if ( ! acecrawl_sitemap_gen_enabled() ) {
         return $urls;
     }
 
@@ -1263,7 +1263,7 @@ function ace_sitemap_gen_filter_redis_prime_urls( $urls ) {
         if ( 'sitemap.xml' === $path || 0 === strpos( $path, 'wp-sitemap' ) ) {
             return false;
         }
-        foreach ( array_keys( ace_sitemap_powertools_custom_routes() ) as $slug ) {
+        foreach ( array_keys( acecrawl_sitemap_custom_routes() ) as $slug ) {
             if ( preg_match( '~^' . preg_quote( $slug, '~' ) . '(-\d+)?(\.xml)?$~', $path ) ) {
                 return false;
             }
@@ -1271,7 +1271,7 @@ function ace_sitemap_gen_filter_redis_prime_urls( $urls ) {
         return true;
     } ) );
 }
-add_filter( 'ace_rc_sitemap_prime_urls', 'ace_sitemap_gen_filter_redis_prime_urls', 20 );
+add_filter( 'ace_rc_sitemap_prime_urls', 'acecrawl_sitemap_gen_filter_redis_prime_urls', 20 );
 
 /* ---------------------------------------------------------------- WP-CLI */
 
@@ -1290,23 +1290,23 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
         $sub = $args[0] ?? 'status';
         switch ( $sub ) {
             case 'run':
-                WP_CLI::log( wp_json_encode( ace_sitemap_gen_run( array( 'force' => ! empty( $assoc['force'] ) ) ) ) );
+                WP_CLI::log( wp_json_encode( acecrawl_sitemap_gen_run( array( 'force' => ! empty( $assoc['force'] ) ) ) ) );
                 break;
             case 'mark-dirty':
-                ace_sitemap_gen_mark_dirty( $assoc['scope'] ?? 'all', true );
+                acecrawl_sitemap_gen_mark_dirty( $assoc['scope'] ?? 'all', true );
                 WP_CLI::success( 'Marked dirty; a background pass is scheduled.' );
                 break;
             case 'pause':
             case 'resume':
-                ace_sitemap_gen_set_paused( 'pause' === $sub );
+                acecrawl_sitemap_gen_set_paused( 'pause' === $sub );
                 WP_CLI::success( ucfirst( $sub ) . 'd.' );
                 break;
             case 'retry':
-                ace_sitemap_gen_retry_failures();
+                acecrawl_sitemap_gen_retry_failures();
                 WP_CLI::success( 'Failures cleared; a pass is scheduled.' );
                 break;
             default:
-                WP_CLI::log( wp_json_encode( ace_sitemap_gen_status(), JSON_PRETTY_PRINT ) );
+                WP_CLI::log( wp_json_encode( acecrawl_sitemap_gen_status(), JSON_PRETTY_PRINT ) );
         }
     } );
 }

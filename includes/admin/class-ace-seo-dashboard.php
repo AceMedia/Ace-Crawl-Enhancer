@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEODashboard {
+class AceCrawlDashboard {
     
     /**
      * Initialize dashboard functionality
@@ -40,12 +40,12 @@ class AceSEODashboard {
      * Render performance overview widget
      */
     public function render_performance_widget() {
-        if ( ! class_exists( 'AceSEOApiHelper' ) || ! AceSEOApiHelper::is_performance_monitoring_enabled() ) {
+        if ( ! class_exists( 'AceCrawlApiHelper' ) || ! AceCrawlApiHelper::is_performance_monitoring_enabled() ) {
             echo '<p>PageSpeed monitoring is not enabled. <a href="' . esc_url( admin_url( 'admin.php?page=ace-seo-settings' ) ) . '">Configure it here</a>.</p>';
             return;
         }
         
-        $monitoring_data = get_option( 'ace_seo_performance_monitoring', array() );
+        $monitoring_data = get_option( 'acecrawl_performance_monitoring', array() );
         
         if ( empty( $monitoring_data ) ) {
             echo '<p>No performance data available yet. Data will appear after the first monitoring cycle.</p>';
@@ -172,7 +172,7 @@ class AceSEODashboard {
      * Add dashboard styles
      */
     private function add_dashboard_styles() {
-        AceSeoAssets::inline_style( 'ace-seo-class-ace-seo-dashboard-style', '
+        AceCrawlAssets::inline_style( 'ace-seo-class-ace-seo-dashboard-style', '
         .ace-dashboard-performance {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
@@ -260,7 +260,7 @@ class AceSEODashboard {
      * Add dashboard script
      */
     private function add_dashboard_script() {
-        AceSeoAssets::inline_script( 'ace-seo-class-ace-seo-dashboard-script', '
+        AceCrawlAssets::inline_script( 'ace-seo-class-ace-seo-dashboard-script', '
         function triggerPerformanceCheck() {
             var button = event.target;
             button.disabled = true;
@@ -270,7 +270,7 @@ class AceSEODashboard {
                 url: ajaxurl,
                 method: "POST",
                 data: {
-                    action: "ace_seo_monitor_performance",
+                    action: "acecrawl_monitor_performance",
                     nonce: "' . esc_js( wp_create_nonce( 'ace_seo_performance_test' ) ) . '"
                 },
                 success: function(response) {
@@ -294,4 +294,4 @@ class AceSEODashboard {
 }
 
 // Initialize the dashboard
-new AceSEODashboard();
+new AceCrawlDashboard();

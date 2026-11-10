@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Activation handler
  */
-class AceSEOActivator {
+class AceCrawlActivator {
     
     /**
      * Run on plugin activation
@@ -41,16 +41,16 @@ class AceSEOActivator {
         self::schedule_database_optimization();
         
         // Add sitemap powertools rewrites if available
-        if ( function_exists( 'ace_sitemap_powertools_add_rewrite_rules' ) ) {
-            ace_sitemap_powertools_add_rewrite_rules();
+        if ( function_exists( 'acecrawl_sitemap_add_rewrite_rules' ) ) {
+            acecrawl_sitemap_add_rewrite_rules();
         }
 
         // Schedule any cron jobs
         self::schedule_events();
         
         // Set activation flag
-        update_option( 'ace_seo_activation_date', current_time( 'mysql' ), false );
-        update_option( 'ace_seo_version', ACE_SEO_VERSION, false );
+        update_option( 'acecrawl_activation_date', current_time( 'mysql' ), false );
+        update_option( 'acecrawl_version', ACECRAWL_VERSION, false );
     }
     
     /** Run a lifecycle operation for every site, restoring the caller's site. */
@@ -73,7 +73,7 @@ class AceSEOActivator {
     /** Initialise a new site only when this plugin is network active. */
     public static function initialize_site( $site ) {
         $active = (array) get_site_option( 'active_sitewide_plugins', array() );
-        if ( ! isset( $active[ ACE_SEO_BASENAME ] ) ) {
+        if ( ! isset( $active[ ACECRAWL_BASENAME ] ) ) {
             return;
         }
         switch_to_blog( (int) $site->blog_id );
@@ -92,7 +92,7 @@ class AceSEOActivator {
         
         // Check WordPress version
         if ( version_compare( $wp_version, '6.0', '<' ) ) {
-            deactivate_plugins( ACE_SEO_BASENAME );
+            deactivate_plugins( ACECRAWL_BASENAME );
             wp_die( 
                 esc_html__( 'Ace SEO requires WordPress 6.0 or higher.', 'ace-crawl-enhancer' ),
                 esc_html__( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
@@ -103,7 +103,7 @@ class AceSEOActivator {
         
         // Check PHP version
         if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
-            deactivate_plugins( ACE_SEO_BASENAME );
+            deactivate_plugins( ACECRAWL_BASENAME );
             wp_die( 
                 esc_html__( 'Ace SEO requires PHP 7.4 or higher.', 'ace-crawl-enhancer' ),
                 esc_html__( 'Plugin Activation Error', 'ace-crawl-enhancer' ),
@@ -120,7 +120,7 @@ class AceSEOActivator {
      */
     private static function set_default_options() {
         // Unified settings structure
-        if ( ! get_option( 'ace_seo_options' ) ) {
+        if ( ! get_option( 'acecrawl_options' ) ) {
             $default_options = array(
                 'general' => array(
                     'separator' => '|',
@@ -150,11 +150,11 @@ class AceSEOActivator {
                     'core_web_vitals' => 1,
                 ),
             );
-            update_option( 'ace_seo_options', $default_options );
+            update_option( 'acecrawl_options', $default_options );
         }
         
         // Legacy settings for backward compatibility
-        if ( ! get_option( 'ace_seo_settings' ) ) {
+        if ( ! get_option( 'acecrawl_settings' ) ) {
             $default_settings = array(
                 'site_name' => get_bloginfo( 'name' ),
                 'site_description' => get_bloginfo( 'description' ),
@@ -162,11 +162,11 @@ class AceSEOActivator {
                 'schema_enabled' => true,
                 'conflict_detection' => true
             );
-            update_option( 'ace_seo_settings', $default_settings );
+            update_option( 'acecrawl_settings', $default_settings );
         }
         
         // Social settings
-        if ( ! get_option( 'ace_seo_social_settings' ) ) {
+        if ( ! get_option( 'acecrawl_social_settings' ) ) {
             $social_settings = array(
                 'og_enabled' => true,
                 'twitter_enabled' => true,
@@ -175,11 +175,11 @@ class AceSEOActivator {
                 'twitter_username' => '',
                 'twitter_card_type' => 'summary_large_image'
             );
-            update_option( 'ace_seo_social_settings', $social_settings );
+            update_option( 'acecrawl_social_settings', $social_settings );
         }
         
         // Advanced settings  
-        if ( ! get_option( 'ace_seo_advanced_settings' ) ) {
+        if ( ! get_option( 'acecrawl_advanced_settings' ) ) {
             $advanced_settings = array(
                 'noindex_empty_categories' => true,
                 'noindex_paginated_pages' => false,
@@ -188,7 +188,7 @@ class AceSEOActivator {
                 'redirect_attachment_urls' => true,
                 'clean_head' => true
             );
-            update_option( 'ace_seo_advanced_settings', $advanced_settings );
+            update_option( 'acecrawl_advanced_settings', $advanced_settings );
         }
     }
 
@@ -199,13 +199,13 @@ class AceSEOActivator {
 
         $counts = wp_count_posts( 'post' );
         $published = isset( $counts->publish ) ? (int) $counts->publish : 0;
-        $threshold = (int) apply_filters( 'ace_sitemap_powertools_large_site_threshold', 1000 );
+        $threshold = (int) apply_filters( 'acecrawl_sitemap_large_site_threshold', 1000 );
 
         if ( $published < $threshold ) {
             return;
         }
 
-        $options = get_option( 'ace_sitemap_powertools_options' );
+        $options = get_option( 'acecrawl_sitemap_options' );
         if ( ! is_array( $options ) ) {
             $options = array();
         }
@@ -214,13 +214,13 @@ class AceSEOActivator {
             return;
         }
 
-        if ( function_exists( 'ace_sitemap_powertools_default_options' ) ) {
-            $options = array_merge( ace_sitemap_powertools_default_options(), $options );
+        if ( function_exists( 'acecrawl_sitemap_default_options' ) ) {
+            $options = array_merge( acecrawl_sitemap_default_options(), $options );
         }
 
         $options['enable_index_lastmod'] = 0;
-        update_option( 'ace_sitemap_powertools_options', $options );
-        update_option( 'ace_sitemap_powertools_large_site_notice', 1, false );
+        update_option( 'acecrawl_sitemap_options', $options );
+        update_option( 'acecrawl_sitemap_large_site_notice', 1, false );
     }
     
     /**
@@ -256,13 +256,13 @@ class AceSEOActivator {
      */
     private static function schedule_database_optimization() {
         // Schedule immediate background optimization
-        if ( ! wp_next_scheduled( 'ace_seo_optimize_database' ) ) {
+        if ( ! wp_next_scheduled( 'acecrawl_optimize_database' ) ) {
             // Schedule for 30 seconds from now to allow activation to complete
-            wp_schedule_single_event( time() + 30, 'ace_seo_optimize_database' );
+            wp_schedule_single_event( time() + 30, 'acecrawl_optimize_database' );
             
             // Set a flag that optimization is pending
-            update_option( 'ace_seo_db_optimization_pending', true, false );
-            update_option( 'ace_seo_db_optimization_scheduled', current_time( 'mysql' ), false );
+            update_option( 'acecrawl_db_optimization_pending', true, false );
+            update_option( 'acecrawl_db_optimization_scheduled', current_time( 'mysql' ), false );
         }
     }
     
@@ -271,8 +271,8 @@ class AceSEOActivator {
      */
     private static function optimize_database() {
         // Include the database optimizer
-        if ( file_exists( ACE_SEO_PATH . 'includes/database/class-database-optimizer.php' ) ) {
-            require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+        if ( file_exists( ACECRAWL_PATH . 'includes/database/class-database-optimizer.php' ) ) {
+            require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             
             if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
                 $optimizer = new ACE_SEO_Database_Optimizer();
@@ -284,9 +284,9 @@ class AceSEOActivator {
                 }
                 
                 // Clear pending flag and store completion status
-                delete_option( 'ace_seo_db_optimization_pending' );
-                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ), false );
-                update_option( 'ace_seo_db_optimization_results', $results, false );
+                delete_option( 'acecrawl_db_optimization_pending' );
+                update_option( 'acecrawl_db_optimized', current_time( 'mysql' ), false );
+                update_option( 'acecrawl_db_optimization_results', $results, false );
             }
         }
     }
@@ -296,8 +296,8 @@ class AceSEOActivator {
      */
     private static function schedule_events() {
         // Cleanup legacy cron hooks removed from the plugin.
-        wp_clear_scheduled_hook( 'ace_seo_generate_sitemap' );
-        wp_clear_scheduled_hook( 'ace_seo_cleanup_analytics' );
+        wp_clear_scheduled_hook( 'acecrawl_generate_sitemap' );
+        wp_clear_scheduled_hook( 'acecrawl_cleanup_analytics' );
 
         // The runtime owns the public background optimisation callback.
     }
@@ -306,14 +306,14 @@ class AceSEOActivator {
 /**
  * Deactivation handler
  */
-class AceSEODeactivator {
+class AceCrawlDeactivator {
     
     /**
      * Run on plugin deactivation
      */
     public static function deactivate( $network_wide = false ) {
         if ( is_multisite() && $network_wide ) {
-            AceSEOActivator::for_each_site( array( __CLASS__, 'deactivate' ) );
+            AceCrawlActivator::for_each_site( array( __CLASS__, 'deactivate' ) );
             return;
         }
         // Clear scheduled events
@@ -337,8 +337,8 @@ class AceSEODeactivator {
         }
         
         // Clear optimization flags
-        delete_option( 'ace_seo_db_optimization_pending' );
+        delete_option( 'acecrawl_db_optimization_pending' );
     }
 }
 
-add_action( 'wp_initialize_site', array( 'AceSEOActivator', 'initialize_site' ), 200 );
+add_action( 'wp_initialize_site', array( 'AceCrawlActivator', 'initialize_site' ), 200 );

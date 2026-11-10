@@ -24,7 +24,7 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 - Available on all consuming sites under Redirects → Auto, without a site flag or developer configuration. Scheduled application defaults off with an empty scope. Review and evidence capture work on indexable and discouraged sites; WordPress noindex remains an application hold. A staging site's absent analytics says nothing about live traffic.
 - Review a specific post/page replacement and reason, save an immutable assessment, then approve a qualifying pair for up to 24 hours. Explicit source scope (maximum 10), one pair per run and at most three applications per UTC day limit processing. Queue controls are bound to the current site URL/blog; cloned databases require fresh configuration and approval.
 - Traffic uses the site's existing dated Analytics/Search Console/own-tracking adapters and their coverage attestations. Verified zero, missing, capped and stale data remain distinct. The chosen period and relevant season must be complete. No traffic or provider is fabricated to make a test pass.
-- Link-data providers can supply complete, fresh provenance via `ace_seo_retention_link_evidence`. Without a provider, an administrator can explicitly attest a zero-link review with a source/method, identity and timestamp. It expires after 24 hours, is preserved in the assessment and cannot override positive saved/provider counts. No custom integration is required for this reviewed path.
+- Link-data providers can supply complete, fresh provenance via `acecrawl_retention_link_evidence`. Without a provider, an administrator can explicitly attest a zero-link review with a source/method, identity and timestamp. It expires after 24 hours, is preserved in the assessment and cannot override positive saved/provider counts. No custom integration is required for this reviewed path.
 - Current DB facts and permissions, completed report generations, HTTP/canonical/indexability checks, keeps and existing redirects are rechecked before application. InnoDB transactions, locks and a durable audit ledger protect writes; cache completion retries and guarded undo handle failures. A 301 has no automatic expiry, Trash or deletion and is not toggled by future scores/seasons.
 - Destination picker queries exclude frontend full-text SQL filters while preserving type choices and manual URLs. Cross-process cache verification is part of consumer release checks; deployments must keep their active cache drop-ins aligned with their installed source.
 - Read [RETENTION-REDIRECTS.md](RETENTION-REDIRECTS.md) for setup, first live testing and rollback. The initial release schedules explicitly approved pairs. Broader category/event rule selection, proposed replacement matching and post-change review signals remain tracked in #34; they are not required to test this approved-pair workflow.
@@ -83,15 +83,15 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 - [x] Remove `test-background-optimization.php`, `test-homepage-sync.php`, `fix-slashes.php` from the
   plugin root. (2026-07-07)
 - [x] Sync versions — all bumped to 1.0.6 (plugin header/constant, `package.json`, README badges).
-- [x] Autoload audit: all admin-only bookkeeping options (`ace_seo_performance_monitoring`, db
+- [x] Autoload audit: all admin-only bookkeeping options (`acecrawl_performance_monitoring`, db
   optimisation flags, sitemap notices, version/activation) now written with `autoload=false`, plus a
-  `maybe_upgrade()` routine (on `admin_init`, keyed off `ace_seo_version`) that fixes the flags on
-  existing installs via `wp_set_option_autoload_values()`. `ace_seo_options` and
-  `ace_sitemap_powertools_options` stay autoloaded (front-end reads). Uninstall now also cleans
-  `ace_seo_options` + the bookkeeping/sitemap options it previously missed.
+  `maybe_upgrade()` routine (on `admin_init`, keyed off `acecrawl_version`) that fixes the flags on
+  existing installs via `wp_set_option_autoload_values()`. `acecrawl_options` and
+  `acecrawl_sitemap_options` stay autoloaded (front-end reads). Uninstall now also cleans
+  `acecrawl_options` + the bookkeeping/sitemap options it previously missed.
 - [x] AI endpoint cost control: shared `guard()` on all 14 AI AJAX endpoints — nonce + filterable
-  capability (`ace_seo_ai_capability`, default `edit_posts`) + per-user hourly rate limit
-  (`ace_seo_ai_rate_limit`, default 60/h, admins exempt, 0 disables).
+  capability (`acecrawl_ai_capability`, default `edit_posts`) + per-user hourly rate limit
+  (`acecrawl_ai_rate_limit`, default 60/h, admins exempt, 0 disables).
 - [x] Double-brand title fix — resolved differently from the original plan: upstream `5740dc8`
   cleared site/tagline unconditionally, which would have stripped the brand from the live sites'
   brand-free manual titles; refined to clear site/tagline **only when the title came from a
@@ -104,7 +104,7 @@ Phase 5 = #1 + #7 (pre-existing), Phase 6 = #15.
 
 Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitted, and a public API.
 
-- [x] **Consolidated to one graph builder** (2026-07-07): new `AceSeoSchemaGraph`
+- [x] **Consolidated to one graph builder** (2026-07-07): new `AceCrawlSchemaGraph`
   (`includes/frontend/class-ace-seo-schema-graph.php`) — provider registry, `@id` de-dupe/merge,
   per-node `@context` stripping, single printer. Investigation showed only ONE emitter was actually
   live; the schema class's LocalBusiness/enhancer/Product/FAQ were dead code and the performance
@@ -112,15 +112,15 @@ Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitte
 - [x] **BreadcrumbList JSON-LD** from `ACE_SEO_Breadcrumbs::get_items()` on every non-front page
   with a ≥2-item trail; referenced from the WebPage node; current page omits `item` per Google.
 - [x] **Orphaned builders wired as providers**: LocalBusiness (front page, settings-gated), Product
-  (`ace_seo_product_schema_enabled` — defaults off when WooCommerce core emits its own), FAQPage
-  (opt-in via `_ace_seo_faq-schema` post meta or `ace_seo_faq_schema_enabled`; metabox toggle UI
-  still to add). The dead `ace_seo_schema_article` enhancer (word count/reading time/section) is
+  (`acecrawl_product_schema_enabled` — defaults off when WooCommerce core emits its own), FAQPage
+  (opt-in via `_ace_seo_faq-schema` post meta or `acecrawl_faq_schema_enabled`; metabox toggle UI
+  still to add). The dead `acecrawl_schema_article` enhancer (word count/reading time/section) is
   now actually applied.
-- [x] **Provider API**: `ace_seo_register_schema_provider()` + `ace_seo_schema_graph` filter with
+- [x] **Provider API**: `acecrawl_register_schema_provider()` + `acecrawl_schema_graph` filter with
   context array; nodes merged by `@id` so providers can enrich core nodes. Documented with
   examples and well-known `@id` table in `docs/schema-api.md`.
 - [x] **Type coverage** (partial): WebPage node on every page (`isPartOf`/`mainEntityOfPage`
-  `@id`-linked), author Person as separate `@id` node, `ace_seo_article_schema_type` filter for
+  `@id`-linked), author Person as separate `@id` node, `acecrawl_article_schema_type` filter for
   NewsArticle/BlogPosting mapping (per-site/adapter wiring is Phase 2).
   - [x] VideoObject when singular content leads with a video block or YouTube/Vimeo/VideoPress/
     Dailymotion embed (first 5 top-level blocks; needs a featured image per Google's requirements).
@@ -139,27 +139,27 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 - [x] **Framework** (2026-07-07): `includes/integrations/class-ace-seo-integrations.php` — adapters
   run once on `template_redirect` (after all plugins register, before `wp_head`).
-- [x] **Directory adapter** (opt-in via the `ace_seo_directory_post_types` filter): maps a site's
+- [x] **Directory adapter** (opt-in via the `acecrawl_directory_post_types` filter): maps a site's
   business, job, location and event post types so they skip the redundant Article node and get
   LocalBusiness, JobPosting (hiringOrganization = linked business or site publisher `@id`) and Place
   schema from `address`/`geo_location` post meta. Plugins can also register their own nodes with
-  `ace_seo_register_schema_provider()` (the `ace_seo_emit_article` filter lets typed post types skip Article).
-- [x] **WooCommerce**: Product provider shipped in Phase 1 (`ace_seo_product_schema_enabled`,
+  `acecrawl_register_schema_provider()` (the `acecrawl_emit_article` filter lets typed post types skip Article).
+- [x] **WooCommerce**: Product provider shipped in Phase 1 (`acecrawl_product_schema_enabled`,
   defaults off while Woo core emits its own); `ItemList` now emitted on ALL archives (incl.
   product-category) from the main query — new `ace-seo/archive-items` provider, capped at 10.
   - [ ] Active suppression of Woo core's per-listing Product blocks when Ace SEO owns product
     schema (needs testing on the WooCommerce consumer sites before flipping).
 - [x] **NewsArticle mapping** (news sites): per-post-type settings key
   `schema.article_type_{post_type}` / `schema.article_type` feeding the
-  `ace_seo_article_schema_type` filter — set `NewsArticle` in `ace_seo_options` on news sites. No
+  `acecrawl_article_schema_type` filter — set `NewsArticle` in `acecrawl_options` on news sites. No
   settings UI yet (option/filter only).
   - [ ] `ace-tournament`/`ace-event-hub` → SportsEvent adapter: their plugin already emits its own
     JSON-LD; adapt when the news site bumps the submodule (or have them self-register via the API).
 - [ ] **Ace-Image-Enhancer**: ensure og:image / ImageObject point at the optimised rendition
   (needs a look at how it rewrites attachment URLs first).
 - [x] The `ace_event` sitemap exclusion was already option-driven + filterable
-  (`ace_sitemap_powertools_excluded_sitemap_taxonomies`) — no change needed.
-- [x] **SportsClub**: `local.business_type` in `ace_seo_options` is free-form and the
+  (`acecrawl_sitemap_excluded_sitemap_taxonomies`) — no change needed.
+- [x] **SportsClub**: `local.business_type` in `acecrawl_options` is free-form and the
   front-page LocalBusiness provider emits whatever type is configured (harness-tested with
   SportsClub) — the sports club site can move its theme-injected schema to config once it takes 1.0.6.
   - [ ] Settings UI for the `local` section (currently config-only via options).
@@ -206,7 +206,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
   (remove competing emitters before output instead of regexing the page).
 - [ ] Split the god files as they're touched: main file → title engine / meta output / migration /
   options classes; sitemap powertools → provider/cache/routes modules. No public rename.
-- [ ] Consider libsodium-encrypted storage for API keys in `ace_seo_options`.
+- [ ] Consider libsodium-encrypted storage for API keys in `acecrawl_options`.
 
 ## Per-task protocol for agents
 
@@ -218,7 +218,7 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 ## Live progress, sidebar notes, rule modal — 8 October 2026 (#25, #32)
 
-1.0.71: `AceSeoRetentionReport::progress_payload()` (also `wp_ajax_ace_seo_retention_progress`, nonce `ace_seo_retention_live`), `render_progress_panel()`, `render_aside()`, `ajax_dismiss` (user meta `ace_seo_retention_dismissed`, md5 of note text), `assets/js/retention-dashboard.js` polls every 5 s while `data-live="1"` and reloads when the check and any Sheet refresh are both quiet. `Ace_SEO_Timing_Suggestions::render_fields()` is the overview; `render_modal()` (outside the form) is a `<dialog>` with per-row pickers; `wp_ajax_ace_seo_timing_rules` → `AceSeoRetentionActions::set_timing_rules( $choices, $ignore )` (explicit rule text per term, '' removes); `explain_rule()` gives the plain-English meaning; `assets/js/timing-rules.js`.
+1.0.71: `AceCrawlRetentionReport::progress_payload()` (also `wp_ajax_acecrawl_retention_progress`, nonce `ace_seo_retention_live`), `render_progress_panel()`, `render_aside()`, `ajax_dismiss` (user meta `ace_seo_retention_dismissed`, md5 of note text), `assets/js/retention-dashboard.js` polls every 5 s while `data-live="1"` and reloads when the check and any Sheet refresh are both quiet. `AceCrawl_Timing_Suggestions::render_fields()` is the overview; `render_modal()` (outside the form) is a `<dialog>` with per-row pickers; `wp_ajax_acecrawl_timing_rules` → `AceCrawlRetentionActions::set_timing_rules( $choices, $ignore )` (explicit rule text per term, '' removes); `explain_rule()` gives the plain-English meaning; `assets/js/timing-rules.js`.
 
 ## Shared save bar and the at-a-glance pass — 8 October 2026 (#25)
 
@@ -226,35 +226,35 @@ Detection framework: `includes/integrations/class-ace-seo-integrations.php` — 
 
 ## Suggested timing rules — 7 October 2026 (#32)
 
-1.0.66: `includes/class-ace-seo-timing-suggestions.php`. `rows()` is one query joining assessed posts (tier meta) to their public terms with publication date and readership band; `infer()` is pure and per term computes persistence (share in daily/weekly/monthly bands), `season_band()` (shortest circular window holding 60% of dates, ≤ 90 days, widened a week each side), and cadence (`median_gap_days()`, span over gaps). Order of tests: season (≥ 2 years) → evergreen (persistence ≥ 15%) → event-bound (persistence < 3%, N = ceil(1.5 × cadence) clamped 2–30). ≥ 30 posts per term; filter `ace_seo_timing_suggestion_taxonomies`. Stored in `ace_seo_timing_suggestions`, recomputed on `ace_seo_retention_built`, lazily when older than the last build, or via `admin_post_ace_seo_timing_suggest`. UI inside the single settings form: `timing_accept[key]`, `timing_ignore[key]`, `timing_suggested[key]`, `timing_suggestions_present`; `save_report_settings()` adds accepted rules not written by hand, removes a rule in use as suggested when unticked, and stores `timing_ignored`. Checks: `tests/timing-suggestions-test.php` (17).
+1.0.66: `includes/class-ace-seo-timing-suggestions.php`. `rows()` is one query joining assessed posts (tier meta) to their public terms with publication date and readership band; `infer()` is pure and per term computes persistence (share in daily/weekly/monthly bands), `season_band()` (shortest circular window holding 60% of dates, ≤ 90 days, widened a week each side), and cadence (`median_gap_days()`, span over gaps). Order of tests: season (≥ 2 years) → evergreen (persistence ≥ 15%) → event-bound (persistence < 3%, N = ceil(1.5 × cadence) clamped 2–30). ≥ 30 posts per term; filter `acecrawl_timing_suggestion_taxonomies`. Stored in `acecrawl_timing_suggestions`, recomputed on `acecrawl_retention_built`, lazily when older than the last build, or via `admin_post_ace_seo_timing_suggest`. UI inside the single settings form: `timing_accept[key]`, `timing_ignore[key]`, `timing_suggested[key]`, `timing_suggestions_present`; `save_report_settings()` adds accepted rules not written by hand, removes a rule in use as suggested when unticked, and stores `timing_ignored`. Checks: `tests/timing-suggestions-test.php` (17).
 
 ## Timing rules, one save bar, plain-English dashboard — 7 October 2026 (#32, #25)
 
-1.0.65: `AceSeoRetentionActions::parse_timing_rules()` / `timing_rule_for()` (option `timing_rules`) feed `Ace_SEO_Retention_Evidence_View::base_context()` as `content_type`, `override` (with its own `source`) or `season`; `relevance()` resolves a season to its current or next occurrence with `recurring => true`; `timing_hold()` judges a finished one-off event on the period after it and otherwise needs a whole occurrence inside the period. Settings tab: one `<form id="ace-retention-settings-form">` posting `ace_seo_retention_settings_save` (`AceSeoRetentionReport::handle_settings_save()` runs every section's existing saver; `AceSeoSheets::save_settings()` and `AceSeoSheetsSchedule::save_settings()` are the redirect-free savers; `render_fields()` / `render_controls()` split fields from run/stop/retry). Dashboard: `render_summary()` + `hold_reasons()`; `tier_labels( $settings )` wording depends on the retained floor. Design notes came from a read-only Codex review (scratch, not committed).
+1.0.65: `AceCrawlRetentionActions::parse_timing_rules()` / `timing_rule_for()` (option `timing_rules`) feed `AceCrawl_Retention_Evidence_View::base_context()` as `content_type`, `override` (with its own `source`) or `season`; `relevance()` resolves a season to its current or next occurrence with `recurring => true`; `timing_hold()` judges a finished one-off event on the period after it and otherwise needs a whole occurrence inside the period. Settings tab: one `<form id="ace-retention-settings-form">` posting `ace_seo_retention_settings_save` (`AceCrawlRetentionReport::handle_settings_save()` runs every section's existing saver; `AceCrawlSheets::save_settings()` and `AceCrawlSheetsSchedule::save_settings()` are the redirect-free savers; `render_fields()` / `render_controls()` split fields from run/stop/retry). Dashboard: `render_summary()` + `hold_reasons()`; `tier_labels( $settings )` wording depends on the retained floor. Design notes came from a read-only Codex review (scratch, not committed).
 
 ## Readership bands — 7 October 2026 (#25, #32)
 
-1.0.64: `AceSeoRetentionReport::RANKS` = daily | weekly | monthly | occasional, `rank_cutoffs( $settings )` = days, ceil(days/7), ceil(days/30), max(1, retained_views); `rank()` returns '' unless `tier()` is retained, so bands and tiers cannot disagree. Stored in `_ace_seo_ret_rank` (in `meta_keys()` so `clear()` removes it), counted in `progress['ranks']` and `rank_counts()`, shown under Retained on the dashboard with post-list links (`ace_ret=<band>` filters on the rank meta), exported as the last column "Readership" and in the CSV `rank` column. With the retained floor at one view, a year-long window on a large archive splits roughly daily 40 / weekly 400 / monthly 3,500 / occasional 27,000, leaving under 3,000 with no recorded readers.
+1.0.64: `AceCrawlRetentionReport::RANKS` = daily | weekly | monthly | occasional, `rank_cutoffs( $settings )` = days, ceil(days/7), ceil(days/30), max(1, retained_views); `rank()` returns '' unless `tier()` is retained, so bands and tiers cannot disagree. Stored in `_ace_seo_ret_rank` (in `meta_keys()` so `clear()` removes it), counted in `progress['ranks']` and `rank_counts()`, shown under Retained on the dashboard with post-list links (`ace_ret=<band>` filters on the rank meta), exported as the last column "Readership" and in the CSV `rank` column. With the retained floor at one view, a year-long window on a large archive splits roughly daily 40 / weekly 400 / monthly 3,500 / occasional 27,000, leaving under 3,000 with no recorded readers.
 
 ## Strict timing policy and Analytics coverage start — 7 October 2026 (#32)
 
-1.0.63: `timing_policy` (`estimate` default | `strict`) in `ace_seo_retention_options` → `AceSeoRetentionReport::settings()['timing_policy']` → `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period, $strict )`. Strict holds any non-retained post whose relevance is not verified. `AceSeoRetentionReport::ga4_first_day()` (one cached GA4 request ordered by date) gives `signals['ga4_from']`; a window starting before it holds quiet posts with the coverage reason, and the dated-traffic provider marks such periods incomplete. The client site's property has data from mid-2025, so its 365-day window was covered; the volume of Dormant there was real low readership, which is why the strict policy exists as a choice rather than a default.
+1.0.63: `timing_policy` (`estimate` default | `strict`) in `acecrawl_retention_options` → `AceCrawlRetentionReport::settings()['timing_policy']` → `AceCrawl_Retention_Evidence::timing_hold( $relevance, $period, $strict )`. Strict holds any non-retained post whose relevance is not verified. `AceCrawlRetentionReport::ga4_first_day()` (one cached GA4 request ordered by date) gives `signals['ga4_from']`; a window starting before it holds quiet posts with the coverage reason, and the dated-traffic provider marks such periods incomplete. The client site's property has data from mid-2025, so its 365-day window was covered; the volume of Dormant there was real low readership, which is why the strict policy exists as a choice rather than a default.
 
 ## Timing holds in the saved report — 7 October 2026 (#32)
 
-1.0.62: `Ace_SEO_Retention_Evidence::timing_hold( $relevance, $period )` is pure and shared by the preview and the scorer. `phase_score()` works out the build's period (started minus `days`), reads `base_context()` for each post (editor fields, linked events, anniversary; no API calls) and, unless the post is retained, sets tier `unknown` / bucket `no-signal` with `reason` "Not ready to judge. …" and `hold` when the period did not contain the relevant dates. `phase_ga4()` records `ga4_capped`; a capped Analytics list makes absent pages `null` views. `do_action( 'ace_seo_retention_built', $p )` fires once a build completes; `AceSeoSheetsSchedule::after_build()` (setting `after_build`) starts a manual-type refresh so the sheet follows the report. The first live run of 1.0.59 showed a 365-day window judging posts whose relevant dates were simply unknown — those are not held (the period stands on its own); only known dates outside the period hold.
+1.0.62: `AceCrawl_Retention_Evidence::timing_hold( $relevance, $period )` is pure and shared by the preview and the scorer. `phase_score()` works out the build's period (started minus `days`), reads `base_context()` for each post (editor fields, linked events, anniversary; no API calls) and, unless the post is retained, sets tier `unknown` / bucket `no-signal` with `reason` "Not ready to judge. …" and `hold` when the period did not contain the relevant dates. `phase_ga4()` records `ga4_capped`; a capped Analytics list makes absent pages `null` views. `do_action( 'acecrawl_retention_built', $p )` fires once a build completes; `AceCrawlSheetsSchedule::after_build()` (setting `after_build`) starts a manual-type refresh so the sheet follows the report. The first live run of 1.0.59 showed a 365-day window judging posts whose relevant dates were simply unknown — those are not held (the period stands on its own); only known dates outside the period hold.
 
 ## Timing columns in exports — 7 October 2026 (#25, #32)
 
-1.0.61: `AceSeoExport::timing_context()` → `Ace_SEO_Retention_Evidence_View::timing_columns()` appends *When it matters*, *Relevant window*, *Timing basis*, *Linked events*, *Assessed in season?* to every CSV/Sheets row. It reads `base_context()` (editor fields, linked `ace_event` terms, anniversary estimate) and never runs the evidence-context filter, so an export of 40k rows makes no Analytics or Search Console calls. Verdicts stay out of the sheet: the client decides. Checks in `tests/retention-event-provider-test.php`.
+1.0.61: `AceCrawlExport::timing_context()` → `AceCrawl_Retention_Evidence_View::timing_columns()` appends *When it matters*, *Relevant window*, *Timing basis*, *Linked events*, *Assessed in season?* to every CSV/Sheets row. It reads `base_context()` (editor fields, linked `ace_event` terms, anniversary estimate) and never runs the evidence-context filter, so an export of 40k rows makes no Analytics or Search Console calls. Verdicts stay out of the sheet: the client decides. Checks in `tests/retention-event-provider-test.php`.
 
 ## Dated traffic and editorial timing — 7 October 2026 (#32)
 
-1.0.60 adds `includes/class-ace-seo-retention-dated-traffic.php`, a built-in `ace_seo_retention_evidence_context` provider: for a finished period it fetches, once and cached, Analytics page views by path (`AceSeoRetentionReport::ga4_report( $start, $end )`), Search Console rows by URL (`AceSEOSearchConsole::pages_between()`), or the plugin's own tracking by post ID (`AceSeoViewTracker::views_between()` bounded by `coverage_start()`), and sets `metrics`, `metric_period` and `coverage` {complete, capped, sources, notes}. `Ace_SEO_Retention_Evidence_View::prepare()` swaps the exact-date figures into the row the rules judge; the saved row is never changed. Per-post Advanced-tab fields `_ace_seo_retention_timing` (evergreen|dates|auto), `_ace_seo_relevant_from`, `_ace_seo_relevant_to` feed `override`/`content_type`. `tests/retention-dated-traffic-test.php` covers unfinished periods, no source, both sources complete, measured zeros, capped Analytics, mid-period tracking, search-only, the 16-month Search Console limit, the editorial fields and provider override order. Still open on #32: a verified event-occurrence picker bound to Ace Teams & Events editions (today an editor types the dates), the three extra suggestions, and reporting the preview's verdicts beyond the preview/snapshot.
+1.0.60 adds `includes/class-ace-seo-retention-dated-traffic.php`, a built-in `acecrawl_retention_evidence_context` provider: for a finished period it fetches, once and cached, Analytics page views by path (`AceCrawlRetentionReport::ga4_report( $start, $end )`), Search Console rows by URL (`AceCrawlSearchConsole::pages_between()`), or the plugin's own tracking by post ID (`AceCrawlViewTracker::views_between()` bounded by `coverage_start()`), and sets `metrics`, `metric_period` and `coverage` {complete, capped, sources, notes}. `AceCrawl_Retention_Evidence_View::prepare()` swaps the exact-date figures into the row the rules judge; the saved row is never changed. Per-post Advanced-tab fields `_ace_seo_retention_timing` (evergreen|dates|auto), `_ace_seo_relevant_from`, `_ace_seo_relevant_to` feed `override`/`content_type`. `tests/retention-dated-traffic-test.php` covers unfinished periods, no source, both sources complete, measured zeros, capped Analytics, mid-period tracking, search-only, the 16-month Search Console limit, the editorial fields and provider override order. Still open on #32: a verified event-occurrence picker bound to Ace Teams & Events editions (today an editor types the dates), the three extra suggestions, and reporting the preview's verdicts beyond the preview/snapshot.
 
 ## Build worker recovery — 7 October 2026 (#30)
 
-1.0.59 makes the retention build self-healing: heartbeat and consecutive-failure count in the progress record, a lease row (`ace_seo_retention_lock`, INSERT IGNORE + compare-and-swap) so a second worker stands down, a shutdown handler that treats a fatal mid-step as a failed attempt and queues the next tick, `worker_state()` (idle/queued/running/interrupted/error/done), `resume()`/`recover()` on an hourly `ace_seo_retention_watch` event, on `admin_init` and inside `run_weekly()`. `tests/retention-worker-recovery-test.php` covers the lost tick, a live lease, an expired lease, repeated failures, the fatal path, the admin action and `run_all()`. Still open from #30: a durable staged generation with an atomic last-complete result; today a resumed build keeps writing rows in place, which is what it did before.
+1.0.59 makes the retention build self-healing: heartbeat and consecutive-failure count in the progress record, a lease row (`acecrawl_retention_lock`, INSERT IGNORE + compare-and-swap) so a second worker stands down, a shutdown handler that treats a fatal mid-step as a failed attempt and queues the next tick, `worker_state()` (idle/queued/running/interrupted/error/done), `resume()`/`recover()` on an hourly `acecrawl_retention_watch` event, on `admin_init` and inside `run_weekly()`. `tests/retention-worker-recovery-test.php` covers the lost tick, a live lease, an expired lease, repeated failures, the fatal path, the admin action and `run_all()`. Still open from #30: a durable staged generation with an atomic last-complete result; today a resumed build keeps writing rows in place, which is what it did before.
 
 ## Retention evidence preview — 7 October 2026
 

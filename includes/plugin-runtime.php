@@ -1,25 +1,29 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
-require_once ACE_SEO_PATH . 'includes/class-ace-seo-assets.php';
-require_once ACE_SEO_PATH . 'includes/class-ace-seo-input.php';
-require_once ACE_SEO_PATH . 'includes/shared-ai/bootstrap.php';
-require_once ACE_SEO_PATH . 'includes/ace-seo-discourage.php';
-require_once ACE_SEO_PATH . 'includes/ace-sitemap-powertools.php';
-require_once ACE_SEO_PATH . 'includes/ace-sitemap-generations.php';
+// Source installs from before the acecrawl prefix keep their old names working. Not part of the WordPress.org package.
+if ( file_exists( ACECRAWL_PATH . 'compat/legacy-names.php' ) ) {
+    require_once ACECRAWL_PATH . 'compat/legacy-names.php';
+}
+require_once ACECRAWL_PATH . 'includes/class-ace-seo-assets.php';
+require_once ACECRAWL_PATH . 'includes/class-ace-seo-input.php';
+require_once ACECRAWL_PATH . 'includes/shared-ai/bootstrap.php';
+require_once ACECRAWL_PATH . 'includes/ace-seo-discourage.php';
+require_once ACECRAWL_PATH . 'includes/ace-sitemap-powertools.php';
+require_once ACECRAWL_PATH . 'includes/ace-sitemap-generations.php';
 
 // Plugin-specific meta keys - no longer use Yoast keys for storage
-define('ACE_SEO_META_PREFIX', '_ace_seo_');
-define('ACE_SEO_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibility with existing templates
+define('ACECRAWL_META_PREFIX', '_ace_seo_');
+define('ACECRAWL_FORM_PREFIX', 'yoast_wpseo_'); // Keep form prefix for compatibility with existing templates
 
 /**
  * A term or archive name as titles and breadcrumbs show it. With "Capitalise names" on (Settings >
  * General), a name stored in lower case ("guides", "bet builder tips") starts with a capital, so a title
  * or crumb reads as a heading; the stored name is untouched.
  */
-function ace_seo_display_name($name) {
+function acecrawl_display_name($name) {
     $name = (string) $name;
-    $options = get_option('ace_seo_options', []);
+    $options = get_option('acecrawl_options', []);
     if ('' === $name || empty($options['general']['capitalise_names'])) {
         return $name;
     }
@@ -268,7 +272,7 @@ class AceCrawlEnhancer {
             add_action('wp_head', [$this, 'output_head_tags']);
             
             // Skip REST API for logged-out users unless needed
-            if (is_user_logged_in() || !apply_filters('ace_seo_skip_rest_api', false)) {
+            if (is_user_logged_in() || !apply_filters('acecrawl_skip_rest_api', false)) {
                 add_action('rest_api_init', [$this, 'register_rest_routes']);
             }
             
@@ -297,7 +301,7 @@ class AceCrawlEnhancer {
             add_action('admin_notices', [$this, 'display_migration_notices']);
             
             // Admin columns (skip for frontend users)
-            if (!apply_filters('ace_seo_skip_admin_columns', false)) {
+            if (!apply_filters('acecrawl_skip_admin_columns', false)) {
                 add_filter('manage_posts_columns', [$this, 'add_admin_columns']);
                 add_filter('manage_pages_columns', [$this, 'add_admin_columns']);
                 add_action('manage_posts_custom_column', [$this, 'populate_admin_columns'], 10, 2);
@@ -307,7 +311,7 @@ class AceCrawlEnhancer {
         
         // Always needed
         add_action('init', [$this, 'register_meta_fields']);
-        add_action('ace_seo_optimize_database', [$this, 'run_background_optimization']);
+        add_action('acecrawl_optimize_database', [$this, 'run_background_optimization']);
         
         // Homepage synchronization hook
         add_action('updated_post_meta', [$this, 'sync_homepage_meta'], 10, 4);
@@ -319,27 +323,27 @@ class AceCrawlEnhancer {
      * don't re-run activation, so this is the only reliable upgrade path).
      */
     public function maybe_upgrade() {
-        if (get_option('ace_seo_version') === ACE_SEO_VERSION) {
+        if (get_option('acecrawl_version') === ACECRAWL_VERSION) {
             return;
         }
 
         // Admin-only bookkeeping options shouldn't load on every front-end request.
         if (function_exists('wp_set_option_autoload_values')) {
             wp_set_option_autoload_values([
-                'ace_seo_activation_date'                  => false,
-                'ace_seo_db_optimized'                     => false,
-                'ace_seo_db_optimization_results'          => false,
-                'ace_seo_db_optimization_pending'          => false,
-                'ace_seo_db_optimization_scheduled'        => false,
-                'ace_seo_optimization_progress'            => false,
-                'ace_seo_performance_monitoring'           => false,
-                'ace_sitemap_powertools_purge_notice'      => false,
-                'ace_sitemap_powertools_large_site_notice' => false,
-                'ace_sitemap_powertools_legacy_cache_purged' => false,
+                'acecrawl_activation_date'                  => false,
+                'acecrawl_db_optimized'                     => false,
+                'acecrawl_db_optimization_results'          => false,
+                'acecrawl_db_optimization_pending'          => false,
+                'acecrawl_db_optimization_scheduled'        => false,
+                'acecrawl_optimization_progress'            => false,
+                'acecrawl_performance_monitoring'           => false,
+                'acecrawl_sitemap_purge_notice'      => false,
+                'acecrawl_sitemap_large_site_notice' => false,
+                'acecrawl_sitemap_legacy_cache_purged' => false,
             ]);
         }
 
-        update_option('ace_seo_version', ACE_SEO_VERSION, false);
+        update_option('acecrawl_version', ACECRAWL_VERSION, false);
     }
 
     /**
@@ -361,13 +365,13 @@ class AceCrawlEnhancer {
      */
     /** Load the Google integration handlers before REST route registration or scheduled work. */
     public function load_google_services() {
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-api-helper.php';
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-google-data.php';
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console.php';
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
-        new AceSEOGoogleData();
-        new AceSEOSearchConsole();
-        new AceSEOPageSpeed();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-api-helper.php';
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-google-data.php';
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-search-console.php';
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-pagespeed.php';
+        new AceCrawlGoogleData();
+        new AceCrawlSearchConsole();
+        new AceCrawlPageSpeed();
     }
 
     private function init_admin() {
@@ -376,70 +380,70 @@ class AceCrawlEnhancer {
         // The Site Kit token bridge is a dependency-free helper. Load it on EVERY request (admin,
         // front-end, REST, WP-CLI and cron) so any code - not just the admin dashboard - can borrow
         // the site's connected Site Kit OAuth token to call Google APIs. It was previously admin-only,
-        // so CLI/cron callers saw class_exists('AceSEOSiteKit') === false.
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sitekit.php';
+        // so CLI/cron callers saw class_exists('AceCrawlSiteKit') === false.
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-sitekit.php';
 
         // Cron is not an admin request, so the orphan report cannot live behind
         // is_admin() — its scan would never run.
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-orphan-report.php';
-        AceSeoOrphanReport::init();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-orphan-report.php';
+        AceCrawlOrphanReport::init();
 
         // Same reason: the retention report builds itself on cron ticks.
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-retention-report.php';
-        AceSeoRetentionReport::init();
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-sheets-schedule.php';
-        AceSeoSheetsSchedule::init();
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-actions.php';
-        AceSeoRetentionActions::init();
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-redirects.php';
-        AceSeoRedirects::init();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-retention-report.php';
+        AceCrawlRetentionReport::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-sheets-schedule.php';
+        AceCrawlSheetsSchedule::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-actions.php';
+        AceCrawlRetentionActions::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-redirects.php';
+        AceCrawlRedirects::init();
         // Timing rules suggested from the site's own assessment, recomputed after each check.
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-timing-suggestions.php';
-        Ace_SEO_Timing_Suggestions::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-timing-suggestions.php';
+        AceCrawl_Timing_Suggestions::init();
         // Traffic for exact dates (Analytics, Search Console, own tracking) for the evidence preview.
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-evidence.php';
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-dated-traffic.php';
-        Ace_SEO_Retention_Dated_Traffic::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-evidence.php';
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-dated-traffic.php';
+        AceCrawl_Retention_Dated_Traffic::init();
         // Own view tracking for old posts (off by default): the beacon, its REST route and the rollup.
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-view-tracker.php';
-        AceSeoViewTracker::init();
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-aggregate-views.php';
-        AceSeoAggregateViews::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-view-tracker.php';
+        AceCrawlViewTracker::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-aggregate-views.php';
+        AceCrawlAggregateViews::init();
         // Retained posts on the front end (off by default): lighter render, continue reading.
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-front.php';
-        AceSeoRetentionFront::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-front.php';
+        AceCrawlRetentionFront::init();
         // Readers panel in the block editor and its REST route (loaded on request in the panel).
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-panel.php';
-        AceSeoRetentionPanel::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-panel.php';
+        AceCrawlRetentionPanel::init();
         // White hat status (off by default): assessed on cron after saves and event times.
-        require_once ACE_SEO_PATH . 'includes/class-ace-seo-whitehat.php';
-        AceSeoWhiteHat::init();
+        require_once ACECRAWL_PATH . 'includes/class-ace-seo-whitehat.php';
+        AceCrawlWhiteHat::init();
 
         // The Search Console digest and the trending-topics list build on cron ticks too.
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-digest.php';
-        AceSeoDigest::init();
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-trending.php';
-        AceSeoTrending::init();
-        require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-tracking.php';
-        AceSeoTracking::init();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-digest.php';
+        AceCrawlDigest::init();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-trending.php';
+        AceCrawlTrending::init();
+        require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-tracking.php';
+        AceCrawlTracking::init();
 
         if (is_admin()) {
-            require_once ACE_SEO_PATH . 'includes/admin/ace-seo-robots-file.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-post-columns.php';
-            AceSeoPostColumns::init();
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-sheets.php';
-            AceSeoSheets::init();
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-admin.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-metabox.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-settings.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-ai-assistant.php';
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard.php';
+            require_once ACECRAWL_PATH . 'includes/admin/ace-seo-robots-file.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-post-columns.php';
+            AceCrawlPostColumns::init();
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-sheets.php';
+            AceCrawlSheets::init();
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-admin.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-metabox.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-settings.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-ai-assistant.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard.php';
         }
 
         
         // Always load database optimizer for performance
-        require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+        require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
         
         // Instantiate admin classes to register AJAX handlers and REST routes
         if ( is_admin() ) {
@@ -454,13 +458,13 @@ class AceCrawlEnhancer {
         }
 
         // WP-CLI: register the Search Console commands (Site Kit-gated at runtime).
-        if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'AceSEOSearchConsole' ) ) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-search-console-cli.php';
-            AceSEOSearchConsoleCli::register();
+        if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'AceCrawlSearchConsole' ) ) {
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-search-console-cli.php';
+            AceCrawlSearchConsoleCli::register();
         }
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
-            AceSeoRetentionReport::register_cli();
-            AceSeoWhiteHat::register_cli();
+            AceCrawlRetentionReport::register_cli();
+            AceCrawlWhiteHat::register_cli();
         }
     }
     
@@ -468,34 +472,34 @@ class AceCrawlEnhancer {
      * Initialize frontend components
      */
     private function init_frontend() {
-        require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-breadcrumbs.php';
+        require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-breadcrumbs.php';
         // Always available so other plugins can register schema providers
         // without guarding for the frontend context.
-        require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema-graph.php';
+        require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-schema-graph.php';
 
         if (!is_admin()) {
             // Load performance optimizer first for guests
-            require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-performance.php';
+            require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-performance.php';
 
             // Load core frontend components
-            require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-frontend.php';
-            require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-schema.php';
-            require_once ACE_SEO_PATH . 'includes/frontend/class-ace-seo-term-redirect.php';
+            require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-frontend.php';
+            require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-schema.php';
+            require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-term-redirect.php';
 
-            require_once ACE_SEO_PATH . 'includes/integrations/class-ace-seo-integrations.php';
+            require_once ACECRAWL_PATH . 'includes/integrations/class-ace-seo-integrations.php';
 
             // Initialize core frontend services
             $performance = ACE_SEO_Frontend_Performance::get_instance();
             $performance->init();
             ( new ACE_SEO_Term_Redirect() )->init();
-            new AceSeoFrontend();
-            new AceSeoSchema();
-            AceSeoIntegrations::init();
+            new AceCrawlFrontend();
+            new AceCrawlSchema();
+            AceCrawlIntegrations::init();
         }
         
         // Load dashboard AJAX handler for admin
         if (is_admin()) {
-            require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-ajax.php';
+            require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-ajax.php';
             new ACE_SEO_Dashboard_Ajax();
         }
         
@@ -510,7 +514,7 @@ class AceCrawlEnhancer {
             return;
         }
 
-        register_block_type(ACE_SEO_PATH, [
+        register_block_type(ACECRAWL_PATH, [
             'render_callback' => [$this, 'render_breadcrumbs_block'],
         ]);
     }
@@ -584,7 +588,7 @@ class AceCrawlEnhancer {
 
             $nav_placeholder = '<nav ' . get_block_wrapper_attributes($placeholder_wrapper, $block) . '>' . $placeholder_content . '</nav>';
 
-            return apply_filters('ace_seo_breadcrumbs_placeholder', $nav_placeholder, $attributes, $block);
+            return apply_filters('acecrawl_breadcrumbs_placeholder', $nav_placeholder, $attributes, $block);
         }
 
         $wrapper_classes = ['ace-seo-breadcrumbs'];
@@ -659,7 +663,7 @@ class AceCrawlEnhancer {
          * @param array     $attributes  Block attributes.
          * @param WP_Block  $block       Block instance.
          */
-        return apply_filters('ace_seo_breadcrumbs_markup', $full_markup, $items, $attributes, $block);
+        return apply_filters('acecrawl_breadcrumbs_markup', $full_markup, $items, $attributes, $block);
     }
     
 
@@ -670,7 +674,7 @@ class AceCrawlEnhancer {
     public function register_meta_fields() {
         foreach (self::$meta_fields as $group => $fields) {
             foreach ($fields as $key => $field) {
-                register_meta('post', ACE_SEO_META_PREFIX . $key, [
+                register_meta('post', ACECRAWL_META_PREFIX . $key, [
                     'type' => 'string',
                     'single' => true,
                     // Ensure Gutenberg REST can read/write these protected (underscore) keys
@@ -695,7 +699,7 @@ class AceCrawlEnhancer {
      */
     public function sanitize_meta_value($value, $meta_key, $object_type) {
         // Remove the prefix to get the field key
-        $field_key = str_replace(ACE_SEO_META_PREFIX, '', $meta_key);
+        $field_key = str_replace(ACECRAWL_META_PREFIX, '', $meta_key);
         
         // Find the field definition
         $field_def = null;
@@ -859,7 +863,7 @@ class AceCrawlEnhancer {
         $replacements = array(
             '%%sitename%%'    => get_bloginfo('name'),
             '%%sitedesc%%'    => get_bloginfo('description'),
-            '%%sep%%'         => apply_filters('ace_seo_title_separator', '-'),
+            '%%sep%%'         => apply_filters('acecrawl_title_separator', '-'),
             '%%currentyear%%' => date_i18n('Y'),
             '%%currentmonth%%'=> date_i18n('F'),
             '%%currentdate%%' => date_i18n(get_option('date_format')),
@@ -895,7 +899,7 @@ class AceCrawlEnhancer {
          * @param array           $replacements Token => value.
          * @param WP_Post|WP_Term $object       Object being rendered.
          */
-        $replacements = apply_filters('ace_seo_token_replacements', $replacements, $object);
+        $replacements = apply_filters('acecrawl_token_replacements', $replacements, $object);
 
         $value = strtr($value, $replacements);
 
@@ -919,7 +923,7 @@ class AceCrawlEnhancer {
         }
         
         // First try to get plugin-specific meta
-        $value = get_post_meta($post_id, ACE_SEO_META_PREFIX . $key, true);
+        $value = get_post_meta($post_id, ACECRAWL_META_PREFIX . $key, true);
         
         // If no plugin meta exists, check for Yoast data and migrate it
         if (empty($value)) {
@@ -927,7 +931,7 @@ class AceCrawlEnhancer {
             
             if (!empty($yoast_value)) {
                 // Migrate Yoast data to plugin meta
-                update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, $yoast_value);
+                update_post_meta($post_id, ACECRAWL_META_PREFIX . $key, $yoast_value);
                 $value = $yoast_value;
             }
         }
@@ -955,14 +959,14 @@ class AceCrawlEnhancer {
         foreach (self::$meta_fields as $group => $fields) {
             foreach ($fields as $key => $field) {
                 // Check if plugin meta already exists
-                $plugin_value = get_post_meta($post_id, ACE_SEO_META_PREFIX . $key, true);
+                $plugin_value = get_post_meta($post_id, ACECRAWL_META_PREFIX . $key, true);
                 
                 if (empty($plugin_value)) {
                     // Check for Yoast data
                     $yoast_value = get_post_meta($post_id, '_yoast_wpseo_' . $key, true);
                     
                     if (!empty($yoast_value)) {
-                        update_post_meta($post_id, ACE_SEO_META_PREFIX . $key, $yoast_value);
+                        update_post_meta($post_id, ACECRAWL_META_PREFIX . $key, $yoast_value);
                         $migrated_count++;
                     }
                 }
@@ -971,8 +975,8 @@ class AceCrawlEnhancer {
         
         // Handle special fields
         $cornerstone = get_post_meta($post_id, '_yoast_wpseo_is_cornerstone', true);
-        if (!empty($cornerstone) && empty(get_post_meta($post_id, ACE_SEO_META_PREFIX . 'is_cornerstone', true))) {
-            update_post_meta($post_id, ACE_SEO_META_PREFIX . 'is_cornerstone', $cornerstone);
+        if (!empty($cornerstone) && empty(get_post_meta($post_id, ACECRAWL_META_PREFIX . 'is_cornerstone', true))) {
+            update_post_meta($post_id, ACECRAWL_META_PREFIX . 'is_cornerstone', $cornerstone);
             $migrated_count++;
         }
         
@@ -1011,10 +1015,10 @@ class AceCrawlEnhancer {
         foreach ($field_mapping as $yoast_key => $ace_key) {
             if (isset($term_meta[$yoast_key]) && !empty($term_meta[$yoast_key])) {
                 // Check if ACE meta already exists
-                $existing_value = get_term_meta($term_id, ACE_SEO_META_PREFIX . $ace_key, true);
+                $existing_value = get_term_meta($term_id, ACECRAWL_META_PREFIX . $ace_key, true);
                 
                 if (empty($existing_value)) {
-                    update_term_meta($term_id, ACE_SEO_META_PREFIX . $ace_key, $term_meta[$yoast_key]);
+                    update_term_meta($term_id, ACECRAWL_META_PREFIX . $ace_key, $term_meta[$yoast_key]);
                     $migrated_count++;
                 }
             }
@@ -1252,9 +1256,9 @@ class AceCrawlEnhancer {
         // Enqueue admin CSS
         wp_enqueue_style(
             'ace-seo-admin',
-            ACE_SEO_URL . 'assets/css/admin.css',
+            ACECRAWL_URL . 'assets/css/admin.css',
             [],
-            ACE_SEO_VERSION
+            ACECRAWL_VERSION
         );
         
         // Tools UI is now integrated into the settings page.
@@ -1579,7 +1583,7 @@ class AceCrawlEnhancer {
      * Check if AI features are enabled
      */
     private function is_ai_enabled() {
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $ai_settings = $options['ai'] ?? [];
         
         return !empty($ai_settings['openai_api_key']) && 
@@ -1590,7 +1594,7 @@ class AceCrawlEnhancer {
      * Get AI-powered recommendations
      */
     private function get_ai_recommendations($post) {
-        if (!class_exists('AceSEOApiHelper')) {
+        if (!class_exists('AceCrawlApiHelper')) {
             return [];
         }
         
@@ -1601,7 +1605,7 @@ class AceCrawlEnhancer {
         $prompt .= "- [Recommendation text]\n";
         $prompt .= "Focus on: keyword optimization, content structure, readability, and technical SEO.";
         
-        $response = AceSEOApiHelper::make_openai_request($prompt);
+        $response = AceCrawlApiHelper::make_openai_request($prompt);
         
         if (is_wp_error($response)) {
             return [];
@@ -1631,17 +1635,17 @@ class AceCrawlEnhancer {
         // 1) ACE manual title
         $seo_title = self::get_meta_value($post->ID, 'title');
         if (!empty($seo_title)) {
-            return apply_filters('ace_seo_singular_title', $seo_title, $post);
+            return apply_filters('acecrawl_singular_title', $seo_title, $post);
         }
 
         // 2) Yoast manual title (respect existing custom content)
         $yoast_title = get_post_meta($post->ID, '_yoast_wpseo_title', true);
         if (!empty($yoast_title)) {
-            return apply_filters('ace_seo_singular_title', $yoast_title, $post);
+            return apply_filters('acecrawl_singular_title', $yoast_title, $post);
         }
         
         // 3) Fallback to template
-        return apply_filters('ace_seo_singular_title', $this->process_title_template($post), $post);
+        return apply_filters('acecrawl_singular_title', $this->process_title_template($post), $post);
     }
     
     /**
@@ -1662,7 +1666,7 @@ class AceCrawlEnhancer {
      * Process title template for a post
      */
     private function process_title_template($post) {
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
 
         $template_key = 'title_template_' . $post->post_type;
@@ -1675,7 +1679,7 @@ class AceCrawlEnhancer {
      * Process title template for special pages (archive, search, author)
      */
     private function process_special_page_title() {
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         
         $template = '{archive_title} {sep} {site_name}'; // Default fallback
@@ -1716,7 +1720,7 @@ class AceCrawlEnhancer {
             }
         }
         
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $general = $options['general'] ?? [];
         
         $variables = [
@@ -1741,7 +1745,7 @@ class AceCrawlEnhancer {
             $archive_title = preg_replace('/^(Category|Tag|Author|Archives?):\s*/', '', $archive_title);
             // Strip HTML tags including span tags that WordPress may add
             $archive_title = wp_strip_all_tags($archive_title);
-            $variables['{archive_title}'] = ace_seo_display_name($archive_title);
+            $variables['{archive_title}'] = acecrawl_display_name($archive_title);
         }
         
         if (is_search()) {
@@ -1755,22 +1759,22 @@ class AceCrawlEnhancer {
         
         if (is_category()) {
             $category = get_queried_object();
-            $variables['{category_name}'] = $category ? ace_seo_display_name($category->name) : '';
+            $variables['{category_name}'] = $category ? acecrawl_display_name($category->name) : '';
         }
         
         if (is_tag()) {
             $tag = get_queried_object();
-            $variables['{tag_name}'] = $tag ? ace_seo_display_name($tag->name) : '';
+            $variables['{tag_name}'] = $tag ? acecrawl_display_name($tag->name) : '';
         }
         
         // Add custom taxonomy support
         if (is_tax()) {
             $term = get_queried_object();
             if ($term) {
-                $variables['{term_name}'] = ace_seo_display_name($term->name);
+                $variables['{term_name}'] = acecrawl_display_name($term->name);
                 $variables['{taxonomy_name}'] = $term->taxonomy;
                 // Also set archive_title for custom taxonomies
-                $variables['{archive_title}'] = ace_seo_display_name($term->name);
+                $variables['{archive_title}'] = acecrawl_display_name($term->name);
             }
         }
         
@@ -1811,7 +1815,7 @@ class AceCrawlEnhancer {
         
         // Let site/CPT plugins add their own placeholders ({venue}, {event_date},
         // {price}...) so templates can be keyword-rich without per-post meta.
-        $variables = apply_filters('ace_seo_template_variables', $variables, $post);
+        $variables = apply_filters('acecrawl_template_variables', $variables, $post);
         $result = str_replace(array_keys($variables), array_values($variables), $template);
         // Unresolved placeholders never leak; collapse the gaps they leave behind.
         $result = preg_replace('/\{[a-z_]+\}/', '', $result);
@@ -1904,24 +1908,24 @@ class AceCrawlEnhancer {
         // 1) ACE manual meta description
         $meta_desc = self::get_meta_value($post->ID, 'metadesc');
         if (!empty($meta_desc)) {
-            return apply_filters('ace_seo_singular_meta_description', $meta_desc, $post);
+            return apply_filters('acecrawl_singular_meta_description', $meta_desc, $post);
         }
 
         // 2) Yoast manual meta description (respect existing custom content)
         $yoast_desc = get_post_meta($post->ID, '_yoast_wpseo_metadesc', true);
         if (!empty($yoast_desc)) {
-            return apply_filters('ace_seo_singular_meta_description', $yoast_desc, $post);
+            return apply_filters('acecrawl_singular_meta_description', $yoast_desc, $post);
         }
         
         // 3) Template fallback
-        return apply_filters('ace_seo_singular_meta_description', $this->process_meta_template($post), $post);
+        return apply_filters('acecrawl_singular_meta_description', $this->process_meta_template($post), $post);
     }
     
     /**
      * Process meta description template for a post
      */
     private function process_meta_template($post) {
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         
         $template_key = 'meta_template_' . $post->post_type;
@@ -2028,7 +2032,7 @@ class AceCrawlEnhancer {
         
         // Titles WordPress builds itself (a 404, a page with no template) carry the site name from the
         // settings rather than the blog name, so every title brands the same way.
-        $site_name = trim((string) (get_option('ace_seo_options', [])['general']['site_name'] ?? ''));
+        $site_name = trim((string) (get_option('acecrawl_options', [])['general']['site_name'] ?? ''));
         if ('' !== $site_name && !empty($title_parts['site'])) {
             $title_parts['site'] = $site_name;
         }
@@ -2040,7 +2044,7 @@ class AceCrawlEnhancer {
      * WordPress's own title separator follows the plugin's, so core-built titles match the templates.
      */
     public function filter_document_title_separator($sep) {
-        $configured = trim((string) (get_option('ace_seo_options', [])['general']['separator'] ?? ''));
+        $configured = trim((string) (get_option('acecrawl_options', [])['general']['separator'] ?? ''));
         return '' !== $configured ? $configured : $sep;
     }
     
@@ -2060,7 +2064,7 @@ class AceCrawlEnhancer {
             }
         }
 
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $settings_title = $options['general']['home_title'] ?? '';
         
         // Check if homepage is a static page
@@ -2076,14 +2080,14 @@ class AceCrawlEnhancer {
                 // Sync page meta to plugin settings if different
                 if ($page_meta_title !== $settings_title) {
                     $options['general']['home_title'] = $page_meta_title;
-                    update_option('ace_seo_options', $options);
+                    update_option('acecrawl_options', $options);
                 }
                 return $page_meta_title;
             } elseif (!empty($yoast_title)) {
                 return $yoast_title;
             } elseif (!empty($settings_title)) {
                 // Sync plugin settings to page meta
-                update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'title', $settings_title);
+                update_post_meta($page_on_front, ACECRAWL_META_PREFIX . 'title', $settings_title);
                 return $settings_title;
             }
         } else {
@@ -2112,7 +2116,7 @@ class AceCrawlEnhancer {
             $context   = 'singular';
         } elseif (is_home() || is_front_page()) {
             // Handle homepage meta description with synchronization
-            $meta_desc = apply_filters('ace_seo_home_meta_description', $this->get_homepage_meta_description());
+            $meta_desc = apply_filters('acecrawl_home_meta_description', $this->get_homepage_meta_description());
             $context   = 'home';
         } elseif (is_category() || is_tag() || is_tax()) {
             $meta_desc = $this->get_taxonomy_meta_description();
@@ -2137,7 +2141,7 @@ class AceCrawlEnhancer {
          * @param string $meta_desc The description about to be printed.
          * @param string $context   singular|home|taxonomy|author|search|archive.
          */
-        $meta_desc = apply_filters('ace_seo_meta_description', $meta_desc, $context);
+        $meta_desc = apply_filters('acecrawl_meta_description', $meta_desc, $context);
 
         if (!empty($meta_desc)) {
             echo '<meta name="description" content="' . esc_attr($meta_desc) . '">' . "\n";
@@ -2156,7 +2160,7 @@ class AceCrawlEnhancer {
             }
         }
 
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $settings_desc = $options['general']['home_description'] ?? '';
         
         // Check if homepage is a static page
@@ -2171,12 +2175,12 @@ class AceCrawlEnhancer {
                 // Sync page meta to plugin settings if different
                 if ($page_meta_desc !== $settings_desc) {
                     $options['general']['home_description'] = $page_meta_desc;
-                    update_option('ace_seo_options', $options);
+                    update_option('acecrawl_options', $options);
                 }
                 return $page_meta_desc;
             } elseif (!empty($settings_desc)) {
                 // Sync plugin settings to page meta
-                update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $settings_desc);
+                update_post_meta($page_on_front, ACECRAWL_META_PREFIX . 'metadesc', $settings_desc);
                 return $settings_desc;
             } else {
                 // Generate from page content only when both settings and page meta are empty
@@ -2186,9 +2190,9 @@ class AceCrawlEnhancer {
                     $auto_desc = wp_trim_words($auto_desc, 25);
                     if (!empty($auto_desc)) {
                         // Save auto-generated description to both places
-                        update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $auto_desc);
+                        update_post_meta($page_on_front, ACECRAWL_META_PREFIX . 'metadesc', $auto_desc);
                         $options['general']['home_description'] = $auto_desc;
-                        update_option('ace_seo_options', $options);
+                        update_option('acecrawl_options', $options);
                         return $auto_desc;
                     }
                 }
@@ -2217,22 +2221,22 @@ class AceCrawlEnhancer {
         }
         
         // Only sync ACE SEO meta fields
-        if (strpos($meta_key, ACE_SEO_META_PREFIX) !== 0) {
+        if (strpos($meta_key, ACECRAWL_META_PREFIX) !== 0) {
             return; // Not our meta field
         }
         
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         
         // Sync title changes
-        if ($meta_key === ACE_SEO_META_PREFIX . 'title') {
+        if ($meta_key === ACECRAWL_META_PREFIX . 'title') {
             $options['general']['home_title'] = $meta_value;
-            update_option('ace_seo_options', $options);
+            update_option('acecrawl_options', $options);
         }
         
         // Sync description changes
-        if ($meta_key === ACE_SEO_META_PREFIX . 'metadesc') {
+        if ($meta_key === ACECRAWL_META_PREFIX . 'metadesc') {
             $options['general']['home_description'] = $meta_value;
-            update_option('ace_seo_options', $options);
+            update_option('acecrawl_options', $options);
         }
     }
     
@@ -2241,7 +2245,7 @@ class AceCrawlEnhancer {
      */
     public function sync_homepage_settings_to_page($option_name, $old_value, $new_value) {
         // Only sync ACE SEO options
-        if ($option_name !== 'ace_seo_options') {
+        if ($option_name !== 'acecrawl_options') {
             return;
         }
         
@@ -2263,12 +2267,12 @@ class AceCrawlEnhancer {
         
         // Sync title if it changed in settings
         if ($new_home_title !== $old_home_title && !empty($new_home_title)) {
-            update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'title', $new_home_title);
+            update_post_meta($page_on_front, ACECRAWL_META_PREFIX . 'title', $new_home_title);
         }
         
         // Sync description if it changed in settings
         if ($new_home_desc !== $old_home_desc && !empty($new_home_desc)) {
-            update_post_meta($page_on_front, ACE_SEO_META_PREFIX . 'metadesc', $new_home_desc);
+            update_post_meta($page_on_front, ACECRAWL_META_PREFIX . 'metadesc', $new_home_desc);
         }
     }
     
@@ -2284,7 +2288,7 @@ class AceCrawlEnhancer {
         }
 
         // First try to get ACE SEO meta
-        $value = get_term_meta($term_id, ACE_SEO_META_PREFIX . $key, true);
+        $value = get_term_meta($term_id, ACECRAWL_META_PREFIX . $key, true);
         
         // If no ACE meta exists, check for Yoast data and migrate it
         if (empty($value)) {
@@ -2321,7 +2325,7 @@ class AceCrawlEnhancer {
                     
                     if (!empty($yoast_value)) {
                         // Migrate Yoast data to term meta
-                        update_term_meta($term_id, ACE_SEO_META_PREFIX . $key, $yoast_value);
+                        update_term_meta($term_id, ACECRAWL_META_PREFIX . $key, $yoast_value);
                         $value = $yoast_value;
                     }
                 }
@@ -2351,7 +2355,7 @@ class AceCrawlEnhancer {
         }
         
         // If no custom title, use archive template from settings
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         
         // Get appropriate template based on taxonomy type
@@ -2390,7 +2394,7 @@ class AceCrawlEnhancer {
         }
         
         // If no term description, use default template
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         
         // Get appropriate meta template based on taxonomy type
@@ -2416,7 +2420,7 @@ class AceCrawlEnhancer {
         }
         
         // Check for custom meta description
-        $meta_desc = get_user_meta($author->ID, ACE_SEO_META_PREFIX . 'metadesc', true);
+        $meta_desc = get_user_meta($author->ID, ACECRAWL_META_PREFIX . 'metadesc', true);
         
         if (!empty($meta_desc)) {
             return $meta_desc;
@@ -2482,7 +2486,7 @@ class AceCrawlEnhancer {
             }
             
             if ($post_type) {
-                $options = get_option('ace_seo_options', []);
+                $options = get_option('acecrawl_options', []);
                 $templates = $options['templates'] ?? [];
                 $archive_meta_key = 'meta_template_archive_' . $post_type;
                 
@@ -2494,7 +2498,7 @@ class AceCrawlEnhancer {
         }
         
         // Generic archive fallback
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         
         // Check for generic archive meta template
@@ -2529,13 +2533,13 @@ class AceCrawlEnhancer {
                 $canonical = get_permalink($post);
             }
 
-            $this->emit_canonical(apply_filters('ace_seo_singular_canonical', $canonical, $post));
+            $this->emit_canonical(apply_filters('acecrawl_singular_canonical', $canonical, $post));
         } elseif (is_home()) {
             // The posts index may live on its own configured page. Its canonical
             // is that page, not the static front page.
             $posts_page_id = (int) get_option('page_for_posts');
             $canonical = $posts_page_id ? get_permalink($posts_page_id) : home_url('/');
-            $this->emit_canonical(apply_filters('ace_seo_home_canonical', $canonical));
+            $this->emit_canonical(apply_filters('acecrawl_home_canonical', $canonical));
         } elseif (is_front_page()) {
             // Static front page
             $page_on_front = get_option('page_on_front');
@@ -2544,7 +2548,7 @@ class AceCrawlEnhancer {
             } else {
                 $canonical = home_url('/');
             }
-            $this->emit_canonical(apply_filters('ace_seo_home_canonical', $canonical));
+            $this->emit_canonical(apply_filters('acecrawl_home_canonical', $canonical));
         } elseif (is_category() || is_tag() || is_tax()) {
             // Taxonomy pages
             $term = get_queried_object();
@@ -2620,7 +2624,7 @@ class AceCrawlEnhancer {
             return $url;
         }
 
-        $settings = get_option('ace_seo_options', array());
+        $settings = get_option('acecrawl_options', array());
         $advanced = isset($settings['advanced']) && is_array($settings['advanced']) ? $settings['advanced'] : array();
 
         // Some sites drive real, distinct content from a query argument — an
@@ -2628,7 +2632,7 @@ class AceCrawlEnhancer {
         // Others only ever carry tracking or a preview mode there. The site
         // says which it is; the plugin does not guess.
         if ('preserve' === ($advanced['canonical_variants'] ?? 'clean')) {
-            $denied = (array) apply_filters('ace_seo_non_canonical_query_args', array());
+            $denied = (array) apply_filters('acecrawl_non_canonical_query_args', array());
 
             return empty($denied) ? $url : self::remove_args($url, $denied);
         }
@@ -2674,7 +2678,7 @@ class AceCrawlEnhancer {
          *
          * @param array $args Argument names to remove.
          */
-        $denied = (array) apply_filters('ace_seo_non_canonical_query_args', array());
+        $denied = (array) apply_filters('acecrawl_non_canonical_query_args', array());
 
         $keep = array();
         foreach ($current as $key => $value) {
@@ -2700,13 +2704,13 @@ class AceCrawlEnhancer {
      * posts, so pointing it at page one would tell search engines to drop the
      * page, and with it the only plain links to the older posts. Google's
      * guidance for paginated lists is a self-referencing canonical on each
-     * page. Turn off with the ace_seo_query_loop_page_canonical filter.
+     * page. Turn off with the acecrawl_query_loop_page_canonical filter.
      *
      * @param string $canonical Canonical URL after cleaning.
      * @return string
      */
     private static function query_loop_page_canonical($canonical) {
-        if (is_singular() || !apply_filters('ace_seo_query_loop_page_canonical', true)) {
+        if (is_singular() || !apply_filters('acecrawl_query_loop_page_canonical', true)) {
             return $canonical;
         }
 
@@ -2740,8 +2744,8 @@ class AceCrawlEnhancer {
             return;
         }
 
-        if (function_exists('ace_sitemap_powertools_normalise_url')) {
-            $canonical = ace_sitemap_powertools_normalise_url($canonical);
+        if (function_exists('acecrawl_sitemap_normalise_url')) {
+            $canonical = acecrawl_sitemap_normalise_url($canonical);
         }
 
         $canonical = self::strip_non_canonical_args($canonical);
@@ -2753,7 +2757,7 @@ class AceCrawlEnhancer {
          *
          * @param string $canonical Canonical URL after normalisation.
          */
-        $canonical = apply_filters('ace_seo_canonical', $canonical);
+        $canonical = apply_filters('acecrawl_canonical', $canonical);
 
         if (empty($canonical)) {
             return;
@@ -2774,7 +2778,7 @@ class AceCrawlEnhancer {
      * @return bool
      */
     public static function force_noindex() {
-        return (bool) apply_filters('ace_seo_force_noindex', false);
+        return (bool) apply_filters('acecrawl_force_noindex', false);
     }
 
     /**
@@ -2821,7 +2825,7 @@ class AceCrawlEnhancer {
         // The site asks search engines to stay away: core's wp_robots filter
         // already prints a hard noindex, so anything we added here would only
         // read as a competing instruction.
-        if (ace_seo_site_is_discouraged()) {
+        if (acecrawl_site_is_discouraged()) {
             return;
         }
 
@@ -2872,7 +2876,7 @@ class AceCrawlEnhancer {
          *
          * @param array $robots Directives, e.g. array('noindex').
          */
-        $robots = (array) apply_filters('ace_seo_robots_directives', $robots);
+        $robots = (array) apply_filters('acecrawl_robots_directives', $robots);
 
         if (!empty($robots)) {
             echo '<meta name="robots" content="' . esc_attr(implode(', ', array_unique(array_filter($robots)))) . '">' . "\n";
@@ -2960,7 +2964,7 @@ class AceCrawlEnhancer {
             if (empty($og_title)) {
                 $og_title = $this->get_seo_title($post);
             }
-            $og_title = apply_filters('ace_seo_singular_og_title', $og_title, $post);
+            $og_title = apply_filters('acecrawl_singular_og_title', $og_title, $post);
             if (!empty($og_title)) {
                 echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
@@ -2970,7 +2974,7 @@ class AceCrawlEnhancer {
             if (empty($og_desc)) {
                 $og_desc = $this->get_meta_description($post);
             }
-            $og_desc = apply_filters('ace_seo_singular_og_description', $og_desc, $post);
+            $og_desc = apply_filters('acecrawl_singular_og_description', $og_desc, $post);
             if (!empty($og_desc)) {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
@@ -2988,7 +2992,7 @@ class AceCrawlEnhancer {
                 }
             }
             if (empty($og_image)) {
-                $ace_options = get_option('ace_seo_options', []);
+                $ace_options = get_option('acecrawl_options', []);
                 $og_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
             $og_image = self::normalise_og_image($og_image);
@@ -3004,13 +3008,13 @@ class AceCrawlEnhancer {
              * @param array   $og_image [url, width, height, alt] resolved so far.
              * @param WP_Post $post
              */
-            $og_image = self::normalise_og_image(apply_filters('ace_seo_singular_og_image', $og_image, $post));
+            $og_image = self::normalise_og_image(apply_filters('acecrawl_singular_og_image', $og_image, $post));
             // Width/height let scrapers lay the card out on the FIRST share,
             // before they have fetched the image file themselves.
             $this->print_og_image($og_image);
             
             // OG URL
-            $og_url = apply_filters('ace_seo_singular_og_url', get_permalink($post), $post);
+            $og_url = apply_filters('acecrawl_singular_og_url', get_permalink($post), $post);
             echo '<meta property="og:url" content="' . esc_url($og_url) . '">' . "\n";
             // WooCommerce products are products, not articles.
             $og_type = ('product' === get_post_type($post)) ? 'product' : 'article';
@@ -3021,7 +3025,7 @@ class AceCrawlEnhancer {
              * @param string  $og_type
              * @param WP_Post $post
              */
-            $og_type = apply_filters('ace_seo_singular_og_type', $og_type, $post);
+            $og_type = apply_filters('acecrawl_singular_og_type', $og_type, $post);
             echo '<meta property="og:type" content="' . esc_attr($og_type) . '">' . "\n";
         } elseif (is_home() || is_front_page()) {
             // Handle homepage Open Graph tags.
@@ -3033,10 +3037,10 @@ class AceCrawlEnhancer {
             // would otherwise have emitted, so a site that hooks nothing is unaffected.
             //
             // OG Title for homepage - use synchronized title
-            $og_title = apply_filters('ace_seo_home_og_title', $this->get_homepage_title());
+            $og_title = apply_filters('acecrawl_home_og_title', $this->get_homepage_title());
 
             // OG Description for homepage - use synchronized description
-            $og_desc = apply_filters('ace_seo_home_og_description', $this->get_homepage_meta_description());
+            $og_desc = apply_filters('acecrawl_home_og_description', $this->get_homepage_meta_description());
 
             // OG Image for homepage - from the front/posts page meta, then thumbnail.
             $home_id  = is_front_page() ? (int) get_option('page_on_front') : (int) get_option('page_for_posts');
@@ -3046,16 +3050,16 @@ class AceCrawlEnhancer {
             }
             // ...then the site's Default Social Image, as on singular pages, so the homepage never shares bare.
             if (empty($og_image)) {
-                $og_image = (string) (get_option('ace_seo_options', [])['social']['default_image'] ?? '');
+                $og_image = (string) (get_option('acecrawl_options', [])['social']['default_image'] ?? '');
             }
-            $og_image = self::normalise_og_image(apply_filters('ace_seo_home_og_image', $og_image));
+            $og_image = self::normalise_og_image(apply_filters('acecrawl_home_og_image', $og_image));
 
             $default_og_url = $home_id ? get_permalink($home_id) : home_url('/');
-            $og_url  = apply_filters('ace_seo_home_og_url', $default_og_url);
-            $og_type = apply_filters('ace_seo_home_og_type', 'website');
+            $og_url  = apply_filters('acecrawl_home_og_url', $default_og_url);
+            $og_type = apply_filters('acecrawl_home_og_type', 'website');
 
             // Assembled in the order this branch has always emitted them. Extra properties
-            // (og:image:width, og:locale, article:*) can be appended via ace_seo_home_og_tags.
+            // (og:image:width, og:locale, article:*) can be appended via acecrawl_home_og_tags.
             $og_tags = [];
             if (!empty($og_title)) {
                 $og_tags['og:title'] = $og_title;
@@ -3079,7 +3083,7 @@ class AceCrawlEnhancer {
             if (!empty($og_type)) {
                 $og_tags['og:type'] = $og_type;
             }
-            $og_tags = apply_filters('ace_seo_home_og_tags', $og_tags);
+            $og_tags = apply_filters('acecrawl_home_og_tags', $og_tags);
 
             $this->print_og_tags($og_tags);
         } elseif (is_search() || is_archive() || is_author()) {
@@ -3087,7 +3091,7 @@ class AceCrawlEnhancer {
             $og_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
             // Filterable like its twitter sibling below, so the share title can
             // match whatever the document title was resolved to.
-            $og_title = apply_filters('ace_seo_archive_og_title', $this->process_special_page_title(), $og_term);
+            $og_title = apply_filters('acecrawl_archive_og_title', $this->process_special_page_title(), $og_term);
             if (!empty($og_title)) {
                 echo '<meta property="og:title" content="' . esc_attr($og_title) . '" data-ace-seo="1">' . "\n";
             }
@@ -3096,14 +3100,14 @@ class AceCrawlEnhancer {
             // to existing behaviour) — sites can enrich via these filters, e.g. supply a term's
             // representative image and a tailored description. The image may be a URL or an
             // array with url, width, height and alt.
-            $og_desc  = apply_filters('ace_seo_archive_og_description', '', $og_term);
+            $og_desc  = apply_filters('acecrawl_archive_og_description', '', $og_term);
             if (!empty($og_desc)) {
                 echo '<meta property="og:description" content="' . esc_attr($og_desc) . '" data-ace-seo="1">' . "\n";
             }
-            $og_image = self::normalise_og_image(apply_filters('ace_seo_archive_og_image', '', $og_term));
+            $og_image = self::normalise_og_image(apply_filters('acecrawl_archive_og_image', '', $og_term));
             // An archive the site gives no image of its own shares the Default Social Image.
             if ('' === $og_image['url']) {
-                $og_image = self::normalise_og_image((string) (get_option('ace_seo_options', [])['social']['default_image'] ?? ''));
+                $og_image = self::normalise_og_image((string) (get_option('acecrawl_options', [])['social']['default_image'] ?? ''));
             }
             $this->print_og_image($og_image, true);
 
@@ -3135,7 +3139,7 @@ class AceCrawlEnhancer {
             if (empty($twitter_title)) {
                 $twitter_title = $this->get_seo_title($post);
             }
-            $twitter_title = apply_filters('ace_seo_twitter_title', $twitter_title, $post);
+            $twitter_title = apply_filters('acecrawl_twitter_title', $twitter_title, $post);
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
@@ -3145,7 +3149,7 @@ class AceCrawlEnhancer {
             if (empty($twitter_desc)) {
                 $twitter_desc = $this->get_meta_description($post);
             }
-            $twitter_desc = apply_filters('ace_seo_twitter_description', $twitter_desc, $post);
+            $twitter_desc = apply_filters('acecrawl_twitter_description', $twitter_desc, $post);
             if (!empty($twitter_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }
@@ -3156,56 +3160,56 @@ class AceCrawlEnhancer {
                 $twitter_image = get_the_post_thumbnail_url($post->ID, 'large');
             }
             if (empty($twitter_image)) {
-                $ace_options = get_option('ace_seo_options', []);
+                $ace_options = get_option('acecrawl_options', []);
                 $twitter_image = (string) ($ace_options['social']['default_image'] ?? '');
             }
-            $twitter_image = self::normalise_og_image(apply_filters('ace_seo_singular_og_image', self::normalise_og_image($twitter_image), $post));
+            $twitter_image = self::normalise_og_image(apply_filters('acecrawl_singular_og_image', self::normalise_og_image($twitter_image), $post));
             if ('' !== $twitter_image['url']) {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image['url']) . '">' . "\n";
             }
         } elseif (is_home() || is_front_page()) {
             // Handle homepage Twitter cards. Filterable for the same reason as the Open Graph
             // branch above, and defaulting to the values this branch has always emitted.
-            $twitter_card = apply_filters('ace_seo_home_twitter_card', 'summary_large_image');
+            $twitter_card = apply_filters('acecrawl_home_twitter_card', 'summary_large_image');
             if (!empty($twitter_card)) {
                 echo '<meta name="twitter:card" content="' . esc_attr($twitter_card) . '">' . "\n";
             }
 
             // Twitter Title for homepage - use synchronized title
-            $twitter_title = apply_filters('ace_seo_home_twitter_title', $this->get_homepage_title());
+            $twitter_title = apply_filters('acecrawl_home_twitter_title', $this->get_homepage_title());
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
 
             // Twitter Description for homepage - use synchronized description
-            $twitter_desc = apply_filters('ace_seo_home_twitter_description', $this->get_homepage_meta_description());
+            $twitter_desc = apply_filters('acecrawl_home_twitter_description', $this->get_homepage_meta_description());
             if (!empty($twitter_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($twitter_desc) . '">' . "\n";
             }
 
             // Twitter Image. No default — the homepage card has never carried one, so an
             // unhooked site emits exactly what it did before.
-            $twitter_image = self::normalise_og_image(apply_filters('ace_seo_home_twitter_image', ''));
+            $twitter_image = self::normalise_og_image(apply_filters('acecrawl_home_twitter_image', ''));
             if ('' !== $twitter_image['url']) {
                 echo '<meta name="twitter:image" content="' . esc_url($twitter_image['url']) . '">' . "\n";
             }
         } elseif (is_search() || is_archive() || is_author()) {
             // Handle special pages. When the archive supplies a representative image
-            // (via ace_seo_archive_og_image), upgrade to the large-image card and add
+            // (via acecrawl_archive_og_image), upgrade to the large-image card and add
             // the matching description/image so the tweet renders a full card, not a
             // bare title. No image supplied -> unchanged "summary" default.
             $tw_term  = (is_category() || is_tag() || is_tax()) ? get_queried_object() : null;
-            $tw_image = self::normalise_og_image(apply_filters('ace_seo_archive_og_image', '', $tw_term));
+            $tw_image = self::normalise_og_image(apply_filters('acecrawl_archive_og_image', '', $tw_term));
             echo '<meta name="twitter:card" content="' . ('' !== $tw_image['url'] ? 'summary_large_image' : 'summary') . '">' . "\n";
 
             // Filterable like its og siblings above. Without a hook here a site serving an
             // archive-shaped page under its own identity could set the document title and the
             // og:title and still have the twitter card announce this site's name instead.
-            $twitter_title = apply_filters('ace_seo_archive_twitter_title', $this->process_special_page_title(), $tw_term);
+            $twitter_title = apply_filters('acecrawl_archive_twitter_title', $this->process_special_page_title(), $tw_term);
             if (!empty($twitter_title)) {
                 echo '<meta name="twitter:title" content="' . esc_attr($twitter_title) . '">' . "\n";
             }
-            $tw_desc = apply_filters('ace_seo_archive_og_description', '', $tw_term);
+            $tw_desc = apply_filters('acecrawl_archive_og_description', '', $tw_term);
             if (!empty($tw_desc)) {
                 echo '<meta name="twitter:description" content="' . esc_attr($tw_desc) . '">' . "\n";
             }
@@ -3219,8 +3223,8 @@ class AceCrawlEnhancer {
      */
     public function run_background_optimization() {
         // Include the database optimizer
-        if ( file_exists( ACE_SEO_PATH . 'includes/database/class-database-optimizer.php' ) ) {
-            require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+        if ( file_exists( ACECRAWL_PATH . 'includes/database/class-database-optimizer.php' ) ) {
+            require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             
             if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
                 $optimizer = new ACE_SEO_Database_Optimizer();
@@ -3232,9 +3236,9 @@ class AceCrawlEnhancer {
                 }
                 
                 // Clear pending flag and store completion status
-                delete_option( 'ace_seo_db_optimization_pending' );
-                update_option( 'ace_seo_db_optimized', current_time( 'mysql' ), false );
-                update_option( 'ace_seo_db_optimization_results', $results, false );
+                delete_option( 'acecrawl_db_optimization_pending' );
+                update_option( 'acecrawl_db_optimized', current_time( 'mysql' ), false );
+                update_option( 'acecrawl_db_optimization_results', $results, false );
                 
                 // Optionally send a notification (if user wants it)
                 $this->send_optimization_notification( $results );
@@ -3247,7 +3251,7 @@ class AceCrawlEnhancer {
      */
     private function send_optimization_notification( $results ) {
         // Only send if user has enabled notifications
-        $send_notifications = get_option( 'ace_seo_send_notifications', false );
+        $send_notifications = get_option( 'acecrawl_send_notifications', false );
         if ( ! $send_notifications ) {
             return;
         }
@@ -3446,10 +3450,14 @@ add_action('plugins_loaded', function() {
 });
 
 // Include activator class
-require_once ACE_SEO_PATH . 'includes/class-ace-seo-activator.php';
+require_once ACECRAWL_PATH . 'includes/class-ace-seo-activator.php';
 
 // Activation hook
-register_activation_hook(ACE_SEO_FILE, array('AceSEOActivator', 'activate'));
+register_activation_hook(ACECRAWL_FILE, array('AceCrawlActivator', 'activate'));
 
 // Deactivation hook
-register_deactivation_hook(ACE_SEO_FILE, array('AceSEODeactivator', 'deactivate'));
+register_deactivation_hook(ACECRAWL_FILE, array('AceCrawlDeactivator', 'deactivate'));
+
+if ( class_exists( 'AceCrawlLegacyNames', false ) ) {
+    AceCrawlLegacyNames::boot();
+}

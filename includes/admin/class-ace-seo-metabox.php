@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOMetabox {
+class AceCrawlMetabox {
     
     /**
      * Initialize metabox functionality
@@ -65,7 +65,7 @@ class AceSEOMetabox {
             );
             
             // Add AI Analysis sidebar metabox
-            if ( AceSEOApiHelper::is_ai_enabled() ) {
+            if ( AceCrawlApiHelper::is_ai_enabled() ) {
                 add_meta_box(
                     'ace-seo-ai-analysis',
                     'AI Content Analysis',
@@ -79,7 +79,7 @@ class AceSEOMetabox {
             // Search performance sidebar (Site Kit-gated, additive). Registered only when a
             // connected Search Console property is available; the render callback fetches the
             // data lazily over REST so nothing calls Google on the page-load render path.
-            if ( class_exists( 'AceSEOSearchConsole' ) && AceSEOSearchConsole::is_ready() ) {
+            if ( class_exists( 'AceCrawlSearchConsole' ) && AceCrawlSearchConsole::is_ready() ) {
                 add_meta_box(
                     'ace-seo-search-performance',
                     'Search performance',
@@ -100,7 +100,7 @@ class AceSEOMetabox {
         wp_nonce_field( 'ace_seo_save_meta', 'ace_seo_meta_nonce' );
         
         // Include the metabox template
-        include ACE_SEO_PATH . 'includes/admin/views/metabox.php';
+        include ACECRAWL_PATH . 'includes/admin/views/metabox.php';
     }
     
     /**
@@ -218,8 +218,8 @@ class AceSEOMetabox {
                 Loading search performance...
             </div>
         </div>
-        <?php AceSeoAssets::script( 'ace-seo-metabox-script-1', 'assets/js/ace-seo-metabox-script-1.js', array( 'ace-seo-admin' ) ); ?>
-        <?php AceSeoAssets::style( 'ace-seo-metabox-style-1', 'assets/css/ace-seo-metabox-style-1.css' ); ?>
+        <?php AceCrawlAssets::script( 'ace-seo-metabox-script-1', 'assets/js/ace-seo-metabox-script-1.js', array( 'ace-seo-admin' ) ); ?>
+        <?php AceCrawlAssets::style( 'ace-seo-metabox-style-1', 'assets/css/ace-seo-metabox-style-1.css' ); ?>
         <?php
     }
 
@@ -248,7 +248,7 @@ class AceSEOMetabox {
         foreach ( $meta_fields as $group => $fields ) {
             foreach ( $fields as $field_key => $field_config ) {
                 // Redirects have shared validation/lifecycle controls in the Advanced tab.
-                if ( 'redirect_to' === $field_key && isset( $_POST['ace_redirect_present'] ) && class_exists( 'AceSeoRedirects' ) ) { continue; }
+                if ( 'redirect_to' === $field_key && isset( $_POST['ace_redirect_present'] ) && class_exists( 'AceCrawlRedirects' ) ) { continue; }
                 $input_name = 'yoast_wpseo_' . $field_key;
                 
                 if ( isset( $_POST[ $input_name ] ) ) {
@@ -290,15 +290,15 @@ class AceSEOMetabox {
         
         // Handle special cases
         $this->handle_special_fields( $post_id );
-        if ( isset( $_POST['ace_redirect_present'] ) && current_user_can( 'manage_options' ) && class_exists( 'AceSeoRedirects' ) ) {
+        if ( isset( $_POST['ace_redirect_present'] ) && current_user_can( 'manage_options' ) && class_exists( 'AceCrawlRedirects' ) ) {
             $input = array();
             $types = array( 'target' => 'target', 'code' => 'int', 'expires' => 'text', 'trash' => 'bool', 'paused' => 'bool' );
             foreach ( array_keys( $types ) as $key ) {
-                $input[ $key ] = isset( $_POST[ 'ace_redirect_' . $key ] ) ? AceSeoInput::clean( wp_unslash( $_POST[ 'ace_redirect_' . $key ] ), $types[ $key ] ) : '';
+                $input[ $key ] = isset( $_POST[ 'ace_redirect_' . $key ] ) ? AceCrawlInput::clean( wp_unslash( $_POST[ 'ace_redirect_' . $key ] ), $types[ $key ] ) : '';
             }
-            $result = AceSeoRedirects::save( $post_id, $input );
+            $result = AceCrawlRedirects::save( $post_id, $input );
             if ( is_wp_error( $result ) ) {
-                set_transient( 'ace_seo_redirect_notice_' . get_current_user_id(), array( 'error' => true, 'text' => 'Post saved, but redirect unchanged: ' . $result->get_error_message() ), 120 );
+                set_transient( 'acecrawl_redirect_notice_' . get_current_user_id(), array( 'error' => true, 'text' => 'Post saved, but redirect unchanged: ' . $result->get_error_message() ), 120 );
             }
         }
     }
@@ -353,17 +353,17 @@ class AceSEOMetabox {
         // Enqueue styles
         wp_enqueue_style(
             'ace-seo-admin',
-            ACE_SEO_URL . 'assets/css/admin.css',
+            ACECRAWL_URL . 'assets/css/admin.css',
             array(),
-            ACE_SEO_VERSION
+            ACECRAWL_VERSION
         );
         
         // Enqueue scripts
         wp_enqueue_script(
             'ace-seo-admin',
-            ACE_SEO_URL . 'assets/js/admin.js',
+            ACECRAWL_URL . 'assets/js/admin.js',
             array( 'jquery', 'wp-api' ),
-            ACE_SEO_VERSION,
+            ACECRAWL_VERSION,
             true
         );
         
@@ -415,7 +415,7 @@ class AceSEOMetabox {
         
         // Localize script with data
         global $post;
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         $templates = $options['templates'] ?? [];
         $general = $options['general'] ?? [];
         
@@ -535,8 +535,8 @@ class AceSEOMetabox {
             </div>
             
             <div class="ace-seo-taxonomy-field">
-                <label for="ace_seo_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
-                <input type="url" name="ace_seo_canonical" id="ace_seo_canonical" value="" size="40" />
+                <label for="acecrawl_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
+                <input type="url" name="acecrawl_canonical" id="acecrawl_canonical" value="" size="40" />
                 <p class="description"><?php esc_html_e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
             </div>
             
@@ -572,7 +572,7 @@ class AceSEOMetabox {
         $canonical = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'canonical' );
         $focuskw = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'focuskw' );
         $noindex = AceCrawlEnhancer::get_taxonomy_meta( $term_id, $taxonomy, 'noindex' );
-        $redirect = get_term_meta( $term_id, ACE_SEO_META_PREFIX . 'redirect', true );
+        $redirect = get_term_meta( $term_id, ACECRAWL_META_PREFIX . 'redirect', true );
         
         // Check if values come from Yoast and haven't been migrated yet
         $yoast_tax_meta = get_option( 'wpseo_taxonomy_meta', [] );
@@ -668,10 +668,10 @@ class AceSEOMetabox {
         
         <tr class="form-field ace-seo-taxonomy-row">
             <th scope="row">
-                <label for="ace_seo_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
+                <label for="acecrawl_canonical"><?php esc_html_e( 'Canonical URL', 'ace-crawl-enhancer' ); ?></label>
             </th>
             <td>
-                <input type="url" name="ace_seo_canonical" id="ace_seo_canonical" value="<?php echo esc_attr( $canonical ); ?>" class="regular-text" />
+                <input type="url" name="acecrawl_canonical" id="acecrawl_canonical" value="<?php echo esc_attr( $canonical ); ?>" class="regular-text" />
                 <p class="description"><?php esc_html_e( 'Custom canonical URL for this term. Leave blank to use default.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
@@ -709,7 +709,7 @@ class AceSEOMetabox {
                 <p class="description"><?php esc_html_e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
-        <?php AceSeoAssets::script( 'ace-seo-metabox-script-2', 'assets/js/ace-seo-metabox-script-2.js' ); ?>
+        <?php AceCrawlAssets::script( 'ace-seo-metabox-script-2', 'assets/js/ace-seo-metabox-script-2.js' ); ?>
         <?php
     }
     
@@ -750,10 +750,10 @@ class AceSEOMetabox {
                 }
                 
                 if ( ! empty( $value ) ) {
-                    update_term_meta( $term_id, ACE_SEO_META_PREFIX . $field, $value );
+                    update_term_meta( $term_id, ACECRAWL_META_PREFIX . $field, $value );
                     $fields_saved++;
                 } else {
-                    delete_term_meta( $term_id, ACE_SEO_META_PREFIX . $field );
+                    delete_term_meta( $term_id, ACECRAWL_META_PREFIX . $field );
                 }
             }
         }
@@ -765,4 +765,4 @@ class AceSEOMetabox {
 }
 
 // Initialize the metabox class
-new AceSEOMetabox();
+new AceCrawlMetabox();

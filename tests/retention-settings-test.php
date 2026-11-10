@@ -11,8 +11,8 @@ if ( PHP_SAPI !== 'cli' ) {
 
 define('ABSPATH',__DIR__.'/'); define('HOUR_IN_SECONDS',3600);
 $root=$argv[1]??dirname(__DIR__);
-define( 'ACE_SEO_URL', 'https://ordinary-wordpress.test/plugin/' );
-define( 'ACE_SEO_VERSION', 'test' );
+define( 'ACECRAWL_URL', 'https://ordinary-wordpress.test/plugin/' );
+define( 'ACECRAWL_VERSION', 'test' );
 function wp_enqueue_style( $handle, $url, $dependencies, $version ) {}
 function did_action( $hook ) { return 0; }
 require $root . '/includes/class-ace-seo-assets.php';
@@ -61,10 +61,10 @@ require $root.'/includes/admin/class-ace-seo-retention-report.php';
 require $root.'/includes/admin/class-ace-seo-sheets.php';
 $failures=0;$checks=0;
 $check=static function($label,$ok)use(&$failures,&$checks){$checks++;echo($ok?'PASS ':'FAIL ').$label."\n";if(!$ok)$failures++;};
-$baseline=AceSeoRetentionActions::options();
+$baseline=AceCrawlRetentionActions::options();
 $baseline=array_merge($baseline,array('notice_enabled'=>1,'notice_years'=>2,'notice_text'=>"It's an older article from {date}.",'lifetimes'=>array('post'=>30,'product'=>90),'lifetime_rules'=>array('category:updates'=>60),'report_years'=>4,'report_days'=>365,'retained_views'=>17,'thin_words'=>450,'auto_build'=>1,'track_views'=>1,'retained_notice'=>1,'retained_notice_text'=>'Published {date}.','light_enabled'=>1,'light_drop'=>'sidebar, ad-slot','light_cache_hours'=>72,'light_continue'=>'none','extension_setting'=>'leave-me'));
 $sheets=array('sheet_id'=>'dummy-sheet-test-only','key'=>'dummy-key-test-only','extension_setting'=>'keep-sheets');
-$reset=static function($options)use($sheets){$GLOBALS['options']=array('ace_seo_retention_options'=>$options,'ace_seo_sheets'=>$sheets,'ace_seo_options'=>array('unrelated'=>'preserved'));$GLOBALS['transients']=array();$GLOBALS['admin']=true;$GLOBALS['nonce_ok']=true;};
+$reset=static function($options)use($sheets){$GLOBALS['options']=array('acecrawl_retention_options'=>$options,'acecrawl_sheets'=>$sheets,'acecrawl_options'=>array('unrelated'=>'preserved'));$GLOBALS['transients']=array();$GLOBALS['admin']=true;$GLOBALS['nonce_ok']=true;};
 $forms=static function()use($root){
  ob_start();include $root.'/includes/admin/views/retention-settings.php';$html=ob_get_clean();
  $dom=new DOMDocument();@$dom->loadHTML('<?xml encoding="UTF-8">'.$html);$xpath=new DOMXPath($dom);$out=array();
@@ -78,32 +78,32 @@ $forms=static function()use($root){
  }parse_str(implode('&',$parts),$payload);$out[$payload['action']]=$payload;}
  // The current screen has one form; retain coverage of its three legacy section handlers.
  if(isset($out['ace_seo_retention_settings_save'])){
-  foreach(array('ace_seo_retention_report_settings','ace_seo_retention_options','ace_seo_retention_front')as$action){$out[$action]=$out['ace_seo_retention_settings_save'];$out[$action]['action']=$action;}
+  foreach(array('ace_seo_retention_report_settings','acecrawl_retention_options','ace_seo_retention_front')as$action){$out[$action]=$out['ace_seo_retention_settings_save'];$out[$action]['action']=$action;}
  }
  return $out;
 };
-$dispatch=static function($action,$payload){$_POST=wp_slash($payload);$map=array('ace_seo_retention_report_settings'=>'handle_report_settings','ace_seo_retention_options'=>'handle_options','ace_seo_retention_front'=>'handle_front_settings');try{AceSeoRetentionReport::{$map[$action]}();}catch(SettingsRedirect $redirect){return $redirect->url;}return '';};
-$groups=array('ace_seo_retention_report_settings'=>array('report_years','report_days','retained_views','thin_words','auto_build','track_views'),'ace_seo_retention_options'=>array('notice_enabled','notice_years','notice_text','lifetimes','lifetime_rules'),'ace_seo_retention_front'=>array('retained_notice','retained_notice_text','light_enabled','light_drop','light_cache_hours','light_continue'));
+$dispatch=static function($action,$payload){$_POST=wp_slash($payload);$map=array('ace_seo_retention_report_settings'=>'handle_report_settings','acecrawl_retention_options'=>'handle_options','ace_seo_retention_front'=>'handle_front_settings');try{AceCrawlRetentionReport::{$map[$action]}();}catch(SettingsRedirect $redirect){return $redirect->url;}return '';};
+$groups=array('ace_seo_retention_report_settings'=>array('report_years','report_days','retained_views','thin_words','auto_build','track_views'),'acecrawl_retention_options'=>array('notice_enabled','notice_years','notice_text','lifetimes','lifetime_rules'),'ace_seo_retention_front'=>array('retained_notice','retained_notice_text','light_enabled','light_drop','light_cache_hours','light_continue'));
 foreach($groups as$action=>$keys){
  $reset($baseline);$payload=$forms()[$action];$before=$GLOBALS['options'];$url=$dispatch($action,$payload);
  $check($action.' rendered unchanged round-trip preserves every option',$GLOBALS['options']===$before);
  $check($action.' returns to retention settings',strpos($url,'page=ace-seo-settings#retention/')!==false);
  $reset($baseline);$payload=$forms()[$action];
  if($action==='ace_seo_retention_report_settings'){$payload['report_days']='180';unset($payload['auto_build'],$payload['track_views']);}
- if($action==='ace_seo_retention_options'){$payload['notice_years']='5';unset($payload['notice_enabled']);$payload['lifetimes']['post']='60';}
+ if($action==='acecrawl_retention_options'){$payload['notice_years']='5';unset($payload['notice_enabled']);$payload['lifetimes']['post']='60';}
  if($action==='ace_seo_retention_front'){$payload['light_cache_hours']='48';unset($payload['light_enabled'],$payload['retained_notice']);}
- $dispatch($action,$payload);$saved=$GLOBALS['options']['ace_seo_retention_options'];
+ $dispatch($action,$payload);$saved=$GLOBALS['options']['acecrawl_retention_options'];
  $check($action.' changes stay inside their own section',array_diff_key($saved,array_flip($keys))===array_diff_key($baseline,array_flip($keys)));
- $check($action.' never changes Sheets or main SEO settings',$GLOBALS['options']['ace_seo_sheets']===$sheets&&$GLOBALS['options']['ace_seo_options']===array('unrelated'=>'preserved'));
+ $check($action.' never changes Sheets or main SEO settings',$GLOBALS['options']['acecrawl_sheets']===$sheets&&$GLOBALS['options']['acecrawl_options']===array('unrelated'=>'preserved'));
  foreach(array('admin','nonce_ok')as$gate){$reset($baseline);$payload=$forms()[$action];$before=$GLOBALS['options'];$GLOBALS[$gate]=false;$blocked=false;try{$dispatch($action,$payload);}catch(RuntimeException$e){$blocked=true;}$check($action.' rejects missing '.$gate.' before writes',$blocked&&$GLOBALS['options']===$before);}
 }
 $legacy=$baseline;$legacy['lifetimes']['private_type']=12;$legacy['lifetimes']['inactive_type']=42;$legacy['lifetime_rules']['inactive_tax:archive']=24;
-$reset($legacy);$payload=$forms()['ace_seo_retention_options'];$dispatch('ace_seo_retention_options',$payload);$saved=$GLOBALS['options']['ace_seo_retention_options'];
+$reset($legacy);$payload=$forms()['acecrawl_retention_options'];$dispatch('acecrawl_retention_options',$payload);$saved=$GLOBALS['options']['acecrawl_retention_options'];
 $check('unchanged notice save preserves unrendered post-type lifetime rules',$saved['lifetimes']==$legacy['lifetimes']);
 $check('unchanged notice save preserves inactive taxonomy rules',$saved['lifetime_rules']===$legacy['lifetime_rules']);
-$reset($legacy);$payload=$forms()['ace_seo_retention_options'];$payload['lifetimes']['post']='';$payload['lifetime_rules']='category:updates=60';$dispatch('ace_seo_retention_options',$payload);$saved=$GLOBALS['options']['ace_seo_retention_options'];
+$reset($legacy);$payload=$forms()['acecrawl_retention_options'];$payload['lifetimes']['post']='';$payload['lifetime_rules']='category:updates=60';$dispatch('acecrawl_retention_options',$payload);$saved=$GLOBALS['options']['acecrawl_retention_options'];
 $check('blank visible lifetime removes its rule while hidden rules survive',!isset($saved['lifetimes']['post'])&&($saved['lifetimes']['private_type']??0)===12&&($saved['lifetimes']['inactive_type']??0)===42);
 $check('removing an inactive taxonomy line explicitly removes that rule',!isset($saved['lifetime_rules']['inactive_tax:archive'])&&($saved['lifetime_rules']['category:updates']??0)===60);
-$reset($legacy);AceSeoRetentionActions::save_options(array('notice_years'=>2,'notice_text'=>$legacy['notice_text'],'notice_enabled'=>1,'lifetimes'=>array('post'=>30),'lifetime_rules'=>'category:updates=60'));
-$check('legacy callers keep the original replace-all lifetime semantics',$GLOBALS['options']['ace_seo_retention_options']['lifetimes']===array('post'=>30));
+$reset($legacy);AceCrawlRetentionActions::save_options(array('notice_years'=>2,'notice_text'=>$legacy['notice_text'],'notice_enabled'=>1,'lifetimes'=>array('post'=>30),'lifetime_rules'=>'category:updates=60'));
+$check('legacy callers keep the original replace-all lifetime semantics',$GLOBALS['options']['acecrawl_retention_options']['lifetimes']===array('post'=>30));
 echo $checks.' checks, '.$failures." failures.\n";exit($failures?1:0);

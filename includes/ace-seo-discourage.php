@@ -20,14 +20,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return bool
  */
-function ace_seo_site_is_discouraged() {
+function acecrawl_site_is_discouraged() {
     /**
      * Filter the discouraged state — lets a site force crawl suppression (for
      * example on a staging host) without touching the Reading setting.
      *
      * @param bool $discouraged
      */
-    return (bool) apply_filters( 'ace_seo_site_is_discouraged', '0' === (string) get_option( 'blog_public' ) );
+    return (bool) apply_filters( 'acecrawl_site_is_discouraged', '0' === (string) get_option( 'blog_public' ) );
 }
 
 /**
@@ -41,21 +41,21 @@ function ace_seo_site_is_discouraged() {
  *             purpose here — they are what brings a crawler back to each URL to
  *             see the directive.
  *
- * Set per environment with ACE_SEO_DISCOURAGE_MODE in wp-config.php, since which
+ * Set per environment with ACECRAWL_DISCOURAGE_MODE in wp-config.php, since which
  * one is right depends on the site's history rather than on its code. Both modes
  * are inert while the site is public.
  *
  * @return string 'block' or 'deindex'.
  */
-function ace_seo_discourage_mode() {
-    $mode = defined( 'ACE_SEO_DISCOURAGE_MODE' ) ? (string) ACE_SEO_DISCOURAGE_MODE : 'block';
+function acecrawl_discourage_mode() {
+    $mode = defined( 'ACECRAWL_DISCOURAGE_MODE' ) ? (string) ACECRAWL_DISCOURAGE_MODE : 'block';
 
     /**
      * Filter the discourage mode.
      *
      * @param string $mode 'block' or 'deindex'.
      */
-    $mode = (string) apply_filters( 'ace_seo_discourage_mode', $mode );
+    $mode = (string) apply_filters( 'acecrawl_discourage_mode', $mode );
 
     return 'deindex' === $mode ? 'deindex' : 'block';
 }
@@ -68,8 +68,8 @@ function ace_seo_discourage_mode() {
  *
  * @return string
  */
-function ace_seo_discourage_directives() {
-    return 'deindex' === ace_seo_discourage_mode()
+function acecrawl_discourage_directives() {
+    return 'deindex' === acecrawl_discourage_mode()
         ? 'noindex, follow'
         : 'noindex, nofollow, noarchive, nosnippet, noimageindex';
 }
@@ -81,8 +81,8 @@ function ace_seo_discourage_directives() {
  * @param array $robots Core's robots directives.
  * @return array
  */
-function ace_seo_force_noindex_robots( $robots ) {
-    if ( ! ace_seo_site_is_discouraged() ) {
+function acecrawl_force_noindex_robots( $robots ) {
+    if ( ! acecrawl_site_is_discouraged() ) {
         return $robots;
     }
 
@@ -93,7 +93,7 @@ function ace_seo_force_noindex_robots( $robots ) {
 
     $robots['noindex'] = true;
 
-    if ( 'deindex' === ace_seo_discourage_mode() ) {
+    if ( 'deindex' === acecrawl_discourage_mode() ) {
         // Core adds nofollow of its own accord once the site is discouraged, and
         // "nofollow, follow" is a directive a crawler is entitled to read either way.
         unset( $robots['nofollow'], $robots['noarchive'], $robots['nosnippet'], $robots['noimageindex'] );
@@ -110,7 +110,7 @@ function ace_seo_force_noindex_robots( $robots ) {
 
     return $robots;
 }
-add_filter( 'wp_robots', 'ace_seo_force_noindex_robots', PHP_INT_MAX );
+add_filter( 'wp_robots', 'acecrawl_force_noindex_robots', PHP_INT_MAX );
 
 /**
  * Send the same directives as an HTTP header.
@@ -121,14 +121,14 @@ add_filter( 'wp_robots', 'ace_seo_force_noindex_robots', PHP_INT_MAX );
  *
  * @return void
  */
-function ace_seo_send_noindex_header() {
-    if ( is_admin() || headers_sent() || ! ace_seo_site_is_discouraged() ) {
+function acecrawl_send_noindex_header() {
+    if ( is_admin() || headers_sent() || ! acecrawl_site_is_discouraged() ) {
         return;
     }
 
-    header( 'X-Robots-Tag: ' . ace_seo_discourage_directives(), true );
+    header( 'X-Robots-Tag: ' . acecrawl_discourage_directives(), true );
 }
-add_action( 'send_headers', 'ace_seo_send_noindex_header' );
+add_action( 'send_headers', 'acecrawl_send_noindex_header' );
 
 /**
  * Belt and braces for robots.txt: core already adds "Disallow: /" when the site is
@@ -139,12 +139,12 @@ add_action( 'send_headers', 'ace_seo_send_noindex_header' );
  * @param string $public The blog_public option.
  * @return string
  */
-function ace_seo_filter_robots_txt( $output, $public ) {
-    if ( ! ace_seo_site_is_discouraged() ) {
+function acecrawl_filter_robots_txt( $output, $public ) {
+    if ( ! acecrawl_site_is_discouraged() ) {
         return $output;
     }
 
-    if ( 'deindex' === ace_seo_discourage_mode() ) {
+    if ( 'deindex' === acecrawl_discourage_mode() ) {
         // Crawling has to be allowed for the noindex on each page to be read at
         // all, and the sitemap is what sends a crawler back round to read them.
         // The admin can live outside wp-admin/ at the site root, so ask WordPress where it is.
@@ -158,18 +158,18 @@ function ace_seo_filter_robots_txt( $output, $public ) {
 
     return "User-agent: *\nDisallow: /\n";
 }
-add_filter( 'robots_txt', 'ace_seo_filter_robots_txt', PHP_INT_MAX, 2 );
+add_filter( 'robots_txt', 'acecrawl_filter_robots_txt', PHP_INT_MAX, 2 );
 
 // No sitemaps at all while discouraged — core's index, our providers, our routes.
 add_filter( 'wp_sitemaps_enabled', function ( $enabled ) {
-    if ( ! ace_seo_site_is_discouraged() ) {
+    if ( ! acecrawl_site_is_discouraged() ) {
         return $enabled;
     }
 
     // Core switches its own sitemaps off from blog_public, so de-index mode has to
     // turn them back on rather than merely decline to disable them: without the
     // registered providers the custom routes have nothing to render and 404.
-    return 'deindex' === ace_seo_discourage_mode();
+    return 'deindex' === acecrawl_discourage_mode();
 }, PHP_INT_MAX );
 
 /**
@@ -181,8 +181,8 @@ add_filter( 'wp_sitemaps_enabled', function ( $enabled ) {
  * @param string $key     Feature key.
  * @return bool
  */
-add_filter( 'ace_sitemap_powertools_is_enabled', function ( $enabled, $key ) {
-    return ( ace_seo_site_is_discouraged() && 'block' === ace_seo_discourage_mode() ) ? false : $enabled;
+add_filter( 'acecrawl_sitemap_is_enabled', function ( $enabled, $key ) {
+    return ( acecrawl_site_is_discouraged() && 'block' === acecrawl_discourage_mode() ) ? false : $enabled;
 }, PHP_INT_MAX, 2 );
 
 /**
@@ -197,13 +197,13 @@ add_filter( 'ace_sitemap_powertools_is_enabled', function ( $enabled, $key ) {
  * @param mixed $new New value.
  * @return void
  */
-function ace_seo_visibility_changed( $old, $new ) {
+function acecrawl_visibility_changed( $old, $new ) {
     if ( (string) $old === (string) $new ) {
         return;
     }
 
-    if ( function_exists( 'ace_sitemap_powertools_bump_cache_version' ) ) {
-        ace_sitemap_powertools_bump_cache_version();
+    if ( function_exists( 'acecrawl_sitemap_bump_cache_version' ) ) {
+        acecrawl_sitemap_bump_cache_version();
     }
 
     // Rewrite rules gate the sitemap routes; they change with visibility.
@@ -235,17 +235,17 @@ function ace_seo_visibility_changed( $old, $new ) {
      *
      * @param bool $discouraged Whether the site is now discouraged.
      */
-    do_action( 'ace_seo_visibility_changed', '0' === (string) $new );
+    do_action( 'acecrawl_visibility_changed', '0' === (string) $new );
 }
-add_action( 'update_option_blog_public', 'ace_seo_visibility_changed', 10, 2 );
+add_action( 'update_option_blog_public', 'acecrawl_visibility_changed', 10, 2 );
 
 /**
  * Tell the admin, on our own screens, that nothing this plugin does will be crawled.
  *
  * @return void
  */
-function ace_seo_discouraged_admin_notice() {
-    if ( ! ace_seo_site_is_discouraged() || ! current_user_can( 'manage_options' ) ) {
+function acecrawl_discouraged_admin_notice() {
+    if ( ! acecrawl_site_is_discouraged() || ! current_user_can( 'manage_options' ) ) {
         return;
     }
 
@@ -266,4 +266,4 @@ function ace_seo_discouraged_admin_notice() {
         )
     );
 }
-add_action( 'admin_notices', 'ace_seo_discouraged_admin_notice' );
+add_action( 'admin_notices', 'acecrawl_discouraged_admin_notice' );

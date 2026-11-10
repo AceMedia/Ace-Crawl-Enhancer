@@ -1,7 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-class AceSeoTrackingUI {
+class AceCrawlTrackingUI {
     public static function detail( $text ) {
         $escaped = esc_html( $text );
         return preg_replace( '/\b(?:(?<=Project )[a-z0-9]+|GTM-[A-Z0-9]+|GT-[A-Z0-9]+|G-[A-Z0-9]+|AW-[0-9]+|[0-9]+(?:\.[0-9]+)+|[0-9]{2,}|[a-z0-9]{4,}[0-9][a-z0-9]{4,})\b/', '<code class="ace-trk-id">$0</code>', $escaped );

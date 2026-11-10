@@ -16,9 +16,9 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Ace_SEO_Timing_Suggestions {
+class AceCrawl_Timing_Suggestions {
 
-    const OPTION   = 'ace_seo_timing_suggestions';
+    const OPTION   = 'acecrawl_timing_suggestions';
 
     /** Whether the last infer() had enough readership data for day-of-event and evergreen suggestions. */
     public static $readership_known = true;
@@ -27,17 +27,17 @@ class Ace_SEO_Timing_Suggestions {
     const MIN_POSTS = 30;
 
     public static function init() {
-        add_action( 'ace_seo_retention_built', array( __CLASS__, 'recompute' ) );
+        add_action( 'acecrawl_retention_built', array( __CLASS__, 'recompute' ) );
         if ( is_admin() ) {
             add_action( 'admin_post_ace_seo_timing_suggest', array( __CLASS__, 'handle_recompute' ) );
-            add_action( 'wp_ajax_ace_seo_timing_rules', array( __CLASS__, 'ajax_save' ) );
-            add_action( 'wp_ajax_ace_seo_timing_detail', array( __CLASS__, 'ajax_detail' ) );
+            add_action( 'wp_ajax_acecrawl_timing_rules', array( __CLASS__, 'ajax_save' ) );
+            add_action( 'wp_ajax_acecrawl_timing_detail', array( __CLASS__, 'ajax_detail' ) );
         }
     }
 
     /** The modal's "Save and close": one chosen rule (or none) per term, plus the ignore list. */
     public static function ajax_save() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_timing_rules', 'nonce', false ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'acecrawl_timing_rules', 'nonce', false ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         $choices = array();
@@ -46,20 +46,20 @@ class Ace_SEO_Timing_Suggestions {
             $choices[ sanitize_text_field( (string) $key ) ] = (string) $text;
         }
         $ignore = isset( $_POST['ignore'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['ignore'] ) ) : array();
-        $result = AceSeoRetentionActions::set_timing_rules( $choices, $ignore );
+        $result = AceCrawlRetentionActions::set_timing_rules( $choices, $ignore );
         if ( $result['invalid'] ) {
             wp_send_json_error( array( 'message' => 'These rules were not understood and were left unchanged: ' . implode( ', ', $result['invalid'] ) . '. An event needs a number of days; a season needs two dates as MM-DD.' ) );
         }
         wp_send_json_success( array(
             'message'  => 'Timing rules saved.',
-            'rules'    => AceSeoRetentionActions::timing_rules_text( (array) $result['options']['timing_rules'] ),
+            'rules'    => AceCrawlRetentionActions::timing_rules_text( (array) $result['options']['timing_rules'] ),
             'overview' => self::overview( self::current(), $result['options'] ),
         ) );
     }
 
     /** Recent assessed posts in one category or tag, for the dialog's worked example. */
     public static function ajax_detail() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_timing_rules', 'nonce', false ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'acecrawl_timing_rules', 'nonce', false ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         $key = sanitize_text_field( wp_unslash( $_POST['key'] ?? '' ) );
@@ -77,9 +77,9 @@ class Ace_SEO_Timing_Suggestions {
              LEFT JOIN {$wpdb->postmeta} r ON r.post_id = p.ID AND r.meta_key = %s
              WHERE tt.taxonomy = %s
              ORDER BY p.post_date DESC LIMIT 6",
-            $m[2], AceSeoRetentionReport::META_TIER, AceSeoRetentionReport::META_RANK, $m[1]
+            $m[2], AceCrawlRetentionReport::META_TIER, AceCrawlRetentionReport::META_RANK, $m[1]
         ), ARRAY_A );
-        $tiers = AceSeoRetentionReport::tier_labels();
+        $tiers = AceCrawlRetentionReport::tier_labels();
         $ranks = array( 'daily' => 'read daily', 'weekly' => 'read weekly', 'monthly' => 'read monthly', 'occasional' => 'read occasionally' );
         $out   = array();
         foreach ( (array) $rows as $r ) {
@@ -96,7 +96,7 @@ class Ace_SEO_Timing_Suggestions {
     /** What a rule means for the posts it covers, in plain words. Accepts the stored array or the text form. */
     public static function explain_rule( $rule ) {
         if ( is_string( $rule ) ) {
-            $parsed = AceSeoRetentionActions::parse_timing_rules( 'x:y = ' . $rule );
+            $parsed = AceCrawlRetentionActions::parse_timing_rules( 'x:y = ' . $rule );
             $rule   = $parsed['x:y'] ?? null;
         }
         if ( ! is_array( $rule ) ) {
@@ -123,7 +123,7 @@ class Ace_SEO_Timing_Suggestions {
         $posts   = 0;
         foreach ( $suggestions as $key => $s ) {
             $types[ $s['type'] ] = ( $types[ $s['type'] ] ?? 0 ) + 1;
-            if ( isset( $rules[ $key ] ) && AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) === $s['rule'] ) {
+            if ( isset( $rules[ $key ] ) && AceCrawlRetentionActions::rule_to_text( $rules[ $key ] ) === $s['rule'] ) {
                 $in_use++;
                 $posts += (int) $s['posts'];
             }
@@ -331,11 +331,11 @@ class Ace_SEO_Timing_Suggestions {
         global $wpdb;
         $taxonomies = array();
         foreach ( get_taxonomies( array( 'public' => true ), 'objects' ) as $tax ) {
-            if ( ! empty( $tax->object_type ) && array_intersect( (array) $tax->object_type, (array) AceSeoRetentionReport::settings()['post_types'] ) ) {
+            if ( ! empty( $tax->object_type ) && array_intersect( (array) $tax->object_type, (array) AceCrawlRetentionReport::settings()['post_types'] ) ) {
                 $taxonomies[] = $tax->name;
             }
         }
-        $taxonomies = (array) apply_filters( 'ace_seo_timing_suggestion_taxonomies', $taxonomies );
+        $taxonomies = (array) apply_filters( 'acecrawl_timing_suggestion_taxonomies', $taxonomies );
         if ( ! $taxonomies ) {
             return array();
         }
@@ -348,7 +348,7 @@ class Ace_SEO_Timing_Suggestions {
                  JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id AND tt.taxonomy IN ($in)
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE tier.meta_key = %s";
-        $args = array_merge( array( AceSeoRetentionReport::META_RANK ), $taxonomies, array( AceSeoRetentionReport::META_TIER ) );
+        $args = array_merge( array( AceCrawlRetentionReport::META_RANK ), $taxonomies, array( AceCrawlRetentionReport::META_TIER ) );
         $rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed template with generated %s placeholders; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $row ) {
@@ -367,7 +367,7 @@ class Ace_SEO_Timing_Suggestions {
     /** Stored suggestions, computed now if there are none yet or the report has moved on. */
     public static function current() {
         $stored = get_option( self::OPTION, array() );
-        $built  = (int) ( AceSeoRetentionReport::progress()['finished'] ?? 0 );
+        $built  = (int) ( AceCrawlRetentionReport::progress()['finished'] ?? 0 );
         $first  = is_array( $stored['suggestions'] ?? null ) ? reset( $stored['suggestions'] ) : null;
         if ( ! is_array( $stored ) || ! isset( $stored['suggestions'], $stored['readership_known'] ) || (int) ( $stored['computed'] ?? 0 ) < $built || ( is_array( $first ) && ! isset( $first['months'] ) ) ) {
             return self::recompute();
@@ -391,7 +391,7 @@ class Ace_SEO_Timing_Suggestions {
             wp_die( 'Not allowed.' );
         }
         $n = count( self::recompute() );
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), sprintf( 'Suggestions recalculated from the current assessment: %d categories or tags have a clear enough shape to suggest a rule.', $n ), 60 );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), sprintf( 'Suggestions recalculated from the current assessment: %d categories or tags have a clear enough shape to suggest a rule.', $n ), 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' ) );
         exit;
     }
@@ -423,8 +423,8 @@ class Ace_SEO_Timing_Suggestions {
         $suggestions = self::current();
         $o           = self::overview( $suggestions, $options );
         $computed    = self::computed_at();
-        wp_enqueue_script( 'ace-seo-timing-rules', ACE_SEO_URL . 'assets/js/timing-rules.js', array(), ACE_SEO_VERSION, true );
-        wp_localize_script( 'ace-seo-timing-rules', 'aceSeoTimingRules', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ace_seo_timing_rules' ) ) );
+        wp_enqueue_script( 'ace-seo-timing-rules', ACECRAWL_URL . 'assets/js/timing-rules.js', array(), ACECRAWL_VERSION, true );
+        wp_localize_script( 'ace-seo-timing-rules', 'aceSeoTimingRules', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'acecrawl_timing_rules' ) ) );
         ?>
         <div id="ace-timing-overview" class="ace-timing-overview">
             <div class="ace-timing-kinds">
@@ -477,7 +477,7 @@ class Ace_SEO_Timing_Suggestions {
                 'lastYear'   => $s['last_year'] ?? 0,
                 'months'     => $s['months'] ?? array(),
                 'season'     => $s['season'] ?? null,
-                'current'    => isset( $rules[ $key ] ) ? AceSeoRetentionActions::rule_to_text( $rules[ $key ] ) : '',
+                'current'    => isset( $rules[ $key ] ) ? AceCrawlRetentionActions::rule_to_text( $rules[ $key ] ) : '',
                 'ignored'    => in_array( $key, $ignored, true ),
             );
         }

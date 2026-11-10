@@ -2,9 +2,9 @@
 /** Minimal first-party statistics: one counter per site/day, never a visitor/event log. */
 defined( 'ABSPATH' ) || exit;
 
-class AceSeoAggregateViews {
-    const OPTION = 'ace_seo_aggregate_views';
-    const SCHEMA = 'ace_seo_aggregate_views_schema';
+class AceCrawlAggregateViews {
+    const OPTION = 'acecrawl_aggregate_views';
+    const SCHEMA = 'acecrawl_aggregate_views_schema';
     const TABLE = 'ace_seo_daily_views';
 
     public static function init() {
@@ -13,7 +13,7 @@ class AceSeoAggregateViews {
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
         add_action( 'wp_footer', array( __CLASS__, 'privacy' ), 5 );
         add_action( 'admin_post_ace_seo_aggregate_views', array( __CLASS__, 'save' ) );
-        add_action( 'ace_seo_tracking_check', array( __CLASS__, 'prune' ) );
+        add_action( 'acecrawl_tracking_check', array( __CLASS__, 'prune' ) );
     }
     public static function table() { global $wpdb; return $wpdb->prefix . self::TABLE; }
     public static function enabled() { return (bool) get_option( self::OPTION, false ) && 1 === (int) get_option( self::SCHEMA, 0 ); }
@@ -69,7 +69,7 @@ class AceSeoAggregateViews {
             return new WP_Error( 'invalid_view', 'Invalid counter request.', array( 'status' => 400 ) );
         }
         $ua = (string) $request->get_header( 'user-agent' );
-        if ( '1' !== $request->get_header( 'dnt' ) && '1' !== $request->get_header( 'sec-gpc' ) && ! AceSeoViewTracker::is_bot( $ua ) ) {
+        if ( '1' !== $request->get_header( 'dnt' ) && '1' !== $request->get_header( 'sec-gpc' ) && ! AceCrawlViewTracker::is_bot( $ua ) ) {
             global $wpdb;
         // The identifier is the trusted WordPress site prefix plus a fixed plugin table suffix; values are prepared. WP 6.0 has no %i placeholder.
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
@@ -88,12 +88,12 @@ class AceSeoAggregateViews {
     }
     public static function enqueue() {
         if ( ! self::frontend() ) { return; }
-        wp_enqueue_script( 'ace-aggregate-views', ACE_SEO_URL . 'assets/js/aggregate-views.js', array(), ACE_SEO_VERSION, true );
+        wp_enqueue_script( 'ace-aggregate-views', ACECRAWL_URL . 'assets/js/aggregate-views.js', array(), ACECRAWL_VERSION, true );
         wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
     }
     /** Optional visitor UI; counting and existing privacy signals are independent. */
     public static function show_privacy() {
-        return (bool) apply_filters( 'ace_seo_aggregate_views_show_privacy', false );
+        return (bool) apply_filters( 'acecrawl_aggregate_views_show_privacy', false );
     }
     public static function privacy() {
         if ( ! self::show_privacy() || ! self::frontend() ) { return; }
@@ -127,7 +127,7 @@ class AceSeoAggregateViews {
     }
     public static function save() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'Not allowed.' ); }
-        check_admin_referer( 'ace_seo_aggregate_views' );
+        check_admin_referer( 'acecrawl_aggregate_views' );
         if ( isset( $_POST['enabled'] ) ) {
             $result = self::enable();
             if ( is_wp_error( $result ) ) { wp_die( esc_html( $result->get_error_message() ) ); }
@@ -135,8 +135,8 @@ class AceSeoAggregateViews {
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-tracking' ) ); exit;
     }
     public static function settings() {
-        echo '<details class="box" id="basic-view-count"><summary><strong>Basic page views: ' . ( self::enabled() ? 'on' : 'off' ) . '</strong></summary><p>A first-party daily total, independent of GA4 consented reporting. Counts visible page loads and React history navigation. No tracking cookies, persistent IDs, URLs, IP addresses or user agents are stored in this counter. Known bots, signed-in users on uncached pages and explicit opt-outs are excluded; disguised bots and blocking affect accuracy. Blank dates mean no recorded coverage.</p><p>Use only for aggregate site-improvement statistics under the rules applicable to your visitors. An optional public privacy control can explain the counter and provide an opt-out when enabled through the privacy-display filter. Purge cached pages after changing this setting.</p><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="ace_seo_aggregate_views">';
-        wp_nonce_field( 'ace_seo_aggregate_views' );
+        echo '<details class="box" id="basic-view-count"><summary><strong>Basic page views: ' . ( self::enabled() ? 'on' : 'off' ) . '</strong></summary><p>A first-party daily total, independent of GA4 consented reporting. Counts visible page loads and React history navigation. No tracking cookies, persistent IDs, URLs, IP addresses or user agents are stored in this counter. Known bots, signed-in users on uncached pages and explicit opt-outs are excluded; disguised bots and blocking affect accuracy. Blank dates mean no recorded coverage.</p><p>Use only for aggregate site-improvement statistics under the rules applicable to your visitors. An optional public privacy control can explain the counter and provide an opt-out when enabled through the privacy-display filter. Purge cached pages after changing this setting.</p><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="acecrawl_aggregate_views">';
+        wp_nonce_field( 'acecrawl_aggregate_views' );
         echo '<label><input type="checkbox" name="enabled" value="1"' . checked( self::enabled(), true, false ) . '> Enable basic aggregate view counting</label> ';
         submit_button( 'Save view counting', 'secondary', 'submit', false ); echo '</form></details>';
     }

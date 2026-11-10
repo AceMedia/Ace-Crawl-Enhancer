@@ -43,7 +43,7 @@ check( true === $s->save( 'own', 'sk-existing', array( 'text' ) ), 'Existing exp
 check( ! $s->subscription_selected() && 'sk-existing' === $s->api_key( 'text' ), 'Explicit API connection is not replaced by core availability' );
 echo "WordPress AI checks passed ($count total)\n";
 
-function ace_ai_connection_service() { return $GLOBALS['core_service']; }
+function acemedia_ai_connection_service() { return $GLOBALS['core_service']; }
 function wp_strip_all_tags( $text ) { return strip_tags( $text ); }
 function apply_filters( $hook, $value, ...$args ) { return $value; }
 class WP_Post { public $post_title = 'A sample post'; }
@@ -51,7 +51,7 @@ $GLOBALS['core_service'] = $s;
 require __DIR__ . '/../includes/class-ace-seo-whitehat.php';
 $s->save( 'wordpress', '', array( 'text' ) );
 $GLOBALS['core_result'] = '{"white_hat":true,"reasons":["Informational"]}';
-$method = new ReflectionMethod( 'AceSeoWhiteHat', 'ask_ai' );
+$method = new ReflectionMethod( 'AceCrawlWhiteHat', 'ask_ai' );
 $method->setAccessible( true );
 $answer = $method->invoke( null, new WP_Post(), 'A factual excerpt.', array( 'provider' => 'wordpress', 'model' => '', 'api_key' => '' ) );
 check( ! is_wp_error( $answer ) && true === $answer['white_hat'], 'White hat core selection works without direct model or key' );
@@ -69,9 +69,9 @@ echo "Core selection protection checks passed\n";
 function add_action( ...$args ) {}
 require __DIR__ . '/../includes/admin/class-ace-seo-api-helper.php';
 $GLOBALS['core_result'] = 'Editor suggestion';
-check( 'Editor suggestion' === AceSEOApiHelper::make_openai_request( 'Suggest a title' ), 'Editor helper routes through core without direct HTTP' );
+check( 'Editor suggestion' === AceCrawlApiHelper::make_openai_request( 'Suggest a title' ), 'Editor helper routes through core without direct HTTP' );
 $GLOBALS['core_supported'] = false;
-check( is_wp_error( AceSEOApiHelper::make_openai_request( 'Suggest a title' ) ), 'Editor helper returns unavailable core provider without direct HTTP' );
+check( is_wp_error( AceCrawlApiHelper::make_openai_request( 'Suggest a title' ) ), 'Editor helper returns unavailable core provider without direct HTTP' );
 echo "Editor core integration checks passed\n";
 
 $s->save( 'disabled', '', array() );

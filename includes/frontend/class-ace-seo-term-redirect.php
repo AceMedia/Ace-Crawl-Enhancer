@@ -24,7 +24,7 @@ class ACE_SEO_Term_Redirect {
      *
      * Accepts a term ID (same taxonomy) or an absolute URL.
      */
-    const META_KEY = ACE_SEO_META_PREFIX . 'redirect';
+    const META_KEY = ACECRAWL_META_PREFIX . 'redirect';
 
     public function init() {
         add_action( 'template_redirect', array( $this, 'maybe_redirect' ), 1 );
@@ -119,7 +119,7 @@ class ACE_SEO_Term_Redirect {
          * @param string  $raw  Stored meta value (term ID or absolute URL).
          * @param WP_Term $term The term being viewed.
          */
-        $raw = (string) apply_filters( 'ace_seo_term_redirect_target', $raw, $term );
+        $raw = (string) apply_filters( 'acecrawl_term_redirect_target', $raw, $term );
 
         if ( '' === $raw ) {
             return '';
@@ -180,8 +180,8 @@ class ACE_SEO_Term_Redirect {
      * sitemap entry can never disagree about the same URL.
      */
     private function normalise( $url ) {
-        if ( function_exists( 'ace_sitemap_powertools_normalise_url' ) ) {
-            return ace_sitemap_powertools_normalise_url( $url );
+        if ( function_exists( 'acecrawl_sitemap_normalise_url' ) ) {
+            return acecrawl_sitemap_normalise_url( $url );
         }
 
         return $url;

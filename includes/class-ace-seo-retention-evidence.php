@@ -1,6 +1,6 @@
 <?php
 /** Pure, read-only interpretation of retention evidence. No WordPress or storage side effects. */
-final class Ace_SEO_Retention_Evidence {
+final class AceCrawl_Retention_Evidence {
     const VERSION = 'event-evidence-preview-2';
 
     public static function recommendations() {

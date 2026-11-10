@@ -365,11 +365,11 @@ class SaveBar {
             }
 
             const formData = new FormData(formEl);
-            formData.append('action', 'ace_seo_save_settings');
-            formData.append('nonce', (window.ace_seo_admin && window.ace_seo_admin.nonce) ? window.ace_seo_admin.nonce : '');
+            formData.append('action', 'acecrawl_save_settings');
+            formData.append('nonce', (window.acecrawl_admin && window.acecrawl_admin.nonce) ? window.acecrawl_admin.nonce : '');
 
             $.ajax({
-                url: (window.ace_seo_admin && window.ace_seo_admin.ajax_url) ? window.ace_seo_admin.ajax_url : window.ajaxurl,
+                url: (window.acecrawl_admin && window.acecrawl_admin.ajax_url) ? window.acecrawl_admin.ajax_url : window.ajaxurl,
                 type: 'POST',
                 data: formData,
                 processData: false,

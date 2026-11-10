@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/shared-ai-connection-test.php';
 function add_action(...$args) {}
-function ace_ai_connection_service() { return $GLOBALS['svc']; }
+function acemedia_ai_connection_service() { return $GLOBALS['svc']; }
 function sanitize_key($s) { return $s; }
 function sanitize_text_field($s) { return $s; }
 function sanitize_textarea_field($s) { return $s; }
@@ -22,13 +22,13 @@ use ACE\AdaptiveCustomerEngagement\AI\OpenAIClient;
 $GLOBALS['http']=array();
 $r=ChatClientFactory::resolve(array('provider'=>'anthropic','anthropic_api_key'=>'legacy-paid'));
 check($r['provider']==='openai' && $r['api_key']==='sk-single','Engagement resolves same managed shared key');
-check(AceSEOApiHelper::get_openai_key()==='sk-single','SEO resolves same shared key');
-check(AceSEOApiHelper::get_openai_key('images')==='','SEO images require explicit feature permission');
+check(AceCrawlApiHelper::get_openai_key()==='sk-single','SEO resolves same shared key');
+check(AceCrawlApiHelper::get_openai_key('images')==='','SEO images require explicit feature permission');
 $GLOBALS['svc']->save('disabled','',array());
 $r=(new OpenAIClient())->create_chat_completion(array(array('role'=>'user','content'=>'hello')),array('api_key'=>'legacy-paid'));
 check(is_wp_error($r),'Direct Engagement client cannot bypass disabled policy');
 check(count($GLOBALS['http'])===0,'Disabled produces no outbound HTTP');
-check(AceSEOApiHelper::get_openai_key()==='','Disabled SEO produces no credential');
+check(AceCrawlApiHelper::get_openai_key()==='','Disabled SEO produces no credential');
 $GLOBALS['svc']->save('own','sk-single',array('text'));
 $r=(new OpenAIClient())->create_chat_completion(array(array('role'=>'user','content'=>'hello')),array('api_key'=>'legacy-paid'));
 check(!is_wp_error($r),'Mocked text completion succeeds');

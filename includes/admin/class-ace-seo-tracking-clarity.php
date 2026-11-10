@@ -2,10 +2,10 @@
 defined( 'ABSPATH' ) || exit;
 
 /** Clarity's export API is a rolling snapshot, not a historical daily series. */
-class AceSeoTrackingClarity {
-    const OPTION = 'ace_seo_tracking_clarity_token';
-    const CACHE = 'ace_seo_tracking_clarity_snapshot';
-    const HISTORY = 'ace_seo_tracking_clarity_history';
+class AceCrawlTrackingClarity {
+    const OPTION = 'acecrawl_tracking_clarity_token';
+    const CACHE = 'acecrawl_tracking_clarity_snapshot';
+    const HISTORY = 'acecrawl_tracking_clarity_history';
 
     public static function encrypt( $token, $project ) {
         if ( ! function_exists( 'openssl_encrypt' ) ) { return new WP_Error( 'clarity_crypto', 'OpenSSL is required to save this token.' ); }
@@ -42,7 +42,7 @@ class AceSeoTrackingClarity {
                 delete_transient( self::CACHE );
             }
         }
-        wp_safe_redirect( admin_url( 'admin.php?page=' . AceSeoTracking::SLUG . '#clarity-data' ) );
+        wp_safe_redirect( admin_url( 'admin.php?page=' . AceCrawlTracking::SLUG . '#clarity-data' ) );
         exit;
     }
 
@@ -167,7 +167,7 @@ class AceSeoTrackingClarity {
             }
             echo '</div>';
             if ( ! $data['metrics'] ) { echo '<p>No metrics were returned for this window.</p>'; }
-            $next = wp_next_scheduled( AceSeoTracking::CRON );
+            $next = wp_next_scheduled( AceCrawlTracking::CRON );
             echo '<p class="ace-trk-history-note"><strong>Daily history logging</strong> · ' . ( $next ? 'Next check ' . esc_html( wp_date( 'j M H:i T', $next ) ) : 'Daily check is not scheduled' ) . '. We keep up to 60 saved windows, even when nobody opens this page.</p>';
             echo '<p class="ace-trk-history-note">' . esc_html( count( self::history() ) ) . ' saved reporting windows. The main chart can show sessions, visitors and available interaction counts. Each point covers the 24 hours before its capture time; it is not a calendar-day total.</p>';
             echo '<details class="ace-trk-clarity-detail"><summary>All reported metrics</summary><div class="ace-trk-clarity-grid">';

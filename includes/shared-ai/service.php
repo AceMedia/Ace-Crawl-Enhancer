@@ -6,7 +6,7 @@ require_once __DIR__ . '/oauth.php';
 require_once __DIR__ . '/responses.php';
 require_once __DIR__ . '/session.php';
 final class Service {
-	const OPTION = 'ace_ai_connection_v1';
+	const OPTION = 'acemedia_ai_connection_v1';
 	const PROVIDERS = array( 'api_key', 'chatgpt', 'codex', 'wordpress' );
 	private $force_network;
 	public function __construct( bool $force_network = false ) { $this->force_network = $force_network; }
@@ -176,9 +176,9 @@ final class Service {
 
 	/* ---- Codex CLI bridge: a second, isolated Codex instance on this server signed in from wp-admin. ---- */
 
-	/** Whether a host-provided Codex runner is registered on the `ace_ai_codex_runner` filter. This plugin never runs programs itself. */
+	/** Whether a host-provided Codex runner is registered on the `acemedia_ai_codex_runner` filter. This plugin never runs programs itself. */
 	public function codex_available(): bool {
-		return (bool) has_filter( 'ace_ai_codex_runner' );
+		return (bool) has_filter( 'acemedia_ai_codex_runner' );
 	}
 	/** One Codex home per WordPress scope, so a site's own connection never shares the network's account. */
 	public function codex_scope( bool $network ): string {
@@ -187,13 +187,13 @@ final class Service {
 	/**
 	 * Hand a Codex request to the host-provided runner.
 	 *
-	 * Filter `ace_ai_codex_runner( null, $sub, $scope, $stdin, $timeout )` returns the decoded
+	 * Filter `acemedia_ai_codex_runner( null, $sub, $scope, $stdin, $timeout )` returns the decoded
 	 * reply array or a WP_Error. A site that wants Codex sign-in supplies the runner; nothing
 	 * is executed from this plugin.
 	 */
 	private function codex_run( string $sub, string $scope, string $stdin = '', int $timeout = 60 ) {
 		if ( ! $this->codex_available() ) { return new \WP_Error( 'ace_ai_codex_unavailable', 'No Codex runner is registered on this site.' ); }
-		$data = apply_filters( 'ace_ai_codex_runner', null, $sub, $scope, $stdin, $timeout );
+		$data = apply_filters( 'acemedia_ai_codex_runner', null, $sub, $scope, $stdin, $timeout );
 		if ( is_wp_error( $data ) ) { return $data; }
 		if ( ! is_array( $data ) ) { return new \WP_Error( 'ace_ai_codex_error', 'The Codex runner gave no usable reply.' ); }
 		return $data;
@@ -253,7 +253,7 @@ final class Service {
 		return 'network' === ( $r['scope'] ?? '' ) ? 'network-' . (int) get_site( get_current_blog_id() )->network_id : 'site-' . (int) get_current_blog_id();
 	}
 	public function host_id(): string {
-		$key = 'ace_ai_host_id_v1';
+		$key = 'acemedia_ai_host_id_v1';
 		$network = is_multisite();
 		$id = $network ? get_network_option( get_current_network_id(), $key, '' ) : get_option( $key, '' );
 		if ( ! $id ) {
@@ -403,7 +403,7 @@ final class Service {
 			if ( $network ) { wp_cache_delete( $id . ':' . self::OPTION, 'site-options' ); } else { wp_cache_delete( self::OPTION, 'options' ); }
 			return 1 === $updated;
 		};
-		$lock_name = 'ace_ai_refresh_' . ( $network ? 'network_' : 'site_' ) . $id;
+		$lock_name = 'acemedia_ai_refresh_' . ( $network ? 'network_' : 'site_' ) . $id;
 		$locks = $wpdb->base_prefix . 'options';
 		$lock = static function () use ( $wpdb, $locks, $lock_name ) {
 			$owner = ( time() + 120 ) . ':' . bin2hex( random_bytes( 16 ) );

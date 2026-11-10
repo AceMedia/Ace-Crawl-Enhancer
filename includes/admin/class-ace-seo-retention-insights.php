@@ -9,14 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Ace_SEO_Retention_Insights {
+class AceCrawl_Retention_Insights {
 
-    const CACHE = 'ace_seo_retention_insights';
+    const CACHE = 'acecrawl_retention_insights';
 
     /** One cached bundle per completed check and rule set. */
     public static function data() {
-        $p      = AceSeoRetentionReport::progress();
-        $rules  = (array) ( AceSeoRetentionActions::options()['timing_rules'] ?? array() );
+        $p      = AceCrawlRetentionReport::progress();
+        $rules  = (array) ( AceCrawlRetentionActions::options()['timing_rules'] ?? array() );
         $key    = md5( (int) ( $p['finished'] ?? 0 ) . '|' . wp_json_encode( $rules ) );
         $cached = get_transient( self::CACHE );
         if ( is_array( $cached ) && ( $cached['key'] ?? '' ) === $key ) {
@@ -37,13 +37,13 @@ class Ace_SEO_Retention_Insights {
     public static function matrix() {
         global $wpdb;
         $case = array();
-        foreach ( AceSeoRetentionReport::BUCKETS as $b ) {
+        foreach ( AceCrawlRetentionReport::BUCKETS as $b ) {
             $case[] = $wpdb->prepare( 'WHEN r.meta_value LIKE %s THEN %s', '%' . $wpdb->esc_like( '"bucket";s:' . strlen( $b ) . ':"' . $b . '"' ) . '%', $b );
         }
         $sql  = "SELECT t.meta_value AS tier, CASE " . implode( ' ', $case ) . " ELSE 'other' END AS bucket, COUNT(*) AS n
                  FROM {$wpdb->postmeta} t JOIN {$wpdb->postmeta} r ON r.post_id = t.post_id AND r.meta_key = %s
                  WHERE t.meta_key = %s GROUP BY tier, bucket";
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceCrawlRetentionReport::META, AceCrawlRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $r ) {
             $out[ $r['tier'] ][ $r['bucket'] ] = (int) $r['n'];
@@ -69,7 +69,7 @@ class Ace_SEO_Retention_Insights {
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE t.meta_key = %s AND (" . implode( ' OR ', $pairs ) . ')
                  GROUP BY tt.taxonomy, tm.slug, tm.name, t.meta_value';
-        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
+        $rows = $wpdb->get_results( $wpdb->prepare( $sql, AceCrawlRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $out  = array();
         foreach ( (array) $rows as $r ) {
             $k = $r['taxonomy'] . ':' . $r['slug'];
@@ -108,7 +108,7 @@ class Ace_SEO_Retention_Insights {
                  JOIN {$wpdb->terms} tm ON tm.term_id = tt.term_id
                  WHERE t.meta_key = %s AND (" . implode( ' OR ', $pairs ) . ')
                  GROUP BY tr.object_id HAVING c > 1';
-        $rows   = $wpdb->get_results( $wpdb->prepare( $sql, AceSeoRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
+        $rows   = $wpdb->get_results( $wpdb->prepare( $sql, AceCrawlRetentionReport::META_TIER ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- fixed query template; values bound by prepare().
         $combos = array();
         foreach ( (array) $rows as $r ) {
             $combos[ $r['combo'] ] = ( $combos[ $r['combo'] ] ?? 0 ) + 1;
@@ -125,7 +125,7 @@ class Ace_SEO_Retention_Insights {
              FROM {$wpdb->postmeta} t JOIN {$wpdb->posts} p ON p.ID = t.post_id
              WHERE t.meta_key = %s AND p.post_date >= '1995-01-01'
              GROUP BY y, m",
-            AceSeoRetentionReport::META_TIER
+            AceCrawlRetentionReport::META_TIER
         ), ARRAY_A );
         $out = array();
         foreach ( (array) $rows as $r ) {
@@ -152,13 +152,13 @@ class Ace_SEO_Retention_Insights {
      * last check actually suggested it for. Options the report never computes show the guide alone.
      */
     private static function render_matrix( array $m ) {
-        if ( ! class_exists( 'Ace_SEO_Retention_Evidence' ) ) {
-            require_once ACE_SEO_PATH . 'includes/class-ace-seo-retention-evidence.php';
+        if ( ! class_exists( 'AceCrawl_Retention_Evidence' ) ) {
+            require_once ACECRAWL_PATH . 'includes/class-ace-seo-retention-evidence.php';
         }
         $tiers   = array( 'retained', 'candidate', 'dormant', 'unknown' );
-        $tlabels = AceSeoRetentionReport::tier_labels();
+        $tlabels = AceCrawlRetentionReport::tier_labels();
         $tsub    = array( 'retained' => 'Read in the period', 'candidate' => 'Short, nobody read it', 'dormant' => 'Nobody read it', 'unknown' => 'Held: evidence not good enough yet' );
-        $options = Ace_SEO_Retention_Evidence::recommendations();
+        $options = AceCrawl_Retention_Evidence::recommendations();
         // Which saved suggestion each option corresponds to (seasonal-refresh is not computed yet).
         $bucket  = array( 'keep' => 'keep', 'refresh' => 'refresh', 'seasonal-refresh' => '', 'consolidate' => 'consolidate', 'noindex' => 'noindex', 'hold' => 'no-signal' );
         $tools   = array( 'consolidate' => 'Manual redirect tool available', 'noindex' => 'Manual noindex tool available' );
@@ -193,7 +193,7 @@ class Ace_SEO_Retention_Insights {
                             <?php if ( '' === $bucket[ $opt ] ) : ?><span class="ace-xref-note">Not suggested automatically yet</span><?php endif; ?>
                         </th>
                         <?php foreach ( $tiers as $t ) :
-                            $cell = Ace_SEO_Retention_Evidence::reference_cell( $t, $opt );
+                            $cell = AceCrawl_Retention_Evidence::reference_cell( $t, $opt );
                             $n    = '' !== $bucket[ $opt ] ? (int) ( $m[ $t ][ $bucket[ $opt ] ] ?? 0 ) : 0;
                             ?>
                             <td class="ace-xref-cell is-<?php echo esc_attr( $cell['status'] ); ?>">
@@ -213,7 +213,7 @@ class Ace_SEO_Retention_Insights {
     }
 
     private static function render_timing( array $d ) {
-        $suggestions = class_exists( 'Ace_SEO_Timing_Suggestions' ) ? Ace_SEO_Timing_Suggestions::current() : array();
+        $suggestions = class_exists( 'AceCrawl_Timing_Suggestions' ) ? AceCrawl_Timing_Suggestions::current() : array();
         $seasons     = array();
         $events      = array();
         $evergreen   = array();
@@ -236,7 +236,7 @@ class Ace_SEO_Retention_Insights {
             if ( 'season' !== $s['type'] || isset( $seasons[ $k ] ) || count( $seasons ) >= 12 ) {
                 continue;
             }
-            $parsed = AceSeoRetentionActions::parse_timing_rules( $k . ' = ' . $s['rule'] );
+            $parsed = AceCrawlRetentionActions::parse_timing_rules( $k . ' = ' . $s['rule'] );
             $seasons[ $k ] = array( 'key' => $k, 'label' => $s['label'], 'posts' => $s['posts'], 'in_use' => false, 'rule' => $parsed[ $k ] ?? null, 'confidence' => $s['confidence'] );
         }
         $months = array( 'J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D' );
@@ -255,7 +255,7 @@ class Ace_SEO_Retention_Insights {
                 ?>
                 <div class="ace-season-row">
                     <span class="ace-season-label"><strong><?php echo esc_html( $s['label'] ); ?></strong><br><small><?php echo esc_html( number_format_i18n( $s['posts'] ) ); ?> posts · <?php echo $s['in_use'] ? 'rule in use' : 'suggested, ' . esc_html( (int) round( 100 * $s['confidence'] ) ) . '%'; ?></small></span>
-                    <div class="ace-season-track" title="<?php echo esc_attr( Ace_SEO_Timing_Suggestions::md_label( $s['rule']['start'] ) . ' to ' . Ace_SEO_Timing_Suggestions::md_label( $s['rule']['end'] ) ); ?>">
+                    <div class="ace-season-track" title="<?php echo esc_attr( AceCrawl_Timing_Suggestions::md_label( $s['rule']['start'] ) . ' to ' . AceCrawl_Timing_Suggestions::md_label( $s['rule']['end'] ) ); ?>">
                         <?php if ( $b >= $a ) : ?>
                             <span class="ace-season-band<?php echo $s['in_use'] ? ' is-used' : ''; ?>" style="left:<?php echo esc_attr( $a ); ?>%;width:<?php echo esc_attr( max( 1, $b - $a ) ); ?>%"></span>
                         <?php else : ?>

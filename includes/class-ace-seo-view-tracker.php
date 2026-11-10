@@ -27,7 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoViewTracker {
+class AceCrawlViewTracker {
 
     const TABLE        = 'ace_seo_post_hits';
     const REF_TABLE    = 'ace_seo_post_referrers';
@@ -35,8 +35,8 @@ class AceSeoViewTracker {
     const META_HUMANS  = '_ace_seo_humans';
     const META_BOT_PCT = '_ace_seo_bot_pct';
     const WINDOW_DAYS  = 30;
-    const DB_OPTION    = 'ace_seo_hits_db_version';
-    const ROLLUP_HOOK  = 'ace_seo_hits_rollup';
+    const DB_OPTION    = 'acecrawl_hits_db_version';
+    const ROLLUP_HOOK  = 'acecrawl_hits_rollup';
     const META_LAST    = '_ace_seo_last_viewed';
     const KEEP_DAYS    = 400;
 
@@ -71,16 +71,16 @@ class AceSeoViewTracker {
 
     /** Switched on, and the table exists. */
     public static function enabled() {
-        if ( ! class_exists( 'AceSeoRetentionActions' ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionActions' ) ) {
             return false;
         }
-        $o = AceSeoRetentionActions::options();
+        $o = AceCrawlRetentionActions::options();
         return ! empty( $o['track_views'] ) && (int) get_option( self::DB_OPTION, 0 ) >= self::DB_VERSION;
     }
 
     /** Create or upgrade the table, only when tracking is switched on. */
     public static function maybe_install() {
-        if ( ! class_exists( 'AceSeoRetentionActions' ) || empty( AceSeoRetentionActions::options()['track_views'] ) ) {
+        if ( ! class_exists( 'AceCrawlRetentionActions' ) || empty( AceCrawlRetentionActions::options()['track_views'] ) ) {
             return;
         }
         if ( (int) get_option( self::DB_OPTION, 0 ) >= self::DB_VERSION ) {
@@ -117,7 +117,7 @@ class AceSeoViewTracker {
         if ( ! $post || 'publish' !== $post->post_status ) {
             return false;
         }
-        $settings = AceSeoRetentionReport::settings();
+        $settings = AceCrawlRetentionReport::settings();
         $ok       = in_array( $post->post_type, (array) $settings['post_types'], true )
             && get_post_time( 'U', true, $post ) < strtotime( '-' . (int) $settings['older_than_years'] . ' years' );
 
@@ -127,7 +127,7 @@ class AceSeoViewTracker {
          * @param bool    $ok
          * @param WP_Post $post
          */
-        return (bool) apply_filters( 'ace_seo_track_post', $ok, $post );
+        return (bool) apply_filters( 'acecrawl_track_post', $ok, $post );
     }
 
     public static function print_beacon() {
@@ -139,7 +139,7 @@ class AceSeoViewTracker {
             return;
         }
         $url = rest_url( 'ace-seo/v1/hit' );
-        AceSeoAssets::inline_script( 'ace-seo-hit', sprintf(
+        AceCrawlAssets::inline_script( 'ace-seo-hit', sprintf(
             '(function(){try{var d=new FormData();d.append("p","%d");d.append("r",document.referrer||"");if(navigator.sendBeacon){navigator.sendBeacon(%s,d);}}catch(e){}})();',
             absint( $id ),
             wp_json_encode( esc_url_raw( $url ) )
@@ -166,7 +166,7 @@ class AceSeoViewTracker {
             $ref = (string) $request->get_param( 'r' );
             self::record( $id, false );
             self::record_referrer( $id, $ref );
-            do_action( 'ace_seo_tracked_hit', $id, $ref, $ua );
+            do_action( 'acecrawl_tracked_hit', $id, $ref, $ua );
         }
         $response = new WP_REST_Response( null, 204 );
         $response->header( 'Cache-Control', 'no-store' );
@@ -214,7 +214,7 @@ class AceSeoViewTracker {
          * @param string $source search, social, site, internal or direct.
          * @param string $host
          */
-        return array( (string) apply_filters( 'ace_seo_referrer_source', $source, $host ), $host );
+        return array( (string) apply_filters( 'acecrawl_referrer_source', $source, $host ), $host );
     }
 
     public static function record_referrer( $post_id, $ref ) {
@@ -304,7 +304,7 @@ class AceSeoViewTracker {
             return true;
         }
         $bot = (bool) preg_match( '/bot|crawl|spider|slurp|scrape|fetch|preview|facebookexternalhit|embedly|headless|phantomjs|lighthouse|pagespeed|gtmetrix|pingdom|uptime|monitor|curl|wget|python|java\/|go-http|okhttp|axios|node-fetch|httpclient|libwww|feedparser|mediapartners|adsbot|google-inspectiontool|chrome-lighthouse|bingpreview|yandex|baidu|semrush|ahrefs|mj12|dotbot|petalbot|bytespider|gptbot|claudebot|ccbot|perplexity|amazonbot|applebot/', $ua );
-        return (bool) apply_filters( 'ace_seo_is_bot_user_agent', $bot, $ua );
+        return (bool) apply_filters( 'acecrawl_is_bot_user_agent', $bot, $ua );
     }
 
     /**
@@ -405,9 +405,9 @@ class AceSeoViewTracker {
             }
         }
 
-        $keep = gmdate( 'Y-m-d', strtotime( '-' . (int) apply_filters( 'ace_seo_track_keep_days', self::KEEP_DAYS ) . ' days' ) );
+        $keep = gmdate( 'Y-m-d', strtotime( '-' . (int) apply_filters( 'acecrawl_track_keep_days', self::KEEP_DAYS ) . ' days' ) );
         $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE day < %s", $keep ) );
         $wpdb->query( $wpdb->prepare( "DELETE FROM {$ref_table} WHERE day < %s", $keep ) );
-        do_action( 'ace_seo_hits_rolled_up' );
+        do_action( 'acecrawl_hits_rolled_up' );
     }
 }

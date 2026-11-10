@@ -6,7 +6,7 @@ define( 'MINUTE_IN_SECONDS', 60 );
 class WP_Post { public $ID; public $post_status = 'publish'; public $post_password = ''; public $public = true; public function __construct( $id ) { $this->ID = $id; } }
 class WP_Error { public $code; public function __construct( $code, $message, $data ) { $this->code = $code; } }
 class WP_REST_Request { public function get_param( $key ) { return 1; } }
-class AceSeoRetentionActions { public static function is_retained( $id ) { return true; } }
+class AceCrawlRetentionActions { public static function is_retained( $id ) { return true; } }
 class DeniedRequest extends Exception {}
 function add_action() {}
 function add_filter() {}
@@ -33,27 +33,27 @@ function check_review( $condition, $message ) { global $checks; ++$checks; if ( 
 $GLOBALS['posts'] = array( 1 => new WP_Post( 1 ), 2 => new WP_Post( 2 ) );
 $GLOBALS['cached'] = array( 2, 1 );
 $request = new WP_REST_Request();
-check_review( AceSeoRetentionFront::rest_next( $request )['next']['id'] === 2, 'Public destination remains available anonymously.' );
+check_review( AceCrawlRetentionFront::rest_next( $request )['next']['id'] === 2, 'Public destination remains available anonymously.' );
 foreach ( array( 'draft', 'private', 'trash' ) as $status ) {
     $GLOBALS['posts'][2]->post_status = $status;
-    check_review( null === AceSeoRetentionFront::rest_next( $request )['next'], 'Stale cache must not reveal ' . $status );
+    check_review( null === AceCrawlRetentionFront::rest_next( $request )['next'], 'Stale cache must not reveal ' . $status );
 }
 $GLOBALS['posts'][2]->post_status = 'publish';
 $GLOBALS['posts'][2]->post_password = 'secret';
-check_review( null === AceSeoRetentionFront::rest_next( $request )['next'], 'Password-protected destination.' );
+check_review( null === AceCrawlRetentionFront::rest_next( $request )['next'], 'Password-protected destination.' );
 $GLOBALS['filtered'] = 2;
-check_review( null === AceSeoRetentionFront::rest_next( $request )['next'], 'Filtered destination still requires visibility.' );
+check_review( null === AceCrawlRetentionFront::rest_next( $request )['next'], 'Filtered destination still requires visibility.' );
 $GLOBALS['posts'][1]->post_password = 'secret';
-check_review( AceSeoRetentionFront::rest_next( $request ) instanceof WP_Error, 'Password-protected source.' );
+check_review( AceCrawlRetentionFront::rest_next( $request ) instanceof WP_Error, 'Password-protected source.' );
 $GLOBALS['posts'][1]->post_password = '';
 $GLOBALS['posts'][1]->public = false;
-check_review( AceSeoRetentionFront::rest_next( $request ) instanceof WP_Error, 'Non-public post type source.' );
+check_review( AceCrawlRetentionFront::rest_next( $request ) instanceof WP_Error, 'Non-public post type source.' );
 $GLOBALS['filtered'] = null;
 $GLOBALS['nonce'] = true;
 $GLOBALS['allowed'] = true;
 $_POST = array( 'post_id' => 2, 'image_url' => 'https://example.test/image.png' );
 $pagespeed = ( new ReflectionClass( 'AceSEOPagespeed' ) )->newInstanceWithoutConstructor();
-$assistant = ( new ReflectionClass( 'AceSEOAiAssistant' ) )->newInstanceWithoutConstructor();
+$assistant = ( new ReflectionClass( 'AceCrawlAiAssistant' ) )->newInstanceWithoutConstructor();
 foreach ( array( array( $pagespeed, 'get_pagespeed_report' ), array( $assistant, 'ajax_generate_titles' ), array( $assistant, 'ajax_save_image_to_library' ) ) as $handler ) {
     foreach ( array( true, false ) as $nonce ) {
         $GLOBALS['nonce'] = $nonce;

@@ -6,7 +6,7 @@
  * Each adapter is a static method guarded by its own is-active check, run
  * once on template_redirect (after every plugin has registered its hooks,
  * before wp_head fires). Adapters for plugins that already register into
- * the graph themselves (via ace_seo_register_schema_provider) are skipped
+ * the graph themselves (via acecrawl_register_schema_provider) are skipped
  * automatically because provider ids are unique.
  *
  * @since 1.0.6
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class AceSeoIntegrations {
+class AceCrawlIntegrations {
 
     public static function init() {
         add_action('template_redirect', [__CLASS__, 'run_adapters'], 1);
@@ -31,7 +31,7 @@ class AceSeoIntegrations {
      *
      * A theme, plugin or MU plugin opts in by mapping roles to its post types:
      *
-     *     add_filter( 'ace_seo_directory_post_types', fn() => array(
+     *     add_filter( 'acecrawl_directory_post_types', fn() => array(
      *         'business' => 'businesses',     // LocalBusiness
      *         'job'      => 'job_listings',   // JobPosting
      *         'location' => 'locations',      // Place
@@ -44,7 +44,7 @@ class AceSeoIntegrations {
      * ({lat,lng}) post meta; a job's hiring organisation from `business_id`.
      */
     private static function directory_adapter() {
-        $types = apply_filters('ace_seo_directory_post_types', array());
+        $types = apply_filters('acecrawl_directory_post_types', array());
         if (!is_array($types) || empty($types)) {
             return;
         }
@@ -55,14 +55,14 @@ class AceSeoIntegrations {
 
         // These post types have their own primary schema type, so don't also
         // mark them up as Article.
-        add_filter('ace_seo_emit_article', function ($emit, $post) use ($types) {
+        add_filter('acecrawl_emit_article', function ($emit, $post) use ($types) {
             if (in_array($post->post_type, $types, true)) {
                 return false;
             }
             return $emit;
         }, 10, 2);
 
-        ace_seo_register_schema_provider('directory/business', function ($context) use ($types) {
+        acecrawl_register_schema_provider('directory/business', function ($context) use ($types) {
             if (empty($types['business']) || !is_singular($types['business'])) {
                 return null;
             }
@@ -83,7 +83,7 @@ class AceSeoIntegrations {
             return self::add_location_details($node, $post_id);
         });
 
-        ace_seo_register_schema_provider('directory/job', function ($context) use ($types) {
+        acecrawl_register_schema_provider('directory/job', function ($context) use ($types) {
             if (empty($types['job']) || !is_singular($types['job'])) {
                 return null;
             }
@@ -114,7 +114,7 @@ class AceSeoIntegrations {
             return $node;
         });
 
-        ace_seo_register_schema_provider('directory/location', function ($context) use ($types) {
+        acecrawl_register_schema_provider('directory/location', function ($context) use ($types) {
             if (empty($types['location']) || !is_singular($types['location'])) {
                 return null;
             }

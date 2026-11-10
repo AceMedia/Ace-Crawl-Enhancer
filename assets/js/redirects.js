@@ -30,7 +30,7 @@ document.addEventListener('click', function (event) {
         const button = panel.querySelector('.ace-destination-find');
         button.disabled = true;
         status.textContent = 'Searching…';
-        const body = new URLSearchParams({action: 'ace_seo_redirect_destinations', nonce: panel.dataset.nonce, search: query});
+        const body = new URLSearchParams({action: 'acecrawl_redirect_destinations', nonce: panel.dataset.nonce, search: query});
         types.forEach(input => body.append('types[]', input.value));
         try {
             const response = await fetch(panel.dataset.endpoint, {method: 'POST', credentials: 'same-origin', body, signal: controller.signal});

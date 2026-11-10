@@ -2,7 +2,7 @@
 /**
  * WP-CLI commands for Google Search Console (Site Kit-gated).
  *
- * Mirrors the REST surface in AceSEOSearchConsole:
+ * Mirrors the REST surface in AceCrawlSearchConsole:
  *   wp ace-crawl gsc sitemaps
  *   wp ace-crawl gsc submit <feed-url>
  *   wp ace-crawl gsc resubmit-all
@@ -16,14 +16,14 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOSearchConsoleCli {
+class AceCrawlSearchConsoleCli {
 
     /**
      * Register the sub-subcommands. Hyphenated names (resubmit-all) cannot be
      * PHP method names, so each maps explicitly to a callable.
      */
     public static function register() {
-        if ( ! class_exists( 'AceSEOSearchConsole' ) ) {
+        if ( ! class_exists( 'AceCrawlSearchConsole' ) ) {
             return;
         }
         $cli = new self();
@@ -35,7 +35,7 @@ class AceSEOSearchConsoleCli {
     }
 
     private function require_ready() {
-        if ( ! AceSEOSearchConsole::is_ready() ) {
+        if ( ! AceCrawlSearchConsole::is_ready() ) {
             WP_CLI::error( 'Search Console is not connected in Site Kit (no active plugin or no property).' );
         }
     }
@@ -58,7 +58,7 @@ class AceSEOSearchConsoleCli {
     public function sitemaps( $args, $assoc_args ) {
         $this->require_ready();
         $force = isset( $assoc_args['refresh'] );
-        $rows  = $this->bail_on_error( AceSEOSearchConsole::list_sitemaps( $force ) );
+        $rows  = $this->bail_on_error( AceCrawlSearchConsole::list_sitemaps( $force ) );
 
         if ( empty( $rows ) ) {
             WP_CLI::success( 'No sitemaps have been submitted to Search Console yet.' );
@@ -105,7 +105,7 @@ class AceSEOSearchConsoleCli {
         if ( '' === $feed ) {
             WP_CLI::error( 'Provide a sitemap URL: wp ace-crawl gsc submit <feed-url>' );
         }
-        $this->bail_on_error( AceSEOSearchConsole::submit_sitemap( $feed ) );
+        $this->bail_on_error( AceCrawlSearchConsole::submit_sitemap( $feed ) );
         WP_CLI::success( 'Submitted: ' . $feed );
     }
 
@@ -114,7 +114,7 @@ class AceSEOSearchConsoleCli {
      */
     public function resubmit_all( $args, $assoc_args ) {
         $this->require_ready();
-        $results = $this->bail_on_error( AceSEOSearchConsole::resubmit_all() );
+        $results = $this->bail_on_error( AceCrawlSearchConsole::resubmit_all() );
 
         $items = array();
         foreach ( $results as $row ) {
@@ -144,7 +144,7 @@ class AceSEOSearchConsoleCli {
         if ( '' === $url ) {
             WP_CLI::error( 'Provide a URL: wp ace-crawl gsc inspect <url>' );
         }
-        $result = $this->bail_on_error( AceSEOSearchConsole::inspect_url( $url ) );
+        $result = $this->bail_on_error( AceCrawlSearchConsole::inspect_url( $url ) );
 
         WP_CLI\Utils\format_items(
             'table',
@@ -193,7 +193,7 @@ class AceSEOSearchConsoleCli {
         $rows = isset( $assoc_args['rows'] ) ? max( 1, min( 1000, (int) $assoc_args['rows'] ) ) : 50;
 
         if ( isset( $assoc_args['totals'] ) ) {
-            $totals = $this->bail_on_error( AceSEOSearchConsole::site_totals( $days ) );
+            $totals = $this->bail_on_error( AceCrawlSearchConsole::site_totals( $days ) );
             WP_CLI\Utils\format_items(
                 'table',
                 array(
@@ -215,7 +215,7 @@ class AceSEOSearchConsoleCli {
 
         $start = gmdate( 'Y-m-d', strtotime( '-' . $days . ' days' ) );
         $end   = gmdate( 'Y-m-d', strtotime( '-1 day' ) );
-        $list  = $this->bail_on_error( AceSEOSearchConsole::top_rows( $dimension, $start, $end, $rows, $url ) );
+        $list  = $this->bail_on_error( AceCrawlSearchConsole::top_rows( $dimension, $start, $end, $rows, $url ) );
 
         if ( empty( $list ) ) {
             WP_CLI::success( 'No ' . $dimension . ' data in the last ' . $days . ' days' . ( '' !== $url ? ' for ' . $url : '' ) . '.' );

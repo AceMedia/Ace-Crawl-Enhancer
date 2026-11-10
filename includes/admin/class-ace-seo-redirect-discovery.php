@@ -2,7 +2,7 @@
 /** Bounded destination searches and read-only retention views for the redirect manager. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-class AceSeoRedirectDiscovery {
+class AceCrawlRedirectDiscovery {
     const LIMIT = 20;
 
     public static function types() {
@@ -20,8 +20,8 @@ class AceSeoRedirectDiscovery {
 
     public static function ajax_destinations() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( array( 'message' => 'You do not have permission to search redirect destinations.' ), 403 ); }
-        check_ajax_referer( 'ace_seo_redirect_destinations', 'nonce' );
-        $result = self::destinations( AceSeoInput::post( array( 'search' => 'text', 'types' => 'text' ) ) );
+        check_ajax_referer( 'acecrawl_redirect_destinations', 'nonce' );
+        $result = self::destinations( AceCrawlInput::post( array( 'search' => 'text', 'types' => 'text' ) ) );
         if ( is_wp_error( $result ) ) { wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 ); }
         wp_send_json_success( $result );
     }
@@ -50,8 +50,8 @@ class AceSeoRedirectDiscovery {
                 'update_post_term_cache' => false ) );
             $more = count( $query->posts ) > self::LIMIT;
             foreach ( array_slice( $query->posts, 0, self::LIMIT ) as $post ) {
-                $redirect = AceSeoRedirects::settings( $post->ID );
-                $blocked = AceSeoRedirects::active( $redirect );
+                $redirect = AceCrawlRedirects::settings( $post->ID );
+                $blocked = AceCrawlRedirects::active( $redirect );
                 $items[] = array( 'title' => get_the_title( $post ), 'url' => get_permalink( $post ), 'type' => $allowed[ 'post:' . $post->post_type ],
                     'blocked' => $blocked, 'note' => $blocked ? 'Already redirects or answers 410. Choose its final destination.' : '' );
             }
@@ -77,7 +77,7 @@ class AceSeoRedirectDiscovery {
         $page = max( 1, absint( $_GET['paged'] ?? 1 ) );
         $settings_url = admin_url( 'admin.php?page=ace-seo-settings#retention/retention-report' );
         $report_url = admin_url( 'admin.php?page=ace-seo-retention' );
-        $options = AceSeoRetentionActions::options();
+        $options = AceCrawlRetentionActions::options();
         include __DIR__ . '/views/redirect-' . ( 'auto' === $tab ? 'auto' : 'suggestions' ) . '.php';
     }
 

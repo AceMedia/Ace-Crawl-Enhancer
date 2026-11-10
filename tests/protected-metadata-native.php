@@ -8,7 +8,7 @@ $assert = static function($condition, $message) use (&$checks) {
     ++$checks;
 };
 $seo = (new ReflectionClass('AceCrawlEnhancer'))->newInstanceWithoutConstructor();
-$frontend = (new ReflectionClass('AceSeoFrontend'))->newInstanceWithoutConstructor();
+$frontend = (new ReflectionClass('AceCrawlFrontend'))->newInstanceWithoutConstructor();
 try {
     foreach (['publish', 'password', 'private', 'draft'] as $case) {
         $id = wp_insert_post(['post_type'=>'post', 'post_status'=>$case === 'password' ? 'publish' : $case, 'post_password'=>$case === 'password' ? 'test-password' : '', 'post_title'=>'Metadata regression', 'post_content'=>'PRIVATE_BODY_SENTINEL', 'post_excerpt'=>'PRIVATE_EXCERPT_SENTINEL']);

@@ -11,29 +11,29 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOAiAssistant {
+class AceCrawlAiAssistant {
     
     /**
      * Initialize AI assistant functionality
      */
     public function __construct() {
-        add_action( 'wp_ajax_ace_seo_generate_titles', array( $this, 'ajax_generate_titles' ) );
-        add_action( 'wp_ajax_ace_seo_generate_descriptions', array( $this, 'ajax_generate_descriptions' ) );
-        add_action( 'wp_ajax_ace_seo_analyze_content', array( $this, 'ajax_analyze_content' ) );
-        add_action( 'wp_ajax_ace_seo_suggest_topics', array( $this, 'ajax_suggest_topics' ) );
-        add_action( 'wp_ajax_ace_seo_improve_content', array( $this, 'ajax_improve_content' ) );
-        add_action( 'wp_ajax_ace_seo_generate_keywords', array( $this, 'ajax_generate_keywords' ) );
+        add_action( 'wp_ajax_acecrawl_generate_titles', array( $this, 'ajax_generate_titles' ) );
+        add_action( 'wp_ajax_acecrawl_generate_descriptions', array( $this, 'ajax_generate_descriptions' ) );
+        add_action( 'wp_ajax_acecrawl_analyze_content', array( $this, 'ajax_analyze_content' ) );
+        add_action( 'wp_ajax_acecrawl_suggest_topics', array( $this, 'ajax_suggest_topics' ) );
+        add_action( 'wp_ajax_acecrawl_improve_content', array( $this, 'ajax_improve_content' ) );
+        add_action( 'wp_ajax_acecrawl_generate_keywords', array( $this, 'ajax_generate_keywords' ) );
         
         // Social media AI handlers
-        add_action( 'wp_ajax_ace_seo_generate_facebook_titles', array( $this, 'ajax_generate_facebook_titles' ) );
-        add_action( 'wp_ajax_ace_seo_generate_facebook_descriptions', array( $this, 'ajax_generate_facebook_descriptions' ) );
-        add_action( 'wp_ajax_ace_seo_generate_twitter_titles', array( $this, 'ajax_generate_twitter_titles' ) );
-        add_action( 'wp_ajax_ace_seo_generate_twitter_descriptions', array( $this, 'ajax_generate_twitter_descriptions' ) );
-        add_action( 'wp_ajax_ace_seo_generate_facebook_image', array( $this, 'ajax_generate_facebook_image' ) );
-        add_action( 'wp_ajax_ace_seo_generate_twitter_image', array( $this, 'ajax_generate_twitter_image' ) );
-        add_action( 'wp_ajax_ace_seo_regenerate_image', array( $this, 'ajax_regenerate_image' ) );
-        add_action( 'wp_ajax_ace_seo_generate_more_images', array( $this, 'ajax_generate_more_images' ) );
-        add_action( 'wp_ajax_ace_seo_save_image_to_library', array( $this, 'ajax_save_image_to_library' ) );
+        add_action( 'wp_ajax_acecrawl_generate_facebook_titles', array( $this, 'ajax_generate_facebook_titles' ) );
+        add_action( 'wp_ajax_acecrawl_generate_facebook_descriptions', array( $this, 'ajax_generate_facebook_descriptions' ) );
+        add_action( 'wp_ajax_acecrawl_generate_twitter_titles', array( $this, 'ajax_generate_twitter_titles' ) );
+        add_action( 'wp_ajax_acecrawl_generate_twitter_descriptions', array( $this, 'ajax_generate_twitter_descriptions' ) );
+        add_action( 'wp_ajax_acecrawl_generate_facebook_image', array( $this, 'ajax_generate_facebook_image' ) );
+        add_action( 'wp_ajax_acecrawl_generate_twitter_image', array( $this, 'ajax_generate_twitter_image' ) );
+        add_action( 'wp_ajax_acecrawl_regenerate_image', array( $this, 'ajax_regenerate_image' ) );
+        add_action( 'wp_ajax_acecrawl_generate_more_images', array( $this, 'ajax_generate_more_images' ) );
+        add_action( 'wp_ajax_acecrawl_save_image_to_library', array( $this, 'ajax_save_image_to_library' ) );
     }
 
     /**
@@ -43,7 +43,7 @@ class AceSEOAiAssistant {
     private function guard() {
         check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
 
-        $capability = apply_filters( 'ace_seo_ai_capability', 'edit_posts' );
+        $capability = apply_filters( 'acecrawl_ai_capability', 'edit_posts' );
         if ( ! current_user_can( $capability ) ) {
             wp_send_json_error( 'Insufficient permissions' );
         }
@@ -58,7 +58,7 @@ class AceSEOAiAssistant {
         $post = $post_id ? get_post( $post_id ) : null;
 
         // Hourly per-user cap on AI requests (0 disables the limit).
-        $limit = (int) apply_filters( 'ace_seo_ai_rate_limit', 60 );
+        $limit = (int) apply_filters( 'acecrawl_ai_rate_limit', 60 );
         if ( $limit > 0 && ! current_user_can( 'manage_options' ) ) {
             $key   = 'ace_seo_ai_rl_' . get_current_user_id();
             $count = (int) get_transient( $key );
@@ -92,7 +92,7 @@ class AceSEOAiAssistant {
         }
         
         // Debug logging
-        $titles = AceSEOApiHelper::generate_seo_titles( $post_content, $focus_keyword, $current_title );
+        $titles = AceCrawlApiHelper::generate_seo_titles( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $titles ) ) {
             wp_send_json_error( $titles->get_error_message() );
@@ -124,7 +124,7 @@ class AceSEOAiAssistant {
         
         // Debug logging
         
-        $descriptions = AceSEOApiHelper::generate_meta_descriptions( $post_content, $focus_keyword, $current_title );        if ( is_wp_error( $descriptions ) ) {
+        $descriptions = AceCrawlApiHelper::generate_meta_descriptions( $post_content, $focus_keyword, $current_title );        if ( is_wp_error( $descriptions ) ) {
             wp_send_json_error( $descriptions->get_error_message() );
         }
         
@@ -145,7 +145,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI analysis' );
         }
         
-        $analysis = AceSEOApiHelper::analyze_content_with_ai( $post_content, $focus_keyword, $current_title );
+        $analysis = AceCrawlApiHelper::analyze_content_with_ai( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $analysis ) ) {
             wp_send_json_error( $analysis->get_error_message() );
@@ -168,7 +168,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for topic suggestions' );
         }
         
-        $suggestions = AceSEOApiHelper::generate_topic_suggestions( $post_content, $focus_keyword, $current_title );
+        $suggestions = AceCrawlApiHelper::generate_topic_suggestions( $post_content, $focus_keyword, $current_title );
         
         if ( is_wp_error( $suggestions ) ) {
             wp_send_json_error( $suggestions->get_error_message() );
@@ -190,7 +190,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for improvement suggestions' );
         }
         
-        $improvements = AceSEOApiHelper::generate_content_improvements( $post_content, $focus_keyword );
+        $improvements = AceCrawlApiHelper::generate_content_improvements( $post_content, $focus_keyword );
         
         if ( is_wp_error( $improvements ) ) {
             wp_send_json_error( $improvements->get_error_message() );
@@ -221,7 +221,7 @@ class AceSEOAiAssistant {
         
         // Debug logging
         
-        $keywords = AceSEOApiHelper::generate_keyword_suggestions( $post_content, $current_title );        if ( is_wp_error( $keywords ) ) {
+        $keywords = AceCrawlApiHelper::generate_keyword_suggestions( $post_content, $current_title );        if ( is_wp_error( $keywords ) ) {
             wp_send_json_error( $keywords->get_error_message() );
         }
         
@@ -246,7 +246,7 @@ class AceSEOAiAssistant {
         // Use SEO title as base if available, otherwise current title
         $base_title = $seo_title ?: $current_title;
         
-        $titles = AceSEOApiHelper::generate_facebook_titles( $post_content, $focus_keyword, $base_title );
+        $titles = AceCrawlApiHelper::generate_facebook_titles( $post_content, $focus_keyword, $base_title );
         
         if ( is_wp_error( $titles ) ) {
             wp_send_json_error( $titles->get_error_message() );
@@ -270,7 +270,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI suggestions' );
         }
         
-        $descriptions = AceSEOApiHelper::generate_facebook_descriptions( $post_content, $focus_keyword, $current_title, $meta_description );
+        $descriptions = AceCrawlApiHelper::generate_facebook_descriptions( $post_content, $focus_keyword, $current_title, $meta_description );
         
         if ( is_wp_error( $descriptions ) ) {
             wp_send_json_error( $descriptions->get_error_message() );
@@ -298,7 +298,7 @@ class AceSEOAiAssistant {
         // Use Facebook title as base if available, otherwise SEO title, otherwise current title
         $base_title = $facebook_title ?: $seo_title ?: $current_title;
         
-        $titles = AceSEOApiHelper::generate_twitter_titles( $post_content, $focus_keyword, $base_title );
+        $titles = AceCrawlApiHelper::generate_twitter_titles( $post_content, $focus_keyword, $base_title );
         
         if ( is_wp_error( $titles ) ) {
             wp_send_json_error( $titles->get_error_message() );
@@ -326,7 +326,7 @@ class AceSEOAiAssistant {
         // Use Facebook description as base if available, otherwise meta description
         $base_description = $facebook_description ?: $meta_description;
         
-        $descriptions = AceSEOApiHelper::generate_twitter_descriptions( $post_content, $focus_keyword, $current_title, $base_description );
+        $descriptions = AceCrawlApiHelper::generate_twitter_descriptions( $post_content, $focus_keyword, $current_title, $base_description );
         
         if ( is_wp_error( $descriptions ) ) {
             wp_send_json_error( $descriptions->get_error_message() );
@@ -342,7 +342,7 @@ class AceSEOAiAssistant {
         $this->guard();
         
         // Check if image generation is enabled
-        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+        if ( ! AceCrawlApiHelper::is_ai_image_generation_enabled() ) {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
@@ -357,7 +357,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI image generation' );
         }
         
-        $image_suggestions = AceSEOApiHelper::generate_facebook_image( 
+        $image_suggestions = AceCrawlApiHelper::generate_facebook_image( 
             $post_content, 
             $focus_keyword, 
             $facebook_title ?: $current_title,
@@ -379,7 +379,7 @@ class AceSEOAiAssistant {
         $this->guard();
         
         // Check if image generation is enabled
-        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+        if ( ! AceCrawlApiHelper::is_ai_image_generation_enabled() ) {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
@@ -394,7 +394,7 @@ class AceSEOAiAssistant {
             wp_send_json_error( 'Content is required for AI image generation' );
         }
         
-        $image_suggestions = AceSEOApiHelper::generate_twitter_image( 
+        $image_suggestions = AceCrawlApiHelper::generate_twitter_image( 
             $post_content, 
             $focus_keyword, 
             $twitter_title ?: $current_title,
@@ -416,7 +416,7 @@ class AceSEOAiAssistant {
         $this->guard();
         
         // Check if image generation is enabled
-        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+        if ( ! AceCrawlApiHelper::is_ai_image_generation_enabled() ) {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
@@ -430,7 +430,7 @@ class AceSEOAiAssistant {
         // Determine image size based on platform
         $size = ( $platform === 'twitter' ) ? '1024x1024' : '1792x1024';
         
-        $image_url = AceSEOApiHelper::generate_dalle_image( $custom_prompt, $size );
+        $image_url = AceCrawlApiHelper::generate_dalle_image( $custom_prompt, $size );
         
         if ( is_wp_error( $image_url ) ) {
             wp_send_json_error( $image_url->get_error_message() );
@@ -446,7 +446,7 @@ class AceSEOAiAssistant {
         $this->guard();
         
         // Check if image generation is enabled
-        if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+        if ( ! AceCrawlApiHelper::is_ai_image_generation_enabled() ) {
             wp_send_json_error( 'AI image generation is not enabled' );
         }
         
@@ -460,7 +460,7 @@ class AceSEOAiAssistant {
         if ( ! empty( $custom_prompt ) ) {
             // Generate from custom prompt
             $size = ( $platform === 'twitter' ) ? '1024x1024' : '1792x1024';
-            $image_url = AceSEOApiHelper::generate_dalle_image( $custom_prompt, $size );
+            $image_url = AceCrawlApiHelper::generate_dalle_image( $custom_prompt, $size );
             
             if ( is_wp_error( $image_url ) ) {
                 wp_send_json_error( $image_url->get_error_message() );
@@ -486,7 +486,7 @@ class AceSEOAiAssistant {
                 $facebook_title = sanitize_text_field( wp_unslash( $_POST['facebook_title'] ?? '' ) );
                 $facebook_description = sanitize_text_field( wp_unslash( $_POST['facebook_description'] ?? '' ) );
                 
-                $image_suggestions = AceSEOApiHelper::generate_facebook_image( 
+                $image_suggestions = AceCrawlApiHelper::generate_facebook_image( 
                     $post_content, 
                     $focus_keyword, 
                     $facebook_title ?: $current_title,
@@ -497,7 +497,7 @@ class AceSEOAiAssistant {
                 $twitter_title = sanitize_text_field( wp_unslash( $_POST['twitter_title'] ?? '' ) );
                 $twitter_description = sanitize_text_field( wp_unslash( $_POST['twitter_description'] ?? '' ) );
                 
-                $image_suggestions = AceSEOApiHelper::generate_twitter_image( 
+                $image_suggestions = AceCrawlApiHelper::generate_twitter_image( 
                     $post_content, 
                     $focus_keyword, 
                     $twitter_title ?: $current_title,
@@ -570,7 +570,7 @@ class AceSEOAiAssistant {
      * Get AI assistance status for current user
      */
     public static function is_ai_available() {
-        return class_exists( 'AceSEOApiHelper' ) && AceSEOApiHelper::is_ai_enabled();
+        return class_exists( 'AceCrawlApiHelper' ) && AceCrawlApiHelper::is_ai_enabled();
     }
     
     /**
@@ -666,7 +666,7 @@ class AceSEOAiAssistant {
         
         // Check if image generation is required and enabled
         if ( isset( $config['requires_image_generation'] ) && $config['requires_image_generation'] ) {
-            if ( ! AceSEOApiHelper::is_ai_image_generation_enabled() ) {
+            if ( ! AceCrawlApiHelper::is_ai_image_generation_enabled() ) {
                 return '';
             }
         }
@@ -722,4 +722,4 @@ class AceSEOAiAssistant {
 // phpcs:enable WordPress.Security.NonceVerification.Missing
 
 // Initialize the AI assistant
-new AceSEOAiAssistant();
+new AceCrawlAiAssistant();

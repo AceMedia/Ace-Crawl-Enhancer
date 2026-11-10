@@ -33,7 +33,7 @@
         // Cache management functions
         loadAiCache: function() {
             try {
-                const cached = localStorage.getItem('ace_seo_ai_cache_' + (aceSeoAdmin.postId || 'new'));
+                const cached = localStorage.getItem('acecrawl_ai_cache_' + (aceSeoAdmin.postId || 'new'));
                 if (cached) {
                     this.aiCache = JSON.parse(cached);
                 }
@@ -45,7 +45,7 @@
 
         saveAiCache: function() {
             try {
-                localStorage.setItem('ace_seo_ai_cache_' + (aceSeoAdmin.postId || 'new'), JSON.stringify(this.aiCache));
+                localStorage.setItem('acecrawl_ai_cache_' + (aceSeoAdmin.postId || 'new'), JSON.stringify(this.aiCache));
             } catch (e) {
                 // Could not save AI cache
             }
@@ -1016,7 +1016,7 @@
                 url: aceSeoAdmin.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_test_pagespeed',
+                    action: 'acecrawl_test_pagespeed',
                     url: currentUrl,
                     strategy: strategy,
                     post_id: (typeof aceSeoAdmin !== 'undefined' && aceSeoAdmin.postId) ? aceSeoAdmin.postId : 0,
@@ -1355,7 +1355,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_titles',
+                action: 'acecrawl_generate_titles',
                 ...contentData
             })
             .done((response) => {
@@ -1385,7 +1385,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_descriptions',
+                action: 'acecrawl_generate_descriptions',
                 ...contentData
             })
             .done((response) => {
@@ -1414,7 +1414,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_keywords',
+                action: 'acecrawl_generate_keywords',
                 ...contentData
             })
             .done((response) => {
@@ -1449,7 +1449,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_facebook_titles',
+                action: 'acecrawl_generate_facebook_titles',
                 ...facebookData
             })
             .done((response) => {
@@ -1483,7 +1483,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_facebook_descriptions',
+                action: 'acecrawl_generate_facebook_descriptions',
                 ...facebookData
             })
             .done((response) => {
@@ -1518,7 +1518,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_twitter_titles',
+                action: 'acecrawl_generate_twitter_titles',
                 ...twitterData
             })
             .done((response) => {
@@ -1553,7 +1553,7 @@
                 return;
             }
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_twitter_descriptions',
+                action: 'acecrawl_generate_twitter_descriptions',
                 ...twitterData
             })
             .done((response) => {
@@ -1591,7 +1591,7 @@
             }
             
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_facebook_image',
+                action: 'acecrawl_generate_facebook_image',
                 ...facebookData
             })
             .done((response) => {
@@ -1630,7 +1630,7 @@
             }
             
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_generate_twitter_image',
+                action: 'acecrawl_generate_twitter_image',
                 ...twitterData
             })
             .done((response) => {
@@ -1654,7 +1654,7 @@
             this.showAnalysisLoading(true);
             
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_analyze_content',
+                action: 'acecrawl_analyze_content',
                 ...contentData
             })
             .done((response) => {
@@ -1679,7 +1679,7 @@
             this.showAnalysisLoading(true);
             
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_improve_content',
+                action: 'acecrawl_improve_content',
                 ...contentData
             })
             .done((response) => {
@@ -1704,7 +1704,7 @@
             this.showAnalysisLoading(true);
             
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_suggest_topics',
+                action: 'acecrawl_suggest_topics',
                 ...contentData
             })
             .done((response) => {
@@ -2009,7 +2009,7 @@
                     url: aceSeoAdmin.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'ace_seo_regenerate_image',
+                        action: 'acecrawl_regenerate_image',
                         nonce: $('#ace_seo_ai_nonce').val(),
                         prompt: customPrompt,
                         platform: platform
@@ -2147,7 +2147,7 @@
                     url: aceSeoAdmin.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'ace_seo_save_image_to_library',
+                        action: 'acecrawl_save_image_to_library',
                         nonce: $('#ace_seo_ai_nonce').val(),
                         image_url: imageUrl,
                         post_id: aceSeoAdmin.postId || 0,
@@ -2280,7 +2280,7 @@
                 url: aceSeoAdmin.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'ace_seo_generate_more_images',
+                    action: 'acecrawl_generate_more_images',
                     nonce: $('#ace_seo_ai_nonce').val(),
                     platform: platform,
                     ...contentData
@@ -2317,7 +2317,7 @@
                 url: aceSeoAdmin.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'ace_seo_generate_more_images',
+                    action: 'acecrawl_generate_more_images',
                     nonce: $('#ace_seo_ai_nonce').val(),
                     platform: platform,
                     custom_prompt: customPrompt
@@ -2797,7 +2797,7 @@
             
             // 1. Content Analysis
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_analyze_content',
+                action: 'acecrawl_analyze_content',
                 ...contentData
             })
             .done((response) => {
@@ -2812,7 +2812,7 @@
             
             // 2. Topic Suggestions
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_suggest_topics',
+                action: 'acecrawl_suggest_topics',
                 ...contentData
             })
             .done((response) => {
@@ -2827,7 +2827,7 @@
             
             // 3. Content Improvements
             $.post(aceSeoAdmin.ajaxurl, {
-                action: 'ace_seo_improve_content',
+                action: 'acecrawl_improve_content',
                 ...contentData
             })
             .done((response) => {
@@ -3303,7 +3303,7 @@ Alternative - Lighthouse CLI:
                 url: ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'ace_seo_refresh_dashboard_cache',
+                    action: 'acecrawl_refresh_dashboard_cache',
                     nonce: aceSeoAdmin.nonce
                 },
                 success: function(response) {
@@ -3356,7 +3356,7 @@ Alternative - Lighthouse CLI:
                 url: ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'ace_seo_clear_dashboard_cache',
+                    action: 'acecrawl_clear_dashboard_cache',
                     nonce: aceSeoAdmin.nonce
                 },
                 success: function(response) {

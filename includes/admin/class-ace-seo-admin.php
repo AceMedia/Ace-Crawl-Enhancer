@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class AceSeoAdmin {
+class AceCrawlAdmin {
     
     public function __construct() {
         $this->init_hooks();
@@ -20,7 +20,7 @@ class AceSeoAdmin {
     private function init_hooks() {
         add_action('admin_init', [$this, 'admin_init']);
         add_action('admin_notices', [$this, 'admin_notices']);
-        add_filter('plugin_action_links_' . ACE_SEO_BASENAME, [$this, 'plugin_action_links']);
+        add_filter('plugin_action_links_' . ACECRAWL_BASENAME, [$this, 'plugin_action_links']);
         
         // Add bulk actions for PageSpeed analysis
         add_filter('bulk_actions-edit-post', [$this, 'add_bulk_actions']);
@@ -42,7 +42,7 @@ class AceSeoAdmin {
             return;
         }
         // Show welcome notice on first activation
-        if (get_transient('ace_seo_activation_notice')) {
+        if (get_transient('acecrawl_activation_notice')) {
             ?>
             <div class="notice notice-success is-dismissible">
                 <p>
@@ -52,7 +52,7 @@ class AceSeoAdmin {
                 </p>
             </div>
             <?php
-            delete_transient('ace_seo_activation_notice');
+            delete_transient('acecrawl_activation_notice');
         }
     }
     
@@ -86,7 +86,7 @@ class AceSeoAdmin {
      * Add bulk actions for PageSpeed analysis
      */
     public function add_bulk_actions($bulk_actions) {
-        if (!class_exists('AceSEOApiHelper') || !AceSEOApiHelper::is_performance_monitoring_enabled()) {
+        if (!class_exists('AceCrawlApiHelper') || !AceCrawlApiHelper::is_performance_monitoring_enabled()) {
             return $bulk_actions;
         }
         
@@ -118,8 +118,8 @@ class AceSeoAdmin {
             }
             
             // Run PageSpeed test for mobile
-            if (class_exists('AceSEOPageSpeed')) {
-                $pagespeed = new AceSEOPageSpeed();
+            if (class_exists('AceCrawlPageSpeed')) {
+                $pagespeed = new AceCrawlPageSpeed();
                 $result = $this->run_pagespeed_for_post($url, $post_id);
                 
                 if (!is_wp_error($result)) {
@@ -142,11 +142,11 @@ class AceSeoAdmin {
      * Run PageSpeed test for a specific post
      */
     private function run_pagespeed_for_post($url, $post_id) {
-        if (!class_exists('AceSEOApiHelper')) {
+        if (!class_exists('AceCrawlApiHelper')) {
             return new WP_Error('missing_helper', 'API Helper not available');
         }
         
-        $pagespeed_data = AceSEOApiHelper::make_pagespeed_request($url, 'mobile');
+        $pagespeed_data = AceCrawlApiHelper::make_pagespeed_request($url, 'mobile');
         
         if (is_wp_error($pagespeed_data)) {
             return $pagespeed_data;

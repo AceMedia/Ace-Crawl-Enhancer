@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return string
  */
-function ace_seo_shadowing_robots_file() {
+function acecrawl_shadowing_robots_file() {
     $root = untrailingslashit( ABSPATH );
 
     // Whatever the site URL has that the home URL doesn't is the subdirectory
@@ -62,7 +62,7 @@ function ace_seo_shadowing_robots_file() {
  *
  * @return void
  */
-function ace_seo_robots_file_notice() {
+function acecrawl_robots_file_notice() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
@@ -79,7 +79,7 @@ function ace_seo_robots_file_notice() {
         return;
     }
 
-    $path = ace_seo_shadowing_robots_file();
+    $path = acecrawl_shadowing_robots_file();
     if ( '' === $path ) {
         return;
     }
@@ -95,7 +95,7 @@ function ace_seo_robots_file_notice() {
     // Whether this is a problem or just a fact depends on what the site is asking
     // for. A static file holding deliberate rules on a public site is a normal way
     // to run things; the same file while the site is trying to hide is defeating it.
-    $conflicts = ace_seo_site_is_discouraged();
+    $conflicts = acecrawl_site_is_discouraged();
     $notice_hash = hash( 'sha256', $path . "\0" . $contents . "\0" . (string) get_option( 'blog_public' ) );
     if ( ! $conflicts && $notice_hash === get_user_meta( get_current_user_id(), 'ace_seo_robots_file_info_dismissed', true ) ) {
         return;
@@ -121,8 +121,8 @@ function ace_seo_robots_file_notice() {
 
     if ( ! $conflicts ) {
         $dismiss_url = wp_nonce_url(
-            admin_url( 'admin-post.php?action=ace_seo_dismiss_robots_file_info' ),
-            'ace_seo_dismiss_robots_file_info'
+            admin_url( 'admin-post.php?action=acecrawl_dismiss_robots_file_info' ),
+            'acecrawl_dismiss_robots_file_info'
         );
         echo '<p><a href="' . esc_url( $dismiss_url ) . '" class="button button-secondary">'
             . esc_html__( 'Dismiss this information', 'ace-crawl-enhancer' )
@@ -139,8 +139,8 @@ function ace_seo_robots_file_notice() {
     }
 
     $url = wp_nonce_url(
-        admin_url( 'admin-post.php?action=ace_seo_disable_robots_file' ),
-        'ace_seo_disable_robots_file'
+        admin_url( 'admin-post.php?action=acecrawl_disable_robots_file' ),
+        'acecrawl_disable_robots_file'
     );
 
     echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary">'
@@ -149,16 +149,16 @@ function ace_seo_robots_file_notice() {
         . esc_html__( 'Renames it rather than deleting it, so nothing is lost and it can be put back.', 'ace-crawl-enhancer' )
         . '</span></p></div>';
 }
-add_action( 'admin_notices', 'ace_seo_robots_file_notice' );
+add_action( 'admin_notices', 'acecrawl_robots_file_notice' );
 
 /** A deliberate static file is informational; keep a real visibility conflict prominent. */
-function ace_seo_dismiss_robots_file_info() {
+function acecrawl_dismiss_robots_file_info() {
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_die( esc_html__( 'You are not allowed to do this.', 'ace-crawl-enhancer' ), 403 );
     }
-    check_admin_referer( 'ace_seo_dismiss_robots_file_info' );
-    $path = ace_seo_shadowing_robots_file();
-    if ( '' !== $path && ! ace_seo_site_is_discouraged() ) {
+    check_admin_referer( 'acecrawl_dismiss_robots_file_info' );
+    $path = acecrawl_shadowing_robots_file();
+    if ( '' !== $path && ! acecrawl_site_is_discouraged() ) {
         $contents = (string) file_get_contents( $path );
         update_user_meta(
             get_current_user_id(),
@@ -169,7 +169,7 @@ function ace_seo_dismiss_robots_file_info() {
     wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) );
     exit;
 }
-add_action( 'admin_post_ace_seo_dismiss_robots_file_info', 'ace_seo_dismiss_robots_file_info' );
+add_action( 'admin_post_ace_seo_dismiss_robots_file_info', 'acecrawl_dismiss_robots_file_info' );
 
 /**
  * Rename the shadowing file so the web server stops serving it.
@@ -179,14 +179,14 @@ add_action( 'admin_post_ace_seo_dismiss_robots_file_info', 'ace_seo_dismiss_robo
  *
  * @return void
  */
-function ace_seo_disable_robots_file() {
+function acecrawl_disable_robots_file() {
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_die( esc_html__( 'You are not allowed to do this.', 'ace-crawl-enhancer' ), 403 );
     }
 
-    check_admin_referer( 'ace_seo_disable_robots_file' );
+    check_admin_referer( 'acecrawl_disable_robots_file' );
 
-    $path   = ace_seo_shadowing_robots_file();
+    $path   = acecrawl_shadowing_robots_file();
     $result = 'missing';
 
     if ( '' !== $path ) {
@@ -203,14 +203,14 @@ function ace_seo_disable_robots_file() {
     );
     exit;
 }
-add_action( 'admin_post_ace_seo_disable_robots_file', 'ace_seo_disable_robots_file' );
+add_action( 'admin_post_ace_seo_disable_robots_file', 'acecrawl_disable_robots_file' );
 
 /**
  * Report the outcome of the rename.
  *
  * @return void
  */
-function ace_seo_robots_file_result_notice() {
+function acecrawl_robots_file_result_notice() {
     if ( ! current_user_can( 'manage_options' ) || empty( $_GET['ace_seo_robots_file'] ) ) {
         return;
     }
@@ -231,4 +231,4 @@ function ace_seo_robots_file_result_notice() {
 
     printf( '<div class="notice %s is-dismissible"><p>%s</p></div>', esc_attr( $class ), esc_html( $message ) );
 }
-add_action( 'admin_notices', 'ace_seo_robots_file_result_notice' );
+add_action( 'admin_notices', 'acecrawl_robots_file_result_notice' );

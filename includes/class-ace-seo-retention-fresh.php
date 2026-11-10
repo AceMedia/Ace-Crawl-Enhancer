@@ -2,7 +2,7 @@
 /** Bounded authoritative reads for the retention queue; object caches are not locks. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-final class AceSeoRetentionFresh {
+final class AceCrawlRetentionFresh {
     public static function option( $key, $default = array() ) {
         // WordPress configuration overrides migrated database URLs. Honour that trusted
         // runtime identity while still avoiding stale object-cache option values.
@@ -37,7 +37,7 @@ final class AceSeoRetentionFresh {
             if ( $post ) { wp_cache_set( $id, $post, 'posts' ); }
             if ( $post ) { foreach ( get_object_taxonomies( $post->post_type ) as $tax ) { wp_cache_delete( $id, $tax . '_relationships' ); } }
         }
-        $keys = array( AceSeoRetentionActions::OPTION, AceSeoRetentionReport::PROGRESS_OPTION, 'blog_public', 'home', 'siteurl', 'page_on_front', 'page_for_posts', 'permalink_structure', $wpdb->prefix . 'user_roles' );
+        $keys = array( AceCrawlRetentionActions::OPTION, AceCrawlRetentionReport::PROGRESS_OPTION, 'blog_public', 'home', 'siteurl', 'page_on_front', 'page_for_posts', 'permalink_structure', $wpdb->prefix . 'user_roles' );
         $options = static function( $pre, $key, $default ) use ( $keys ) {
             return in_array( $key, $keys, true ) ? self::option( $key, false === $default ? '' : $default ) : $pre;
         };
@@ -54,8 +54,8 @@ final class AceSeoRetentionFresh {
     }
 
     public static function generation( $source ) {
-        $p = self::option( AceSeoRetentionReport::PROGRESS_OPTION );
-        $row = self::meta( $source, AceSeoRetentionReport::META );
+        $p = self::option( AceCrawlRetentionReport::PROGRESS_OPTION );
+        $row = self::meta( $source, AceCrawlRetentionReport::META );
         if ( 'done' !== ( $p['phase'] ?? '' ) || empty( $p['generation'] ) || empty( $p['finished'] )
             || ! is_array( $row ) || ( $row['generation'] ?? '' ) !== $p['generation'] ) { return null; }
         return array( 'id' => $p['generation'], 'started' => $p['started'], 'finished' => $p['finished'], 'settings' => $p['settings'] );

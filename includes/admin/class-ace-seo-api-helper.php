@@ -11,15 +11,15 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOApiHelper {
+class AceCrawlApiHelper {
     
     /**
      * Initialize API helper functionality
      */
     public function __construct() {
-        add_action( 'wp_ajax_ace_seo_test_api', array( $this, 'test_api_connection' ) );
-        add_action( 'wp_ajax_ace_seo_validate_openai', array( $this, 'validate_openai_key' ) );
-        add_action( 'wp_ajax_ace_seo_validate_pagespeed', array( $this, 'validate_pagespeed_key' ) );
+        add_action( 'wp_ajax_acecrawl_test_api', array( $this, 'test_api_connection' ) );
+        add_action( 'wp_ajax_acecrawl_validate_openai', array( $this, 'validate_openai_key' ) );
+        add_action( 'wp_ajax_acecrawl_validate_pagespeed', array( $this, 'validate_pagespeed_key' ) );
         
         // Clear AI cache when posts are updated
         add_action( 'save_post', array( __CLASS__, 'clear_post_ai_cache' ) );
@@ -164,9 +164,9 @@ class AceSEOApiHelper {
      * Get OpenAI API key from settings
      */
     public static function get_openai_key( $feature = 'text' ) {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $legacy = $options['ai']['openai_api_key'] ?? '';
-        $service = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        $service = function_exists( 'acemedia_ai_connection_service' ) ? acemedia_ai_connection_service() : null;
         $key = $service ? $service->api_key( $feature, $legacy ) : $legacy;
         return is_wp_error( $key ) ? '' : $key;
     }
@@ -175,7 +175,7 @@ class AceSEOApiHelper {
      * Test basic OpenAI connection with a simple prompt
      */
     public static function test_basic_openai_connection() {
-        $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        $shared = function_exists( 'acemedia_ai_connection_service' ) ? acemedia_ai_connection_service() : null;
         if ( $shared && $shared->subscription_selected() ) {
             $result = self::make_openai_request( "Say 'Hello, this is a test' in exactly those words." );
             return is_wp_error( $result ) ? $result : 'AI connection successful. Response: ' . substr( $result, 0, 100 );
@@ -202,7 +202,7 @@ class AceSEOApiHelper {
      * Get PageSpeed API key from settings
      */
     public static function get_pagespeed_key() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         return $options['performance']['pagespeed_api_key'] ?? '';
     }
     
@@ -210,10 +210,10 @@ class AceSEOApiHelper {
      * Check if AI features are enabled
      */
     public static function is_ai_enabled() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
-        return ( ! empty( self::get_openai_key() ) || ( function_exists( 'ace_ai_connection_service' ) && ace_ai_connection_service() && ace_ai_connection_service()->subscription_selected() ) ) &&
+        return ( ! empty( self::get_openai_key() ) || ( function_exists( 'acemedia_ai_connection_service' ) && acemedia_ai_connection_service() && acemedia_ai_connection_service()->subscription_selected() ) ) &&
                ( ! empty( $ai_settings['ai_content_analysis'] ) ||
                  ! empty( $ai_settings['ai_keyword_suggestions'] ) ||
                  ! empty( $ai_settings['ai_content_optimization'] ) );
@@ -223,7 +223,7 @@ class AceSEOApiHelper {
      * Check if AI web search is enabled
      */
     public static function is_ai_web_search_enabled() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
         return ! empty( self::get_openai_key() ) &&
@@ -234,7 +234,7 @@ class AceSEOApiHelper {
      * Check if AI image generation is enabled
      */
     public static function is_ai_image_generation_enabled() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $ai_settings = $options['ai'] ?? array();
         
         return ! empty( self::get_openai_key( 'images' ) ) &&
@@ -245,7 +245,7 @@ class AceSEOApiHelper {
      * Check if performance monitoring is enabled
      */
     public static function is_performance_monitoring_enabled() {
-        $options = get_option( 'ace_seo_options', array() );
+        $options = get_option( 'acecrawl_options', array() );
         $performance_settings = $options['performance'] ?? array();
         
         return self::has_pagespeed_connection() && $performance_settings['pagespeed_monitoring'];
@@ -259,11 +259,11 @@ class AceSEOApiHelper {
             return true;
         }
 
-        if ( ! class_exists( 'AceSEOSiteKit' ) ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) ) {
             return false;
         }
 
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_PAGESPEED ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_PAGESPEED ) );
         return ! is_wp_error( $token ) && $token !== false;
     }
 
@@ -293,7 +293,7 @@ class AceSEOApiHelper {
      * Make OpenAI API request with model fallback
      */
     public static function make_openai_request( $prompt, $model = 'gpt-3.5-turbo', $enable_web_search = false ) {
-        $shared = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+        $shared = function_exists( 'acemedia_ai_connection_service' ) ? acemedia_ai_connection_service() : null;
         if ( $shared && $shared->subscription_selected() ) {
             if ( $enable_web_search ) { return new WP_Error( 'ace_ai_subscription_web_search', 'Web search is not enabled for the selected text connection.' ); }
             $result = $shared->subscription_text( array( array( 'role' => 'user', 'content' => $prompt ) ), $model );
@@ -1869,4 +1869,4 @@ class AceSEOApiHelper {
 }
 
 // Initialize the API helper
-new AceSEOApiHelper();
+new AceCrawlApiHelper();

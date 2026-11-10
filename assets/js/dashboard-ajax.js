@@ -50,7 +50,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_dashboard_stats',
+                    action: 'acecrawl_load_dashboard_stats',
                     nonce: aceSEODashboard.nonce
                 },
                 success: (response) => {
@@ -82,7 +82,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_recent_activity',
+                    action: 'acecrawl_load_recent_activity',
                     nonce: aceSEODashboard.nonce,
                     limit: 5
                 },
@@ -112,7 +112,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_orphan_report',
+                    action: 'acecrawl_load_orphan_report',
                     nonce: aceSEODashboard.nonce,
                     scan: scan ? 1 : 0
                 },
@@ -147,7 +147,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_content_analysis',
+                    action: 'acecrawl_load_content_analysis',
                     nonce: aceSEODashboard.nonce
                 },
                 success: (response) => {
@@ -188,7 +188,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_post_batch',
+                    action: 'acecrawl_load_post_batch',
                     nonce: aceSEODashboard.nonce,
                     batch: batchNumber
                 },
@@ -459,7 +459,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_google_signals',
+                    action: 'acecrawl_load_google_signals',
                     nonce: aceSEODashboard.nonce
                 },
                 success: (response) => {
@@ -491,7 +491,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_load_database_performance',
+                    action: 'acecrawl_load_database_performance',
                     nonce: aceSEODashboard.nonce
                 },
                 success: (response) => {
@@ -585,7 +585,7 @@
                 url: aceSEODashboard.ajaxurl,
                 method: 'POST',
                 data: {
-                    action: 'ace_seo_optimize_database',
+                    action: 'acecrawl_optimize_database',
                     nonce: aceSEODashboard.nonce
                 },
                 success: (response) => {

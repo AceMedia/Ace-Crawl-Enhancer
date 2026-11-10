@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOSettings {
+class AceCrawlSettings {
     
     /**
      * Initialize settings functionality
@@ -20,16 +20,16 @@ class AceSEOSettings {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
-        add_action( 'wp_ajax_ace_seo_save_settings', array( $this, 'ajax_save_settings' ) );
-        add_action( 'wp_ajax_ace_seo_migrate_yoast', array( $this, 'ajax_migrate_yoast_data' ) );
-        add_action( 'wp_ajax_ace_seo_batch_migrate_yoast', array( $this, 'ajax_batch_migrate_yoast_data' ) );
-        add_action( 'wp_ajax_ace_seo_get_migration_stats', array( $this, 'ajax_get_migration_stats' ) );
-        add_action( 'wp_ajax_ace_seo_optimize_database_manual', array( $this, 'ajax_optimize_database_manual' ) );
-        add_action( 'wp_ajax_ace_seo_refresh_dashboard_cache', array( $this, 'ajax_refresh_dashboard_cache' ) );
-        add_action( 'wp_ajax_ace_seo_clear_dashboard_cache', array( $this, 'ajax_clear_dashboard_cache' ) );
-        add_action( 'wp_ajax_ace_seo_get_yoast_key_counts', array( $this, 'ajax_get_yoast_key_counts' ) );
-        add_action( 'wp_ajax_ace_seo_delete_yoast_keys', array( $this, 'ajax_delete_yoast_keys' ) );
-        add_action( 'wp_ajax_ace_seo_recreate_yoast_keys', array( $this, 'ajax_recreate_yoast_keys' ) );
+        add_action( 'wp_ajax_acecrawl_save_settings', array( $this, 'ajax_save_settings' ) );
+        add_action( 'wp_ajax_acecrawl_migrate_yoast', array( $this, 'ajax_migrate_yoast_data' ) );
+        add_action( 'wp_ajax_acecrawl_batch_migrate_yoast', array( $this, 'ajax_batch_migrate_yoast_data' ) );
+        add_action( 'wp_ajax_acecrawl_get_migration_stats', array( $this, 'ajax_get_migration_stats' ) );
+        add_action( 'wp_ajax_acecrawl_optimize_database_manual', array( $this, 'ajax_optimize_database_manual' ) );
+        add_action( 'wp_ajax_acecrawl_refresh_dashboard_cache', array( $this, 'ajax_refresh_dashboard_cache' ) );
+        add_action( 'wp_ajax_acecrawl_clear_dashboard_cache', array( $this, 'ajax_clear_dashboard_cache' ) );
+        add_action( 'wp_ajax_acecrawl_get_yoast_key_counts', array( $this, 'ajax_get_yoast_key_counts' ) );
+        add_action( 'wp_ajax_acecrawl_delete_yoast_keys', array( $this, 'ajax_delete_yoast_keys' ) );
+        add_action( 'wp_ajax_acecrawl_recreate_yoast_keys', array( $this, 'ajax_recreate_yoast_keys' ) );
     }
     
     /**
@@ -97,17 +97,17 @@ class AceSEOSettings {
      */
     public function register_settings() {
         // General settings
-        register_setting( 'ace_seo_general', 'ace_seo_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
-        register_setting( 'ace_seo_social', 'ace_seo_social_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
-        register_setting( 'ace_seo_advanced', 'ace_seo_advanced_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
-        register_setting( 'ace_seo_compatibility', 'ace_seo_compatibility_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'acecrawl_general', 'acecrawl_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'acecrawl_social', 'acecrawl_social_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'acecrawl_advanced', 'acecrawl_advanced_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
+        register_setting( 'acecrawl_compatibility', 'acecrawl_compatibility_settings', array( 'type' => 'array', 'sanitize_callback' => array( $this, 'sanitize_settings_array' ) ) );
         
         // General settings section
         add_settings_section(
             'ace_seo_general_section',
             'General Settings',
             array( $this, 'general_section_callback' ),
-            'ace_seo_general'
+            'acecrawl_general'
         );
         
         // Social settings section
@@ -115,7 +115,7 @@ class AceSEOSettings {
             'ace_seo_social_section',
             'Social Media Settings',
             array( $this, 'social_section_callback' ),
-            'ace_seo_social'
+            'acecrawl_social'
         );
         
         // Advanced settings section
@@ -123,7 +123,7 @@ class AceSEOSettings {
             'ace_seo_advanced_section',
             'Advanced Settings',
             array( $this, 'advanced_section_callback' ),
-            'ace_seo_advanced'
+            'acecrawl_advanced'
         );
         
         // Compatibility settings section
@@ -131,7 +131,7 @@ class AceSEOSettings {
             'ace_seo_compatibility_section',
             'Yoast Compatibility',
             array( $this, 'compatibility_section_callback' ),
-            'ace_seo_compatibility'
+            'acecrawl_compatibility'
         );
     }
     
@@ -139,14 +139,14 @@ class AceSEOSettings {
      * Render dashboard page
      */
     public function render_dashboard_page() {
-        include ACE_SEO_PATH . 'includes/admin/views/dashboard.php';
+        include ACECRAWL_PATH . 'includes/admin/views/dashboard.php';
     }
     
     /**
      * Render settings page
      */
     public function render_settings_page() {
-        include ACE_SEO_PATH . 'includes/admin/views/settings.php';
+        include ACECRAWL_PATH . 'includes/admin/views/settings.php';
     }
     
     /**
@@ -168,8 +168,8 @@ class AceSEOSettings {
         return array(
             'postmeta' => $this->get_meta_key_count( $wpdb->postmeta, '_yoast_wpseo_' ),
             'termmeta' => $this->get_meta_key_count( $wpdb->termmeta, '_yoast_wpseo_' ),
-            'ace_postmeta' => $this->get_meta_key_count( $wpdb->postmeta, ACE_SEO_META_PREFIX ),
-            'ace_termmeta' => $this->get_meta_key_count( $wpdb->termmeta, ACE_SEO_META_PREFIX ),
+            'ace_postmeta' => $this->get_meta_key_count( $wpdb->postmeta, ACECRAWL_META_PREFIX ),
+            'ace_termmeta' => $this->get_meta_key_count( $wpdb->termmeta, ACECRAWL_META_PREFIX ),
         );
     }
 
@@ -206,7 +206,7 @@ class AceSEOSettings {
         check_ajax_referer( 'ace_seo_yoast_tools', 'nonce' );
 
         global $wpdb;
-        $ace_prefix = ACE_SEO_META_PREFIX;
+        $ace_prefix = ACECRAWL_META_PREFIX;
         $yoast_prefix = '_yoast_wpseo_';
 
         $like_yoast = $wpdb->esc_like( $yoast_prefix ) . '%';
@@ -252,7 +252,7 @@ class AceSEOSettings {
      */
     public function ajax_migrate_yoast_data() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_migrate_yoast')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_migrate_yoast')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }
@@ -295,24 +295,24 @@ class AceSEOSettings {
         
         wp_enqueue_style(
             'ace-seo-admin',
-            ACE_SEO_URL . 'assets/css/admin.css',
+            ACECRAWL_URL . 'assets/css/admin.css',
             array(),
-            ACE_SEO_VERSION
+            ACECRAWL_VERSION
         );
 
         if ( 'ace-seo_page_ace-seo-settings' === $hook ) {
             wp_enqueue_style(
                 'ace-seo-admin-redis',
-                ACE_SEO_URL . 'assets/css/admin-redis.css',
+                ACECRAWL_URL . 'assets/css/admin-redis.css',
                 array( 'ace-seo-admin' ),
-                ACE_SEO_VERSION
+                ACECRAWL_VERSION
             );
         }
         
-        $asset_path = ACE_SEO_PATH . 'build/index.asset.php';
+        $asset_path = ACECRAWL_PATH . 'build/index.asset.php';
         $asset_data = file_exists( $asset_path ) ? include $asset_path : array(
             'dependencies' => array( 'jquery' ),
-            'version' => ACE_SEO_VERSION,
+            'version' => ACECRAWL_VERSION,
         );
 
         $script_deps = isset( $asset_data['dependencies'] ) && is_array( $asset_data['dependencies'] )
@@ -324,21 +324,21 @@ class AceSEOSettings {
         }
 
         // The suite-wide save bar on its own, for other Ace plugins' settings pages to enqueue.
-        if ( file_exists( ACE_SEO_PATH . 'build/savebar.js' ) && ! wp_script_is( 'ace-savebar', 'registered' ) ) {
-            wp_register_script( 'ace-savebar', ACE_SEO_URL . 'build/savebar.js', array( 'jquery' ), ACE_SEO_VERSION, true );
+        if ( file_exists( ACECRAWL_PATH . 'build/savebar.js' ) && ! wp_script_is( 'ace-savebar', 'registered' ) ) {
+            wp_register_script( 'ace-savebar', ACECRAWL_URL . 'build/savebar.js', array( 'jquery' ), ACECRAWL_VERSION, true );
         }
         wp_enqueue_script(
             'ace-seo-admin',
-            ACE_SEO_URL . 'build/index.js',
+            ACECRAWL_URL . 'build/index.js',
             $script_deps,
-            isset( $asset_data['version'] ) ? $asset_data['version'] : ACE_SEO_VERSION,
+            isset( $asset_data['version'] ) ? $asset_data['version'] : ACECRAWL_VERSION,
             true
         );
         
         wp_enqueue_media(); // For image selection
         
         // Localize script for AJAX
-        wp_localize_script('ace-seo-admin', 'ace_seo_admin', [
+        wp_localize_script('ace-seo-admin', 'acecrawl_admin', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'rest_url' => rest_url(),
             'nonce' => wp_create_nonce('ace_seo_admin_nonce'),
@@ -372,12 +372,12 @@ class AceSEOSettings {
             wp_send_json_error('Insufficient permissions or invalid nonce');
         }
 
-        $options = get_option('ace_seo_options', []);
+        $options = get_option('acecrawl_options', []);
         
         // Ensure we have an array - handle corrupted data
         if (!is_array($options)) {
             $options = [];
-            delete_option('ace_seo_options');
+            delete_option('acecrawl_options');
         }
         
         // Ensure all required array keys exist
@@ -494,7 +494,7 @@ class AceSEOSettings {
             $options['person']['twitter_username'] = '@' . ltrim($options['person']['twitter_username'], '@');
         }
 
-        $person_same_as_input = isset($_POST['person_same_as']) ? AceSeoInput::clean(wp_unslash($_POST['person_same_as']), 'url') : [];
+        $person_same_as_input = isset($_POST['person_same_as']) ? AceCrawlInput::clean(wp_unslash($_POST['person_same_as']), 'url') : [];
         $person_same_as_input = is_array($person_same_as_input) ? $person_same_as_input : [];
         $options['person']['same_as'] = array_values(array_filter(array_unique($person_same_as_input)));
 
@@ -541,17 +541,17 @@ class AceSEOSettings {
 
         $sitemap_options_updated = false;
         $sanitized_sitemap_options = null;
-        if (isset($_POST['ace_sitemap_powertools_options'])) {
+        if (isset($_POST['acecrawl_sitemap_options'])) {
             // Cleaned field by field, for each setting's own type, by the sitemap options sanitiser.
-            $sanitized_sitemap_options = ace_sitemap_powertools_sanitize_options(
-                is_array($_POST['ace_sitemap_powertools_options']) ? wp_unslash($_POST['ace_sitemap_powertools_options']) : []
+            $sanitized_sitemap_options = acecrawl_sitemap_sanitize_options(
+                is_array($_POST['acecrawl_sitemap_options']) ? wp_unslash($_POST['acecrawl_sitemap_options']) : []
             );
 
-            $sitemap_options_updated = update_option('ace_sitemap_powertools_options', $sanitized_sitemap_options);
+            $sitemap_options_updated = update_option('acecrawl_sitemap_options', $sanitized_sitemap_options);
         }
         
         // Save options
-        $updated = update_option('ace_seo_options', $options);
+        $updated = update_option('acecrawl_options', $options);
         
         if ($updated || $sitemap_options_updated) {
             wp_send_json_success(['message' => 'Settings saved successfully']);
@@ -559,9 +559,9 @@ class AceSEOSettings {
 
         // update_option() returns false for an unchanged value as well as a failed write,
         // so it only counts as a failure when what is stored differs from what was submitted.
-        $options_stored = get_option('ace_seo_options') == $options;
+        $options_stored = get_option('acecrawl_options') == $options;
         $sitemap_stored = null === $sanitized_sitemap_options
-            || get_option('ace_sitemap_powertools_options') == $sanitized_sitemap_options;
+            || get_option('acecrawl_sitemap_options') == $sanitized_sitemap_options;
 
         if ($options_stored && $sitemap_stored) {
             wp_send_json_success(['message' => 'No changes to save']);
@@ -582,8 +582,8 @@ class AceSEOSettings {
         
         // Include the database optimizer
         if (!class_exists('ACE_SEO_Database_Optimizer')) {
-            if (file_exists(ACE_SEO_PATH . 'includes/database/class-database-optimizer.php')) {
-                require_once ACE_SEO_PATH . 'includes/database/class-database-optimizer.php';
+            if (file_exists(ACECRAWL_PATH . 'includes/database/class-database-optimizer.php')) {
+                require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             } else {
                 wp_send_json_error('Database optimizer class not found');
                 return;
@@ -600,9 +600,9 @@ class AceSEOSettings {
             }
             
             // Update optimization status
-            update_option('ace_seo_db_optimized', current_time('mysql'), false);
-            update_option('ace_seo_db_optimization_results', $results, false);
-            delete_option('ace_seo_db_optimization_pending');
+            update_option('acecrawl_db_optimized', current_time('mysql'), false);
+            update_option('acecrawl_db_optimization_results', $results, false);
+            delete_option('acecrawl_db_optimization_pending');
             
             wp_send_json_success($results);
             
@@ -621,12 +621,12 @@ class AceSEOSettings {
             wp_die('Unauthorized access');
         }
         
-        check_ajax_referer('ace_seo_admin', 'nonce');
+        check_ajax_referer('acecrawl_admin', 'nonce');
         
         try {
             // Load dashboard cache class
             if (!class_exists('ACE_SEO_Dashboard_Cache')) {
-                require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+                require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
             }
             
             // Force regenerate cache
@@ -661,12 +661,12 @@ class AceSEOSettings {
             wp_die('Unauthorized access');
         }
         
-        check_ajax_referer('ace_seo_admin', 'nonce');
+        check_ajax_referer('acecrawl_admin', 'nonce');
         
         try {
             // Load dashboard cache class
             if (!class_exists('ACE_SEO_Dashboard_Cache')) {
-                require_once ACE_SEO_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
+                require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
             }
             
             // Clear all cache
@@ -858,4 +858,4 @@ class AceSEOSettings {
 }
 
 // Initialize the settings class
-new AceSEOSettings();
+new AceCrawlSettings();

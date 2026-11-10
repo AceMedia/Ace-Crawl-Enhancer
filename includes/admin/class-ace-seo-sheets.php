@@ -15,10 +15,10 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class AceSeoSheets {
+class AceCrawlSheets {
 
-    const OPTION    = 'ace_seo_sheets';
-    const TOKEN_KEY = 'ace_seo_sheets_token';
+    const OPTION    = 'acecrawl_sheets';
+    const TOKEN_KEY = 'acecrawl_sheets_token';
     const SCOPE     = 'https://www.googleapis.com/auth/spreadsheets';
     const API       = 'https://sheets.googleapis.com/v4/spreadsheets/';
 
@@ -27,7 +27,7 @@ class AceSeoSheets {
     }
 
     /**
-     * Stored settings. The key can instead come from the ACE_SEO_SHEETS_KEY_FILE constant (a path to
+     * Stored settings. The key can instead come from the ACECRAWL_SHEETS_KEY_FILE constant (a path to
      * the JSON key outside the web root), which keeps the private key out of the database.
      *
      * @return array{key: array, sheet_id: string}
@@ -36,8 +36,8 @@ class AceSeoSheets {
         $o   = get_option( self::OPTION, array() );
         $o   = is_array( $o ) ? $o : array();
         $key = array();
-        if ( defined( 'ACE_SEO_SHEETS_KEY_FILE' ) && is_readable( ACE_SEO_SHEETS_KEY_FILE ) ) {
-            $key = json_decode( (string) file_get_contents( ACE_SEO_SHEETS_KEY_FILE ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+        if ( defined( 'ACECRAWL_SHEETS_KEY_FILE' ) && is_readable( ACECRAWL_SHEETS_KEY_FILE ) ) {
+            $key = json_decode( (string) file_get_contents( ACECRAWL_SHEETS_KEY_FILE ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions
         } elseif ( ! empty( $o['key'] ) ) {
             $key = json_decode( (string) $o['key'], true );
         }
@@ -75,8 +75,8 @@ class AceSeoSheets {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $msg = self::save_settings( AceSeoInput::post( array( 'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool' ) ) );
-        set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
+        $msg = self::save_settings( AceCrawlInput::post( array( 'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool' ) ) );
+        set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
         exit;
     }
@@ -123,8 +123,8 @@ class AceSeoSheets {
         echo '<input type="hidden" name="action" value="ace_seo_sheets_settings">';
         self::render_fields( false );
         echo '<p><button class="button">Save and check access</button></p></form>';
-        if ( class_exists( 'AceSeoSheetsSchedule' ) ) {
-            AceSeoSheetsSchedule::render_settings();
+        if ( class_exists( 'AceCrawlSheetsSchedule' ) ) {
+            AceCrawlSheetsSchedule::render_settings();
         }
     }
 
@@ -134,7 +134,7 @@ class AceSeoSheets {
             return;
         }
         $email  = self::account_email();
-        $locked = defined( 'ACE_SEO_SHEETS_KEY_FILE' );
+        $locked = defined( 'ACECRAWL_SHEETS_KEY_FILE' );
         ?>
         <details id="retention-sheets" style="margin:1em 0" <?php echo self::configured() ? '' : 'open'; ?>>
             <summary style="cursor:pointer;font-weight:600">Connection <?php echo self::configured() ? '(connection details saved)' : '(not set up)'; ?></summary>
@@ -142,7 +142,7 @@ class AceSeoSheets {
                 <p>To set it up:</p>
                 <ol style="margin-left:2em">
                     <li>In Google Cloud, enable the <em>Google Sheets API</em> on a project, create a service account and download a JSON key for it.</li>
-                    <li>Paste the key below (or put the file outside the web root and define <code>ACE_SEO_SHEETS_KEY_FILE</code> as its path).</li>
+                    <li>Paste the key below (or put the file outside the web root and define <code>ACECRAWL_SHEETS_KEY_FILE</code> as its path).</li>
                     <li>Create a spreadsheet and share it, as an Editor, with the service account's email<?php echo $email ? ': <code style="user-select:all">' . esc_html( $email ) . '</code>' : ''; ?>.</li>
                     <li>Paste the spreadsheet's URL below and save; it checks the connection there and then.</li>
                 </ol>
@@ -150,7 +150,7 @@ class AceSeoSheets {
                     <tr><th scope="row"><label for="ace-seo-sheet">Spreadsheet link or ID</label></th><td><input type="text" id="ace-seo-sheet" name="sheet" class="large-text" placeholder="https://docs.google.com/spreadsheets/d/…" value="<?php echo esc_attr( self::sheet_url() ); ?>"></td></tr>
                     <tr><th scope="row"><?php if ( $locked ) : ?>Google service account key<?php else : ?><label for="ace-seo-sheets-key">Google service account key</label><?php endif; ?></th><td>
                         <?php if ( $locked ) : ?>
-                            Read from <code>ACE_SEO_SHEETS_KEY_FILE</code><?php echo $email ? '' : ' (file missing or unreadable)'; ?>.
+                            Read from <code>ACECRAWL_SHEETS_KEY_FILE</code><?php echo $email ? '' : ' (file missing or unreadable)'; ?>.
                         <?php else : ?>
                             <textarea id="ace-seo-sheets-key" name="key" autocomplete="off" spellcheck="false" rows="4" class="large-text code" placeholder="<?php echo $email ? esc_attr( 'Stored for ' . $email . '. Paste a new key to replace it.' ) : '{ &quot;type&quot;: &quot;service_account&quot;, … }'; ?>"></textarea>
                             <?php if ( $email ) : ?><label><input type="checkbox" name="forget_key" value="1"> Forget the stored key</label><?php endif; ?>
@@ -161,8 +161,8 @@ class AceSeoSheets {
                 <p class="description">Saving checks that Google lets us read the spreadsheet; the result is shown after saving. Creating an export also needs Editor access. Saving does not export any posts.</p>
         </details>
         <?php
-        if ( $with_schedule && class_exists( 'AceSeoSheetsSchedule' ) ) {
-            AceSeoSheetsSchedule::render_fields();
+        if ( $with_schedule && class_exists( 'AceCrawlSheetsSchedule' ) ) {
+            AceCrawlSheetsSchedule::render_fields();
         }
     }
 

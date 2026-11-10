@@ -1,6 +1,6 @@
 <?php
 /** Private, immutable review snapshots. Deliberately independent of the legacy live report writer. */
-final class Ace_SEO_Retention_Snapshot {
+final class AceCrawl_Retention_Snapshot {
     private $directory;
     private $lock;
     private $state;

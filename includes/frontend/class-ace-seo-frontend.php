@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class AceSeoFrontend {
+class AceCrawlFrontend {
     public function __construct() {
         $this->init_hooks();
     }
@@ -122,7 +122,7 @@ class AceSeoFrontend {
              * both an Article and its real type. Integration adapters set this
              * for their CPTs.
              */
-            if ($post && apply_filters('ace_seo_emit_article', true, $post)) {
+            if ($post && apply_filters('acecrawl_emit_article', true, $post)) {
                 $article = $this->generate_article_schema($post, $publisher_ref, $webpage_ref);
                 $graph[] = $article['node'];
                 if (!empty($article['author'])) {
@@ -153,7 +153,7 @@ class AceSeoFrontend {
             'publisher_id'   => $publisher['@id'] ?? '',
         ];
 
-        AceSeoSchemaGraph::render(AceSeoSchemaGraph::build($graph, $context));
+        AceCrawlSchemaGraph::render(AceCrawlSchemaGraph::build($graph, $context));
     }
 
     /**
@@ -241,7 +241,7 @@ class AceSeoFrontend {
         $options = $this->get_seo_options();
         $default_type = $options['schema']['article_type_' . $post->post_type]
             ?? ($options['schema']['article_type'] ?? 'Article');
-        $type = apply_filters('ace_seo_article_schema_type', $default_type, $post);
+        $type = apply_filters('acecrawl_article_schema_type', $default_type, $post);
 
         $author_node = null;
         $author_url = get_author_posts_url($post->post_author);
@@ -288,9 +288,9 @@ class AceSeoFrontend {
 
         /**
          * Filter the article node (word count, reading time, section and
-         * keyword enhancements hook in here — see AceSeoSchema).
+         * keyword enhancements hook in here — see AceCrawlSchema).
          */
-        $schema = apply_filters('ace_seo_schema_article', $schema, $post);
+        $schema = apply_filters('acecrawl_schema_article', $schema, $post);
 
         // Anchor to the WebPage node last so enhancers can't detach it.
         $schema['isPartOf'] = $webpage_ref;
@@ -331,7 +331,7 @@ class AceSeoFrontend {
                         $description = wp_trim_words(wp_strip_all_tags($post->post_content), 25);
                     }
                 }
-                return apply_filters('ace_seo_singular_meta_description', $description, $post);
+                return apply_filters('acecrawl_singular_meta_description', $description, $post);
             }
         }
 
@@ -620,14 +620,14 @@ class AceSeoFrontend {
          * @param array $organization  Saved organization settings.
          * @param array $options       All Ace SEO options.
          */
-        return $cached = apply_filters('ace_seo_publisher_schema', $publisher, $organization, $options);
+        return $cached = apply_filters('acecrawl_publisher_schema', $publisher, $organization, $options);
     }
 
-    /** Per-request cache for ace_seo_options to avoid repeated get_option() calls. */
+    /** Per-request cache for acecrawl_options to avoid repeated get_option() calls. */
     private function get_seo_options() {
         static $options = null;
         if ( $options === null ) {
-            $options = get_option( 'ace_seo_options', [] );
+            $options = get_option( 'acecrawl_options', [] );
         }
         return $options;
     }
@@ -670,7 +670,7 @@ class AceSeoFrontend {
          * @param array $person Person settings.
          * @param array $options All Ace SEO options.
          */
-        return apply_filters('ace_seo_publisher_person_schema', $schema, $person, $options);
+        return apply_filters('acecrawl_publisher_person_schema', $schema, $person, $options);
     }
 
     private function build_logo_schema($organization, $options) {
@@ -900,7 +900,7 @@ class AceSeoFrontend {
 
     public function output_additional_meta() {
         // Add generator meta
-        echo '<meta name="generator" content="Ace SEO ' . esc_attr( ACE_SEO_VERSION ) . '">' . "\n";
+        echo '<meta name="generator" content="Ace SEO ' . esc_attr( ACECRAWL_VERSION ) . '">' . "\n";
 
         // Add site verification meta if set
         $options = $this->get_seo_options();

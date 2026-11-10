@@ -19,6 +19,6 @@ Processing is opt-in per site. Saved controls include the canonical home URL and
 
 Every application rechecks the evidence, snapshot integrity, permissions, source and destination. An expiring DB lease serialises workers; transaction locks protect settings/articles/permissions. Redirect and audit writes commit together. Cache invalidation is retried if completion cannot be recorded. Keep active object-cache drop-ins in sync with the installed cache plugin, and check web/CLI invalidation when releasing to a consumer.
 
-An optional provider can return `backlinks` and `internal` entries from `ace_seo_retention_link_evidence`, each with `count`, `source`, `complete`, `capped` and Unix `checked_at`. Complete, uncapped, zero-count evidence must be no more than 24 hours old. Provider entries take precedence over manual attestations. The review workflow remains usable without a provider through the explicit administrator check.
+An optional provider can return `backlinks` and `internal` entries from `acecrawl_retention_link_evidence`, each with `count`, `source`, `complete`, `capped` and Unix `checked_at`. Complete, uncapped, zero-count evidence must be no more than 24 hours old. Provider entries take precedence over manual attestations. The review workflow remains usable without a provider through the explicit administrator check.
 
 This release handles approved pairs. It does not discover replacements or sweep categories automatically. Existing archive redirects remain independently configured in their archive editors.

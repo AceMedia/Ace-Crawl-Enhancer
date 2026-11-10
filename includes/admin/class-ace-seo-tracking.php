@@ -19,14 +19,14 @@ require_once __DIR__ . '/class-ace-seo-tracking-clarity.php';
 require_once __DIR__ . '/class-ace-seo-tracking-ui.php';
 require_once __DIR__ . '/class-ace-seo-tracking-google.php';
 
-class AceSeoTracking {
+class AceCrawlTracking {
     const SLUG       = 'ace-seo-tracking';
-    const CRON       = 'ace_seo_tracking_check';
-    const OPT_ALERTS = 'ace_seo_tracking_alerts';
-    const OPT_EMAIL  = 'ace_seo_tracking_email';
-    const T_PAGE     = 'ace_seo_tracking_page';
+    const CRON       = 'acecrawl_tracking_check';
+    const OPT_ALERTS = 'acecrawl_tracking_alerts';
+    const OPT_EMAIL  = 'acecrawl_tracking_email';
+    const T_PAGE     = 'acecrawl_tracking_page';
     const PROBE_VERSION = 2;
-    const T_SERIES   = 'ace_seo_tracking_series';
+    const T_SERIES   = 'acecrawl_tracking_series';
     const DAYS       = 60;
     const MIN_TRAFFIC = 10;
 
@@ -45,7 +45,7 @@ class AceSeoTracking {
         add_action( 'admin_post_ace_seo_tracking_refresh', array( __CLASS__, 'admin_refresh' ) );
         add_action( 'admin_post_ace_seo_tracking_email', array( __CLASS__, 'admin_email_toggle' ) );
         add_action( 'admin_post_ace_seo_tracking_csv', array( __CLASS__, 'admin_csv' ) );
-        add_action( 'admin_post_ace_seo_tracking_clarity', array( 'AceSeoTrackingClarity', 'save' ) );
+        add_action( 'admin_post_ace_seo_tracking_clarity', array( 'AceCrawlTrackingClarity', 'save' ) );
     }
 
     public static function schedule() {
@@ -83,7 +83,7 @@ class AceSeoTracking {
         };
 
         // Google Site Kit.
-        $sk_on = class_exists( 'AceSEOSiteKit' ) && AceSEOSiteKit::is_active();
+        $sk_on = class_exists( 'AceCrawlSiteKit' ) && AceCrawlSiteKit::is_active();
         $modules = (array) get_option( 'googlesitekit_active_modules', array() );
         $a4 = self::sitekit_option( 'analytics-4_settings' );
         $tm = self::sitekit_option( 'tagmanager_settings' );
@@ -95,7 +95,7 @@ class AceSeoTracking {
         if ( ! $sk_on ) {
             $add( 'sitekit', 'Google Site Kit', 'off', 'Not installed or not active on this site.' );
         } else {
-            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+            $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
             $token_ok = ! is_wp_error( $token ) && $token;
             $detail = 'Modules: ' . ( $modules ? implode( ', ', $modules ) : 'none' ) . '. ';
             $detail .= $owner ? 'Owner: user ' . $owner . '. ' : '';
@@ -362,8 +362,8 @@ class AceSeoTracking {
 
         // GA4 via the Site Kit token bridge.
         $a4 = self::sitekit_option( 'analytics-4_settings' );
-        if ( class_exists( 'AceSEOSiteKit' ) && AceSEOSiteKit::is_active() && ! empty( $a4['propertyID'] ) ) {
-            $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        if ( class_exists( 'AceCrawlSiteKit' ) && AceCrawlSiteKit::is_active() && ! empty( $a4['propertyID'] ) ) {
+            $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
             if ( is_wp_error( $token ) ) {
                 $out['ga']['error'] = $token->get_error_message();
             } else {
@@ -575,7 +575,7 @@ class AceSeoTracking {
     // ------------------------------------------------------------ cron
 
     public static function run() {
-        AceSeoTrackingClarity::snapshot();
+        AceCrawlTrackingClarity::snapshot();
         $detect = self::detect();
         $page = self::probe_page( true );
         $series = self::series( true );
@@ -634,8 +634,8 @@ class AceSeoTracking {
 
     public static function assets() {
         if ( sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) !== self::SLUG ) { return; }
-        wp_enqueue_style( 'ace-seo-tracking', ACE_SEO_URL . 'assets/css/tracking.css', array(), ACE_SEO_VERSION );
-        wp_enqueue_script( 'ace-seo-tracking', ACE_SEO_URL . 'assets/js/tracking.js', array(), ACE_SEO_VERSION, true );
+        wp_enqueue_style( 'ace-seo-tracking', ACECRAWL_URL . 'assets/css/tracking.css', array(), ACECRAWL_VERSION );
+        wp_enqueue_script( 'ace-seo-tracking', ACECRAWL_URL . 'assets/js/tracking.js', array(), ACECRAWL_VERSION, true );
     }
 
     public static function admin_refresh() {
@@ -645,10 +645,10 @@ class AceSeoTracking {
         check_admin_referer( 'ace_seo_tracking_refresh' );
         delete_transient( self::T_PAGE );
         delete_transient( self::T_SERIES );
-        delete_transient( AceSeoTrackingCommerce::CACHE );
-        delete_transient( AceSeoTrackingGoogle::CACHE );
-        if ( class_exists( 'AceSEOSiteKit' ) ) {
-            AceSEOSiteKit::clear_token_cache();
+        delete_transient( AceCrawlTrackingCommerce::CACHE );
+        delete_transient( AceCrawlTrackingGoogle::CACHE );
+        if ( class_exists( 'AceCrawlSiteKit' ) ) {
+            AceCrawlSiteKit::clear_token_cache();
         }
         self::run();
         wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG . '&refreshed=1' ) );
@@ -659,7 +659,7 @@ class AceSeoTracking {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'No.' );
         }
-        check_admin_referer( 'ace_seo_tracking_email' );
+        check_admin_referer( 'acecrawl_tracking_email' );
         update_option( self::OPT_EMAIL, empty( $_POST['on'] ) ? 0 : 1, false );
         wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG ) );
         exit;
@@ -671,10 +671,10 @@ class AceSeoTracking {
         }
         check_admin_referer( 'ace_seo_tracking_csv' );
         $s = self::series();
-        $commerce = AceSeoTrackingCommerce::series( array_keys( $s['days'] ) );
-        $google = AceSeoTrackingGoogle::series( array_keys( $s['days'] ) );
-        $google = AceSeoAggregateViews::enrich( $google, array_keys( $s['days'] ) );
-        $clarity = AceSeoTrackingClarity::history();
+        $commerce = AceCrawlTrackingCommerce::series( array_keys( $s['days'] ) );
+        $google = AceCrawlTrackingGoogle::series( array_keys( $s['days'] ) );
+        $google = AceCrawlAggregateViews::enrich( $google, array_keys( $s['days'] ) );
+        $clarity = AceCrawlTrackingClarity::history();
         $host = wp_parse_url( home_url(), PHP_URL_HOST );
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="tracking-' . sanitize_file_name( $host ) . '-' . wp_date( 'Y-m-d' ) . '.csv"' );
@@ -682,7 +682,7 @@ class AceSeoTracking {
         $columns = array( 'date', 'ga4_active_users', 'ga4_page_views', 'jetpack_visitors', 'jetpack_views' );
         if ( $commerce['ok'] ) { $columns = array_merge( $columns, array( 'orders', 'order_value_after_refunds', 'currency' ) ); }
         foreach ( $google['definitions'] as $definition ) { $columns[] = $definition['label']; }
-        foreach ( AceSeoTrackingClarity::definitions() as $definition ) { $columns[] = 'Clarity ' . $definition[0] . ' (24h)'; }
+        foreach ( AceCrawlTrackingClarity::definitions() as $definition ) { $columns[] = 'Clarity ' . $definition[0] . ' (24h)'; }
         $columns[] = 'Clarity window start UTC'; $columns[] = 'Clarity window end UTC';
         fputcsv( $fh, $columns );
         foreach ( $s['days'] as $d ) {
@@ -690,7 +690,7 @@ class AceSeoTracking {
             if ( $commerce['ok'] ) { $row = array_merge( $row, array( $commerce['days'][ $d['date'] ]['wc_orders'], $commerce['days'][ $d['date'] ]['wc_value'], $commerce['currency'] ) ); }
             foreach ( $google['definitions'] as $key => $definition ) { $row[] = $google['days'][ $d['date'] ][ $key ] ?? ''; }
             $saved = $clarity[ $d['date'] ] ?? array();
-            foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) { $row[] = $saved['values'][ $key ] ?? ''; }
+            foreach ( AceCrawlTrackingClarity::definitions() as $key => $definition ) { $row[] = $saved['values'][ $key ] ?? ''; }
             $row[] = isset( $saved['at'] ) ? gmdate( 'c', $saved['at'] - 86400 ) : '';
             $row[] = isset( $saved['at'] ) ? gmdate( 'c', $saved['at'] ) : '';
             fputcsv( $fh, $row );
@@ -717,16 +717,16 @@ class AceSeoTracking {
             $detect['banner'] = array( 'key' => 'banner', 'label' => 'Cookie banner', 'status' => 'ok', 'detail' => 'The theme provides the consent banner and sends Google consent updates directly.', 'ids' => array() );
         }
         $series = self::series();
-        $commerce = AceSeoTrackingCommerce::series( array_keys( $series['days'] ) );
-        $google = AceSeoTrackingGoogle::series( array_keys( $series['days'] ) );
-        $google = AceSeoAggregateViews::enrich( $google, array_keys( $series['days'] ) );
-        if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::snapshot(); }
+        $commerce = AceCrawlTrackingCommerce::series( array_keys( $series['days'] ) );
+        $google = AceCrawlTrackingGoogle::series( array_keys( $series['days'] ) );
+        $google = AceCrawlAggregateViews::enrich( $google, array_keys( $series['days'] ) );
+        if ( isset( $detect['clarity'] ) ) { AceCrawlTrackingClarity::snapshot(); }
         $problems = self::problems( $detect, $page, $series );
         $a = ! empty( $series['ga']['ok'] ) ? self::analyse( $series['days'] ) : null;
         $email_on = (bool) get_option( self::OPT_EMAIL, 1 );
         $next = wp_next_scheduled( self::CRON );
 
-        AceSeoAssets::inline_style( 'ace-seo-class-ace-seo-tracking-style', '.ace-trk .pill{display:inline-block;font:600 11px/1 sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px;border-radius:999px;white-space:nowrap}.ace-trk .pill-ok{background:#e6f4ea;color:#137333}.ace-trk .pill-warn{background:#fef3e0;color:#9a5b00}.ace-trk .pill-bad{background:#fde8e6;color:#b3261e}.ace-trk .pill-off{background:#eceff1;color:#5f6b73}.ace-trk .box{background:#fff;border:1px solid #c3c4c7;border-left-width:4px;padding:12px 16px;margin:12px 0;max-width:1100px}.ace-trk .box-bad{border-left-color:#d63638}.ace-trk .box-warn{border-left-color:#dba617}.ace-trk .box-ok{border-left-color:#00a32a}.ace-trk .box ul{margin:6px 0 0 18px}.ace-trk .tiles{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.ace-trk .tile{background:#fff;border:1px solid #c3c4c7;padding:10px 14px;min-width:160px}.ace-trk .tile b{display:block;font-size:22px;line-height:1.2}.ace-trk .tile span{color:#50575e;font-size:12px}.ace-trk svg{max-width:1100px;width:100%;height:auto;display:block;background:#fff;border:1px solid #c3c4c7}.ace-trk .legend{font-size:13px;color:#50575e;margin:6px 0}.ace-trk .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}.ace-trk table.widefat{max-width:1100px}.ace-trk td.n{text-align:right;font-variant-numeric:tabular-nums}.ace-trk code{font-size:12px}' );
+        AceCrawlAssets::inline_style( 'ace-seo-class-ace-seo-tracking-style', '.ace-trk .pill{display:inline-block;font:600 11px/1 sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px;border-radius:999px;white-space:nowrap}.ace-trk .pill-ok{background:#e6f4ea;color:#137333}.ace-trk .pill-warn{background:#fef3e0;color:#9a5b00}.ace-trk .pill-bad{background:#fde8e6;color:#b3261e}.ace-trk .pill-off{background:#eceff1;color:#5f6b73}.ace-trk .box{background:#fff;border:1px solid #c3c4c7;border-left-width:4px;padding:12px 16px;margin:12px 0;max-width:1100px}.ace-trk .box-bad{border-left-color:#d63638}.ace-trk .box-warn{border-left-color:#dba617}.ace-trk .box-ok{border-left-color:#00a32a}.ace-trk .box ul{margin:6px 0 0 18px}.ace-trk .tiles{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}.ace-trk .tile{background:#fff;border:1px solid #c3c4c7;padding:10px 14px;min-width:160px}.ace-trk .tile b{display:block;font-size:22px;line-height:1.2}.ace-trk .tile span{color:#50575e;font-size:12px}.ace-trk svg{max-width:1100px;width:100%;height:auto;display:block;background:#fff;border:1px solid #c3c4c7}.ace-trk .legend{font-size:13px;color:#50575e;margin:6px 0}.ace-trk .legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}.ace-trk table.widefat{max-width:1100px}.ace-trk td.n{text-align:right;font-variant-numeric:tabular-nums}.ace-trk code{font-size:12px}' );
         echo '<div class="wrap ace-trk"><h1>Tracking</h1>';
         if ( ! empty( $_GET['refreshed'] ) ) {
             echo '<div class="notice notice-success"><p>Checks re-run.</p></div>';
@@ -737,8 +737,8 @@ class AceSeoTracking {
         wp_nonce_field( 'ace_seo_tracking_refresh' );
         echo '<input type="hidden" name="action" value="ace_seo_tracking_refresh"><button class="button">Re-run checks now</button></form>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
-        wp_nonce_field( 'ace_seo_tracking_email' );
-        echo '<input type="hidden" name="action" value="ace_seo_tracking_email"><input type="hidden" name="on" value="' . ( $email_on ? '0' : '1' ) . '"><button class="button">' . ( $email_on ? 'Email alerts: on (turn off)' : 'Email alerts: off (turn on)' ) . '</button></form>';
+        wp_nonce_field( 'acecrawl_tracking_email' );
+        echo '<input type="hidden" name="action" value="acecrawl_tracking_email"><input type="hidden" name="on" value="' . ( $email_on ? '0' : '1' ) . '"><button class="button">' . ( $email_on ? 'Email alerts: on (turn off)' : 'Email alerts: off (turn on)' ) . '</button></form>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block">';
         wp_nonce_field( 'ace_seo_tracking_csv' );
         echo '<input type="hidden" name="action" value="ace_seo_tracking_csv"><button class="button">Download daily numbers (CSV)</button></form>';
@@ -774,10 +774,10 @@ class AceSeoTracking {
             echo '</ul></div>';
         }
 
-        AceSeoAggregateViews::settings();
+        AceCrawlAggregateViews::settings();
 
         // Chart.
-        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceSeoTrackingClarity::history() || $google['definitions'] ) {
+        if ( ! empty( $series['ga']['ok'] ) || ! empty( $series['jp']['ok'] ) || $commerce['ok'] || AceCrawlTrackingClarity::history() || $google['definitions'] ) {
             $jp_on = ! empty( $series['jp']['ok'] );
             echo '<h2>Last ' . (int) self::DAYS . ' days: traffic' . ( $commerce['ok'] ? ' and sales' : '' ) . '</h2>';
             if ( $a ) {
@@ -819,14 +819,14 @@ class AceSeoTracking {
             if ( in_array( $row['key'], array( 'ads', 'gla' ), true ) ) {
                 if ( $ads_shown ) { continue; }
                 $ads_shown = true;
-                AceSeoTrackingUI::ads( $ads );
+                AceCrawlTrackingUI::ads( $ads );
                 continue;
             }
-            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceSeoTrackingUI and svg_chart() escape every dynamic value as they build the markup.
-            echo '<tr><td><strong>' . esc_html( $row['label'] ) . '</strong></td><td><span class="pill pill-' . esc_html( $row['status'] ) . '">' . esc_html( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . wp_kses_post( AceSeoTrackingUI::detail( $row['detail'] ) ) . '<span class="ace-trk-row-links">' . wp_kses_post( AceSeoTrackingUI::links( $row['key'], $row ) ) . '</span></td></tr>';
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceCrawlTrackingUI and svg_chart() escape every dynamic value as they build the markup.
+            echo '<tr><td><strong>' . esc_html( $row['label'] ) . '</strong></td><td><span class="pill pill-' . esc_html( $row['status'] ) . '">' . esc_html( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . wp_kses_post( AceCrawlTrackingUI::detail( $row['detail'] ) ) . '<span class="ace-trk-row-links">' . wp_kses_post( AceCrawlTrackingUI::links( $row['key'], $row ) ) . '</span></td></tr>';
         }
         echo '</tbody></table>';
-        if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::render(); }
+        if ( isset( $detect['clarity'] ) ) { AceCrawlTrackingClarity::render(); }
 
         // On the page.
         echo '<h2>Found in home-page HTML</h2>';
@@ -884,7 +884,7 @@ class AceSeoTracking {
      */
     public static function render_chart( $series, $commerce, $metric, $gap, $google = array() ) {
         $days = $series['days'];
-        $clarity_history = AceSeoTrackingClarity::history();
+        $clarity_history = AceCrawlTrackingClarity::history();
         $clarity_available = array();
         foreach ( $days as $date => &$day ) {
             if ( ! isset( $clarity_history[ $date ] ) ) { continue; }
@@ -903,7 +903,7 @@ class AceSeoTracking {
         if ( $commerce['ok'] ) {
             echo '<label><input type="checkbox" name="orders"' . ( ! $ga && ! $jp ? ' checked' : '' ) . '> Orders</label><label><input type="checkbox" name="value"> Order value (' . esc_html( $commerce['currency'] ) . ')</label>';
         }
-        foreach ( AceSeoTrackingClarity::definitions() as $key => $definition ) {
+        foreach ( AceCrawlTrackingClarity::definitions() as $key => $definition ) {
             if ( ! isset( $clarity_available[ $key ] ) ) { continue; }
             echo '<label><input type="checkbox" name="clarity_' . esc_attr( $key ) . '" data-clarity-label="' . esc_attr( $definition[0] ) . '" data-description="' . esc_attr( $definition[3] ) . '"' . ( 'sessions' === $key ? ' checked' : '' ) . '> Clarity ' . esc_html( strtolower( $definition[0] ) ) . '</label>';
         }

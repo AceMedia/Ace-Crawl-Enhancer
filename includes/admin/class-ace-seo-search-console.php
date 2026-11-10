@@ -3,7 +3,7 @@
  * Google Search Console sitemap management and page-performance signals.
  *
  * Everything here is Site Kit-gated and additive: it borrows the site's
- * connected Site Kit OAuth token via AceSEOSiteKit, and degrades silently
+ * connected Site Kit OAuth token via AceCrawlSiteKit, and degrades silently
  * (returns a WP_Error or a "not connected" shape) whenever Site Kit is
  * absent, disconnected, or has no Search Console property. No Google call
  * happens on a front-end render path - reads are lazy (REST/AJAX/CLI only)
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSEOSearchConsole {
+class AceCrawlSearchConsole {
 
     /** Transient TTLs. */
     const TTL_SITEMAPS = 600;        // 10 minutes.
@@ -38,7 +38,7 @@ class AceSEOSearchConsole {
      * True when Site Kit is active and a Search Console property is known.
      */
     public static function is_ready() {
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) {
             return false;
         }
         return self::get_property() !== '';
@@ -48,10 +48,10 @@ class AceSEOSearchConsole {
      * Resolve the Search Console property (site URL or sc-domain:... token).
      */
     public static function get_property() {
-        if ( ! class_exists( 'AceSEOSiteKit' ) ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) ) {
             return '';
         }
-        return (string) AceSEOSiteKit::get_search_console_property_id();
+        return (string) AceCrawlSiteKit::get_search_console_property_id();
     }
 
     /**
@@ -75,11 +75,11 @@ class AceSEOSearchConsole {
      * @return array|WP_Error Decoded response (empty array on 2xx with no body) or WP_Error.
      */
     private static function google_request( $method, $url, $scopes, $body = null ) {
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) {
             return new WP_Error( 'sitekit_inactive', 'Google Site Kit is not installed or active.' );
         }
 
-        $token = AceSEOSiteKit::get_access_token( $scopes );
+        $token = AceCrawlSiteKit::get_access_token( $scopes );
         if ( is_wp_error( $token ) ) {
             return $token;
         }
@@ -148,7 +148,7 @@ class AceSEOSearchConsole {
             return new WP_Error( 'gsc_no_property', 'No Search Console property is configured in Site Kit.' );
         }
 
-        $cache_key = 'ace_seo_gsc_sitemaps_' . md5( $property );
+        $cache_key = 'acecrawl_gsc_sitemaps_' . md5( $property );
         if ( ! $force ) {
             $cached = get_transient( $cache_key );
             if ( false !== $cached ) {
@@ -157,7 +157,7 @@ class AceSEOSearchConsole {
         }
 
         $url  = 'https://www.googleapis.com/webmasters/v3/sites/' . rawurlencode( $property ) . '/sitemaps';
-        $body = self::google_request( 'GET', $url, array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE ) );
+        $body = self::google_request( 'GET', $url, array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE ) );
         if ( is_wp_error( $body ) ) {
             return $body;
         }
@@ -195,7 +195,7 @@ class AceSEOSearchConsole {
     public static function clear_sitemaps_cache() {
         $property = self::get_property();
         if ( '' !== $property ) {
-            delete_transient( 'ace_seo_gsc_sitemaps_' . md5( $property ) );
+            delete_transient( 'acecrawl_gsc_sitemaps_' . md5( $property ) );
         }
     }
 
@@ -222,7 +222,7 @@ class AceSEOSearchConsole {
 
         $url    = 'https://www.googleapis.com/webmasters/v3/sites/' . rawurlencode( $property )
             . '/sitemaps/' . rawurlencode( $feed );
-        $result = self::google_request( 'PUT', $url, array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE_WRITE ) );
+        $result = self::google_request( 'PUT', $url, array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE_WRITE ) );
         if ( is_wp_error( $result ) ) {
             return $result;
         }
@@ -338,7 +338,7 @@ class AceSEOSearchConsole {
         $result = self::google_request(
             'POST',
             'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
-            array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE ),
+            array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE ),
             $body
         );
         if ( is_wp_error( $result ) ) {
@@ -675,7 +675,7 @@ class AceSEOSearchConsole {
     private static function search_analytics( $property, $request ) {
         $url = 'https://searchconsole.googleapis.com/webmasters/v3/sites/'
             . rawurlencode( $property ) . '/searchAnalytics/query';
-        return self::google_request( 'POST', $url, array( AceSEOSiteKit::SCOPE_SEARCH_CONSOLE ), $request );
+        return self::google_request( 'POST', $url, array( AceCrawlSiteKit::SCOPE_SEARCH_CONSOLE ), $request );
     }
 
     /**

@@ -3,9 +3,9 @@
  * Ace SEO Schema Graph — single JSON-LD @graph builder and provider registry.
  *
  * Every schema node on a page flows through here: the page-type nodes built by
- * AceSeoFrontend, the built-in providers registered by AceSeoSchema (LocalBusiness,
+ * AceCrawlFrontend, the built-in providers registered by AceCrawlSchema (LocalBusiness,
  * Product, FAQ), and any nodes registered by other plugins via
- * ace_seo_register_schema_provider() or the ace_seo_schema_graph filter.
+ * acecrawl_register_schema_provider() or the acecrawl_schema_graph filter.
  *
  * Nodes are de-duplicated by @id and stripped of per-node @context; the printer
  * emits one <script type="application/ld+json"> with a single @context + @graph.
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class AceSeoSchemaGraph {
+class AceCrawlSchemaGraph {
 
     /** @var array<string, callable> Registered providers, keyed by id. */
     private static $providers = [];
@@ -70,7 +70,7 @@ class AceSeoSchemaGraph {
          * @param array $nodes   List of schema.org nodes (no @context on nodes).
          * @param array $context Page context array.
          */
-        $nodes = apply_filters('ace_seo_schema_graph', $nodes, $context);
+        $nodes = apply_filters('acecrawl_schema_graph', $nodes, $context);
 
         return self::normalize($nodes);
     }
@@ -137,7 +137,7 @@ class AceSeoSchemaGraph {
     }
 }
 
-if (!function_exists('ace_seo_register_schema_provider')) {
+if (!function_exists('acecrawl_register_schema_provider')) {
     /**
      * Public helper for other plugins to inject schema.org nodes into the
      * Ace SEO graph. See docs/schema-api.md in the plugin for examples.
@@ -145,7 +145,7 @@ if (!function_exists('ace_seo_register_schema_provider')) {
      * @param string   $id       Unique provider id, e.g. 'my-plugin/event'.
      * @param callable $callback function( array $context ): array|null
      */
-    function ace_seo_register_schema_provider($id, callable $callback) {
-        AceSeoSchemaGraph::register_provider($id, $callback);
+    function acecrawl_register_schema_provider($id, callable $callback) {
+        AceCrawlSchemaGraph::register_provider($id, $callback);
     }
 }

@@ -9,14 +9,14 @@ final class Admin {
 		add_action( 'network_admin_menu', static function () {
 			add_submenu_page( 'settings.php', 'Ace AI connection', 'Ace AI connection', 'manage_network_options', 'ace-ai-connection', array( __CLASS__, 'render' ) );
 		} );
-		add_action( 'wp_ajax_ace_ai_codex_status', array( __CLASS__, 'ajax_codex_status' ) );
+		add_action( 'wp_ajax_acemedia_ai_codex_status', array( __CLASS__, 'ajax_codex_status' ) );
 	}
 	/** Polled by the sign-in screen until the device code is approved; the service saves the record itself. */
 	public static function ajax_codex_status() {
 		$network = ! empty( $_GET['network'] );
 		check_ajax_referer( 'ace-ai-codex-status-' . ( $network ? 'network' : 'site' ) );
 		if ( ! current_user_can( $network ? 'manage_network_options' : 'manage_options' ) ) { wp_send_json_error( array( 'message' => 'Forbidden' ), 403 ); }
-		$service = $network ? new Service( true ) : ace_ai_connection_service();
+		$service = $network ? new Service( true ) : acemedia_ai_connection_service();
 		$status = $service->codex_login_status( $network );
 		if ( is_wp_error( $status ) ) { wp_send_json_error( array( 'message' => $status->get_error_message() ) ); }
 		wp_send_json_success( $status );
@@ -27,7 +27,7 @@ final class Admin {
 			return;
 		}
 		if ( ! $service->codex_available() ) {
-			?><h2>Sign in with ChatGPT</h2><p>Signing in from this screen needs a Codex runner supplied by your host through the <code>ace_ai_codex_runner</code> filter. See <code>docs/SHARED-AI-CONNECTION.md</code>.</p><?php
+			?><h2>Sign in with ChatGPT</h2><p>Signing in from this screen needs a Codex runner supplied by your host through the <code>acemedia_ai_codex_runner</code> filter. See <code>docs/SHARED-AI-CONNECTION.md</code>.</p><?php
 			return;
 		}
 		$status = $service->codex_login_status( $network );
@@ -43,7 +43,7 @@ final class Admin {
 			<li>Enter this one-time code (it expires in 15 minutes):<br><code style="font-size:1.6em;letter-spacing:.08em"><?php echo esc_html( $status['code'] ); ?></code></li></ol>
 			<p id="ace-ai-codex-wait">Waiting for approval… this page updates by itself once the code is accepted.</p>
 			<form method="post" style="display:inline"><?php wp_nonce_field( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) ); ?><input type="hidden" name="intent" value="codex_cancel"><?php submit_button( 'Cancel sign-in', 'secondary', 'submit', false ); ?></form>
-			<?php \AceSeoAssets::inline_script( 'ace-seo-admin-script-1', '(function(){var u=' . (wp_json_encode( add_query_arg( array( 'action' => 'ace_ai_codex_status', 'network' => $network ? 1 : 0, '_wpnonce' => wp_create_nonce( 'ace-ai-codex-status-' . ( $network ? 'network' : 'site' ) ) ), admin_url( 'admin-ajax.php' ) ) )) . ';function tick(){fetch(u,{credentials:\'same-origin\'}).then(function(r){return r.json()}).then(function(j){var d=j&&j.data||{};if(d.connected){location.reload();return;}if(!d.pending){document.getElementById(\'ace-ai-codex-wait\').textContent=d.error||\'The code expired or the sign-in was cancelled. Start again.\';return;}setTimeout(tick,4000);}).catch(function(){setTimeout(tick,8000);});}setTimeout(tick,4000);})();' ); ?><?php
+			<?php \AceCrawlAssets::inline_script( 'ace-seo-admin-script-1', '(function(){var u=' . (wp_json_encode( add_query_arg( array( 'action' => 'acemedia_ai_codex_status', 'network' => $network ? 1 : 0, '_wpnonce' => wp_create_nonce( 'ace-ai-codex-status-' . ( $network ? 'network' : 'site' ) ) ), admin_url( 'admin-ajax.php' ) ) )) . ';function tick(){fetch(u,{credentials:\'same-origin\'}).then(function(r){return r.json()}).then(function(j){var d=j&&j.data||{};if(d.connected){location.reload();return;}if(!d.pending){document.getElementById(\'ace-ai-codex-wait\').textContent=d.error||\'The code expired or the sign-in was cancelled. Start again.\';return;}setTimeout(tick,4000);}).catch(function(){setTimeout(tick,8000);});}setTimeout(tick,4000);})();' ); ?><?php
 		} elseif ( ! empty( $status['pending'] ) ) {
 			?><p id="ace-ai-codex-wait">Codex is requesting a sign-in code… <a href="">Refresh</a> in a few seconds.</p><?php
 		} else {
@@ -56,7 +56,7 @@ final class Admin {
 	public static function render() {
 		$network = is_network_admin();
 		if ( ! current_user_can( $network ? 'manage_network_options' : 'manage_options' ) ) { return; }
-		$service = $network ? new Service( true ) : ace_ai_connection_service();
+		$service = $network ? new Service( true ) : acemedia_ai_connection_service();
 		$message = '';
 		if ( 'post' === sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
 			check_admin_referer( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) );

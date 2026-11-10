@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoRetentionPanel {
+class AceCrawlRetentionPanel {
 
     public static function init() {
         add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
@@ -25,10 +25,10 @@ class AceSeoRetentionPanel {
     public static function enqueue() {
         $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
         $post   = get_post();
-        if ( ! $screen || 'post' !== $screen->base || ! $post || ! in_array( $post->post_type, (array) AceSeoRetentionReport::settings()['post_types'], true ) ) {
+        if ( ! $screen || 'post' !== $screen->base || ! $post || ! in_array( $post->post_type, (array) AceCrawlRetentionReport::settings()['post_types'], true ) ) {
             return;
         }
-        $tier = (string) get_post_meta( $post->ID, AceSeoRetentionReport::META_TIER, true );
+        $tier = (string) get_post_meta( $post->ID, AceCrawlRetentionReport::META_TIER, true );
         if ( '' === $tier ) {
             return;
         }
@@ -36,16 +36,16 @@ class AceSeoRetentionPanel {
         $deps[] = wp_script_is( 'wp-editor', 'registered' ) ? 'wp-editor' : 'wp-edit-post';
         wp_enqueue_script(
             'ace-seo-retention-panel',
-            ACE_SEO_URL . 'assets/js/retention-panel.js',
+            ACECRAWL_URL . 'assets/js/retention-panel.js',
             $deps,
-            ACE_SEO_VERSION,
+            ACECRAWL_VERSION,
             true
         );
         wp_add_inline_script( 'ace-seo-retention-panel', 'window.aceSeoRetentionPanel = ' . wp_json_encode( array(
             'postId'    => (int) $post->ID,
             'tier'      => $tier,
-            'tierLabel' => AceSeoRetentionReport::tier_labels()[ $tier ] ?? $tier,
-            'tracking'  => class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled(),
+            'tierLabel' => AceCrawlRetentionReport::tier_labels()[ $tier ] ?? $tier,
+            'tracking'  => class_exists( 'AceCrawlViewTracker' ) && AceCrawlViewTracker::enabled(),
         ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
     }
 
@@ -69,9 +69,9 @@ class AceSeoRetentionPanel {
             return new WP_Error( 'ace_seo_not_found', 'No such post.', array( 'status' => 404 ) );
         }
         $days     = (int) $request->get_param( 'days' );
-        $tracking = class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled();
-        $series   = $tracking ? AceSeoViewTracker::series( $post->ID, $days ) : array();
-        $refs     = $tracking ? AceSeoViewTracker::referrers( $post->ID, $days, 50 ) : array();
+        $tracking = class_exists( 'AceCrawlViewTracker' ) && AceCrawlViewTracker::enabled();
+        $series   = $tracking ? AceCrawlViewTracker::series( $post->ID, $days ) : array();
+        $refs     = $tracking ? AceCrawlViewTracker::referrers( $post->ID, $days, 50 ) : array();
 
         $humans = array_sum( wp_list_pluck( $series, 'humans' ) );
         $bots   = array_sum( wp_list_pluck( $series, 'bots' ) );
@@ -81,7 +81,7 @@ class AceSeoRetentionPanel {
         }
         arsort( $by_source );
 
-        $row = get_post_meta( $post->ID, AceSeoRetentionReport::META, true );
+        $row = get_post_meta( $post->ID, AceCrawlRetentionReport::META, true );
 
         return rest_ensure_response( array(
             'tracking'  => $tracking,
@@ -131,10 +131,10 @@ class AceSeoRetentionPanel {
      * medium), when Site Kit has Analytics connected. Cached for six hours.
      */
     private static function analytics_sources( WP_Post $post ) {
-        if ( ! class_exists( 'AceSEOSiteKit' ) || ! AceSEOSiteKit::is_active() ) {
+        if ( ! class_exists( 'AceCrawlSiteKit' ) || ! AceCrawlSiteKit::is_active() ) {
             return array( 'available' => false, 'message' => 'Site Kit is not active.' );
         }
-        $property = AceSEOSiteKit::get_analytics_property_id();
+        $property = AceCrawlSiteKit::get_analytics_property_id();
         if ( '' === $property ) {
             return array( 'available' => false, 'message' => 'Site Kit has no Analytics property connected.' );
         }
@@ -144,7 +144,7 @@ class AceSeoRetentionPanel {
         if ( is_array( $cached ) ) {
             return $cached;
         }
-        $token = AceSEOSiteKit::get_access_token( array( AceSEOSiteKit::SCOPE_ANALYTICS ) );
+        $token = AceCrawlSiteKit::get_access_token( array( AceCrawlSiteKit::SCOPE_ANALYTICS ) );
         if ( is_wp_error( $token ) || empty( $token ) ) {
             return array( 'available' => false, 'message' => is_wp_error( $token ) ? $token->get_error_message() : 'No Site Kit token for Analytics.' );
         }

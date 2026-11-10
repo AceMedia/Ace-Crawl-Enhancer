@@ -32,9 +32,9 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class AceSeoWhiteHat {
+class AceCrawlWhiteHat {
 
-    const OPTION        = 'ace_seo_whitehat_options';
+    const OPTION        = 'acecrawl_whitehat_options';
 
     /** Generic AI instruction for fresh installs. */
     const DEFAULT_INSTRUCTION = 'You check articles for promotional calls to action. An article is white hat when it does not tell or encourage the reader to buy, sign up for, claim or otherwise act on a promoted offer. Reporting facts, prices or offers as information, and mentioning a brand, are fine. You get the headline and only the sentences that contain trigger words. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.';
@@ -45,8 +45,8 @@ class AceSeoWhiteHat {
     const META_DATA     = '_ace_seo_whitehat_data';
     const META_RECHECK  = '_ace_seo_whitehat_recheck';
     const META_CHECKED  = '_ace_seo_whitehat_checked';
-    const CHECK_HOOK    = 'ace_seo_whitehat_check';
-    const SWEEP_HOOK    = 'ace_seo_whitehat_sweep';
+    const CHECK_HOOK    = 'acecrawl_whitehat_check';
+    const SWEEP_HOOK    = 'acecrawl_whitehat_sweep';
     const STATUSES      = array( 'yes', 'no', 'unknown' );
 
     public static function init() {
@@ -99,10 +99,10 @@ class AceSeoWhiteHat {
         if ( is_array( $saved ) && $saved && ! array_key_exists( 'instruction', $saved ) ) {
             $o['instruction'] = self::LEGACY_INSTRUCTION;
         }
-        if ( defined( 'ACE_SEO_WHITEHAT_API_KEY' ) && ACE_SEO_WHITEHAT_API_KEY ) {
-            $o['api_key'] = (string) ACE_SEO_WHITEHAT_API_KEY;
+        if ( defined( 'ACECRAWL_WHITEHAT_API_KEY' ) && ACECRAWL_WHITEHAT_API_KEY ) {
+            $o['api_key'] = (string) ACECRAWL_WHITEHAT_API_KEY;
         }
-        return apply_filters( 'ace_seo_whitehat_options', $o );
+        return apply_filters( 'acecrawl_whitehat_options', $o );
     }
 
     public static function enabled() {
@@ -184,7 +184,7 @@ class AceSeoWhiteHat {
             }
         };
         $walk( parse_blocks( $post->post_content ) );
-        return (int) apply_filters( 'ace_seo_whitehat_event_time', $latest, $post );
+        return (int) apply_filters( 'acecrawl_whitehat_event_time', $latest, $post );
     }
 
     /**
@@ -271,7 +271,7 @@ class AceSeoWhiteHat {
         $data['checked'] = time();
         $data['recheck'] = $recheck;
 
-        $data = apply_filters( 'ace_seo_whitehat_result', $data, $post->ID );
+        $data = apply_filters( 'acecrawl_whitehat_result', $data, $post->ID );
         self::store( $post->ID, $data );
         return $data;
     }
@@ -290,7 +290,7 @@ class AceSeoWhiteHat {
     /** The instruction the AI gets. Filterable; kept short because it is sent with every check. */
     private static function instruction() {
         $saved = trim( (string) ( self::options()['instruction'] ?? '' ) );
-        return (string) apply_filters( 'ace_seo_whitehat_instruction', '' !== $saved ? $saved : self::DEFAULT_INSTRUCTION );
+        return (string) apply_filters( 'acecrawl_whitehat_instruction', '' !== $saved ? $saved : self::DEFAULT_INSTRUCTION );
     }
 
     /**
@@ -305,7 +305,7 @@ class AceSeoWhiteHat {
             return is_wp_error( $pre ) ? $pre : array( 'white_hat' => ! empty( $pre['white_hat'] ), 'reasons' => (array) ( $pre['reasons'] ?? array() ) );
         }
         if ( 'wordpress' === $o['provider'] ) {
-            $service = function_exists( 'ace_ai_connection_service' ) ? ace_ai_connection_service() : null;
+            $service = function_exists( 'acemedia_ai_connection_service' ) ? acemedia_ai_connection_service() : null;
             if ( ! $service || ! method_exists( $service, 'wordpress_text' ) ) {
                 return new WP_Error( 'ace_seo_whitehat_core', 'Configure the WordPress AI connection first.' );
             }
@@ -399,7 +399,7 @@ class AceSeoWhiteHat {
         if ( ! self::enabled() ) {
             return;
         }
-        $limit = (int) apply_filters( 'ace_seo_whitehat_sweep_batch', 25 );
+        $limit = (int) apply_filters( 'acecrawl_whitehat_sweep_batch', 25 );
         $due   = $wpdb->get_col( $wpdb->prepare(
             "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND CAST(meta_value AS UNSIGNED) <= %d LIMIT %d",
             self::META_RECHECK,
@@ -436,7 +436,7 @@ class AceSeoWhiteHat {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_whitehat_save' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $in      = AceSeoInput::post( array(
+        $in      = AceCrawlInput::post( array(
             'enabled' => 'bool', 'post_types' => 'key', 'provider' => 'key', 'model' => 'text', 'api_key' => 'text',
             'bet_links' => 'textarea', 'allowed_links' => 'textarea', 'keywords' => 'textarea', 'cta_patterns' => 'textarea',
             'instruction' => 'textarea', 'bet_blocks' => 'text', 'event_attr' => 'text', 'grace_hours' => 'int', 'max_chars' => 'int',
@@ -474,7 +474,7 @@ class AceSeoWhiteHat {
             }
             $msg .= sprintf( ' Checked %d post(s).', count( $ids ) );
         }
-        set_transient( 'ace_seo_whitehat_msg_' . get_current_user_id(), $msg, 60 );
+        set_transient( 'acecrawl_whitehat_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-whitehat' ) );
         exit;
     }
@@ -495,11 +495,11 @@ class AceSeoWhiteHat {
             return;
         }
         $o   = self::options();
-        $msg = get_transient( 'ace_seo_whitehat_msg_' . get_current_user_id() );
+        $msg = get_transient( 'acecrawl_whitehat_msg_' . get_current_user_id() );
         ?>
         <div class="wrap">
             <h1>White hat status</h1>
-            <?php if ( $msg ) { delete_transient( 'ace_seo_whitehat_msg_' . get_current_user_id() ); echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $msg ) . '</p></div>'; } ?>
+            <?php if ( $msg ) { delete_transient( 'acecrawl_whitehat_msg_' . get_current_user_id() ); echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $msg ) . '</p></div>'; } ?>
             <p>Which posts have no promotional links and no promotional calls to action. Rules decide first (promotional links, then whether the post contains a trigger word at all); only posts with trigger words and no promotional link go to the AI, with just the headline and those sentences, and only when they have changed since the last check. Posts are checked after they are published or updated, again after the events in their promotion blocks have passed, and daily while they are not white hat.</p>
             <?php if ( self::enabled() ) : $c = self::counts(); ?>
                 <p><?php foreach ( self::labels() as $k => $l ) { echo esc_html( $l ) . ': <strong>' . esc_html( number_format_i18n( $c[ $k ] ) ) . '</strong> &nbsp; '; } ?>
@@ -525,7 +525,7 @@ class AceSeoWhiteHat {
                         <p>WordPress AI uses the provider and model in WordPress settings. Enable text in the shared Ace AI connection before selecting it here. The model and key below apply only to direct Anthropic or OpenAI connections.</p>
                         <label>Model <input type="text" name="model" value="<?php echo esc_attr( $o['model'] ); ?>" class="regular-text" placeholder="claude-opus-5"></label>
                         <p><label>API key <input type="password" name="api_key" value="" autocomplete="new-password" class="regular-text" placeholder="<?php echo esc_attr( '' !== $o['api_key'] ? 'Saved (leave blank to keep, type clear to remove)' : 'Not set' ); ?>"></label></p>
-                        <p class="description">Or define <code>ACE_SEO_WHITEHAT_API_KEY</code> in wp-config.php. Up to <input type="number" name="max_chars" min="200" max="20000" value="<?php echo esc_attr( (int) $o['max_chars'] ); ?>" style="width:6em"> characters of matching sentences are sent per check.</p>
+                        <p class="description">Or define <code>ACECRAWL_WHITEHAT_API_KEY</code> in wp-config.php. Up to <input type="number" name="max_chars" min="200" max="20000" value="<?php echo esc_attr( (int) $o['max_chars'] ); ?>" style="width:6em"> characters of matching sentences are sent per check.</p>
                     </td></tr>
                     <tr><th scope="row">Check now</th><td><input type="text" name="check_ids" class="regular-text" placeholder="Post IDs, comma separated (up to 20)"><p class="description">Checked when you save, ignoring the unchanged-content shortcut. For many posts use <code>wp ace-crawl whitehat check</code>.</p></td></tr>
                 </tbody></table>

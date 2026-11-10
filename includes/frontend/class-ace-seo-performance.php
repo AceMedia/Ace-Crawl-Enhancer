@@ -227,7 +227,7 @@ class ACE_SEO_Frontend_Performance {
         remove_action('load-post-new.php', array('AceCrawlEnhancer', 'maybe_migrate_post_data'));
         
         // Skip admin columns on frontend
-        if (apply_filters('ace_seo_skip_admin_columns', false)) {
+        if (apply_filters('acecrawl_skip_admin_columns', false)) {
             remove_filter('manage_posts_columns', array('AceCrawlEnhancer', 'add_admin_columns'));
             remove_filter('manage_pages_columns', array('AceCrawlEnhancer', 'add_admin_columns'));
             remove_action('manage_posts_custom_column', array('AceCrawlEnhancer', 'populate_admin_columns'));
