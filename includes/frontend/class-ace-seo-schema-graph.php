@@ -119,11 +119,21 @@ class AceSeoSchemaGraph {
             '@graph'   => $graph,
         ];
 
-        $json = wp_json_encode($output, JSON_UNESCAPED_UNICODE);
-        // Prevent breaking out of the script tag via </script> in values.
-        $json = str_replace('</', '<\/', $json);
+        self::print_json_ld($output);
+    }
 
-        echo '<script type="application/ld+json">' . "\n" . $json . "\n" . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
+    /**
+     * Print data as a JSON-LD script tag. JSON_HEX_TAG and JSON_HEX_AMP encode every <, > and &,
+     * so no value can close the script element whatever its case, and WordPress prints the tag.
+     *
+     * @param array $data Schema data.
+     */
+    public static function print_json_ld(array $data) {
+        $json = wp_json_encode($data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+        if (false === $json) {
+            return;
+        }
+        wp_print_inline_script_tag($json, array('type' => 'application/ld+json'));
     }
 }
 

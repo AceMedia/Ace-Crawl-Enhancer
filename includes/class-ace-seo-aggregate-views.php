@@ -89,7 +89,7 @@ class AceSeoAggregateViews {
     public static function enqueue() {
         if ( ! self::frontend() ) { return; }
         wp_enqueue_script( 'ace-aggregate-views', ACE_SEO_URL . 'assets/js/aggregate-views.js', array(), ACE_SEO_VERSION, true );
-        wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ) ) . ';', 'before' );
+        wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
     }
     /** Optional visitor UI; counting and existing privacy signals are independent. */
     public static function show_privacy() {

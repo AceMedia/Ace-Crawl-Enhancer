@@ -15,7 +15,8 @@ final class AceSeoAssets {
         }
         wp_register_script( $handle, false, $dependencies, ACE_SEO_VERSION, true );
         wp_enqueue_script( $handle );
-        wp_add_inline_script( $handle, $code );
+        // A closing script tag in any letter case would end the element early.
+        wp_add_inline_script( $handle, preg_replace( '#</(script)#i', '<\\/$1', (string) $code ) );
     }
 
     /**
@@ -35,7 +36,8 @@ final class AceSeoAssets {
         }
         wp_register_style( $handle, false, array(), ACE_SEO_VERSION );
         wp_enqueue_style( $handle );
-        wp_add_inline_style( $handle, $css );
+        // CSS never needs markup, so strip anything that could close the style element.
+        wp_add_inline_style( $handle, wp_strip_all_tags( (string) $css ) );
         if ( did_action( 'admin_head' ) || did_action( 'wp_head' ) ) {
             wp_print_styles( array( $handle ) );
         }

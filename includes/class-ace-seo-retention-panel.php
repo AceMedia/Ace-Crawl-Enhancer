@@ -46,7 +46,7 @@ class AceSeoRetentionPanel {
             'tier'      => $tier,
             'tierLabel' => AceSeoRetentionReport::tier_labels()[ $tier ] ?? $tier,
             'tracking'  => class_exists( 'AceSeoViewTracker' ) && AceSeoViewTracker::enabled(),
-        ) ) . ';', 'before' );
+        ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
     }
 
     public static function register_routes() {

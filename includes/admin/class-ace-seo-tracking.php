@@ -823,7 +823,7 @@ class AceSeoTracking {
                 continue;
             }
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceSeoTrackingUI and svg_chart() escape every dynamic value as they build the markup.
-            echo '<tr><td><strong>' . esc_html( $row['label'] ) . '</strong></td><td><span class="pill pill-' . esc_html( $row['status'] ) . '">' . esc_html( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . AceSeoTrackingUI::detail( $row['detail'] ) . '<span class="ace-trk-row-links">' . AceSeoTrackingUI::links( $row['key'], $row ) . '</span></td></tr>';
+            echo '<tr><td><strong>' . esc_html( $row['label'] ) . '</strong></td><td><span class="pill pill-' . esc_html( $row['status'] ) . '">' . esc_html( array( 'ok' => 'On', 'warn' => 'Check', 'bad' => 'Broken', 'off' => 'Off' )[ $row['status'] ] ) . '</span></td><td>' . wp_kses_post( AceSeoTrackingUI::detail( $row['detail'] ) ) . '<span class="ace-trk-row-links">' . wp_kses_post( AceSeoTrackingUI::links( $row['key'], $row ) ) . '</span></td></tr>';
         }
         echo '</tbody></table>';
         if ( isset( $detect['clarity'] ) ) { AceSeoTrackingClarity::render(); }
@@ -913,8 +913,7 @@ class AceSeoTracking {
             echo '<label><input type="checkbox" name="' . esc_attr( $key ) . '" data-google-label="' . esc_attr( $definition['label'] ) . '" data-group="' . esc_attr( $definition['group'] ) . '"' . ( ! empty( $definition['area'] ) ? ' data-area="1"' : '' ) . ( 'baseline_views' === $key ? ' checked' : '' ) . '> ' . esc_html( $definition['label'] ) . '</label>';
         }
         if ( $has_sources ) { echo '<button type="button" class="button ace-trk-show-sources">Show traffic mix</button><label class="ace-trk-source-style">Sources <select name="source_style"><option value="area">Filled</option><option value="lines">Lines</option></select></label>'; }
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- AceSeoTrackingUI and svg_chart() escape every dynamic value as they build the markup.
-        echo '</div><div class="ace-trk-chart-stage">' . self::svg_chart( $days, $metric, $gap ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><div class="ace-trk-chart-guides" aria-label="About the selected chart data"><p class="ace-trk-chart-hint">Hover or touch to inspect a date. Use the arrow keys when the chart is focused. Missing data stays blank.</p>';
+        echo '</div><div class="ace-trk-chart-stage">' . wp_kses( self::svg_chart( $days, $metric, $gap ), self::chart_allowed_html() ) . '<div class="ace-trk-tooltip" role="status" aria-live="polite" hidden></div></div><div class="ace-trk-chart-guides" aria-label="About the selected chart data"><p class="ace-trk-chart-hint">Hover or touch to inspect a date. Use the arrow keys when the chart is focused. Missing data stays blank.</p>';
         echo '<p data-guide="ga"><strong>Google Analytics</strong> Dates use ' . esc_html( $google['timezone'] ?? 'the property timezone' ) . '. Today’s figures may still be processing.</p>';
         echo '<p data-guide="baseline"><strong>Basic page views</strong> Daily first-party counts in ' . esc_html( wp_timezone_string() ) . '. No visitor IDs or tracking cookies. Includes React history navigation; excludes known bots and opt-outs. These are views, not unique people. Unrecorded dates stay blank.</p>';
         if ( ! empty( $google['definitions'] ) ) {
@@ -932,6 +931,24 @@ class AceSeoTracking {
         echo '</div>';
         $data = array( 'days' => array_values( $days ), 'gaps' => array_values( $gap ), 'today' => wp_date( 'Y-m-d' ), 'currency' => $commerce['currency'] ?? '', 'preferences' => home_url( '/' ) );
         echo '<script type="application/json">' . wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ) . '</script></div>';
+    }
+
+    /** SVG elements and attributes the chart uses, for wp_kses() at the point of output. */
+    private static function chart_allowed_html() {
+        $common = array( 'class' => true, 'fill' => true, 'stroke' => true, 'stroke-width' => true, 'stroke-linejoin' => true, 'stroke-linecap' => true, 'stroke-dasharray' => true, 'opacity' => true, 'fill-opacity' => true, 'transform' => true, 'style' => true );
+        return array(
+            'svg'      => $common + array( 'xmlns' => true, 'viewbox' => true, 'width' => true, 'height' => true, 'role' => true, 'aria-label' => true, 'aria-hidden' => true, 'focusable' => true, 'preserveaspectratio' => true, 'tabindex' => true ),
+            'g'        => $common,
+            'title'    => array(),
+            'desc'     => array(),
+            'line'     => $common + array( 'x1' => true, 'x2' => true, 'y1' => true, 'y2' => true ),
+            'polyline' => $common + array( 'points' => true ),
+            'polygon'  => $common + array( 'points' => true ),
+            'path'     => $common + array( 'd' => true ),
+            'rect'     => $common + array( 'x' => true, 'y' => true, 'width' => true, 'height' => true, 'rx' => true ),
+            'circle'   => $common + array( 'cx' => true, 'cy' => true, 'r' => true ),
+            'text'     => $common + array( 'x' => true, 'y' => true, 'font-size' => true, 'text-anchor' => true, 'dominant-baseline' => true ),
+        );
     }
 
     public static function svg_chart( array $days, $metric, array $gap ) {

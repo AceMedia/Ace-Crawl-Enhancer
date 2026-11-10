@@ -951,9 +951,9 @@ class AceSeoRetentionReport {
             ?>
             <tr>
                 <td><?php echo esc_html( wp_date( 'j M Y', (int) $row['finished'] ) ); ?><br><span style="font-size:11px;color:#666"><?php echo esc_html( (int) $row['years'] . 'y+, ' . (int) $row['days'] . '-day window' ); ?></span></td>
-                <?php foreach ( self::BUCKETS as $b ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['counts'][ $b ] ?? 0 ) ) ) . $delta( $row['counts'][ $b ] ?? 0, $prev ? ( $prev['counts'][ $b ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
-                <?php foreach ( self::TIERS as $t ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['tiers'][ $t ] ?? 0 ) ) ) . $delta( $row['tiers'][ $t ] ?? 0, $prev ? ( $prev['tiers'][ $t ] ?? 0 ) : null ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
-                <?php foreach ( array( 'rising', 'falling', 'gone' ) as $t ) : ?><td><?php echo isset( $row['trends'] ) ? esc_html( number_format_i18n( (int) ( $row['trends'][ $t ] ?? 0 ) ) ) . $delta( $row['trends'][ $t ] ?? 0, $prev && isset( $prev['trends'] ) ? ( $prev['trends'][ $t ] ?? 0 ) : null ) : '–'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td><?php endforeach; ?>
+                <?php foreach ( self::BUCKETS as $b ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['counts'][ $b ] ?? 0 ) ) ) . wp_kses_post( $delta( $row['counts'][ $b ] ?? 0, $prev ? ( $prev['counts'][ $b ] ?? 0 ) : null ) ); ?></td><?php endforeach; ?>
+                <?php foreach ( self::TIERS as $t ) : ?><td><?php echo esc_html( number_format_i18n( (int) ( $row['tiers'][ $t ] ?? 0 ) ) ) . wp_kses_post( $delta( $row['tiers'][ $t ] ?? 0, $prev ? ( $prev['tiers'][ $t ] ?? 0 ) : null ) ); ?></td><?php endforeach; ?>
+                <?php foreach ( array( 'rising', 'falling', 'gone' ) as $t ) : ?><td><?php echo isset( $row['trends'] ) ? esc_html( number_format_i18n( (int) ( $row['trends'][ $t ] ?? 0 ) ) ) . wp_kses_post( $delta( $row['trends'][ $t ] ?? 0, $prev && isset( $prev['trends'] ) ? ( $prev['trends'][ $t ] ?? 0 ) : null ) ) : '–'; ?></td><?php endforeach; ?>
                 <td><?php echo ! empty( $row['share']['total'] ) ? esc_html( round( 100 * $row['share']['old'] / $row['share']['total'], 1 ) . '%' ) : '–'; ?></td>
                 <td style="font-size:11px"><?php
                     $out = array();
@@ -961,7 +961,7 @@ class AceSeoRetentionReport {
                         list( $a, $b ) = explode( '>', $k );
                         $out[] = esc_html( ( $labels[ $a ] ?? $a ) . ' → ' . ( $labels[ $b ] ?? $b ) . ': ' . number_format_i18n( $n ) );
                     }
-                    echo $out ? implode( '<br>', $out ) : ( $prev ? 'No moves' : 'First build' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    echo wp_kses_post( $out ? implode( '<br>', $out ) : ( $prev ? 'No moves' : 'First build' ) );
                 ?></td>
             </tr>
         <?php endforeach; ?>
@@ -1984,12 +1984,12 @@ class AceSeoRetentionReport {
                 $total = '' === $bucket ? array_sum( $counts ) : $counts[ $bucket ];
                 $pages = (int) ceil( $total / $per );
                 if ( $pages > 1 ) {
-                    echo '<p class="tablenav-pages" style="margin-top:1em">' . paginate_links( array( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    echo '<p class="tablenav-pages" style="margin-top:1em">' . wp_kses_post( (string) paginate_links( array(
                         'base'    => add_query_arg( array( 'page' => 'ace-seo-retention', 'bucket' => $bucket, 'paged' => '%#%' ), admin_url( 'admin.php' ) ) . '#retention-rows',
                         'format'  => '',
                         'current' => $paged,
                         'total'   => $pages,
-                    ) ) . '</p>';
+                    ) ) ) . '</p>';
                 }
                 ?>
         <?php

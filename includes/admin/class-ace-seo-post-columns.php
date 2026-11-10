@@ -510,18 +510,18 @@ class AceSeoPostColumns {
 
             case 'ace_seo_people':
                 $people = get_post_meta( $post_id, '_ace_seo_humans', true );
-                echo '' === $people ? self::dash() : esc_html( number_format_i18n( (int) $people ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                echo '' === $people ? wp_kses_post( self::dash() ) : esc_html( number_format_i18n( (int) $people ) );
                 break;
 
             case 'ace_seo_bot_pct':
                 $pct = get_post_meta( $post_id, '_ace_seo_bot_pct', true );
-                echo '' === $pct ? self::dash() : esc_html( (int) $pct . '%' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                echo '' === $pct ? wp_kses_post( self::dash() ) : esc_html( (int) $pct . '%' );
                 break;
 
             case 'ace_seo_whitehat':
                 $status = (string) get_post_meta( $post_id, '_ace_seo_whitehat', true );
                 if ( '' === $status || ! class_exists( 'AceSeoWhiteHat' ) ) {
-                    echo self::dash(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    echo wp_kses_post( self::dash() );
                     break;
                 }
                 $data   = get_post_meta( $post_id, '_ace_seo_whitehat_data', true );
@@ -542,7 +542,7 @@ class AceSeoPostColumns {
             case 'ace_seo_ret_links':
                 $links = get_post_meta( $post_id, '_ace_seo_ret_links', true );
                 if ( '' === $links ) {
-                    echo self::dash(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    echo wp_kses_post( self::dash() );
                 } elseif ( 0 === (int) $links ) {
                     printf(
                         '<span style="color:#b32d2e" title="%s">0 %s</span>',

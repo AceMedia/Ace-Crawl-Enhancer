@@ -670,7 +670,7 @@ class AceSeoRetentionActions {
             nocache_headers();
             header( 'X-Robots-Tag: noindex' );
             $message = apply_filters( 'ace_seo_retention_gone_message', '<p>This page has been retired and is no longer available.</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( get_bloginfo( 'name' ) ) . '</a></p>', $id );
-            wp_die( $message, esc_html__( 'Gone', 'ace-crawl-enhancer' ), array( 'response' => 410 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- filtered markup
+            wp_die( wp_kses_post( $message ), esc_html__( 'Gone', 'ace-crawl-enhancer' ), array( 'response' => 410 ) );
         }
         if ( class_exists( 'AceSeoRedirects' ) ? AceSeoRedirects::url_key( $url ) === AceSeoRedirects::url_key( get_permalink( $id ) ) : self::path_of( $url ) === self::path_of( get_permalink( $id ) ) ) {
             return;

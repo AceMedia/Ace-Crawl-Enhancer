@@ -224,13 +224,7 @@ class AceSeoSchema {
         $entity = $this->get_site_entity_schema($options);
         
         if (!empty($entity)) {
-            echo '<script type="application/ld+json">' . "\n";
-            // Escape for HTML context to prevent XSS via </script> injection
-            $json = wp_json_encode($entity, JSON_UNESCAPED_UNICODE);
-            // Replace </ with <\/ to prevent breaking out of script tag
-            $json = str_replace('</', '<\/', $json);
-            echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
-            echo "\n" . '</script>' . "\n";
+            AceSeoSchemaGraph::print_json_ld($entity);
         }
     }
     
@@ -248,13 +242,7 @@ class AceSeoSchema {
         $local_business = $this->get_local_business_data();
         
         if (!empty($local_business)) {
-            echo '<script type="application/ld+json">' . "\n";
-            // Escape for HTML context to prevent XSS via </script> injection
-            $json = wp_json_encode($local_business, JSON_UNESCAPED_UNICODE);
-            // Replace </ with <\/ to prevent breaking out of script tag
-            $json = str_replace('</', '<\/', $json);
-            echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD from wp_json_encode() with </ escaped.
-            echo "\n" . '</script>' . "\n";
+            AceSeoSchemaGraph::print_json_ld($local_business);
         }
     }
     
