@@ -58,6 +58,9 @@ Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a f
 * JSON-LD and inline scripts and styles cannot be closed early by their content, and generated admin markup is escaped where it is printed.
 * The term edit Yoast migration uses the edit form's own term and checks the user can edit it.
 * The discouraged robots.txt works out the admin path instead of assuming wp-admin.
+* The homepage share card carries the site's real title: its oEmbed title uses the homepage SEO title, and the Open Graph and Twitter tags are printed straight after the title tag, each only once.
+* The retention report recovers when its background worker ends without an error, and says when a Search Console period is empty.
+* Uninstalling clears only this plugin's own transients.
 
 = 1.0.97 =
 * Retention report counts are cached in Ace Redis Cache's admin query cache when it is active, and cleared whenever the report changes.
