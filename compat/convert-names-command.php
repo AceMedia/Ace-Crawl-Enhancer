@@ -64,7 +64,8 @@ final class AceCrawlConvertNamesCommand {
 				add_option( $new, $old_value, '', in_array( $old_row->autoload, array( 'no', 'off', 'auto-off' ), true ) ? 'no' : 'yes' );
 			}
 			if ( $delete ) {
-				$wpdb->delete( $wpdb->options, array( 'option_name' => $old ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				// Through the options API, so a persistent object cache (Redis, Valkey) drops it too.
+				delete_option( $old );
 			}
 		}
 
@@ -106,6 +107,8 @@ final class AceCrawlConvertNamesCommand {
 		}
 		AceCrawlLegacyNames::fix_values();
 		AceCrawlLegacyNames::move_events();
+		wp_cache_delete( 'alloptions', 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
 		$manual = count( array_filter( $rows, static function ( $row ) { return 'wp-config' === $row['type']; } ) );
 		if ( $manual || $held ) {
 			WP_CLI::warning( sprintf( 'Not marked converted yet: %d wp-config constant(s) to rename and %d old option(s) that differ from the new ones. Compare them, then run again (with --force to keep the new values).', $manual, $held ) );
