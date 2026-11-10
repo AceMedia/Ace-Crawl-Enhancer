@@ -63,3 +63,7 @@ $fragment = '<p>No head</p>';
 asset_check( $fragment === $frontend->filter_head_output( $fragment ), 'Fragments remain untouched.' );
 $huge = '<!doctype html><html><head><title>x</title><script>' . str_repeat( 'a ', 1500000 ) . '</script></head><body>kept</body></html>';
 asset_check( $huge === $frontend->filter_head_output( $huge ), 'A head past the backtrack limit keeps the page.' );
+$late = '<html><head><title>T</title><style>' . str_repeat( 'x', 5000 ) . '</style><meta property="og:site_name" content="S"><meta property="og:image" content="i"><meta name="twitter:card" content="c"><meta property="og:site_name" content="S"><meta data-ace-seo="1" property="og:title" content="Real"></head><body></body></html>';
+$hoisted = $frontend->filter_head_output( $late );
+asset_check( strpos( $hoisted, 'og:title' ) < strpos( $hoisted, '<style>' ) && strpos( $hoisted, 'twitter:card' ) < strpos( $hoisted, '<style>' ) && strpos( $hoisted, '</title>' ) < strpos( $hoisted, 'og:' ), 'Share tags sit just after the title, ahead of inline styles.' );
+asset_check( 1 === substr_count( $hoisted, 'og:site_name' ) && strpos( $hoisted, 'og:image' ) < strpos( $hoisted, 'og:title' ), 'Repeated share tags print once and keep their order.' );

@@ -87,7 +87,36 @@ class AceCrawlFrontend {
             }
             $head = substr( $without, 0, -7 ) . $canonical . "\n</head>";
         }
+        $head = $this->hoist_social_meta( $head );
         return $head === $original ? $html : substr_replace( $html, $head, $start, $length );
+    }
+
+    /**
+     * Move the share tags (og:, article:, twitter:, fb:) up to just after <title>.
+     *
+     * Inline block styles push them tens of kilobytes down the head, and some share
+     * scrapers (LinkedIn) stop reading before they get there, then fall back to the
+     * oEmbed title ("Home" on the front page). Exact repeats are printed once.
+     */
+    private function hoist_social_meta( $head ) {
+        $pattern = '/<meta\b[^>]*\b(?:property|name)=["\'](?:og|article|twitter|fb):[^"\']*["\'][^>]*>\s*/i';
+        if ( ! preg_match_all( $pattern, $head, $tags ) ) {
+            return $head;
+        }
+        $without = preg_replace( $pattern, '', $head );
+        if ( null === $without ) {
+            return $head;
+        }
+        $block = implode( "\n", array_unique( array_map( 'trim', $tags[0] ) ) ) . "\n";
+        $title = stripos( $without, '</title>' );
+        if ( false !== $title ) {
+            $at = $title + 8;
+        } elseif ( preg_match( '/<head\b[^>]*>/i', $without, $open ) ) {
+            $at = strlen( $open[0] );
+        } else {
+            return $head;
+        }
+        return substr( $without, 0, $at ) . $block . substr( $without, $at );
     }
 
     public function output_schema_markup() {

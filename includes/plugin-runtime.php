@@ -297,6 +297,9 @@ class AceCrawlEnhancer {
             add_action('wp_head', [$this, 'output_robots_meta'], 3);
             add_action('wp_head', [$this, 'output_opengraph_tags'], 10);
             add_action('wp_head', [$this, 'output_twitter_tags'], 11);
+            // Share scrapers (LinkedIn) read the oEmbed title, which is the bare page name:
+            // "Home" on a static front page. Give them the homepage SEO title instead.
+            add_filter('oembed_response_data', [$this, 'filter_oembed_title'], 10, 2);
         } else {
             // Admin-only hooks
             add_action('admin_enqueue_scripts', [$this, 'admin_scripts']);
@@ -2058,6 +2061,17 @@ class AceCrawlEnhancer {
     /**
      * Get homepage title with synchronization between settings and page meta
      */
+    public function filter_oembed_title($data, $post) {
+        if (is_array($data) && $post instanceof WP_Post && 'page' === get_option('show_on_front')
+            && (int) get_option('page_on_front') === (int) $post->ID) {
+            $title = trim(wp_strip_all_tags($this->get_homepage_title()));
+            if ($title !== '') {
+                $data['title'] = $title;
+            }
+        }
+        return $data;
+    }
+
     private function get_homepage_title() {
         // WordPress reports the configured posts page as `is_home()`, even when
         // a different static page is the actual front page. Treat that posts
