@@ -274,8 +274,8 @@ class AceCrawlActivator {
         if ( file_exists( ACECRAWL_PATH . 'includes/database/class-database-optimizer.php' ) ) {
             require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             
-            if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
-                $optimizer = new ACE_SEO_Database_Optimizer();
+            if ( class_exists( 'AceCrawl_Database_Optimizer' ) ) {
+                $optimizer = new AceCrawl_Database_Optimizer();
                 $results = $optimizer->create_indexes();
                 
                 // Log the optimization results

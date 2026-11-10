@@ -447,7 +447,7 @@ class AceCrawlEnhancer {
         
         // Instantiate admin classes to register AJAX handlers and REST routes
         if ( is_admin() ) {
-            new ACE_SEO_Database_Optimizer();
+            new AceCrawl_Database_Optimizer();
         }
 
         if ( $load_google_services ) {
@@ -489,9 +489,9 @@ class AceCrawlEnhancer {
             require_once ACECRAWL_PATH . 'includes/integrations/class-ace-seo-integrations.php';
 
             // Initialize core frontend services
-            $performance = ACE_SEO_Frontend_Performance::get_instance();
+            $performance = AceCrawl_Frontend_Performance::get_instance();
             $performance->init();
-            ( new ACE_SEO_Term_Redirect() )->init();
+            ( new AceCrawl_Term_Redirect() )->init();
             new AceCrawlFrontend();
             new AceCrawlSchema();
             AceCrawlIntegrations::init();
@@ -500,7 +500,7 @@ class AceCrawlEnhancer {
         // Load dashboard AJAX handler for admin
         if (is_admin()) {
             require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-ajax.php';
-            new ACE_SEO_Dashboard_Ajax();
+            new AceCrawl_Dashboard_Ajax();
         }
         
         // Sitemap functionality removed - WordPress core sitemaps are used instead
@@ -541,8 +541,8 @@ class AceCrawlEnhancer {
             $context = (array) $block->context;
         }
 
-        $items = class_exists('ACE_SEO_Breadcrumbs')
-            ? ACE_SEO_Breadcrumbs::get_items($context)
+        $items = class_exists('AceCrawl_Breadcrumbs')
+            ? AceCrawl_Breadcrumbs::get_items($context)
             : [];
 
         if (!$attributes['showHome'] && !empty($items)) {
@@ -3226,8 +3226,8 @@ class AceCrawlEnhancer {
         if ( file_exists( ACECRAWL_PATH . 'includes/database/class-database-optimizer.php' ) ) {
             require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             
-            if ( class_exists( 'ACE_SEO_Database_Optimizer' ) ) {
-                $optimizer = new ACE_SEO_Database_Optimizer();
+            if ( class_exists( 'AceCrawl_Database_Optimizer' ) ) {
+                $optimizer = new AceCrawl_Database_Optimizer();
                 $results = $optimizer->create_indexes();
                 
                 // Log the optimization results

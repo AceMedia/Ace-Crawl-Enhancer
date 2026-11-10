@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ACE_SEO_Dashboard_Cache {
+class AceCrawl_Dashboard_Cache {
     
     const CACHE_DURATION = 3600; // 1 hour
     const STATS_TRANSIENT = 'acecrawl_dashboard_stats';
@@ -270,5 +270,5 @@ class ACE_SEO_Dashboard_Cache {
 }
 
 // Hook into post updates to clear cache
-add_action('save_post', array('ACE_SEO_Dashboard_Cache', 'clear_cache_on_post_update'));
-add_action('delete_post', array('ACE_SEO_Dashboard_Cache', 'clear_cache_on_post_update'));
+add_action('save_post', array('AceCrawl_Dashboard_Cache', 'clear_cache_on_post_update'));
+add_action('delete_post', array('AceCrawl_Dashboard_Cache', 'clear_cache_on_post_update'));

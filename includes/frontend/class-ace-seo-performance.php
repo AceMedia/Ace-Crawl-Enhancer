@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ACE_SEO_Frontend_Performance {
+class AceCrawl_Frontend_Performance {
     
     private static $instance = null;
     private $cached_meta = array();
@@ -244,7 +244,7 @@ class ACE_SEO_Frontend_Performance {
 }
 
 // Initialize performance optimizations
-ACE_SEO_Frontend_Performance::get_instance();
+AceCrawl_Frontend_Performance::get_instance();
 
 // Clear cache on post update
-add_action('save_post', array('ACE_SEO_Frontend_Performance', 'clear_post_cache'));
+add_action('save_post', array('AceCrawl_Frontend_Performance', 'clear_post_cache'));

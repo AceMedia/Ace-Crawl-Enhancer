@@ -109,7 +109,7 @@ Goal: a single `@graph` per page, every node `@id`-linked, nothing double-emitte
   per-node `@context` stripping, single printer. Investigation showed only ONE emitter was actually
   live; the schema class's LocalBusiness/enhancer/Product/FAQ were dead code and the performance
   footer emitter was never hooked (removed — it was a double-emit trap, not a live bug).
-- [x] **BreadcrumbList JSON-LD** from `ACE_SEO_Breadcrumbs::get_items()` on every non-front page
+- [x] **BreadcrumbList JSON-LD** from `AceCrawl_Breadcrumbs::get_items()` on every non-front page
   with a ≥2-item trail; referenced from the WebPage node; current page omits `item` per Google.
 - [x] **Orphaned builders wired as providers**: LocalBusiness (front page, settings-gated), Product
   (`acecrawl_product_schema_enabled` — defaults off when WooCommerce core emits its own), FAQPage

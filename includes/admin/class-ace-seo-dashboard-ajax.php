@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ACE_SEO_Dashboard_Ajax {
+class AceCrawl_Dashboard_Ajax {
     
     const BATCH_SIZE = 1000; // Process posts in batches of 1000
     
@@ -78,7 +78,7 @@ class ACE_SEO_Dashboard_Ajax {
         // Served from cache when warm. These aggregates are around half a
         // second of database work each and were recomputed on every single
         // dashboard load, by every admin, uncached.
-        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'stats' );
+        $ace_cached = AceCrawl_Dashboard_Cache::payload_get( 'stats' );
 
         if ( false !== $ace_cached ) {
             wp_send_json( $ace_cached );
@@ -148,7 +148,7 @@ class ACE_SEO_Dashboard_Ajax {
         }
         
         if ( isset( $response['status'] ) && 'success' === $response['status'] ) {
-            ACE_SEO_Dashboard_Cache::payload_set( 'stats', $response );
+            AceCrawl_Dashboard_Cache::payload_set( 'stats', $response );
         }
 
         wp_send_json($response);
@@ -171,7 +171,7 @@ class ACE_SEO_Dashboard_Ajax {
         // Served from cache when warm. These aggregates are around half a
         // second of database work each and were recomputed on every single
         // dashboard load, by every admin, uncached.
-        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'recent_activity' );
+        $ace_cached = AceCrawl_Dashboard_Cache::payload_get( 'recent_activity' );
 
         if ( false !== $ace_cached ) {
             wp_send_json( $ace_cached );
@@ -213,7 +213,7 @@ class ACE_SEO_Dashboard_Ajax {
             }
             
             $ace_payload = array( 'status' => 'success', 'data' => $recent_posts );
-            ACE_SEO_Dashboard_Cache::payload_set( 'recent_activity', $ace_payload );
+            AceCrawl_Dashboard_Cache::payload_set( 'recent_activity', $ace_payload );
 
             wp_send_json( $ace_payload );
             
@@ -242,7 +242,7 @@ class ACE_SEO_Dashboard_Ajax {
         // Served from cache when warm. These aggregates are around half a
         // second of database work each and were recomputed on every single
         // dashboard load, by every admin, uncached.
-        $ace_cached = ACE_SEO_Dashboard_Cache::payload_get( 'content_analysis' );
+        $ace_cached = AceCrawl_Dashboard_Cache::payload_get( 'content_analysis' );
 
         if ( false !== $ace_cached ) {
             wp_send_json( $ace_cached );
@@ -310,7 +310,7 @@ class ACE_SEO_Dashboard_Ajax {
             );
             
             $ace_payload = array( 'status' => 'success', 'data' => $analysis );
-            ACE_SEO_Dashboard_Cache::payload_set( 'content_analysis', $ace_payload );
+            AceCrawl_Dashboard_Cache::payload_set( 'content_analysis', $ace_payload );
 
             wp_send_json( $ace_payload );
             
@@ -493,8 +493,8 @@ class ACE_SEO_Dashboard_Ajax {
                 $html .= '</div>';
             } else {
                 // Initialize database optimizer for analysis
-                if (class_exists('ACE_SEO_Database_Optimizer')) {
-                    $db_optimizer = new ACE_SEO_Database_Optimizer();
+                if (class_exists('AceCrawl_Database_Optimizer')) {
+                    $db_optimizer = new AceCrawl_Database_Optimizer();
                     $analysis = $db_optimizer->analyze_performance();
                     
                     $html .= '<div class="ace-seo-db-stats">';
@@ -590,4 +590,4 @@ class ACE_SEO_Dashboard_Ajax {
 }
 
 // Initialize AJAX handler
-new ACE_SEO_Dashboard_Ajax();
+new AceCrawl_Dashboard_Ajax();

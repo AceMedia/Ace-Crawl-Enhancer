@@ -182,11 +182,11 @@ class AceCrawlFrontend {
      * BreadcrumbList node from the shared breadcrumb trail.
      */
     private function generate_breadcrumb_schema($webpage_ref) {
-        if (!class_exists('ACE_SEO_Breadcrumbs') || is_front_page() || is_404()) {
+        if (!class_exists('AceCrawl_Breadcrumbs') || is_front_page() || is_404()) {
             return null;
         }
 
-        $items = ACE_SEO_Breadcrumbs::get_items();
+        $items = AceCrawl_Breadcrumbs::get_items();
         if (count($items) < 2) {
             return null;
         }

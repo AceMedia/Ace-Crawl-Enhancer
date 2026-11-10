@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class ACE_SEO_Term_Redirect {
+class AceCrawl_Term_Redirect {
 
     /**
      * Term meta key holding the redirect target.

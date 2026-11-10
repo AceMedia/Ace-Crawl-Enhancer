@@ -183,7 +183,7 @@ class AceCrawlRedirects {
 
     public static function purge( $id ) {
         clean_post_cache( $id );
-        if ( class_exists( 'ACE_SEO_Frontend_Performance' ) ) { ACE_SEO_Frontend_Performance::clear_post_cache( $id ); }
+        if ( class_exists( 'AceCrawl_Frontend_Performance' ) ) { AceCrawl_Frontend_Performance::clear_post_cache( $id ); }
         $url = get_permalink( $id );
         if ( $url ) { do_action( 'ace_redis_cache_purge_url', $url ); }
         $s = self::settings( $id );

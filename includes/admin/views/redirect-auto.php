@@ -4,8 +4,8 @@ require_once ACECRAWL_PATH . 'includes/frontend/class-ace-seo-term-redirect.php'
 $taxonomies = get_taxonomies( array( 'public' => true ) );
 $terms = $taxonomies ? get_terms( array( 'taxonomy' => array_values( $taxonomies ), 'hide_empty' => false, 'number' => 31,
     'offset' => ( $page - 1 ) * 30, 'orderby' => 'term_id', 'order' => 'ASC',
-    'meta_query' => array( array( 'key' => ACE_SEO_Term_Redirect::META_KEY, 'value' => '', 'compare' => '!=' ) ) ) ) : array();
-$resolver = new ACE_SEO_Term_Redirect();
+    'meta_query' => array( array( 'key' => AceCrawl_Term_Redirect::META_KEY, 'value' => '', 'compare' => '!=' ) ) ) ) : array();
+$resolver = new AceCrawl_Term_Redirect();
 ?>
 <section class="ace-redirect-card ace-redirect-tab-panel">
     <h2>Auto redirects</h2>
@@ -27,7 +27,7 @@ $resolver = new ACE_SEO_Term_Redirect();
         $source = get_term_link( $term );
         $taxonomy = get_taxonomy( $term->taxonomy ); ?>
         <tr><td><strong><?php echo esc_html( $term->name ); ?></strong><br><?php echo esc_html( $taxonomy->labels->singular_name ); ?><br><?php if ( ! is_wp_error( $source ) ) { echo esc_html( $source ); } ?></td>
-        <td><?php echo esc_html( $target ?: (string) get_term_meta( $term->term_id, ACE_SEO_Term_Redirect::META_KEY, true ) ); ?><br><strong><?php echo $target ? '301 — configured' : 'Not served — target could not be resolved'; ?></strong></td>
+        <td><?php echo esc_html( $target ?: (string) get_term_meta( $term->term_id, AceCrawl_Term_Redirect::META_KEY, true ) ); ?><br><strong><?php echo $target ? '301 — configured' : 'Not served — target could not be resolved'; ?></strong></td>
         <td><?php if ( current_user_can( 'edit_term', $term->term_id ) ) : ?><a class="button" href="<?php echo esc_url( get_edit_term_link( $term->term_id, $term->taxonomy ) ); ?>">Manage archive</a><?php else : ?>Requires archive editing permission<?php endif; ?></td></tr>
     <?php endforeach; ?>
     <?php if ( ! $terms ) : ?><tr><td colspan="3">No configured archive redirects.</td></tr><?php endif; ?>

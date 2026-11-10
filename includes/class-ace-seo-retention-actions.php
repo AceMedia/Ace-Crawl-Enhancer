@@ -429,8 +429,8 @@ class AceCrawlRetentionActions {
             // The front end reads post meta through the plugin's guest meta cache; a change made here
             // has to reach it now, not on the next save.
             clean_post_cache( $id );
-            if ( class_exists( 'ACE_SEO_Frontend_Performance' ) ) {
-                ACE_SEO_Frontend_Performance::clear_post_cache( $id );
+            if ( class_exists( 'AceCrawl_Frontend_Performance' ) ) {
+                AceCrawl_Frontend_Performance::clear_post_cache( $id );
             }
             do_action( 'acecrawl_retention_post_changed', $id );
 

@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ACE_SEO_Database_Optimizer {
+class AceCrawl_Database_Optimizer {
     
     /**
      * Initialize database optimizer
@@ -286,4 +286,4 @@ class ACE_SEO_Database_Optimizer {
 }
 
 // Initialize the database optimizer
-new ACE_SEO_Database_Optimizer();
+new AceCrawl_Database_Optimizer();

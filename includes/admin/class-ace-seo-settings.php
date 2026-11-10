@@ -581,7 +581,7 @@ class AceCrawlSettings {
         }
         
         // Include the database optimizer
-        if (!class_exists('ACE_SEO_Database_Optimizer')) {
+        if (!class_exists('AceCrawl_Database_Optimizer')) {
             if (file_exists(ACECRAWL_PATH . 'includes/database/class-database-optimizer.php')) {
                 require_once ACECRAWL_PATH . 'includes/database/class-database-optimizer.php';
             } else {
@@ -591,7 +591,7 @@ class AceCrawlSettings {
         }
         
         try {
-            $optimizer = new ACE_SEO_Database_Optimizer();
+            $optimizer = new AceCrawl_Database_Optimizer();
             $results = $optimizer->create_indexes();
             
             // Log the optimization results
@@ -625,15 +625,15 @@ class AceCrawlSettings {
         
         try {
             // Load dashboard cache class
-            if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+            if (!class_exists('AceCrawl_Dashboard_Cache')) {
                 require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
             }
             
             // Force regenerate cache
-            $result = ACE_SEO_Dashboard_Cache::force_regenerate();
+            $result = AceCrawl_Dashboard_Cache::force_regenerate();
             
             // Get updated cache status
-            $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+            $cache_status = AceCrawl_Dashboard_Cache::get_cache_status();
             
             wp_send_json_success(array(
                 'message' => 'Dashboard cache refreshed successfully!',
@@ -665,21 +665,21 @@ class AceCrawlSettings {
         
         try {
             // Load dashboard cache class
-            if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+            if (!class_exists('AceCrawl_Dashboard_Cache')) {
                 require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
             }
             
             // Clear all cache
-            $cleared = ACE_SEO_Dashboard_Cache::clear_cache();
+            $cleared = AceCrawl_Dashboard_Cache::clear_cache();
 
             // The AJAX payload caches expire on time rather than on save — on a site
             // publishing every few minutes, clearing them per save would keep them
             // permanently cold and undo the point of caching them. This button is
             // the deliberate way to force them fresh.
-            ACE_SEO_Dashboard_Cache::payload_flush();
+            AceCrawl_Dashboard_Cache::payload_flush();
             
             // Get updated cache status after clearing
-            $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+            $cache_status = AceCrawl_Dashboard_Cache::get_cache_status();
             
             wp_send_json_success(array(
                 'message' => 'Dashboard cache cleared successfully!',

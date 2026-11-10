@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ACE_SEO_Breadcrumbs {
+class AceCrawl_Breadcrumbs {
     /**
      * Build the breadcrumb list for the current context.
      *

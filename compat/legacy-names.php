@@ -242,6 +242,14 @@ final class AceCrawlLegacyNames {
 
 	/** Old class => new class. */
 	const CLASSES = array(
+		'ACE_Authors_Sitemaps_Provider' => 'AceCrawl_Authors_Sitemaps_Provider',
+		'ACE_News_Posts_Sitemaps_Provider' => 'AceCrawl_News_Posts_Sitemaps_Provider',
+		'ACE_SEO_Breadcrumbs' => 'AceCrawl_Breadcrumbs',
+		'ACE_SEO_Dashboard_Ajax' => 'AceCrawl_Dashboard_Ajax',
+		'ACE_SEO_Dashboard_Cache' => 'AceCrawl_Dashboard_Cache',
+		'ACE_SEO_Database_Optimizer' => 'AceCrawl_Database_Optimizer',
+		'ACE_SEO_Frontend_Performance' => 'AceCrawl_Frontend_Performance',
+		'ACE_SEO_Term_Redirect' => 'AceCrawl_Term_Redirect',
 		'AceSEOActivator' => 'AceCrawlActivator',
 		'AceSeoAdmin' => 'AceCrawlAdmin',
 		'AceSeoAggregateViews' => 'AceCrawlAggregateViews',

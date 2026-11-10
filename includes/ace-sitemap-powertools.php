@@ -1148,8 +1148,8 @@ function acecrawl_sitemap_get_provider() {
         return null;
     }
 
-    if ( ! class_exists( 'ACE_News_Posts_Sitemaps_Provider' ) ) {
-        class ACE_News_Posts_Sitemaps_Provider extends WP_Sitemaps_Posts {
+    if ( ! class_exists( 'AceCrawl_News_Posts_Sitemaps_Provider' ) ) {
+        class AceCrawl_News_Posts_Sitemaps_Provider extends WP_Sitemaps_Posts {
             public function __construct() {
                 parent::__construct();
                 $this->name = 'news';
@@ -1202,7 +1202,7 @@ function acecrawl_sitemap_get_provider() {
         }
     }
 
-    return new ACE_News_Posts_Sitemaps_Provider();
+    return new AceCrawl_News_Posts_Sitemaps_Provider();
 }
 
 function acecrawl_sitemap_register_news_provider( $wp_sitemaps ) {
@@ -2670,8 +2670,8 @@ function acecrawl_sitemap_get_authors_provider() {
         return null;
     }
 
-    if ( ! class_exists( 'ACE_Authors_Sitemaps_Provider' ) ) {
-        class ACE_Authors_Sitemaps_Provider extends WP_Sitemaps_Users {
+    if ( ! class_exists( 'AceCrawl_Authors_Sitemaps_Provider' ) ) {
+        class AceCrawl_Authors_Sitemaps_Provider extends WP_Sitemaps_Users {
             public function __construct() {
                 parent::__construct();
                 $this->name = 'authors';
@@ -2679,7 +2679,7 @@ function acecrawl_sitemap_get_authors_provider() {
         }
     }
 
-    return new ACE_Authors_Sitemaps_Provider();
+    return new AceCrawl_Authors_Sitemaps_Provider();
 }
 
 function acecrawl_sitemap_register_authors_provider( $wp_sitemaps ) {

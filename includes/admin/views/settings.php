@@ -897,8 +897,8 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             <p>Optimize your database with strategic indexes for faster SEO queries. This is the same optimization that runs on plugin activation.</p>
 
                             <?php
-                            if (class_exists('ACE_SEO_Database_Optimizer')) {
-                                $db_optimizer = new ACE_SEO_Database_Optimizer();
+                            if (class_exists('AceCrawl_Database_Optimizer')) {
+                                $db_optimizer = new AceCrawl_Database_Optimizer();
                                 $analysis = $db_optimizer->analyze_performance();
 
                                 echo '<p><strong>Current Database Status:</strong></p>';
@@ -947,11 +947,11 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             <p>Manage dashboard statistics cache to prevent 504 timeouts on large sites. Statistics are cached for 1 hour to improve performance.</p>
 
                             <?php
-                            if (!class_exists('ACE_SEO_Dashboard_Cache')) {
+                            if (!class_exists('AceCrawl_Dashboard_Cache')) {
                                 require_once ACECRAWL_PATH . 'includes/admin/class-ace-seo-dashboard-cache.php';
                             }
 
-                            $cache_status = ACE_SEO_Dashboard_Cache::get_cache_status();
+                            $cache_status = AceCrawl_Dashboard_Cache::get_cache_status();
                             ?>
 
                             <p><strong>Cache Status:</strong></p>
