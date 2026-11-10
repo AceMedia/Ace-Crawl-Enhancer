@@ -27,7 +27,7 @@ class AceCrawlTrackingClarity {
 
     public static function save() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'You cannot manage this connection.' ); }
-        check_admin_referer( 'ace_seo_tracking_clarity' );
+        check_admin_referer( 'acecrawl_tracking_clarity' );
         if ( ! empty( $_POST['disconnect'] ) ) {
             delete_option( self::OPTION );
             delete_transient( self::CACHE );
@@ -183,8 +183,8 @@ class AceCrawlTrackingClarity {
             echo '<div class="ace-trk-clarity-empty"><strong>See what happens after a visit</strong><p>Connect reporting for sessions, dead clicks, rage clicks and more. Your tracking tag works separately. Once connected, we save a rolling 24-hour snapshot each day to build a chart history.</p></div>';
         }
         echo '<details class="ace-trk-clarity-connection"' . ( ! $data['connected'] ? ' open' : '' ) . '><summary>' . ( $data['connected'] ? 'Manage reporting connection' : 'Connect Clarity reporting' ) . '</summary><p>Open <a href="' . esc_url( $base . '/settings' ) . '" target="_blank" rel="noopener noreferrer">Clarity Settings → Data Export</a>, generate a token and paste it below. Past daily figures cannot be backfilled through this API.</p><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-        wp_nonce_field( 'ace_seo_tracking_clarity' );
-        echo '<input type="hidden" name="action" value="ace_seo_tracking_clarity"><label for="ace-clarity-token">Data Export API token</label><div class="ace-trk-connection-fields"><input id="ace-clarity-token" name="clarity_token" type="password" autocomplete="new-password" class="regular-text" value="" placeholder="' . ( $data['connected'] ? 'Leave blank to keep the saved token' : 'Paste the token for this project' ) . '"><button class="button button-primary">Save connection</button>';
+        wp_nonce_field( 'acecrawl_tracking_clarity' );
+        echo '<input type="hidden" name="action" value="acecrawl_tracking_clarity"><label for="ace-clarity-token">Data Export API token</label><div class="ace-trk-connection-fields"><input id="ace-clarity-token" name="clarity_token" type="password" autocomplete="new-password" class="regular-text" value="" placeholder="' . ( $data['connected'] ? 'Leave blank to keep the saved token' : 'Paste the token for this project' ) . '"><button class="button button-primary">Save connection</button>';
         if ( $data['connected'] ) { echo '<button class="button" name="disconnect" value="1">Disconnect reporting</button>'; }
         echo '</div><p class="description">Token stored encrypted. Results refresh at most every six hours; daily checks also save history. Disconnecting reporting leaves tracking and saved history intact.</p></form></details></section>';
     }

@@ -18,7 +18,7 @@ final class AceCrawlRetentionPrototype {
         require_once __DIR__ . '/admin/class-ace-seo-retention-evidence-view.php';
         register_post_type( self::TYPE, array( 'public' => false, 'show_ui' => false, 'show_in_rest' => false,
             'rewrite' => false, 'query_var' => false, 'supports' => array() ) );
-        add_action( 'admin_post_ace_retention_preview', array( __CLASS__, 'handle' ) );
+        add_action( 'admin_post_acecrawl_retention_preview', array( __CLASS__, 'handle' ) );
         require_once __DIR__ . '/class-ace-seo-retention-queue.php';
         AceCrawlRetentionQueue::init();
     }
@@ -197,7 +197,7 @@ final class AceCrawlRetentionPrototype {
 
     public static function handle() {
         if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
-        check_admin_referer( 'ace_retention_preview' );
+        check_admin_referer( 'acecrawl_retention_preview' );
         $input = AceCrawlInput::post( array( 'source' => 'text', 'target' => 'target', 'start' => 'text', 'end' => 'text', 'reason' => 'textarea', 'operation' => 'key', 'confirmed' => 'text', 'links_confirmed' => 'text', 'links_source' => 'text' ) );
         foreach ( array( 'source', 'target', 'start', 'end', 'reason', 'operation', 'confirmed', 'links_confirmed', 'links_source' ) as $key ) {
             if ( isset( $input[ $key ] ) && ! is_scalar( $input[ $key ] ) ) { wp_die( 'Invalid form data.' ); }

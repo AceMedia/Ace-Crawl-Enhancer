@@ -13,7 +13,7 @@ $notice = is_string( $_GET['queue_notice'] ?? null ) ? sanitize_key( wp_unslash(
     <p><strong><?php echo $control['enabled'] ? 'Enabled for the listed sources only' : 'Paused'; ?></strong>. One approved pair per hourly run, at most three applications per UTC day. A 301 stays in place until explicitly changed or safely undone. No expiry, Trash or deletion is added by this queue.</p>
     <p>Configure scope first, then approve individual assessments. Every configuration change invalidates earlier approvals. Approval expires after at most 24 hours. The worker rechecks permissions, evidence, destination and source before applying anything. Sites that discourage search engines can review assessments, but cannot automatically apply redirects. A copied database must be configured again for its new site.</p>
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-        <?php wp_nonce_field( 'ace_retention_queue' ); ?><input type="hidden" name="action" value="ace_retention_queue">
+        <?php wp_nonce_field( 'acecrawl_retention_queue' ); ?><input type="hidden" name="action" value="acecrawl_retention_queue">
         <p><label for="retention-scope">Allowed source article IDs (up to 10, comma separated)</label><br><input class="large-text" id="retention-scope" name="scope" value="<?php echo esc_attr( implode( ',', $control['scope'] ) ); ?>"></p>
         <p><label for="retention-cap">Daily application limit</label> <input type="number" min="1" max="3" id="retention-cap" name="cap" value="<?php echo (int) $control['daily_cap']; ?>"></p>
         <p><label><input type="checkbox" name="enabled" value="1" <?php checked( $control['enabled'] ); ?>> Enable the guarded queue for this scope</label></p>
@@ -26,7 +26,7 @@ $notice = is_string( $_GET['queue_notice'] ?? null ) ? sanitize_key( wp_unslash(
             <a href="<?php echo esc_url( get_edit_post_link( $job['source_id'] ) ); ?>">Review source</a>
             <details><summary>Evidence and rule changes</summary><pre style="white-space:pre-wrap;max-width:48em;max-height:24em;overflow:auto"><?php echo esc_html( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre></details>
             <?php if ( in_array( $job['state'], array( 'approved', 'applied' ), true ) ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <?php wp_nonce_field( 'ace_retention_queue' ); ?><input type="hidden" name="action" value="ace_retention_queue"><input type="hidden" name="plan" value="<?php echo (int) $job['plan_id']; ?>">
+                <?php wp_nonce_field( 'acecrawl_retention_queue' ); ?><input type="hidden" name="action" value="acecrawl_retention_queue"><input type="hidden" name="plan" value="<?php echo (int) $job['plan_id']; ?>">
                 <button class="button" name="operation" value="<?php echo 'applied' === $job['state'] ? 'undo' : 'cancel'; ?>"><?php echo 'applied' === $job['state'] ? 'Undo if unchanged' : 'Cancel approval'; ?></button>
             </form><?php endif; ?>
         </td></tr>

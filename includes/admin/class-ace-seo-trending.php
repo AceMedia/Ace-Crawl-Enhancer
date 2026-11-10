@@ -45,7 +45,7 @@ class AceCrawlTrending {
 
     public static function init() {
         add_action('init', [__CLASS__, 'schedule']);
-        add_action('admin_post_ace_seo_trending_topics', [__CLASS__, 'admin_topics']);
+        add_action('admin_post_acecrawl_trending_topics', [__CLASS__, 'admin_topics']);
         add_action(self::CRON, [__CLASS__, 'run']);
     }
 

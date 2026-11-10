@@ -88,19 +88,19 @@ class AceCrawlRetentionReport {
         add_action( 'admin_init', array( __CLASS__, 'recover' ) );
         if ( is_admin() ) {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 20 );
-            add_action( 'admin_post_ace_seo_retention_build', array( __CLASS__, 'handle_build' ) );
-            add_action( 'admin_post_ace_seo_retention_resume', array( __CLASS__, 'handle_resume' ) );
-            add_action( 'admin_post_ace_seo_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
+            add_action( 'admin_post_acecrawl_retention_build', array( __CLASS__, 'handle_build' ) );
+            add_action( 'admin_post_acecrawl_retention_resume', array( __CLASS__, 'handle_resume' ) );
+            add_action( 'admin_post_acecrawl_retention_settings_save', array( __CLASS__, 'handle_settings_save' ) );
             add_action( 'wp_ajax_acecrawl_retention_progress', array( __CLASS__, 'ajax_progress' ) );
             add_action( 'wp_ajax_acecrawl_retention_dismiss', array( __CLASS__, 'ajax_dismiss' ) );
             add_action( 'wp_ajax_acecrawl_retention_rows', array( __CLASS__, 'ajax_rows' ) );
-            add_action( 'admin_post_ace_seo_retention_export', array( __CLASS__, 'handle_export' ) );
-            add_action( 'admin_post_ace_seo_retention_clear', array( __CLASS__, 'handle_clear' ) );
-            add_action( 'admin_post_ace_seo_retention_apply', array( __CLASS__, 'handle_apply' ) );
-            add_action( 'admin_post_ace_seo_retention_options', array( __CLASS__, 'handle_options' ) );
-            add_action( 'admin_post_ace_seo_retention_redirect', array( __CLASS__, 'handle_redirect' ) );
-            add_action( 'admin_post_ace_seo_retention_report_settings', array( __CLASS__, 'handle_report_settings' ) );
-            add_action( 'admin_post_ace_seo_retention_front', array( __CLASS__, 'handle_front_settings' ) );
+            add_action( 'admin_post_acecrawl_retention_export', array( __CLASS__, 'handle_export' ) );
+            add_action( 'admin_post_acecrawl_retention_clear', array( __CLASS__, 'handle_clear' ) );
+            add_action( 'admin_post_acecrawl_retention_apply', array( __CLASS__, 'handle_apply' ) );
+            add_action( 'admin_post_acecrawl_retention_options', array( __CLASS__, 'handle_options' ) );
+            add_action( 'admin_post_acecrawl_retention_redirect', array( __CLASS__, 'handle_redirect' ) );
+            add_action( 'admin_post_acecrawl_retention_report_settings', array( __CLASS__, 'handle_report_settings' ) );
+            add_action( 'admin_post_acecrawl_retention_front', array( __CLASS__, 'handle_front_settings' ) );
         }
     }
 
@@ -1623,7 +1623,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_build() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_build' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_build' ) ) {
             wp_die( 'Not allowed.' );
         }
         $overrides = array();
@@ -1639,7 +1639,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_resume() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_resume' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_resume' ) ) {
             wp_die( 'Not allowed.' );
         }
         $msg = self::resume() ? 'The build has been queued to continue from where it stopped.' : 'The build did not need resuming.';
@@ -1672,7 +1672,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_settings_save() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_settings_save' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_settings_save' ) ) {
             wp_die( 'Not allowed.' );
         }
         $in = AceCrawlInput::post( self::settings_fields() );
@@ -1704,7 +1704,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_report_settings() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_report_settings' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_report_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
         AceCrawlRetentionActions::save_report_settings( AceCrawlInput::post( self::settings_fields() ) );
@@ -1718,7 +1718,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_front_settings() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_front' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_front' ) ) {
             wp_die( 'Not allowed.' );
         }
         AceCrawlRetentionActions::save_front_settings( AceCrawlInput::post( self::settings_fields() ) );
@@ -1744,7 +1744,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function handle_clear() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_clear' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_clear' ) ) {
             wp_die( 'Not allowed.' );
         }
         self::clear();
@@ -1754,7 +1754,7 @@ class AceCrawlRetentionReport {
 
     /** Bulk action: the ticked rows, or every post in a bucket. */
     public static function handle_apply() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_apply' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_apply' ) ) {
             wp_die( 'Not allowed.' );
         }
         $action = sanitize_key( wp_unslash( $_POST['retention_action'] ?? '' ) );
@@ -1788,7 +1788,7 @@ class AceCrawlRetentionReport {
 
     /** The redirect map's add form: a post (ID or its URL) to a target URL, or to 410. */
     public static function handle_redirect() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_redirect' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_retention_redirect' ) ) {
             wp_die( 'Not allowed.' );
         }
         $from = isset( $_POST['from'] ) ? AceCrawlInput::clean( wp_unslash( $_POST['from'] ), 'target' ) : '';
@@ -1968,8 +1968,8 @@ class AceCrawlRetentionReport {
 
                 <?php $rows = self::rows( $bucket, $per, ( $paged - 1 ) * $per ); ?>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="ace-seo-retention-apply" onsubmit="return this.scope.value !== 'bucket' || confirm('Apply to every post in this bucket?');">
-                <?php wp_nonce_field( 'ace_seo_retention_apply' ); ?>
-                <input type="hidden" name="action" value="ace_seo_retention_apply">
+                <?php wp_nonce_field( 'acecrawl_retention_apply' ); ?>
+                <input type="hidden" name="action" value="acecrawl_retention_apply">
                 <input type="hidden" name="bucket" value="<?php echo esc_attr( $bucket ); ?>">
                 <p><strong>Applying an action below can change search visibility or redirect visitors. It does not delete the saved post.</strong></p>
                 <details class="ace-retention-detail"><summary>Administrator actions for selected posts</summary>
@@ -2141,8 +2141,8 @@ class AceCrawlRetentionReport {
                 <?php if ( $live['error'] ) : ?><p class="ace-retention-progress-error" data-field="error">Last error: <?php echo esc_html( $live['error'] ); ?></p><?php endif; ?>
                 <?php if ( 'interrupted' === $live['state'] ) : ?>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:6px 0 0">
-                    <?php wp_nonce_field( 'ace_seo_retention_resume' ); ?>
-                    <input type="hidden" name="action" value="ace_seo_retention_resume">
+                    <?php wp_nonce_field( 'acecrawl_retention_resume' ); ?>
+                    <input type="hidden" name="action" value="acecrawl_retention_resume">
                     <button class="button button-primary">Resume the check</button>
                 </form>
                 <?php endif; ?>
@@ -2275,8 +2275,8 @@ class AceCrawlRetentionReport {
             <?php self::render_progress_panel( $live ); ?>
             <div class="ace-retention-controls">
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0">
-                    <?php wp_nonce_field( 'ace_seo_retention_build' ); ?>
-                    <input type="hidden" name="action" value="ace_seo_retention_build">
+                    <?php wp_nonce_field( 'acecrawl_retention_build' ); ?>
+                    <input type="hidden" name="action" value="acecrawl_retention_build">
                     <button class="button" <?php disabled( self::is_building() ); ?>><?php echo $built ? 'Check older posts again' : 'Check older posts'; ?></button>
                 </form>
                 <?php if ( $built ) : ?>
@@ -2307,8 +2307,8 @@ class AceCrawlRetentionReport {
                 <details class="ace-retention-detail"><summary>Developer tools: clear report scores</summary>
                 <p>Clears the report scores. Posts and actions already applied stay unchanged.</p>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear the report? The posts are untouched; only the scores go.');">
-                    <?php wp_nonce_field( 'ace_seo_retention_clear' ); ?>
-                    <input type="hidden" name="action" value="ace_seo_retention_clear">
+                    <?php wp_nonce_field( 'acecrawl_retention_clear' ); ?>
+                    <input type="hidden" name="action" value="acecrawl_retention_clear">
                     <button class="button-link-delete">Clear the report</button>
                 </form>
                 </details>
@@ -2319,8 +2319,8 @@ class AceCrawlRetentionReport {
             <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-redirects' ) ); ?>">Open Redirect Manager</a> to search posts, choose redirect types, set expiry dates, pause rules and review their age. The legacy tools below create permanent redirects; the manager shows their current lifecycle state.</p>
             <details class="ace-retention-detail"><summary>Administrator tools: redirects and unavailable pages</summary>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin-bottom:1em">
-                <?php wp_nonce_field( 'ace_seo_retention_redirect' ); ?>
-                <input type="hidden" name="action" value="ace_seo_retention_redirect">
+                <?php wp_nonce_field( 'acecrawl_retention_redirect' ); ?>
+                <input type="hidden" name="action" value="acecrawl_retention_redirect">
                 <input type="text" name="from" aria-label="Post ID or URL to change" placeholder="Post ID or its URL" style="width:22em" required>
                 <span>→</span>
                 <input type="text" name="to" aria-label="Redirect target URL or gone" placeholder="Target URL, or the word gone" style="width:22em" required>

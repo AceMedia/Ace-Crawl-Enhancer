@@ -56,7 +56,7 @@ class AceCrawlWhiteHat {
         add_action( self::SWEEP_HOOK, array( __CLASS__, 'sweep' ) );
         if ( is_admin() ) {
             add_action( 'admin_menu', array( __CLASS__, 'add_menu' ), 21 );
-            add_action( 'admin_post_ace_seo_whitehat_save', array( __CLASS__, 'handle_save' ) );
+            add_action( 'admin_post_acecrawl_whitehat_save', array( __CLASS__, 'handle_save' ) );
         }
 
         if ( ! self::enabled() ) {
@@ -437,7 +437,7 @@ class AceCrawlWhiteHat {
     }
 
     public static function handle_save() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_whitehat_save' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_whitehat_save' ) ) {
             wp_die( 'Not allowed.' );
         }
         $in      = AceCrawlInput::post( array(
@@ -510,8 +510,8 @@ class AceCrawlWhiteHat {
                 <a href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&ace_wh=no' ) ); ?>">List posts that are not white hat</a></p>
             <?php endif; ?>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <?php wp_nonce_field( 'ace_seo_whitehat_save' ); ?>
-                <input type="hidden" name="action" value="ace_seo_whitehat_save">
+                <?php wp_nonce_field( 'acecrawl_whitehat_save' ); ?>
+                <input type="hidden" name="action" value="acecrawl_whitehat_save">
                 <table class="form-table" style="max-width:1000px"><tbody>
                     <tr><th scope="row">On</th><td><label><input type="checkbox" name="enabled" value="1" <?php checked( ! empty( $o['enabled'] ) ); ?>> Assess white hat status</label></td></tr>
                     <tr><th scope="row">Post types</th><td><?php foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $pt ) : if ( 'attachment' === $pt->name ) { continue; } ?>

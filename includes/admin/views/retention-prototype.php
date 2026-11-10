@@ -22,8 +22,8 @@ $plans = new WP_Query( array( 'post_type' => AceCrawlRetentionPrototype::TYPE, '
     <p>Choose a replacement post or page on this site. Use Existing redirects for manual archive or external destinations. Saving an assessment does not change a redirect.</p>
     <p>Traffic comes from this site's connected Analytics, Search Console or own tracking for the selected dates. <a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>">Review data coverage and rebuild the retention report</a>.</p>
     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-        <?php wp_nonce_field( 'ace_retention_preview' ); ?>
-        <input type="hidden" name="action" value="ace_retention_preview">
+        <?php wp_nonce_field( 'acecrawl_retention_preview' ); ?>
+        <input type="hidden" name="action" value="acecrawl_retention_preview">
         <p><label for="retention-source">Source article ID</label><br><input id="retention-source" name="source" type="number" min="1" required></p>
         <details class="ace-destination-search" data-target="retention-destination" data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'acecrawl_redirect_destinations' ) ); ?>">
             <summary>Find a replacement post or page</summary>
@@ -68,7 +68,7 @@ $plans = new WP_Query( array( 'post_type' => AceCrawlRetentionPrototype::TYPE, '
             <ul><?php foreach ( $s['holds'] as $hold ) : ?><li><?php echo esc_html( $hold ); ?></li><?php endforeach; ?></ul>
             <?php if ( ! $stale && ! $old && ! $s['holds'] ) : ?>
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                    <?php wp_nonce_field( 'ace_retention_queue' ); ?><input type="hidden" name="action" value="ace_retention_queue"><input type="hidden" name="plan" value="<?php echo (int) $plan->ID; ?>">
+                    <?php wp_nonce_field( 'acecrawl_retention_queue' ); ?><input type="hidden" name="action" value="acecrawl_retention_queue"><input type="hidden" name="plan" value="<?php echo (int) $plan->ID; ?>">
                     <button class="button" name="operation" value="approve">Approve this pair for 24 hours</button>
                 </form>
             <?php else : ?><p>Approval is unavailable until a new assessment passes every hold.</p><?php endif; ?>

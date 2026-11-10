@@ -1,10 +1,12 @@
 <?php
+require_once __DIR__ . '/wp-stubs.php';
 if ( PHP_SAPI !== 'cli' ) { exit; }
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'ARRAY_A', 'ARRAY_A' );
 require dirname( __DIR__ ) . '/includes/class-ace-seo-aggregate-views.php';
 $options = array( AceCrawlAggregateViews::OPTION => 1, AceCrawlAggregateViews::SCHEMA => 1 );
 function apply_filters($tag, $value) { return $GLOBALS['show_privacy'] ?? $value; }
+function sanitize_key( $key ) { return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) ); }
 function get_option( $key, $default = false ) { return $GLOBALS['options'][ $key ] ?? $default; }
 function home_url() { return 'https://example.test'; }
 function wp_parse_url( $url ) { return parse_url( $url ); }

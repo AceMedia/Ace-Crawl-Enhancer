@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/wp-stubs.php';
 if ( PHP_SAPI !== 'cli' ) {
     http_response_code( 404 );
     exit;
@@ -54,6 +55,7 @@ function acecrawl_site_is_discouraged(){return $GLOBALS['noindex'];}
 class AceCrawlEnhancer {static function get_meta_value($id,$key){return '';}}
 // Copy the actual implementation unchanged to resolve its dependency path against a fake API boundary.
 $source=getenv('ACE_SCHEDULE_REVIEW_SOURCE')?:dirname(__DIR__) . '/includes';
+require_once dirname(__DIR__) . '/includes/class-ace-seo-input.php';
 $harness=sys_get_temp_dir().'/ace-sheets-worker-fixture-'.getmypid();mkdir($harness);mkdir($harness.'/admin');
 foreach(['class-ace-seo-sheets-schedule.php','class-ace-seo-export.php'] as $f){copy($source.'/'.$f,$harness.'/'.$f);}
 file_put_contents($harness.'/admin/class-ace-seo-sheets.php', <<<'STUB'

@@ -13,8 +13,8 @@ $o = AceCrawlRetentionActions::options();
     <p><a href="<?php echo esc_url( admin_url( 'admin.php?page=ace-seo-retention' ) ); ?>">Open the retention dashboard</a> · <a href="#retention-help" class="ace-subtab-link" data-target-tab="retention" data-target-group="retention-help">What the groups and recommendations mean</a></p>
     <p class="description">Change anything below and use the save bar at the bottom of the screen, the same one as every other Ace settings page. Nothing here auto-saves. Running, stopping or retrying a Google Sheets refresh is separate and never part of a save.</p>
     <form id="ace-retention-settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-ace-savebar="admin-post" data-ace-savebar-autosave="0" data-ace-savebar-reload="1">
-        <?php wp_nonce_field( 'ace_seo_retention_settings_save' ); ?>
-        <input type="hidden" name="action" value="ace_seo_retention_settings_save">
+        <?php wp_nonce_field( 'acecrawl_retention_settings_save' ); ?>
+        <input type="hidden" name="action" value="acecrawl_retention_settings_save">
         <noscript><p><button class="button button-primary">Save all retention settings</button></p></noscript>
 
     <section id="retention-report" class="ace-retention-section">

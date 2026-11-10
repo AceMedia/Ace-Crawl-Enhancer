@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/wp-stubs.php';
 /**
  * Retention form round-trip checks with isolated WordPress stubs.
  * No database, network or live settings. Requires PHP DOM for HTML form parsing.
@@ -56,6 +57,7 @@ function taxonomy_exists($type){return in_array($type,array('category','post_tag
 function current_time($type,$gmt=false){return '2026-10-06 14:00:00';}
 function get_term_by($field,$value,$taxonomy){return false;}
 $wpdb=new class{public $posts='wp_posts';function prepare($query,...$args){return $query;}function get_row($query){return(object)array('total'=>0,'expired'=>0);}};
+require $root.'/includes/class-ace-seo-input.php';
 require $root.'/includes/class-ace-seo-retention-actions.php';
 require $root.'/includes/admin/class-ace-seo-retention-report.php';
 require $root.'/includes/admin/class-ace-seo-sheets.php';
@@ -77,21 +79,21 @@ $forms=static function()use($root){
   $parts[]=rawurlencode($name).'='.rawurlencode($value);
  }parse_str(implode('&',$parts),$payload);$out[$payload['action']]=$payload;}
  // The current screen has one form; retain coverage of its three legacy section handlers.
- if(isset($out['ace_seo_retention_settings_save'])){
-  foreach(array('ace_seo_retention_report_settings','acecrawl_retention_options','ace_seo_retention_front')as$action){$out[$action]=$out['ace_seo_retention_settings_save'];$out[$action]['action']=$action;}
+ if(isset($out['acecrawl_retention_settings_save'])){
+  foreach(array('acecrawl_retention_report_settings','acecrawl_retention_options','acecrawl_retention_front')as$action){$out[$action]=$out['acecrawl_retention_settings_save'];$out[$action]['action']=$action;}
  }
  return $out;
 };
-$dispatch=static function($action,$payload){$_POST=wp_slash($payload);$map=array('ace_seo_retention_report_settings'=>'handle_report_settings','acecrawl_retention_options'=>'handle_options','ace_seo_retention_front'=>'handle_front_settings');try{AceCrawlRetentionReport::{$map[$action]}();}catch(SettingsRedirect $redirect){return $redirect->url;}return '';};
-$groups=array('ace_seo_retention_report_settings'=>array('report_years','report_days','retained_views','thin_words','auto_build','track_views'),'acecrawl_retention_options'=>array('notice_enabled','notice_years','notice_text','lifetimes','lifetime_rules'),'ace_seo_retention_front'=>array('retained_notice','retained_notice_text','light_enabled','light_drop','light_cache_hours','light_continue'));
+$dispatch=static function($action,$payload){$_POST=wp_slash($payload);$map=array('acecrawl_retention_report_settings'=>'handle_report_settings','acecrawl_retention_options'=>'handle_options','acecrawl_retention_front'=>'handle_front_settings');try{AceCrawlRetentionReport::{$map[$action]}();}catch(SettingsRedirect $redirect){return $redirect->url;}return '';};
+$groups=array('acecrawl_retention_report_settings'=>array('report_years','report_days','retained_views','thin_words','auto_build','track_views'),'acecrawl_retention_options'=>array('notice_enabled','notice_years','notice_text','lifetimes','lifetime_rules'),'acecrawl_retention_front'=>array('retained_notice','retained_notice_text','light_enabled','light_drop','light_cache_hours','light_continue'));
 foreach($groups as$action=>$keys){
  $reset($baseline);$payload=$forms()[$action];$before=$GLOBALS['options'];$url=$dispatch($action,$payload);
  $check($action.' rendered unchanged round-trip preserves every option',$GLOBALS['options']===$before);
  $check($action.' returns to retention settings',strpos($url,'page=ace-seo-settings#retention/')!==false);
  $reset($baseline);$payload=$forms()[$action];
- if($action==='ace_seo_retention_report_settings'){$payload['report_days']='180';unset($payload['auto_build'],$payload['track_views']);}
+ if($action==='acecrawl_retention_report_settings'){$payload['report_days']='180';unset($payload['auto_build'],$payload['track_views']);}
  if($action==='acecrawl_retention_options'){$payload['notice_years']='5';unset($payload['notice_enabled']);$payload['lifetimes']['post']='60';}
- if($action==='ace_seo_retention_front'){$payload['light_cache_hours']='48';unset($payload['light_enabled'],$payload['retained_notice']);}
+ if($action==='acecrawl_retention_front'){$payload['light_cache_hours']='48';unset($payload['light_enabled'],$payload['retained_notice']);}
  $dispatch($action,$payload);$saved=$GLOBALS['options']['acecrawl_retention_options'];
  $check($action.' changes stay inside their own section',array_diff_key($saved,array_flip($keys))===array_diff_key($baseline,array_flip($keys)));
  $check($action.' never changes Sheets or main SEO settings',$GLOBALS['options']['acecrawl_sheets']===$sheets&&$GLOBALS['options']['acecrawl_options']===array('unrelated'=>'preserved'));

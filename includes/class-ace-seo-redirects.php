@@ -12,7 +12,7 @@ class AceCrawlRedirects {
         add_action( 'updated_post_meta', array( __CLASS__, 'target_changed' ), 20, 4 );
         add_action( 'deleted_post_meta', array( __CLASS__, 'target_changed' ), 20, 4 );
         add_action( 'admin_menu', array( __CLASS__, 'menu' ), 30 );
-        add_action( 'admin_post_ace_seo_redirect_save', array( __CLASS__, 'handle_save' ) );
+        add_action( 'admin_post_acecrawl_redirect_save', array( __CLASS__, 'handle_save' ) );
         add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
         require_once __DIR__ . '/admin/class-ace-seo-redirect-discovery.php';

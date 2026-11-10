@@ -53,13 +53,14 @@ Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a f
 == Changelog ==
 
 = 1.0.98 =
-* Every function, class, constant, hook, option and AJAX action now uses the acecrawl prefix (acemedia_ai for the shared AI connection library).
+* Every function, class, constant, hook, option, AJAX action and admin-post action now uses the acecrawl prefix (acemedia_ai for the shared AI connection library).
 * Posted form data is sanitised as it is read, and each form accepts only the fields it sends.
 * JSON-LD and inline scripts and styles cannot be closed early by their content, and generated admin markup is escaped where it is printed.
 * The term edit Yoast migration uses the edit form's own term and checks the user can edit it.
 * The discouraged robots.txt works out the admin path instead of assuming wp-admin.
 * The homepage share card carries the site's real title: its oEmbed title uses the homepage SEO title, and the Open Graph and Twitter tags are printed straight after the title tag, each only once.
 * The retention report recovers when its background worker ends without an error, and says when a Search Console period is empty.
+* Pasting a Google Sheets key that is not JSON says the key was not accepted, and keeps the working key.
 * Uninstalling clears only this plugin's own transients.
 
 = 1.0.97 =

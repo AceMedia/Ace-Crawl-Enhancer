@@ -23,7 +23,7 @@ class AceCrawlSheets {
     const API       = 'https://sheets.googleapis.com/v4/spreadsheets/';
 
     public static function init() {
-        add_action( 'admin_post_ace_seo_sheets_settings', array( __CLASS__, 'handle_settings' ) );
+        add_action( 'admin_post_acecrawl_sheets_settings', array( __CLASS__, 'handle_settings' ) );
     }
 
     /**
@@ -72,10 +72,16 @@ class AceCrawlSheets {
     }
 
     public static function handle_settings() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_settings' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_sheets_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $msg = self::save_settings( AceCrawlInput::post( array( 'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool' ) ) );
+        $input = AceCrawlInput::post( array( 'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool' ) );
+        // Invalid JSON is cleaned to an empty string; keep it distinct from a blank field so the
+        // admin is told the key was not accepted rather than that the settings saved.
+        if ( isset( $input['key'] ) && '' === $input['key'] && '' !== ( AceCrawlInput::post( array( 'key' => 'text' ) )['key'] ?? '' ) ) {
+            $input['key'] = 'invalid';
+        }
+        $msg = self::save_settings( $input );
         set_transient( 'acecrawl_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
         exit;
@@ -119,8 +125,8 @@ class AceCrawlSheets {
             return;
         }
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-        wp_nonce_field( 'ace_seo_sheets_settings' );
-        echo '<input type="hidden" name="action" value="ace_seo_sheets_settings">';
+        wp_nonce_field( 'acecrawl_sheets_settings' );
+        echo '<input type="hidden" name="action" value="acecrawl_sheets_settings">';
         self::render_fields( false );
         echo '<p><button class="button">Save and check access</button></p></form>';
         if ( class_exists( 'AceCrawlSheetsSchedule' ) ) {

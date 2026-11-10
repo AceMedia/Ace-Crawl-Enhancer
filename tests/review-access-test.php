@@ -52,7 +52,7 @@ $GLOBALS['filtered'] = null;
 $GLOBALS['nonce'] = true;
 $GLOBALS['allowed'] = true;
 $_POST = array( 'post_id' => 2, 'image_url' => 'https://example.test/image.png' );
-$pagespeed = ( new ReflectionClass( 'AceSEOPagespeed' ) )->newInstanceWithoutConstructor();
+$pagespeed = ( new ReflectionClass( 'AceCrawlPageSpeed' ) )->newInstanceWithoutConstructor();
 $assistant = ( new ReflectionClass( 'AceCrawlAiAssistant' ) )->newInstanceWithoutConstructor();
 foreach ( array( array( $pagespeed, 'get_pagespeed_report' ), array( $assistant, 'ajax_generate_titles' ), array( $assistant, 'ajax_save_image_to_library' ) ) as $handler ) {
     foreach ( array( true, false ) as $nonce ) {

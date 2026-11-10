@@ -42,10 +42,10 @@ class AceCrawlTracking {
         add_action( 'admin_menu', array( __CLASS__, 'menu' ), 20 );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
         add_action( 'admin_notices', array( __CLASS__, 'notice' ) );
-        add_action( 'admin_post_ace_seo_tracking_refresh', array( __CLASS__, 'admin_refresh' ) );
-        add_action( 'admin_post_ace_seo_tracking_email', array( __CLASS__, 'admin_email_toggle' ) );
-        add_action( 'admin_post_ace_seo_tracking_csv', array( __CLASS__, 'admin_csv' ) );
-        add_action( 'admin_post_ace_seo_tracking_clarity', array( 'AceCrawlTrackingClarity', 'save' ) );
+        add_action( 'admin_post_acecrawl_tracking_refresh', array( __CLASS__, 'admin_refresh' ) );
+        add_action( 'admin_post_acecrawl_tracking_email', array( __CLASS__, 'admin_email_toggle' ) );
+        add_action( 'admin_post_acecrawl_tracking_csv', array( __CLASS__, 'admin_csv' ) );
+        add_action( 'admin_post_acecrawl_tracking_clarity', array( 'AceCrawlTrackingClarity', 'save' ) );
     }
 
     public static function schedule() {
@@ -642,7 +642,7 @@ class AceCrawlTracking {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'No.' );
         }
-        check_admin_referer( 'ace_seo_tracking_refresh' );
+        check_admin_referer( 'acecrawl_tracking_refresh' );
         delete_transient( self::T_PAGE );
         delete_transient( self::T_SERIES );
         delete_transient( AceCrawlTrackingCommerce::CACHE );
@@ -669,7 +669,7 @@ class AceCrawlTracking {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'No.' );
         }
-        check_admin_referer( 'ace_seo_tracking_csv' );
+        check_admin_referer( 'acecrawl_tracking_csv' );
         $s = self::series();
         $commerce = AceCrawlTrackingCommerce::series( array_keys( $s['days'] ) );
         $google = AceCrawlTrackingGoogle::series( array_keys( $s['days'] ) );
@@ -734,14 +734,14 @@ class AceCrawlTracking {
         echo '<p>Tracking configuration, evidence in home-page HTML, and reported traffic are separate checks. This server check does not execute JavaScript or accept consent. Checked daily at 05:10; next run ' . esc_html( $next ? wp_date( 'D j M H:i', $next ) : 'not scheduled' ) . '. Page probed ' . esc_html( ! empty( $page['at'] ) ? wp_date( 'D j M H:i', $page['at'] ) : 'never' ) . '.</p>';
 
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
-        wp_nonce_field( 'ace_seo_tracking_refresh' );
-        echo '<input type="hidden" name="action" value="ace_seo_tracking_refresh"><button class="button">Re-run checks now</button></form>';
+        wp_nonce_field( 'acecrawl_tracking_refresh' );
+        echo '<input type="hidden" name="action" value="acecrawl_tracking_refresh"><button class="button">Re-run checks now</button></form>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:1em">';
         wp_nonce_field( 'acecrawl_tracking_email' );
         echo '<input type="hidden" name="action" value="acecrawl_tracking_email"><input type="hidden" name="on" value="' . ( $email_on ? '0' : '1' ) . '"><button class="button">' . ( $email_on ? 'Email alerts: on (turn off)' : 'Email alerts: off (turn on)' ) . '</button></form>';
         echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block">';
-        wp_nonce_field( 'ace_seo_tracking_csv' );
-        echo '<input type="hidden" name="action" value="ace_seo_tracking_csv"><button class="button">Download daily numbers (CSV)</button></form>';
+        wp_nonce_field( 'acecrawl_tracking_csv' );
+        echo '<input type="hidden" name="action" value="acecrawl_tracking_csv"><button class="button">Download daily numbers (CSV)</button></form>';
 
         // Problems.
         $bad = array_filter( $problems, function ( $x ) {

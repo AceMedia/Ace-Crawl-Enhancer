@@ -29,8 +29,8 @@ class AceCrawlDigest {
         add_action('init', [__CLASS__, 'schedule']);
         add_action(self::CRON, [__CLASS__, 'run']);
         add_action('admin_menu', [__CLASS__, 'menu'], 20);
-        add_action('admin_post_ace_seo_digest_run', [__CLASS__, 'admin_run']);
-        add_action('admin_post_ace_seo_digest_email', [__CLASS__, 'admin_email_toggle']);
+        add_action('admin_post_acecrawl_digest_run', [__CLASS__, 'admin_run']);
+        add_action('admin_post_acecrawl_digest_email', [__CLASS__, 'admin_email_toggle']);
     }
 
     public static function schedule() {

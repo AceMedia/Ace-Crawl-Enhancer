@@ -29,7 +29,7 @@ class AceCrawl_Timing_Suggestions {
     public static function init() {
         add_action( 'acecrawl_retention_built', array( __CLASS__, 'recompute' ) );
         if ( is_admin() ) {
-            add_action( 'admin_post_ace_seo_timing_suggest', array( __CLASS__, 'handle_recompute' ) );
+            add_action( 'admin_post_acecrawl_timing_suggest', array( __CLASS__, 'handle_recompute' ) );
             add_action( 'wp_ajax_acecrawl_timing_rules', array( __CLASS__, 'ajax_save' ) );
             add_action( 'wp_ajax_acecrawl_timing_detail', array( __CLASS__, 'ajax_detail' ) );
         }
@@ -387,7 +387,7 @@ class AceCrawl_Timing_Suggestions {
     }
 
     public static function handle_recompute() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_timing_suggest' ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'acecrawl_timing_suggest' ) ) {
             wp_die( 'Not allowed.' );
         }
         $n = count( self::recompute() );
@@ -441,7 +441,7 @@ class AceCrawl_Timing_Suggestions {
                     <span data-overview="evergreen"><?php echo esc_html( number_format_i18n( $o['evergreen'] ) ); ?></span> evergreen.
                     <span data-overview="in_use"><?php echo esc_html( number_format_i18n( $o['in_use'] ) ); ?></span> in use, covering <span data-overview="in_use_posts"><?php echo esc_html( number_format_i18n( $o['in_use_posts'] ) ); ?></span> posts.</p>
                 <p><button type="button" class="button button-primary" id="ace-timing-open">Review and choose timing rules</button>
-                    <span class="description">Worked out <?php echo $computed ? esc_html( human_time_diff( $computed ) ) . ' ago' : 'now'; ?> from the saved assessment and refreshed after every check. <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ace_seo_timing_suggest' ), 'ace_seo_timing_suggest' ) ); ?>">Recalculate now</a></span></p>
+                    <span class="description">Worked out <?php echo $computed ? esc_html( human_time_diff( $computed ) ) . ' ago' : 'now'; ?> from the saved assessment and refreshed after every check. <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=acecrawl_timing_suggest' ), 'acecrawl_timing_suggest' ) ); ?>">Recalculate now</a></span></p>
             <?php endif; ?>
         </div>
         <?php

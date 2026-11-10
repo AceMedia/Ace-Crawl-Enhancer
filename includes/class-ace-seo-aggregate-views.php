@@ -12,7 +12,7 @@ class AceCrawlAggregateViews {
         add_filter( 'rest_authentication_errors', array( __CLASS__, 'public_counter_auth' ), 1000 );
         add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
         add_action( 'wp_footer', array( __CLASS__, 'privacy' ), 5 );
-        add_action( 'admin_post_ace_seo_aggregate_views', array( __CLASS__, 'save' ) );
+        add_action( 'admin_post_acecrawl_aggregate_views', array( __CLASS__, 'save' ) );
         add_action( 'acecrawl_tracking_check', array( __CLASS__, 'prune' ) );
     }
     public static function table() { global $wpdb; return $wpdb->prefix . self::TABLE; }

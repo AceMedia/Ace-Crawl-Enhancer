@@ -169,7 +169,7 @@ function acecrawl_dismiss_robots_file_info() {
     wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=ace-seo' ) );
     exit;
 }
-add_action( 'admin_post_ace_seo_dismiss_robots_file_info', 'acecrawl_dismiss_robots_file_info' );
+add_action( 'admin_post_acecrawl_dismiss_robots_file_info', 'acecrawl_dismiss_robots_file_info' );
 
 /**
  * Rename the shadowing file so the web server stops serving it.
@@ -203,7 +203,7 @@ function acecrawl_disable_robots_file() {
     );
     exit;
 }
-add_action( 'admin_post_ace_seo_disable_robots_file', 'acecrawl_disable_robots_file' );
+add_action( 'admin_post_acecrawl_disable_robots_file', 'acecrawl_disable_robots_file' );
 
 /**
  * Report the outcome of the rename.

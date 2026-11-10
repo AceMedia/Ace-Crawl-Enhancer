@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/wp-stubs.php';
 /**
  * Isolated Sheets boundary checks. No WordPress database or Google requests.
  * Run: php tests/sheets-export-test.php
@@ -53,6 +54,7 @@ function esc_html( $value ) { return htmlspecialchars( $value, ENT_QUOTES, 'UTF-
 function wp_nonce_field( $action ) {}
 // WordPress provides this compatibility function when mbstring is unavailable.
 if ( ! function_exists( 'mb_substr' ) ) { function mb_substr( $value, $offset, $length ) { return substr( $value, $offset, $length ); } }
+require dirname( __DIR__ ) . '/includes/class-ace-seo-input.php';
 require dirname( __DIR__ ) . '/includes/admin/class-ace-seo-sheets.php';
 
 $failures = 0;

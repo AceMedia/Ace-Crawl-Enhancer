@@ -23,9 +23,9 @@ COMPAT = ROOT / "compat" / "legacy-names.php"
 EDIT = {".php", ".js", ".jsx", ".mjs", ".ts", ".tsx"}
 SKIP_DIRS = {".git", "node_modules", "vendor", "vendor_prefixed", "core", "upgrade", "cache"}
 BUILT_DIRS = {"build", "dist"}
-# WordPress builds these hook names from an AJAX action, option or transient name.
+# WordPress builds these hook names from an AJAX or admin-post action, option or transient name.
 GLUE = (
-    "wp_ajax_nopriv_", "wp_ajax_", "pre_update_option_", "update_option_", "pre_option_", "default_option_",
+    "wp_ajax_nopriv_", "wp_ajax_", "admin_post_nopriv_", "admin_post_", "pre_update_option_", "update_option_", "pre_option_", "default_option_",
     "sanitize_option_", "add_option_", "delete_option_", "pre_site_option_", "site_option_", "option_",
     "_transient_timeout_", "_transient_", "pre_transient_", "transient_",
 )

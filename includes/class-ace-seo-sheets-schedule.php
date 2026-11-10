@@ -20,10 +20,10 @@ class AceCrawlSheetsSchedule {
         add_action( self::TICK, array( __CLASS__, 'tick' ) );
         if ( is_admin() ) {
             add_action( 'admin_init', array( __CLASS__, 'sync_schedule' ) );
-            add_action( 'admin_post_ace_seo_sheets_schedule', array( __CLASS__, 'handle_settings' ) );
-            add_action( 'admin_post_ace_seo_sheets_run', array( __CLASS__, 'handle_run' ) );
-            add_action( 'admin_post_ace_seo_sheets_stop', array( __CLASS__, 'handle_stop' ) );
-            add_action( 'admin_post_ace_seo_sheets_retry', array( __CLASS__, 'handle_retry' ) );
+            add_action( 'admin_post_acecrawl_sheets_schedule', array( __CLASS__, 'handle_settings' ) );
+            add_action( 'admin_post_acecrawl_sheets_run', array( __CLASS__, 'handle_run' ) );
+            add_action( 'admin_post_acecrawl_sheets_stop', array( __CLASS__, 'handle_stop' ) );
+            add_action( 'admin_post_acecrawl_sheets_retry', array( __CLASS__, 'handle_retry' ) );
         }
         if ( wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
             add_action( 'wp_loaded', array( __CLASS__, 'sync_schedule' ) );

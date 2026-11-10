@@ -10,7 +10,7 @@ class AceCrawlRetentionQueue {
 
     public static function init() {
         add_action( 'admin_init', array( __CLASS__, 'install' ) );
-        add_action( 'admin_post_ace_retention_queue', array( __CLASS__, 'handle' ) );
+        add_action( 'admin_post_acecrawl_retention_queue', array( __CLASS__, 'handle' ) );
         add_action( self::HOOK, array( __CLASS__, 'tick' ) );
     }
 
@@ -290,7 +290,7 @@ class AceCrawlRetentionQueue {
 
     public static function handle() {
         if ( ! AceCrawlRetentionPrototype::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
-        check_admin_referer( 'ace_retention_queue' );
+        check_admin_referer( 'acecrawl_retention_queue' );
         foreach ( array( 'operation', 'plan', 'scope', 'cap', 'enabled' ) as $k ) { if ( isset( $_POST[ $k ] ) && ! is_scalar( $_POST[ $k ] ) ) { wp_die( 'Invalid form.' ); } }
         $op = sanitize_key( wp_unslash( $_POST['operation'] ?? '' ) ); $plan = absint( $_POST['plan'] ?? 0 );
         try {
