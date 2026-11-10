@@ -65,12 +65,8 @@ class AceCrawlUninstaller {
             'acecrawl_social_settings', 
             'acecrawl_advanced_settings',
             'acecrawl_compatibility_settings',
-            'ace_seo_sitemap_settings',
-            'ace_seo_dashboard_settings',
             'acecrawl_version',
             'acecrawl_activation_date',
-            'ace_seo_usage_stats',
-            'ace_seo_wizard_completed',
             'acecrawl_options',
             'acecrawl_db_optimized',
             'acecrawl_db_optimization_results',
@@ -104,7 +100,8 @@ class AceCrawlUninstaller {
     private static function clean_transients() {
         global $wpdb;
         
-        foreach ( array( 'ace_seo_', 'ace_sitemap_', 'ace_retention_' ) as $prefix ) {
+        // Only this plugin's own prefix: other Ace plugins cache under names that start with ace_seo_.
+        foreach ( array( 'acecrawl_' ) as $prefix ) {
             $names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_' . $prefix ) . '%' ) );
             foreach ( $names as $name ) {
                 delete_transient( substr( $name, strlen( '_transient_' ) ) );
