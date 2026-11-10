@@ -9,6 +9,12 @@
 defined( 'ABSPATH' ) || exit;
 
 final class AceCrawlConvertNamesCommand {
+	/**
+	 * Shared AI identity: a ChatGPT subscription is bound to the host ID, so if a new ID was generated
+	 * before the old one was carried across, the old one must win or the subscription stops matching.
+	 */
+	const OLD_WINS = array( 'acemedia_ai_host_id_v1', 'acemedia_ai_connection_v1' );
+
 	/** Options the plugin rewrites on load; a newer value under the new name never needs comparing. */
 	const PLUGIN_MANAGED = array(
 		'acecrawl_version',
@@ -64,13 +70,17 @@ final class AceCrawlConvertNamesCommand {
 			$old_value  = AceCrawlLegacyNames::normalise_value( $new, maybe_unserialize( $old_row->option_value ) );
 			// Version and schema markers are rewritten by the plugin itself, so the new value is always the right one.
 			$managed    = in_array( $new, self::PLUGIN_MANAGED, true );
-			$differs    = ! $managed && $new_exists && maybe_serialize( get_option( $new ) ) !== maybe_serialize( $old_value );
+			$old_wins   = in_array( $new, self::OLD_WINS, true ) && $new_exists && maybe_serialize( get_option( $new ) ) !== maybe_serialize( $old_value );
+			$differs    = ! $managed && ! $old_wins && $new_exists && maybe_serialize( get_option( $new ) ) !== maybe_serialize( $old_value );
 			$delete     = ! $keep && ( ! $differs || $force );
 			$held      += ( $differs && ! $force ) ? 1 : 0;
-			$action     = ! $new_exists ? 'copy' : ( $differs ? 'keep new, old differs' : 'keep new' );
+			$action     = ! $new_exists ? 'copy' : ( $old_wins ? 'old replaces new' : ( $differs ? 'keep new, old differs' : 'keep new' ) );
 			$rows[]     = array( 'type' => 'option', 'old' => $old, 'new' => $new, 'action' => $action . ( $delete ? ', delete old' : ( $differs && ! $keep ? ', old kept (use --force)' : '' ) ) );
 			if ( $dry ) {
 				continue;
+			}
+			if ( $old_wins ) {
+				update_option( $new, $old_value, false );
 			}
 			if ( ! $new_exists ) {
 				add_option( $new, $old_value, '', in_array( $old_row->autoload, array( 'no', 'off', 'auto-off' ), true ) ? 'no' : 'yes' );
