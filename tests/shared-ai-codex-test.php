@@ -19,13 +19,13 @@ esac
 SH
 );
 chmod( $fake, 0755 );
-// The plugin only exposes the `ace_ai_codex_runner` filter; this test registers a runner that drives the fake bridge.
+// The plugin only exposes the `acemedia_ai_codex_runner` filter; this test registers a runner that drives the fake bridge.
 $GLOBALS['ace_filters'] = array();
 if ( ! function_exists( 'add_filter' ) ) { function add_filter( $tag, $cb, $priority = 10, $args = 1 ) { $GLOBALS['ace_filters'][ $tag ][] = $cb; return true; } }
 if ( ! function_exists( 'has_filter' ) ) { function has_filter( $tag ) { return ! empty( $GLOBALS['ace_filters'][ $tag ] ); } }
 if ( ! function_exists( 'apply_filters' ) ) { function apply_filters( $tag, $value, ...$args ) { foreach ( $GLOBALS['ace_filters'][ $tag ] ?? array() as $cb ) { $value = $cb( $value, ...$args ); } return $value; } }
 require __DIR__ . '/shared-ai-connection-test.php';
-add_filter( 'ace_ai_codex_runner', function ( $reply, $sub, $scope, $stdin = '', $timeout = 60 ) use ( $fake ) {
+add_filter( 'acemedia_ai_codex_runner', function ( $reply, $sub, $scope, $stdin = '', $timeout = 60 ) use ( $fake ) {
 	$proc = proc_open( array( $fake, $sub, $scope ), array( 0 => array( 'pipe', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
 	fwrite( $pipes[0], (string) $stdin ); fclose( $pipes[0] );
 	$out = stream_get_contents( $pipes[1] ); fclose( $pipes[1] ); $err = stream_get_contents( $pipes[2] ); fclose( $pipes[2] );
@@ -87,7 +87,7 @@ check( is_wp_error( $site->subscription_text( array( array( 'role' => 'user', 'c
 $GLOBALS['caps'] = array( 'manage_options' => true, 'manage_network_options' => false );
 check( is_wp_error( $net->codex_login_start( true ) ), 'Site admin cannot start a network sign-in' );
 $GLOBALS['caps']['manage_network_options'] = true;
-check( ! $net->codex_available() === false && ! has_filter( 'ace_ai_codex_runner' ) === false, 'Runner stays registered' );
+check( ! $net->codex_available() === false && ! has_filter( 'acemedia_ai_codex_runner' ) === false, 'Runner stays registered' );
 
 // Hybrid: a signed-in scope keeps text on the subscription and can hold an API key for images and voice.
 $GLOBALS['caps'] = array( 'manage_options' => true, 'manage_network_options' => true );

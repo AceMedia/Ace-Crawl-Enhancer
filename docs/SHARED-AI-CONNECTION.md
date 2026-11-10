@@ -4,10 +4,10 @@
 
 ## Sign in with ChatGPT (host-provided runner)
 
-This plugin never runs programs on your server. If your host wants to offer "Sign in with ChatGPT" from the settings screen, it registers a runner on the `ace_ai_codex_runner` filter:
+This plugin never runs programs on your server. If your host wants to offer "Sign in with ChatGPT" from the settings screen, it registers a runner on the `acemedia_ai_codex_runner` filter:
 
 ```php
-add_filter( 'ace_ai_codex_runner', function ( $reply, $sub, $scope, $stdin, $timeout ) {
+add_filter( 'acemedia_ai_codex_runner', function ( $reply, $sub, $scope, $stdin, $timeout ) {
     // $sub: login-start | login-status | login-cancel | logout | models | ask
     // $scope: network-<id> or site-<blog_id>, one isolated Codex home each.
     // Return the decoded reply array, or a WP_Error.
