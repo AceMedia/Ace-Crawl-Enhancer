@@ -9,6 +9,16 @@
 defined( 'ABSPATH' ) || exit;
 
 final class AceCrawlConvertNamesCommand {
+	/** Options the plugin rewrites on load; a newer value under the new name never needs comparing. */
+	const PLUGIN_MANAGED = array(
+		'acecrawl_version',
+		'acecrawl_sitemap_cache_version',
+		'acecrawl_hits_db_version',
+		'acecrawl_aggregate_views_schema',
+		'acecrawl_retention_queue_schema',
+		'acecrawl_activation_date',
+	);
+
 	/**
 	 * Move stored options, network options and scheduled events to the new names, and list what is
 	 * left for a person to change.
@@ -52,7 +62,9 @@ final class AceCrawlConvertNamesCommand {
 			}
 			$new_exists = null !== $wpdb->get_var( $wpdb->prepare( "SELECT option_id FROM {$wpdb->options} WHERE option_name = %s", $new ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$old_value  = AceCrawlLegacyNames::normalise_value( $new, maybe_unserialize( $old_row->option_value ) );
-			$differs    = $new_exists && maybe_serialize( get_option( $new ) ) !== maybe_serialize( $old_value );
+			// Version and schema markers are rewritten by the plugin itself, so the new value is always the right one.
+			$managed    = in_array( $new, self::PLUGIN_MANAGED, true );
+			$differs    = ! $managed && $new_exists && maybe_serialize( get_option( $new ) ) !== maybe_serialize( $old_value );
 			$delete     = ! $keep && ( ! $differs || $force );
 			$held      += ( $differs && ! $force ) ? 1 : 0;
 			$action     = ! $new_exists ? 'copy' : ( $differs ? 'keep new, old differs' : 'keep new' );
