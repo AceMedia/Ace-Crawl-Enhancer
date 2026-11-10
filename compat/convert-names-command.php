@@ -23,9 +23,13 @@ final class AceCrawlConvertNamesCommand {
 	 *
 	 * ## EXAMPLES
 	 *
+	 * Run it after the new code is live everywhere (php-fpm reloaded), not while a deploy is switching.
+	 *
 	 *     wp acecrawl convert-names --dry-run
 	 *     wp acecrawl convert-names
 	 *     wp acecrawl convert-names --url=sub.example.com    # each site of a network
+	 *
+	 * @subcommand convert-names
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Flags.
@@ -34,10 +38,10 @@ final class AceCrawlConvertNamesCommand {
 		global $wpdb;
 		$dry  = ! empty( $assoc_args['dry-run'] );
 		$keep = ! empty( $assoc_args['keep-old'] );
-		// Once the compatibility layer has copied options across, the plugin writes only the new names,
-		// so they are current. Without that copy, the old rows are.
-		$new_is_current = (bool) get_option( AceCrawlLegacyNames::MIGRATED );
-		$rows           = array();
+		// Run this once the deploy has fully switched (PHP reloaded): old code still serving requests would
+		// recreate the old rows. A new option that already exists is never overwritten, since the new code
+		// writes only the new names; a differing old value is reported and left for a person to compare.
+		$rows = array();
 
 		foreach ( AceCrawlLegacyNames::OPTIONS as $old => $new ) {
 			$old_row = $wpdb->get_row( $wpdb->prepare( "SELECT option_value, autoload FROM {$wpdb->options} WHERE option_name = %s", $old ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -45,12 +49,13 @@ final class AceCrawlConvertNamesCommand {
 				continue;
 			}
 			$new_exists = null !== $wpdb->get_var( $wpdb->prepare( "SELECT option_id FROM {$wpdb->options} WHERE option_name = %s", $new ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$action     = $new_exists ? ( $new_is_current ? 'keep new' : 'old over new' ) : 'copy';
+			$differs    = $new_exists && maybe_serialize( get_option( $new ) ) !== $old_row->option_value;
+			$action     = $new_exists ? ( $differs ? 'keep new (old differed)' : 'keep new' ) : 'copy';
 			$rows[]     = array( 'type' => 'option', 'old' => $old, 'new' => $new, 'action' => $action . ( $keep ? '' : ', delete old' ) );
 			if ( $dry ) {
 				continue;
 			}
-			if ( ! $new_exists || ! $new_is_current ) {
+			if ( ! $new_exists ) {
 				$value    = maybe_unserialize( $old_row->option_value );
 				$autoload = in_array( $old_row->autoload, array( 'no', 'off', 'auto-off' ), true ) ? 'no' : 'yes';
 				$new_exists ? update_option( $new, $value, $autoload ) : add_option( $new, $value, '', $autoload );

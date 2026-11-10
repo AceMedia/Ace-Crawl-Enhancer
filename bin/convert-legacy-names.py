@@ -52,6 +52,10 @@ def files(paths: list[Path]):
             parts = set(path.relative_to(base).parts[:-1])
             if not path.is_file() or path.suffix not in EDIT or parts & SKIP_DIRS:
                 continue
+            if path.is_symlink():
+                # Writing would change the file the link points at, somewhere else entirely.
+                print(f"LINK  {path}  (symlink; not followed)")
+                continue
             built = bool(parts & BUILT_DIRS) or path.name.endswith(".min.js")
             yield path, built
 
