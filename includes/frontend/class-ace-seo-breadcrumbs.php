@@ -457,7 +457,7 @@ class ACE_SEO_Breadcrumbs {
      */
     private static function home_item() {
         $label = apply_filters(
-            'ace_seo_breadcrumb_home_label',
+            'acecrawl_breadcrumb_home_label',
             esc_html__('Home', 'ace-crawl-enhancer')
         );
 
@@ -493,7 +493,7 @@ class ACE_SEO_Breadcrumbs {
      */
     private static function get_blog_index_label() {
         return apply_filters(
-            'ace_seo_breadcrumb_blog_label',
+            'acecrawl_breadcrumb_blog_label',
             esc_html__('Blog', 'ace-crawl-enhancer')
         );
     }

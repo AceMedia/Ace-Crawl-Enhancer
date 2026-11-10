@@ -439,7 +439,7 @@ function acecrawl_sitemap_gen_is_stale( array $artifact, ?array $seqs = null ) {
 
 /** True while a generation build runs, so lower cache layers can step aside. */
 function acecrawl_sitemap_gen_is_building() {
-    return ! empty( $GLOBALS['ace_sitemap_gen_building'] );
+    return ! empty( $GLOBALS['acecrawl_sitemap_gen_building'] );
 }
 
 /**
@@ -692,14 +692,14 @@ function acecrawl_sitemap_gen_build( $key, array $meta, callable $builder ) {
     // Lower cache layers (the powertools object cache) must not hand a rebuild the list it
     // is replacing: that stored a stale list under a current sequence.
     $was_building                       = acecrawl_sitemap_gen_is_building();
-    $GLOBALS['ace_sitemap_gen_building'] = true;
+    $GLOBALS['acecrawl_sitemap_gen_building'] = true;
     try {
         $data = call_user_func( $builder );
     } catch ( Throwable $e ) {
         acecrawl_sitemap_gen_record_failure( $key, 'exception', get_class( $e ) );
         return $previous;
     } finally {
-        $GLOBALS['ace_sitemap_gen_building'] = $was_building;
+        $GLOBALS['acecrawl_sitemap_gen_building'] = $was_building;
     }
 
     if ( ! acecrawl_sitemap_gen_is_valid_list( $data, $meta ) ) {

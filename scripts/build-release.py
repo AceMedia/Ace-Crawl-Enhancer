@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 SLUG = "ace-crawl-enhancer"
 FILES = json.loads((ROOT / "scripts/release-files.json").read_text())
-VERSION = "1.0.95"
+# The plugin header is the one place the version is set.
+_header = re.search(r"^\s*\*\s*Version:\s*(\S+)", (ROOT / "accelerated-crawl-enhancer.php").read_text(), re.M)
+if not _header:
+    raise SystemExit("No Version header in accelerated-crawl-enhancer.php")
+VERSION = _header.group(1)
 
 if len(FILES) != len(set(FILES)):
     raise SystemExit("Duplicate path in release manifest")

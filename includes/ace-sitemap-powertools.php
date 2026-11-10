@@ -967,7 +967,7 @@ function acecrawl_sitemap_clean_urls_description() {
     $mapped_providers = array_unique( $mapped_providers );
 
     $excluded_slugs = apply_filters(
-        'ace_sitemap_powertools_excluded_clean_slugs',
+        'acecrawl_sitemap_excluded_clean_slugs',
         array( 'popular' )
     );
     $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
@@ -1232,7 +1232,7 @@ function acecrawl_sitemap_custom_routes() {
     }
 
     $excluded_slugs = apply_filters(
-        'ace_sitemap_powertools_excluded_clean_slugs',
+        'acecrawl_sitemap_excluded_clean_slugs',
         array( 'popular' )
     );
     $excluded_post_types = acecrawl_sitemap_excluded_sitemap_post_types();
@@ -1986,7 +1986,7 @@ function acecrawl_sitemap_handle_legacy_gone(): void {
      * @param string[] $patterns Array of PCRE regex patterns.
      */
     $patterns = apply_filters(
-        'ace_sitemap_powertools_legacy_gone_patterns',
+        'acecrawl_sitemap_legacy_gone_patterns',
         array(
             '~^post-sitemap\d*(-\d+)?\.xml$~i',
             '~^image-sitemap(-\d+)?\.xml$~i',
@@ -2226,7 +2226,7 @@ function acecrawl_sitemap_send_success_status() {
 
 function acecrawl_sitemap_send_response_cache_headers() {
     $ttl = (int) apply_filters(
-        'ace_sitemap_powertools_response_cache_ttl',
+        'acecrawl_sitemap_response_cache_ttl',
         acecrawl_sitemap_get_cache_ttl()
     );
 

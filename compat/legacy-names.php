@@ -322,6 +322,13 @@ final class AceCrawlLegacyNames {
 
 	/** Old filter => new filter the plugin applies. */
 	const FILTERS = array(
+		'ace_seo_breadcrumb_blog_label' => 'acecrawl_breadcrumb_blog_label',
+		'ace_seo_breadcrumb_home_label' => 'acecrawl_breadcrumb_home_label',
+		'ace_seo_canonical_query_args' => 'acecrawl_canonical_query_args',
+		'ace_sitemap_powertools_excluded_clean_slugs' => 'acecrawl_sitemap_excluded_clean_slugs',
+		'ace_sitemap_powertools_legacy_gone_patterns' => 'acecrawl_sitemap_legacy_gone_patterns',
+		'ace_sitemap_powertools_response_cache_ttl' => 'acecrawl_sitemap_response_cache_ttl',
+		'pre_ace_seo_whitehat_ai' => 'acecrawl_pre_whitehat_ai',
 		'ace_seo_admin_column_post_types' => 'acecrawl_admin_column_post_types',
 		'ace_seo_admin_sort_max_posts' => 'acecrawl_admin_sort_max_posts',
 		'ace_seo_aggregate_views_show_privacy' => 'acecrawl_aggregate_views_show_privacy',

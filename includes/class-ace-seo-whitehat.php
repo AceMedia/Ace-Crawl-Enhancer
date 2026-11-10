@@ -295,12 +295,12 @@ class AceCrawlWhiteHat {
 
     /**
      * One classification call. Returns array( white_hat => bool, reasons => string[] ) or WP_Error.
-     * `pre_ace_seo_whitehat_ai` can answer instead (tests, a site's own classifier), so no call is made.
+     * `acecrawl_pre_whitehat_ai` can answer instead (tests, a site's own classifier), so no call is made.
      */
     private static function ask_ai( WP_Post $post, $excerpt, array $o ) {
         $input = 'Headline: ' . wp_strip_all_tags( $post->post_title ) . "\n\nSentences:\n" . $excerpt;
 
-        $pre = apply_filters( 'pre_ace_seo_whitehat_ai', null, $input, $post, $o );
+        $pre = apply_filters( 'acecrawl_pre_whitehat_ai', null, $input, $post, $o );
         if ( null !== $pre ) {
             return is_wp_error( $pre ) ? $pre : array( 'white_hat' => ! empty( $pre['white_hat'] ), 'reasons' => (array) ( $pre['reasons'] ?? array() ) );
         }

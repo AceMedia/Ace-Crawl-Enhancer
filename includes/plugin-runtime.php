@@ -2662,7 +2662,7 @@ class AceCrawlEnhancer {
         $configured = array_filter(array_map('trim', explode(',', (string) ($advanced['canonical_query_args'] ?? ''))));
 
         $allowed = (array) apply_filters(
-            'ace_seo_canonical_query_args',
+            'acecrawl_canonical_query_args',
             array_merge(
                 array('s', 'paged', 'page', 'p', 'page_id', 'cat', 'tag', 'author', 'year', 'monthnum', 'day'),
                 $configured
