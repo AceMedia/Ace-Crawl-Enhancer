@@ -175,7 +175,7 @@ class AceSeoViewTracker {
 
     /** Bots, counted where WordPress renders the post (GET only; a cached copy never gets here). */
     public static function count_bot() {
-        if ( ! is_singular() || is_preview() || 'GET' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+        if ( ! is_singular() || is_preview() || 'GET' !== strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) ) {
             return;
         }
         $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';

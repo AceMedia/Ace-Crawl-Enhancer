@@ -2,6 +2,7 @@
 if (!defined('ABSPATH')) { exit; }
 
 require_once ACE_SEO_PATH . 'includes/class-ace-seo-assets.php';
+require_once ACE_SEO_PATH . 'includes/class-ace-seo-input.php';
 require_once ACE_SEO_PATH . 'includes/shared-ai/bootstrap.php';
 require_once ACE_SEO_PATH . 'includes/ace-seo-discourage.php';
 require_once ACE_SEO_PATH . 'includes/ace-sitemap-powertools.php';

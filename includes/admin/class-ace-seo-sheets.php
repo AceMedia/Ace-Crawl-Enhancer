@@ -75,7 +75,7 @@ class AceSeoSheets {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $msg = self::save_settings( wp_unslash( $_POST ) );
+        $msg = self::save_settings( AceSeoInput::post( array( 'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool' ) ) );
         set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), $msg, 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-sheets' ) );
         exit;

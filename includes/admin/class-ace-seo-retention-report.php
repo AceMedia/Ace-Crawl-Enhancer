@@ -1637,11 +1637,30 @@ class AceSeoRetentionReport {
      * One save for the whole Retention tab. Each section's own saver still runs (and its own action still
      * works), so nothing about how settings are stored changes; only the number of Save buttons does.
      */
+    /** Every field the retention settings forms send, with the type each is sanitised as. */
+    private static function settings_fields() {
+        return array(
+            // Report.
+            'auto_build' => 'bool', 'report_days' => 'int', 'report_years' => 'int', 'retained_views' => 'int', 'thin_words' => 'int',
+            'timing_policy' => 'key', 'timing_rules' => 'textarea', 'timing_suggested' => 'textarea', 'timing_accept' => 'textarea',
+            'timing_ignore' => 'textarea', 'timing_suggestions_present' => 'bool', 'track_views' => 'bool',
+            // Old content notice and lifetimes.
+            'settings_section' => 'key', 'notice_enabled' => 'bool', 'notice_years' => 'int', 'notice_text' => 'text',
+            'lifetimes' => 'text', 'lifetime_rules' => 'textarea',
+            // Retained article front end.
+            'retained_notice' => 'bool', 'retained_notice_text' => 'text', 'light_enabled' => 'bool', 'light_cache_hours' => 'int',
+            'light_continue' => 'key', 'light_drop' => 'text',
+            // Google Sheets connection and schedule.
+            'sheet' => 'text', 'key' => 'json', 'forget_key' => 'bool', 'frequency' => 'key', 'post_types' => 'key',
+            'after_build' => 'bool', 'include_unpublished' => 'bool',
+        );
+    }
+
     public static function handle_settings_save() {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_settings_save' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $in = wp_unslash( $_POST );
+        $in = AceSeoInput::post( self::settings_fields() );
         AceSeoRetentionActions::save_report_settings( $in );
         $in['settings_section'] = 'notice-lifetimes';
         AceSeoRetentionActions::save_options( $in );
@@ -1673,7 +1692,7 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_report_settings' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_report_settings( wp_unslash( $_POST ) );
+        AceSeoRetentionActions::save_report_settings( AceSeoInput::post( self::settings_fields() ) );
         self::sync_weekly_schedule();
         if ( class_exists( 'AceSeoViewTracker' ) ) {
             AceSeoViewTracker::maybe_install();
@@ -1687,7 +1706,7 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_front' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_front_settings( wp_unslash( $_POST ) );
+        AceSeoRetentionActions::save_front_settings( AceSeoInput::post( self::settings_fields() ) );
         set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Front-end settings for retained posts saved. Cached pages pick them up as they expire or are purged.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-readers' ) );
         exit;
@@ -1746,7 +1765,7 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_options' ) ) {
             wp_die( 'Not allowed.' );
         }
-        AceSeoRetentionActions::save_options( wp_unslash( $_POST ) );
+        AceSeoRetentionActions::save_options( AceSeoInput::post( self::settings_fields() ) );
         set_transient( 'ace_seo_retention_msg_' . get_current_user_id(), 'Notice and search expiry rules saved. Cached pages pick them up as they expire or are purged.', 60 );
         wp_safe_redirect( admin_url( 'admin.php?page=ace-seo-settings#retention/retention-notice' ) );
         exit;
@@ -1757,9 +1776,9 @@ class AceSeoRetentionReport {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_retention_redirect' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $from = trim( (string) wp_unslash( $_POST['from'] ?? '' ) );
+        $from = isset( $_POST['from'] ) ? AceSeoInput::clean( wp_unslash( $_POST['from'] ), 'target' ) : '';
         $id   = ctype_digit( $from ) ? (int) $from : (int) url_to_postid( $from );
-        $to   = trim( (string) wp_unslash( $_POST['to'] ?? '' ) );
+        $to   = isset( $_POST['to'] ) ? AceSeoInput::clean( wp_unslash( $_POST['to'] ), 'target' ) : '';
         if ( ! $id ) {
             $msg = 'That source is not a post on this site (give a post ID or its URL).';
         } elseif ( 'gone' === strtolower( $to ) ) {

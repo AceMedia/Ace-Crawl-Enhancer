@@ -252,7 +252,7 @@ class AceSEOMetabox {
                 $input_name = 'yoast_wpseo_' . $field_key;
                 
                 if ( isset( $_POST[ $input_name ] ) ) {
-                    $value = wp_unslash( $_POST[ $input_name ] );
+                    $value = map_deep( wp_unslash( $_POST[ $input_name ] ), 'sanitize_textarea_field' );
                     
                     // Sanitize based on field type
                     switch ( $field_config['type'] ) {
@@ -292,8 +292,9 @@ class AceSEOMetabox {
         $this->handle_special_fields( $post_id );
         if ( isset( $_POST['ace_redirect_present'] ) && current_user_can( 'manage_options' ) && class_exists( 'AceSeoRedirects' ) ) {
             $input = array();
-            foreach ( array( 'target', 'code', 'expires', 'trash', 'paused' ) as $key ) {
-                $input[ $key ] = isset( $_POST[ 'ace_redirect_' . $key ] ) ? wp_unslash( $_POST[ 'ace_redirect_' . $key ] ) : '';
+            $types = array( 'target' => 'target', 'code' => 'int', 'expires' => 'text', 'trash' => 'bool', 'paused' => 'bool' );
+            foreach ( array_keys( $types ) as $key ) {
+                $input[ $key ] = isset( $_POST[ 'ace_redirect_' . $key ] ) ? AceSeoInput::clean( wp_unslash( $_POST[ 'ace_redirect_' . $key ] ), $types[ $key ] ) : '';
             }
             $result = AceSeoRedirects::save( $post_id, $input );
             if ( is_wp_error( $result ) ) {
@@ -734,8 +735,7 @@ class AceSEOMetabox {
             $key = 'ace_seo_' . $field;
             
             if ( isset( $_POST[$key] ) ) {
-                $value = wp_unslash( $_POST[$key] );
-                $value = sanitize_text_field( $value );
+                $value = sanitize_text_field( wp_unslash( $_POST[$key] ) );
                 
                 if ( $field === 'desc' ) {
                     $value = sanitize_textarea_field( wp_unslash( $_POST[$key] ) );

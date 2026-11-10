@@ -436,7 +436,12 @@ class AceSeoWhiteHat {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_whitehat_save' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $in      = wp_unslash( $_POST );
+        $in      = AceSeoInput::post( array(
+            'enabled' => 'bool', 'post_types' => 'key', 'provider' => 'key', 'model' => 'text', 'api_key' => 'text',
+            'bet_links' => 'textarea', 'allowed_links' => 'textarea', 'keywords' => 'textarea', 'cta_patterns' => 'textarea',
+            'instruction' => 'textarea', 'bet_blocks' => 'text', 'event_attr' => 'text', 'grace_hours' => 'int', 'max_chars' => 'int',
+            'check_ids' => 'text',
+        ) );
         $current = get_option( self::OPTION, array() );
         $current = is_array( $current ) ? $current : array();
         $clean   = array(

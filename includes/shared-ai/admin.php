@@ -58,11 +58,11 @@ final class Admin {
 		if ( ! current_user_can( $network ? 'manage_network_options' : 'manage_options' ) ) { return; }
 		$service = $network ? new Service( true ) : ace_ai_connection_service();
 		$message = '';
-		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+		if ( 'post' === sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
 			check_admin_referer( 'ace-ai-connection-' . ( $network ? 'network' : 'site' ) );
 			$mode = isset( $_POST['connection_mode'] ) && is_string( $_POST['connection_mode'] ) ? sanitize_key( wp_unslash( $_POST['connection_mode'] ) ) : '';
-			$key = isset( $_POST['api_key'] ) && is_string( $_POST['api_key'] ) ? trim( wp_unslash( $_POST['api_key'] ) ) : '';
-			$features = isset( $_POST['features'] ) && is_array( $_POST['features'] ) ? array_filter( wp_unslash( $_POST['features'] ), 'is_string' ) : array();
+			$key = isset( $_POST['api_key'] ) && is_string( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
+			$features = isset( $_POST['features'] ) && is_array( $_POST['features'] ) ? array_values( array_filter( map_deep( wp_unslash( $_POST['features'] ), 'sanitize_key' ), 'is_string' ) ) : array();
 			$intent = isset( $_POST['intent'] ) && is_string( $_POST['intent'] ) ? sanitize_key( wp_unslash( $_POST['intent'] ) ) : 'settings';
 			if ( 'import' === $intent ) {
 				$file = $_FILES['credential_file'] ?? array();

@@ -102,7 +102,9 @@ class AceSeoPostColumns {
         check_ajax_referer( 'ace_seo_list_export' );
 
         $params = array();
-        wp_parse_str( (string) wp_unslash( $_POST['q'] ?? '' ), $params );
+        // The list screen's own query string: parsed, then every value cleaned before use.
+        wp_parse_str( isset( $_POST['q'] ) && is_string( $_POST['q'] ) ? wp_unslash( $_POST['q'] ) : '', $params );
+        $params = map_deep( $params, 'sanitize_text_field' );
         $post_type = sanitize_key( $params['post_type'] ?? 'post' );
         $type_obj  = get_post_type_object( $post_type );
 
@@ -153,7 +155,7 @@ class AceSeoPostColumns {
 
         // To Google Sheets: the first batch opens a new tab and writes the header, every batch appends
         // its own rows server-side, and the browser only carries the tab name between requests.
-        if ( 'sheets' === ( $_POST['dest'] ?? '' ) ) {
+        if ( 'sheets' === sanitize_key( wp_unslash( $_POST['dest'] ?? '' ) ) ) {
             if ( ! class_exists( 'AceSeoSheets' ) || ! AceSeoSheets::configured() ) {
                 wp_send_json_error( __( 'Google Sheets is not set up (Ace SEO, Retention report).', 'ace-crawl-enhancer' ), 400 );
             }

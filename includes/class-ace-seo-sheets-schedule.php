@@ -156,7 +156,7 @@ class AceSeoSheetsSchedule {
         if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'ace_seo_sheets_schedule' ) ) {
             wp_die( 'Not allowed.' );
         }
-        $saved = self::save_settings( wp_unslash( $_POST ) );
+        $saved = self::save_settings( AceSeoInput::post( array( 'frequency' => 'key', 'post_types' => 'key', 'after_build' => 'bool', 'include_unpublished' => 'bool' ) ) );
         if ( is_wp_error( $saved ) ) {
             wp_die( esc_html( $saved->get_error_message() ) );
         }

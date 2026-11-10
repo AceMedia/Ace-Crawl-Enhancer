@@ -1226,7 +1226,8 @@ function ace_sitemap_gen_handle_admin_action() {
     }
     check_admin_referer( 'ace_sitemap_gen_action', 'ace_sitemap_gen_nonce' );
 
-    $action = sanitize_key( (string) key( (array) $_POST['ace_sitemap_gen_do'] ) );
+    $requested = map_deep( (array) wp_unslash( $_POST['ace_sitemap_gen_do'] ), 'sanitize_text_field' );
+    $action    = sanitize_key( (string) key( $requested ) );
     if ( 'pause' === $action ) {
         ace_sitemap_gen_set_paused( true );
     } elseif ( 'resume' === $action ) {

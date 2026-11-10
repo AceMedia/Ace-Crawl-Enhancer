@@ -44,7 +44,7 @@ class AceSeoAggregateViews {
     /** Community sites can close REST globally. Only exempt this deliberately public counter. */
     public static function public_counter_auth( $result ) {
         $route = $GLOBALS['wp']->query_vars['rest_route'] ?? '';
-        if ( self::enabled() && 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' )
+        if ( self::enabled() && 'post' === sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? '' ) )
             && '/ace-seo/v1/aggregate-view' === rtrim( $route, '/' )
             && is_wp_error( $result ) && 'rest_not_logged_in' === $result->get_error_code() ) {
             return null; // Route permission_callback still verifies origin, fetch metadata and size.

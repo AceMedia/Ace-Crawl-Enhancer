@@ -494,8 +494,9 @@ class AceSEOSettings {
             $options['person']['twitter_username'] = '@' . ltrim($options['person']['twitter_username'], '@');
         }
 
-        $person_same_as_input = array_map('trim', (array) (wp_unslash($_POST['person_same_as'] ?? [])));
-        $options['person']['same_as'] = array_values(array_filter(array_unique(array_map('esc_url_raw', $person_same_as_input))));
+        $person_same_as_input = isset($_POST['person_same_as']) ? AceSeoInput::clean(wp_unslash($_POST['person_same_as']), 'url') : [];
+        $person_same_as_input = is_array($person_same_as_input) ? $person_same_as_input : [];
+        $options['person']['same_as'] = array_values(array_filter(array_unique($person_same_as_input)));
 
         // Update webmaster verification codes
         $options['webmaster'] = isset($options['webmaster']) && is_array($options['webmaster']) ? $options['webmaster'] : [];
@@ -541,16 +542,10 @@ class AceSEOSettings {
         $sitemap_options_updated = false;
         $sanitized_sitemap_options = null;
         if (isset($_POST['ace_sitemap_powertools_options'])) {
-            $raw_sitemap_options = wp_unslash($_POST['ace_sitemap_powertools_options']);
-            if (!is_array($raw_sitemap_options)) {
-                $raw_sitemap_options = [];
-            }
-
-            if (function_exists('ace_sitemap_powertools_sanitize_options')) {
-                $sanitized_sitemap_options = ace_sitemap_powertools_sanitize_options($raw_sitemap_options);
-            } else {
-                $sanitized_sitemap_options = $raw_sitemap_options;
-            }
+            // Cleaned field by field, for each setting's own type, by the sitemap options sanitiser.
+            $sanitized_sitemap_options = ace_sitemap_powertools_sanitize_options(
+                is_array($_POST['ace_sitemap_powertools_options']) ? wp_unslash($_POST['ace_sitemap_powertools_options']) : []
+            );
 
             $sitemap_options_updated = update_option('ace_sitemap_powertools_options', $sanitized_sitemap_options);
         }

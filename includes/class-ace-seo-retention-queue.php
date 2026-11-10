@@ -294,7 +294,7 @@ class AceSeoRetentionQueue {
         foreach ( array( 'operation', 'plan', 'scope', 'cap', 'enabled' ) as $k ) { if ( isset( $_POST[ $k ] ) && ! is_scalar( $_POST[ $k ] ) ) { wp_die( 'Invalid form.' ); } }
         $op = sanitize_key( wp_unslash( $_POST['operation'] ?? '' ) ); $plan = absint( $_POST['plan'] ?? 0 );
         try {
-            if ( 'configure' === $op ) { $r = self::configure( ! empty( $_POST['enabled'] ), preg_split( '/[\s,]+/', wp_unslash( $_POST['scope'] ?? '' ) ), absint( wp_unslash( $_POST['cap'] ?? 3 ) ) ); }
+            if ( 'configure' === $op ) { $r = self::configure( ! empty( $_POST['enabled'] ), preg_split( '/[\s,]+/', sanitize_text_field( wp_unslash( $_POST['scope'] ?? '' ) ) ), absint( wp_unslash( $_POST['cap'] ?? 3 ) ) ); }
             elseif ( 'pause' === $op ) { $c = self::control(); $r = self::configure( false, $c['scope'], $c['daily_cap'] ); }
             elseif ( 'approve' === $op ) { $r = self::approve( $plan ); }
             elseif ( 'undo' === $op ) { $r = self::undo( $plan ); }

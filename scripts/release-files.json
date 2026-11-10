@@ -82,6 +82,7 @@
   "includes/class-ace-seo-aggregate-views.php",
   "includes/class-ace-seo-assets.php",
   "includes/class-ace-seo-export.php",
+  "includes/class-ace-seo-input.php",
   "includes/class-ace-seo-redirects.php",
   "includes/class-ace-seo-retention-actions.php",
   "includes/class-ace-seo-retention-dated-traffic.php",

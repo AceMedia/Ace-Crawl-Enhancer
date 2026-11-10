@@ -211,7 +211,7 @@ class AceSeoRedirects {
     public static function handle_save() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'You do not have permission to manage redirects.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_seo_redirect_save' );
-        $input = wp_unslash( $_POST );
+        $input = AceSeoInput::post( array( 'ids' => 'ids', 'operation' => 'key', 'target' => 'target', 'code' => 'int', 'expires' => 'text', 'trash' => 'bool', 'paused' => 'bool' ) );
         $ids = array_slice( array_unique( array_map( 'absint', (array) ( $input['ids'] ?? array() ) ) ), 0, 50 );
         $count = 0; $errors = array();
         foreach ( $ids as $id ) {

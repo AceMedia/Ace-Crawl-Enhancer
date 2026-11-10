@@ -198,7 +198,7 @@ final class AceSeoRetentionPrototype {
     public static function handle() {
         if ( ! self::enabled() || ! current_user_can( 'manage_options' ) ) { wp_die( 'Administrator permission required.', '', array( 'response' => 403 ) ); }
         check_admin_referer( 'ace_retention_preview' );
-        $input = wp_unslash( $_POST );
+        $input = AceSeoInput::post( array( 'source' => 'text', 'target' => 'target', 'start' => 'text', 'end' => 'text', 'reason' => 'textarea', 'operation' => 'key', 'confirmed' => 'text', 'links_confirmed' => 'text', 'links_source' => 'text' ) );
         foreach ( array( 'source', 'target', 'start', 'end', 'reason', 'operation', 'confirmed', 'links_confirmed', 'links_source' ) as $key ) {
             if ( isset( $input[ $key ] ) && ! is_scalar( $input[ $key ] ) ) { wp_die( 'Invalid form data.' ); }
         }

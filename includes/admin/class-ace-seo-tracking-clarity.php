@@ -33,7 +33,7 @@ class AceSeoTrackingClarity {
             delete_transient( self::CACHE );
         } else {
             $project = (string) get_option( 'clarity_project_id', '' );
-            $token = isset( $_POST['clarity_token'] ) && is_string( $_POST['clarity_token'] ) ? trim( wp_unslash( $_POST['clarity_token'] ) ) : '';
+            $token = isset( $_POST['clarity_token'] ) && is_string( $_POST['clarity_token'] ) ? sanitize_text_field( wp_unslash( $_POST['clarity_token'] ) ) : '';
             if ( '' !== $token ) {
                 if ( ! $project || strlen( $token ) > 8192 || preg_match( '/[^\x21-\x7e]/', $token ) ) { wp_die( 'Enter a valid token for the configured Clarity project.' ); }
                 $encrypted = self::encrypt( $token, $project );

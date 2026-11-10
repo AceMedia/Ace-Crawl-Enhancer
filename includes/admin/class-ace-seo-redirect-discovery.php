@@ -21,7 +21,7 @@ class AceSeoRedirectDiscovery {
     public static function ajax_destinations() {
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( array( 'message' => 'You do not have permission to search redirect destinations.' ), 403 ); }
         check_ajax_referer( 'ace_seo_redirect_destinations', 'nonce' );
-        $result = self::destinations( wp_unslash( $_POST ) );
+        $result = self::destinations( AceSeoInput::post( array( 'search' => 'text', 'types' => 'text' ) ) );
         if ( is_wp_error( $result ) ) { wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 ); }
         wp_send_json_success( $result );
     }

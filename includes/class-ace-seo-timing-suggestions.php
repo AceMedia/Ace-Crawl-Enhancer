@@ -41,10 +41,11 @@ class Ace_SEO_Timing_Suggestions {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         $choices = array();
-        foreach ( (array) wp_unslash( $_POST['rule'] ?? array() ) as $key => $text ) {
-            $choices[ sanitize_text_field( (string) $key ) ] = sanitize_text_field( (string) $text );
+        $rules = isset( $_POST['rule'] ) && is_array( $_POST['rule'] ) ? map_deep( wp_unslash( $_POST['rule'] ), 'sanitize_text_field' ) : array();
+        foreach ( $rules as $key => $text ) {
+            $choices[ sanitize_text_field( (string) $key ) ] = (string) $text;
         }
-        $ignore = array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['ignore'] ?? array() ) );
+        $ignore = isset( $_POST['ignore'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['ignore'] ) ) : array();
         $result = AceSeoRetentionActions::set_timing_rules( $choices, $ignore );
         if ( $result['invalid'] ) {
             wp_send_json_error( array( 'message' => 'These rules were not understood and were left unchanged: ' . implode( ', ', $result['invalid'] ) . '. An event needs a number of days; a season needs two dates as MM-DD.' ) );
