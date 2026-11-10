@@ -472,6 +472,7 @@ final class AceCrawlLegacyNames {
 
 	/** Old option => new option. */
 	const OPTIONS = array(
+		'ace_ai_connection_v1' => 'acemedia_ai_connection_v1',
 		'ace_ai_host_id_v1' => 'acemedia_ai_host_id_v1',
 		'ace_retention_queue_schema' => 'acecrawl_retention_queue_schema',
 		'ace_seo_activation_date' => 'acecrawl_activation_date',
@@ -525,6 +526,8 @@ final class AceCrawlLegacyNames {
 		if ( (int) get_option( self::MIGRATED ) < self::VERSION ) {
 			self::migrate();
 		}
+		// Every load, as running an older copy again reschedules its events under the old names.
+		self::move_events();
 	}
 
 	/** Everything else, once the plugin's own code has loaded. */
@@ -624,6 +627,11 @@ final class AceCrawlLegacyNames {
 			}
 			update_site_option( self::MIGRATED, self::VERSION );
 		}
+		update_option( self::MIGRATED, self::VERSION, false );
+	}
+
+	/** Move events scheduled under an old hook name to the new one. Writes nothing when there are none. */
+	public static function move_events() {
 		$cron = _get_cron_array();
 		foreach ( is_array( $cron ) ? $cron : array() as $timestamp => $hooks ) {
 			foreach ( self::CRONS as $old => $new ) {
@@ -640,7 +648,6 @@ final class AceCrawlLegacyNames {
 				}
 			}
 		}
-		update_option( self::MIGRATED, self::VERSION, false );
 	}
 }
 
