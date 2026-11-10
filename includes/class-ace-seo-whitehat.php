@@ -39,8 +39,10 @@ class AceCrawlWhiteHat {
     /** Generic AI instruction for fresh installs. */
     const DEFAULT_INSTRUCTION = 'You check articles for promotional calls to action. An article is white hat when it does not tell or encourage the reader to buy, sign up for, claim or otherwise act on a promoted offer. Reporting facts, prices or offers as information, and mentioning a brand, are fine. You get the headline and only the sentences that contain trigger words. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.';
 
+    // acecrawl-source-only:start
     /** The instruction used before it became a setting; kept for sites whose settings predate that. */
     const LEGACY_INSTRUCTION = 'You check sports news articles for a betting company. An article is white hat when it contains no betting call to action: it does not tell or encourage the reader to place, back, add or claim a bet, and does not offer odds as a bet to take. Reporting odds or prices as information, and mentioning the brand, are fine. You get the headline and only the sentences that mention betting. Reply with JSON only: {"white_hat": true or false, "reasons": ["short reason", ...]}.';
+    // acecrawl-source-only:end
     const META          = '_ace_seo_whitehat';
     const META_DATA     = '_ace_seo_whitehat_data';
     const META_RECHECK  = '_ace_seo_whitehat_recheck';
@@ -95,10 +97,12 @@ class AceCrawlWhiteHat {
     public static function options() {
         $saved = get_option( self::OPTION, array() );
         $o     = array_merge( self::defaults(), is_array( $saved ) ? array_intersect_key( $saved, self::defaults() ) : array() );
+        // acecrawl-source-only:start
         // Settings saved before the instruction became a setting keep the instruction they were tuned with.
         if ( is_array( $saved ) && $saved && ! array_key_exists( 'instruction', $saved ) ) {
             $o['instruction'] = self::LEGACY_INSTRUCTION;
         }
+        // acecrawl-source-only:end
         if ( defined( 'ACECRAWL_WHITEHAT_API_KEY' ) && ACECRAWL_WHITEHAT_API_KEY ) {
             $o['api_key'] = (string) ACECRAWL_WHITEHAT_API_KEY;
         }

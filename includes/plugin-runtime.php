@@ -1,10 +1,12 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
-// Source installs from before the acecrawl prefix keep their old names working. Not part of the WordPress.org package.
+// acecrawl-source-only:start
+// Source installs from before the acecrawl prefix keep their old names working. The release build leaves this out.
 if ( file_exists( ACECRAWL_PATH . 'compat/legacy-names.php' ) ) {
     require_once ACECRAWL_PATH . 'compat/legacy-names.php';
 }
+// acecrawl-source-only:end
 require_once ACECRAWL_PATH . 'includes/class-ace-seo-assets.php';
 require_once ACECRAWL_PATH . 'includes/class-ace-seo-input.php';
 require_once ACECRAWL_PATH . 'includes/shared-ai/bootstrap.php';
@@ -3458,6 +3460,8 @@ register_activation_hook(ACECRAWL_FILE, array('AceCrawlActivator', 'activate'));
 // Deactivation hook
 register_deactivation_hook(ACECRAWL_FILE, array('AceCrawlDeactivator', 'deactivate'));
 
+// acecrawl-source-only:start
 if ( class_exists( 'AceCrawlLegacyNames', false ) ) {
     AceCrawlLegacyNames::boot();
 }
+// acecrawl-source-only:end

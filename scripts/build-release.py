@@ -20,6 +20,20 @@ VERSION = _header.group(1)
 if len(FILES) != len(set(FILES)):
     raise SystemExit("Duplicate path in release manifest")
 
+# Code between these markers keeps older installs of the source repository working; the release leaves it out.
+SOURCE_ONLY = re.compile(rb"^[ \t]*// acecrawl-source-only:start\n.*?^[ \t]*// acecrawl-source-only:end\n", re.M | re.S)
+
+
+def release_bytes(relative: str, path: Path) -> bytes:
+    data = path.read_bytes()
+    if not relative.endswith(".php"):
+        return data
+    data, _ = SOURCE_ONLY.subn(b"", data)
+    if b"acecrawl-source-only" in data:
+        raise SystemExit(f"Unbalanced source-only marker in {relative}")
+    return data
+
+
 DIST = ROOT / "dist"
 DIST.mkdir(exist_ok=True)
 archive = DIST / f"{SLUG}-{VERSION}.zip"
@@ -31,7 +45,7 @@ with ZipFile(archive, "w", compression=ZIP_DEFLATED) as output:
         info = ZipInfo(f"{SLUG}/{relative}", (2026, 1, 1, 0, 0, 0))
         info.compress_type = ZIP_DEFLATED
         info.external_attr = 0o100644 << 16
-        output.writestr(info, path.read_bytes())
+        output.writestr(info, release_bytes(relative, path))
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 archive.with_suffix(".zip.sha256").write_text(f"{digest}  {archive.name}\n")
 print(f"{archive}\n{digest}")
