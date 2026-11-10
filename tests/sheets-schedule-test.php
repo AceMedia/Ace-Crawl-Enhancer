@@ -32,7 +32,7 @@ function wp_next_scheduled($h){return $GLOBALS['cron'][$h]['timestamp']??false;}
 function wp_schedule_single_event($t,$h,$args=[],$e=false){$GLOBALS['cron'][$h]=['timestamp'=>$t,'schedule'=>false];return true;}
 function wp_schedule_event($t,$s,$h){$GLOBALS['cron'][$h]=['timestamp'=>$t,'schedule'=>$s];return true;}
 function wp_get_scheduled_event($h){return isset($GLOBALS['cron'][$h])?(object)$GLOBALS['cron'][$h]:false;}
-function wp_get_schedules(){return ['daily'=>['interval'=>86400],'weekly'=>['interval'=>604800],'ace_seo_four_weeks'=>['interval'=>2419200]];}
+function wp_get_schedules(){return ['daily'=>['interval'=>86400],'weekly'=>['interval'=>604800],'acecrawl_four_weeks'=>['interval'=>2419200]];}
 function wp_clear_scheduled_hook($h){unset($GLOBALS['cron'][$h]);}
 function sanitize_key($x){return strtolower(preg_replace('/[^a-zA-Z0-9_-]/','',$x));}
 function wp_strip_all_tags($x){return strip_tags($x);}

@@ -1210,23 +1210,23 @@ function acecrawl_sitemap_gen_render_status_panel() {
     echo '</tbody></table>';
 
     echo '<form method="post" style="margin-top:12px">';
-    wp_nonce_field( 'ace_sitemap_gen_action', 'ace_sitemap_gen_nonce' );
-    submit_button( $s['paused'] ? 'Resume' : 'Pause', 'secondary', 'ace_sitemap_gen_do[' . ( $s['paused'] ? 'resume' : 'pause' ) . ']', false );
+    wp_nonce_field( 'acecrawl_sitemap_gen_action', 'acecrawl_sitemap_gen_nonce' );
+    submit_button( $s['paused'] ? 'Resume' : 'Pause', 'secondary', 'acecrawl_sitemap_gen_do[' . ( $s['paused'] ? 'resume' : 'pause' ) . ']', false );
     echo ' ';
-    submit_button( 'Queue a full rebuild', 'secondary', 'ace_sitemap_gen_do[rebuild]', false );
+    submit_button( 'Queue a full rebuild', 'secondary', 'acecrawl_sitemap_gen_do[rebuild]', false );
     echo ' ';
-    submit_button( 'Retry failures now', 'secondary', 'ace_sitemap_gen_do[retry]', false );
+    submit_button( 'Retry failures now', 'secondary', 'acecrawl_sitemap_gen_do[retry]', false );
     echo '<p class="description">Rebuilds run in the background, a few lists at a time. The current sitemaps stay online throughout.</p>';
     echo '</form>';
 }
 
 function acecrawl_sitemap_gen_handle_admin_action() {
-    if ( empty( $_POST['ace_sitemap_gen_do'] ) || ! current_user_can( 'manage_options' ) ) {
+    if ( empty( $_POST['acecrawl_sitemap_gen_do'] ) || ! current_user_can( 'manage_options' ) ) {
         return;
     }
-    check_admin_referer( 'ace_sitemap_gen_action', 'ace_sitemap_gen_nonce' );
+    check_admin_referer( 'acecrawl_sitemap_gen_action', 'acecrawl_sitemap_gen_nonce' );
 
-    $requested = map_deep( (array) wp_unslash( $_POST['ace_sitemap_gen_do'] ), 'sanitize_text_field' );
+    $requested = map_deep( (array) wp_unslash( $_POST['acecrawl_sitemap_gen_do'] ), 'sanitize_text_field' );
     $action    = sanitize_key( (string) key( $requested ) );
     if ( 'pause' === $action ) {
         acecrawl_sitemap_gen_set_paused( true );

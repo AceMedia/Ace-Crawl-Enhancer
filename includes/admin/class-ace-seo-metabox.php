@@ -252,12 +252,14 @@ class AceCrawlMetabox {
                 $input_name = 'yoast_wpseo_' . $field_key;
                 
                 if ( isset( $_POST[ $input_name ] ) ) {
-                    $value = map_deep( wp_unslash( $_POST[ $input_name ] ), 'sanitize_textarea_field' );
+                    // URLs keep their percent-encoding; every other type is cleaned as text first.
+                    $value = 'url' === $field_config['type']
+                        ? esc_url_raw( trim( (string) wp_unslash( $_POST[ $input_name ] ) ) )
+                        : map_deep( wp_unslash( $_POST[ $input_name ] ), 'sanitize_textarea_field' );
                     
                     // Sanitize based on field type
                     switch ( $field_config['type'] ) {
                         case 'url':
-                            $value = esc_url_raw( $value );
                             break;
                         case 'textarea':
                             $value = sanitize_textarea_field( $value );

@@ -40,12 +40,12 @@ class AceCrawlSheetsSchedule {
     }
 
     public static function intervals( $schedules ) {
-        $schedules['ace_seo_four_weeks'] = array( 'interval' => 28 * DAY_IN_SECONDS, 'display' => 'Every four weeks' );
+        $schedules['acecrawl_four_weeks'] = array( 'interval' => 28 * DAY_IN_SECONDS, 'display' => 'Every four weeks' );
         return $schedules;
     }
 
     public static function frequencies() {
-        return array( 'off' => 'Off', 'daily' => 'Every day', 'weekly' => 'Every week', 'ace_seo_four_weeks' => 'Every four weeks' );
+        return array( 'off' => 'Off', 'daily' => 'Every day', 'weekly' => 'Every week', 'acecrawl_four_weeks' => 'Every four weeks' );
     }
 
     /** Read these small control records from the database: web/CLI object caches can differ. */

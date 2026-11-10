@@ -90,8 +90,11 @@ final class AceCrawlInput {
         return (string) wp_json_encode( map_deep( $decoded, array( __CLASS__, 'json_string' ) ) );
     }
 
-    /** @internal map_deep() callback: strings lose markup and control characters, other scalars pass. */
+    /**
+     * @internal map_deep() callback for JSON credentials: strings lose null bytes and invalid UTF-8 but
+     * keep every other character, as keys and certificate URLs must stay byte for byte.
+     */
     public static function json_string( $value ) {
-        return is_string( $value ) ? sanitize_textarea_field( $value ) : $value;
+        return is_string( $value ) ? wp_check_invalid_utf8( wp_kses_no_null( $value ) ) : $value;
     }
 }

@@ -88,7 +88,8 @@ class AceCrawlUninstaller {
         );
         
         global $wpdb;
-        foreach ( array( 'ace_seo_', 'ace_sitemap_', 'ace_retention_' ) as $prefix ) {
+        // Only this plugin's own prefix: other Ace plugins keep options that start with ace_seo_.
+        foreach ( array( 'acecrawl_' ) as $prefix ) {
             $names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( $prefix ) . '%' ) );
             $options_to_remove = array_merge( $options_to_remove, $names );
         }

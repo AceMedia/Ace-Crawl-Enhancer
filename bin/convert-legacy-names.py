@@ -45,6 +45,10 @@ def load_map() -> dict[str, str]:
 
 def files(paths: list[Path]):
     for base in paths:
+        if base.is_symlink():
+            # A site's plugin folder can link to a repository other sites share; convert that on purpose.
+            print(f"LINK  {base} -> {base.resolve()}  (pass the target path to convert it; skipped)")
+            continue
         if base.is_file():
             yield base, False
             continue
@@ -75,7 +79,8 @@ def main() -> int:
     built_hits = []
     for path, built in files(args.paths):
         try:
-            text = path.read_text(encoding="utf-8")
+            with path.open(encoding="utf-8", newline="") as handle:
+                text = handle.read()
         except (UnicodeDecodeError, OSError):
             continue
         found: dict[str, int] = {}
@@ -95,7 +100,8 @@ def main() -> int:
         shown = ", ".join(sorted(found)[:4]) + (" ..." if len(found) > 4 else "")
         print(f"{count:4d}  {path}  ({shown})")
         if args.write:
-            path.write_text(converted, encoding="utf-8")
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                handle.write(converted)
 
     for path, count in built_hits:
         print(f"BUILT {count:3d}  {path}  (rebuild from source; not edited)")

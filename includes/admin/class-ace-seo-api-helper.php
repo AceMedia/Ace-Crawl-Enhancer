@@ -59,6 +59,9 @@ class AceCrawlApiHelper {
      */
     public function validate_openai_key() {
         check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
         
         $api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ?? '' ) );
         $result = $this->test_openai_connection( $api_key );
@@ -71,6 +74,9 @@ class AceCrawlApiHelper {
      */
     public function validate_pagespeed_key() {
         check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
+        }
         
         $api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ?? '' ) );
         $result = $this->test_pagespeed_connection( $api_key );
