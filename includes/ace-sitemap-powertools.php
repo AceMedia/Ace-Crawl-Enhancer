@@ -1814,6 +1814,20 @@ function acecrawl_sitemap_admin_notices() {
 }
 add_action( 'admin_notices', 'acecrawl_sitemap_admin_notices' );
 
+/**
+ * Whether a provider still offers a subtype. Providers list their subtypes after the
+ * wp_sitemaps_post_types / wp_sitemaps_taxonomies filters, so an excluded post type or
+ * taxonomy is missing here. Providers without subtypes (users, news) always pass.
+ */
+function acecrawl_sitemap_subtype_is_offered( $provider, $subtype ) {
+    if ( '' === (string) $subtype || ! is_object( $provider ) || ! method_exists( $provider, 'get_object_subtypes' ) ) {
+        return true;
+    }
+
+    $subtypes = (array) $provider->get_object_subtypes();
+    return empty( $subtypes ) || isset( $subtypes[ $subtype ] );
+}
+
 function acecrawl_sitemap_serve_custom_routes() {
     if ( ! acecrawl_sitemap_is_enabled( 'enable_custom_routes' ) || ! acecrawl_sitemap_is_enabled( 'serve_custom_routes' ) ) {
         return;
@@ -1854,7 +1868,11 @@ function acecrawl_sitemap_serve_custom_routes() {
             return;
         }
 
-        $url_list = acecrawl_sitemap_get_cached_url_list( $provider, $route, $page );
+        // A subtype the provider no longer offers (a post type or taxonomy left out of the
+        // sitemaps) is gone, even when a list built before it was excluded is still stored.
+        $url_list = acecrawl_sitemap_subtype_is_offered( $provider, $route['subtype'] )
+            ? acecrawl_sitemap_get_cached_url_list( $provider, $route, $page )
+            : array();
         if ( null === $url_list ) {
             acecrawl_sitemap_send_unavailable();
         }

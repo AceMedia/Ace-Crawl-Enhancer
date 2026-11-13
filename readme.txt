@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.98
+Stable tag: 1.0.99
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,9 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.99 =
+* A sitemap for a post type or taxonomy left out of the sitemaps answers 404, even when a list built before it was left out is still stored. Before, leaving the glossary out dropped it from the index but its stored glossary-1.xml and glossary-2.xml were still served.
 
 = 1.0.98 =
 * Every function, class, constant, hook, option, AJAX action and admin-post action now uses the acecrawl prefix (acemedia_ai for the shared AI connection library).
