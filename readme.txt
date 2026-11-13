@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.99
+Stable tag: 1.0.100
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,9 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.100 =
+* The page view counter sends nothing from crawlers and automated browsers (the same list the server already ignores). Googlebot runs page scripts while rendering, and on one site its counter calls were a fifth of all its requests, every one refused.
 
 = 1.0.99 =
 * A sitemap for a post type or taxonomy left out of the sitemaps answers 404, even when a list built before it was left out is still stored. Before, leaving the glossary out dropped it from the index but its stored glossary-1.xml and glossary-2.xml were still served.

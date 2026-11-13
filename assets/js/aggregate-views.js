@@ -4,6 +4,10 @@
     const endpoint = new URL(window.aceAggregateViewsConfig.endpoint, location.href);
     if (endpoint.origin !== location.origin) return;
     const preference = 'ace_basic_views_off';
+    // Crawlers that run scripts (Googlebot renders every page) would only be refused or ignored by
+    // the counter, so they never send. Same list as AceCrawlViewTracker::is_bot().
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    const crawler = navigator.webdriver === true || /bot|crawl|spider|slurp|scrape|fetch|preview|facebookexternalhit|embedly|headless|phantomjs|lighthouse|pagespeed|gtmetrix|pingdom|uptime|monitor|curl|wget|python|java\/|go-http|okhttp|axios|node-fetch|httpclient|libwww|feedparser|mediapartners|adsbot|google-inspectiontool|chrome-lighthouse|bingpreview|yandex|baidu|semrush|ahrefs|mj12|dotbot|petalbot|bytespider|gptbot|claudebot|ccbot|perplexity|amazonbot|applebot/.test(ua);
     let last = null, pending, stopped = false;
     const routes = new Set([location.pathname + location.search + location.hash]);
     const cookie = name => {
@@ -25,7 +29,7 @@
         const route = location.pathname + location.search + location.hash;
         if (!force && route === last) return;
         last = route;
-        if (stopped || optedOut()) return;
+        if (stopped || crawler || optedOut()) return;
         // No URL, referrer, cookie, visitor identifier or consent profile leaves the page.
         // Do not retry: without an identifier, retries could count one view twice.
         fetch(endpoint.href, {method: 'POST', mode: 'same-origin', credentials: 'omit',
