@@ -11,7 +11,7 @@
  * Plugin Name: Ace Crawl Enhancer
  * Plugin URI: https://github.com/AceMedia/Ace-Crawl-Enhancer
  * Description: Advanced SEO plugin with seamless Yoast migration, modern interface, AI-powered optimization, and comprehensive SEO features.
- * Version: 1.0.101
+ * Version: 1.0.102
  * Author: AceMedia
  * Text Domain: ace-crawl-enhancer
  * Domain Path: /languages
@@ -34,7 +34,7 @@ if (version_compare(PHP_VERSION, '7.4', '<') || version_compare($GLOBALS['wp_ver
 }
 
 // Define plugin constants
-define('ACECRAWL_VERSION', '1.0.101');
+define('ACECRAWL_VERSION', '1.0.102');
 define('ACECRAWL_FILE', __FILE__);
 define('ACECRAWL_PATH', plugin_dir_path(__FILE__));
 define('ACECRAWL_URL', plugin_dir_url(__FILE__));
@@ -46,6 +46,13 @@ define('ACECRAWL_BASENAME', plugin_basename(__FILE__));
 if ('POST' === ($_SERVER['REQUEST_METHOD'] ?? '') && preg_match('#/wp-json/ace-seo/v1/aggregate-view/?(\?|$)#', (string) ($_SERVER['REQUEST_URI'] ?? ''))) {
     require_once ACECRAWL_PATH . 'includes/class-ace-seo-view-tracker.php';
     require_once ACECRAWL_PATH . 'includes/class-ace-seo-aggregate-views.php';
+    if (AceCrawlAggregateViews::fast_refuse($_SERVER)) {
+        status_header(401);
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+        echo '{"code":"rest_forbidden","message":"Sorry, you are not allowed to do that.","data":{"status":401}}';
+        exit;
+    }
     if (AceCrawlAggregateViews::fast_hit($_SERVER, (string) file_get_contents('php://input'))) {
         status_header(204);
         header('Cache-Control: no-store');

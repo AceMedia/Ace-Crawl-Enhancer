@@ -66,6 +66,10 @@ $options[AceCrawlAggregateViews::OPTION]=0;check('Fast path does nothing when th
 $GLOBALS['multisite']=true;check('Fast path stays out of multisite',!AceCrawlAggregateViews::fast_hit($fast,'{"v":1}'));$GLOBALS['multisite']=false;
 check('Fast path wrote nothing for refused requests',count($wpdb->queries)===$before);
 foreach(array('HTTP_DNT'=>'1','HTTP_SEC_GPC'=>'1','HTTP_USER_AGENT'=>'Googlebot') as $key=>$value){check('Fast path answers '.$key.' without writing',AceCrawlAggregateViews::fast_hit(array($key=>$value)+$fast,'{"v":1}') && count($wpdb->queries)===$before);}
+check('Fast path counts a same-origin hit that carries no Origin',AceCrawlAggregateViews::fast_hit(array('HTTP_ORIGIN'=>'')+$fast,'{"v":1}'));
+check('A request without browser fetch metadata is refused early',AceCrawlAggregateViews::fast_refuse(array('HTTP_ORIGIN'=>'https://example.test')) && AceCrawlAggregateViews::fast_refuse(array('HTTP_SEC_FETCH_SITE'=>'cross-site')));
+check('A same-origin browser request is never refused early',!AceCrawlAggregateViews::fast_refuse($fast) && !AceCrawlAggregateViews::fast_refuse(array('HTTP_SEC_FETCH_SITE'=>'same-origin','HTTP_ORIGIN'=>'https://mapped.example')));
+$r=new Request();$r->headers['origin']='';check('The route also accepts a same-origin request with no Origin',AceCrawlAggregateViews::permission($r));
 $wpdb->fail=true;check('Fast path hands a failed write to the route',!AceCrawlAggregateViews::fast_hit($fast,'{"v":1}'));$wpdb->fail=false;
 
 ob_start(); AceCrawlAggregateViews::privacy(); $html=ob_get_clean();

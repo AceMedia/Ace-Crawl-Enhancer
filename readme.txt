@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.101
+Stable tag: 1.0.102
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,10 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.102 =
+* The basic page view counter turns away automated requests before the rest of WordPress loads.
+* A same-origin request from a browser that sends no Origin header is now counted.
 
 = 1.0.101 =
 * The basic page view counter now records a visit before the rest of WordPress loads, so counting views no longer uses a full page's worth of server time.

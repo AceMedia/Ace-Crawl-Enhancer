@@ -59,7 +59,7 @@ class AceCrawlAggregateViews {
         $expected = $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
         // The beacon's no-referrer policy makes browsers following the Fetch spec, such as Safari,
         // send "Origin: null". Sec-Fetch-Site still proves the request came from our own page.
-        return self::enabled() && ( $origin === $expected || 'null' === $origin )
+        return self::enabled() && ( $origin === $expected || 'null' === $origin || '' === $origin )
             && 'same-origin' === $request->get_header( 'sec-fetch-site' )
             && strlen( $request->get_body() ) <= 32;
     }
@@ -82,7 +82,7 @@ class AceCrawlAggregateViews {
         if ( empty( $home['scheme'] ) || empty( $home['host'] ) ) { return false; }
         $expected = $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
         $origin = untrailingslashit( $get( 'HTTP_ORIGIN' ) );
-        if ( ( $origin !== $expected && 'null' !== $origin ) || 'same-origin' !== $get( 'HTTP_SEC_FETCH_SITE' ) ) { return false; }
+        if ( ( $origin !== $expected && 'null' !== $origin && '' !== $origin ) || 'same-origin' !== $get( 'HTTP_SEC_FETCH_SITE' ) ) { return false; }
         $host = strtolower( $get( 'HTTP_HOST' ) );
         if ( $host !== strtolower( $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' ) ) ) { return false; }
         if ( strlen( (string) $raw ) > 32 || array( 'v' => 1 ) !== json_decode( (string) $raw, true ) ) { return false; }
@@ -90,6 +90,17 @@ class AceCrawlAggregateViews {
         global $wpdb;
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
         return false !== $wpdb->query( $wpdb->prepare( 'INSERT INTO ' . self::table() . ' (day, views) VALUES (%s, 1) ON DUPLICATE KEY UPDATE views = views + 1', wp_date( 'Y-m-d' ) ) );
+    }
+    /**
+     * True when the route could only refuse this request: every browser sends
+     * "Sec-Fetch-Site: same-origin" with the beacon and page scripts cannot set that header, so a
+     * request without it is an automated client. On one site those were nine in ten counter
+     * requests, each loading the whole of WordPress to be told no.
+     *
+     * @param array $server Request server variables.
+     */
+    public static function fast_refuse( array $server ) {
+        return 'same-origin' !== ( isset( $server['HTTP_SEC_FETCH_SITE'] ) ? sanitize_text_field( wp_unslash( $server['HTTP_SEC_FETCH_SITE'] ) ) : '' );
     }
     public static function hit( $request ) {
         $body = $request->get_json_params();
