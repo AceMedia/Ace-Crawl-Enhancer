@@ -63,6 +63,34 @@ class AceCrawlAggregateViews {
             && 'same-origin' === $request->get_header( 'sec-fetch-site' )
             && strlen( $request->get_body() ) <= 32;
     }
+    /**
+     * Count a plain, valid hit while this plugin is still loading, so the request never pays for
+     * the rest of WordPress (later plugins, the theme, the REST server). Measured on a busy server
+     * the full route cost 0.3 to 5 seconds per view for one INSERT.
+     *
+     * Returns true only when the hit was fully handled. Anything else (another origin such as a
+     * mapped domain, an odd body, multisite, a failed write) returns false and the normal REST
+     * route decides, exactly as before.
+     *
+     * @param array  $server Request server variables.
+     * @param string $raw    Raw request body.
+     */
+    public static function fast_hit( array $server, $raw ) {
+        if ( is_multisite() || ! self::enabled() ) { return false; }
+        $get = static function ( $key ) use ( $server ) { return isset( $server[ $key ] ) ? sanitize_text_field( wp_unslash( $server[ $key ] ) ) : ''; };
+        $home = wp_parse_url( (string) get_option( 'home' ) );
+        if ( empty( $home['scheme'] ) || empty( $home['host'] ) ) { return false; }
+        $expected = $home['scheme'] . '://' . $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' );
+        $origin = untrailingslashit( $get( 'HTTP_ORIGIN' ) );
+        if ( ( $origin !== $expected && 'null' !== $origin ) || 'same-origin' !== $get( 'HTTP_SEC_FETCH_SITE' ) ) { return false; }
+        $host = strtolower( $get( 'HTTP_HOST' ) );
+        if ( $host !== strtolower( $home['host'] . ( isset( $home['port'] ) ? ':' . $home['port'] : '' ) ) ) { return false; }
+        if ( strlen( (string) $raw ) > 32 || array( 'v' => 1 ) !== json_decode( (string) $raw, true ) ) { return false; }
+        if ( '1' === $get( 'HTTP_DNT' ) || '1' === $get( 'HTTP_SEC_GPC' ) || AceCrawlViewTracker::is_bot( $get( 'HTTP_USER_AGENT' ) ) ) { return true; }
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter -- Fixed internal identifier, prepared values.
+        return false !== $wpdb->query( $wpdb->prepare( 'INSERT INTO ' . self::table() . ' (day, views) VALUES (%s, 1) ON DUPLICATE KEY UPDATE views = views + 1', wp_date( 'Y-m-d' ) ) );
+    }
     public static function hit( $request ) {
         $body = $request->get_json_params();
         if ( ! is_array( $body ) || array_keys( $body ) !== array( 'v' ) || 1 !== $body['v'] ) {

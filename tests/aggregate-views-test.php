@@ -51,6 +51,23 @@ $wp->query_vars['rest_route']='/wp/v2/users';check('Private routes remain protec
 $wp->query_vars['rest_route']='/ace-seo/v1/aggregate-view';$invalid=new WP_Error('rest_cookie_invalid_nonce','Bad nonce');check('Other authentication failures remain protected',AceCrawlAggregateViews::public_counter_auth($invalid)===$invalid);
 $_SERVER['REQUEST_METHOD']='GET';check('Only POST is exempt',AceCrawlAggregateViews::public_counter_auth($error)===$error);
 
+// Fast path: handled before the rest of WordPress loads.
+function is_multisite() { return $GLOBALS['multisite'] ?? false; }
+function sanitize_text_field( $v ) { return trim( (string) $v ); }
+function wp_unslash( $v ) { return $v; }
+$fast=array('HTTP_ORIGIN'=>'https://example.test','HTTP_SEC_FETCH_SITE'=>'same-origin','HTTP_HOST'=>'example.test','HTTP_USER_AGENT'=>'Mozilla/5.0 Chrome/140.0 Safari/537.36');
+$options['home']='https://example.test';$before=count($wpdb->queries);
+check('Fast path counts a plain hit',AceCrawlAggregateViews::fast_hit($fast,'{"v":1}') && count($wpdb->queries)===$before+1 && end($wpdb->queries)[1]===array('2026-10-14'));
+check('Fast path accepts the null origin Safari sends',AceCrawlAggregateViews::fast_hit(array('HTTP_ORIGIN'=>'null')+$fast,'{"v":1}'));
+$before=count($wpdb->queries);
+foreach(array('other origin'=>array('HTTP_ORIGIN'=>'https://evil.test'),'cross-site fetch'=>array('HTTP_SEC_FETCH_SITE'=>'cross-site'),'another host'=>array('HTTP_HOST'=>'topic.example.test')) as $label=>$change){check('Fast path leaves '.$label.' to the route',!AceCrawlAggregateViews::fast_hit($change+$fast,'{"v":1}'));}
+foreach(array('{"v":1,"url":"/x"}','{"v":2}','',str_repeat('a',33)) as $bad){check('Fast path leaves an odd body to the route',!AceCrawlAggregateViews::fast_hit($fast,$bad));}
+$options[AceCrawlAggregateViews::OPTION]=0;check('Fast path does nothing when the counter is off',!AceCrawlAggregateViews::fast_hit($fast,'{"v":1}'));$options[AceCrawlAggregateViews::OPTION]=1;
+$GLOBALS['multisite']=true;check('Fast path stays out of multisite',!AceCrawlAggregateViews::fast_hit($fast,'{"v":1}'));$GLOBALS['multisite']=false;
+check('Fast path wrote nothing for refused requests',count($wpdb->queries)===$before);
+foreach(array('HTTP_DNT'=>'1','HTTP_SEC_GPC'=>'1','HTTP_USER_AGENT'=>'Googlebot') as $key=>$value){check('Fast path answers '.$key.' without writing',AceCrawlAggregateViews::fast_hit(array($key=>$value)+$fast,'{"v":1}') && count($wpdb->queries)===$before);}
+$wpdb->fail=true;check('Fast path hands a failed write to the route',!AceCrawlAggregateViews::fast_hit($fast,'{"v":1}'));$wpdb->fail=false;
+
 ob_start(); AceCrawlAggregateViews::privacy(); $html=ob_get_clean();
 check('Visitor UI hidden by default', '' === $html && !AceCrawlAggregateViews::show_privacy());
 $GLOBALS['show_privacy']=true;
