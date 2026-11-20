@@ -43,6 +43,44 @@ const ACECRAWL_SITEMAP_GEN_FORMAT      = 1;
 
 /* ------------------------------------------------------------------ Store */
 
+/** Save complete bytes in the target directory, retaining the last good file on failure. */
+function acecrawl_sitemap_gen_save_bytes( $file, $bytes ) {
+    if ( ! is_string( $bytes ) ) {
+        return false;
+    }
+    $dir = dirname( $file );
+    $tmp = @tempnam( $dir, '.ace-sitemap-' );
+    if ( ! is_string( $tmp ) ) {
+        return false;
+    }
+    try {
+        if ( realpath( dirname( $tmp ) ) !== realpath( $dir ) ) {
+            return false;
+        }
+        $mode = is_file( $file ) ? @fileperms( $file ) : ( 0666 & ~umask() );
+        if ( false === $mode || strlen( $bytes ) !== @file_put_contents( $tmp, $bytes ) ) {
+            return false;
+        }
+        if ( ! @chmod( $tmp, $mode & 0777 ) || ! @rename( $tmp, $file ) ) {
+            return false;
+        }
+        return true;
+    } finally {
+        if ( is_file( $tmp ) ) {
+            wp_delete_file( $tmp );
+        }
+    }
+}
+
+/** Report a bounded reason only, never file paths, raw metadata or URLs. */
+function acecrawl_sitemap_gen_storage_error( $reason ) {
+    static $reported = array();
+    if ( ! isset( $reported[ $reason ] ) ) {
+        $reported[ $reason ] = true;
+        error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason );
+    }
+}
+
 /**
  * Directory holding this site's artifacts, or '' when no usable store exists.
  *
@@ -81,9 +119,11 @@ function acecrawl_sitemap_gen_dir() {
 
     // The lists are public sitemap data, but there is no reason to serve the raw files.
     $parent = dirname( $path );
-    if ( ! file_exists( $parent . '/index.php' ) ) {
-        @file_put_contents( $parent . '/index.php', "<?php\n// Silence is golden.\n" );
-        @file_put_contents( $parent . '/.htaccess', "Require all denied\nDeny from all\n" );
+    foreach ( array( 'index.php' => "<?php\n// Silence is golden.\n", '.htaccess' => "Require all denied\nDeny from all\n" ) as $name => $bytes ) {
+        if ( ! file_exists( $parent . '/' . $name ) && ! acecrawl_sitemap_gen_save_bytes( $parent . '/' . $name, $bytes ) ) {
+            acecrawl_sitemap_gen_storage_error( 'protective-file-save' );
+            return $dir;
+        }
     }
 
     $dir = untrailingslashit( $path );
@@ -226,36 +266,60 @@ function acecrawl_sitemap_gen_meta_get( $name ) {
     return is_array( $value ) ? $value : array();
 }
 
-/** Read-modify-write a record under a blocking lock, so concurrent writers never lose updates. */
-function acecrawl_sitemap_gen_meta_update( $name, callable $mutate ) {
+/**
+ * Read-modify-write under a blocking lock. Return only the last committed record.
+ *
+ * @param bool|null $committed Optional explicit persistence result for callers that need it.
+ * @return array Last successfully saved value, or an empty record when none is available.
+ */
+function acecrawl_sitemap_gen_meta_update( $name, callable $mutate, &$committed = null ) {
+    $committed = false;
     $dir = acecrawl_sitemap_gen_dir();
     if ( '' === $dir ) {
         return array();
     }
-
-    $fh = @fopen( $dir . '/.lock-meta', 'c' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
+    $before = acecrawl_sitemap_gen_meta_get( $name );
+    $fh = @fopen( $dir . '/.lock-meta', 'c' );
     if ( ! $fh ) {
-        $fh = @fopen( $dir . '/.lock-meta', 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
+        $fh = @fopen( $dir . '/.lock-meta', 'r' );
     }
-    if ( $fh ) {
-        flock( $fh, LOCK_EX );
+    if ( ! $fh ) {
+        acecrawl_sitemap_gen_storage_error( 'metadata-lock-open' );
+        return $before;
     }
-
+    $locked = false;
     try {
-        $value = (array) $mutate( acecrawl_sitemap_gen_meta_get( $name ) );
-        $file  = $dir . '/' . $name . '.meta';
-        $tmp   = $dir . '/.' . $name . '.' . wp_generate_password( 8, false ) . '.tmp';
-        if ( false !== @file_put_contents( $tmp, wp_json_encode( $value, JSON_UNESCAPED_SLASHES ) ) ) {
-            @rename( $tmp, $file ) || wp_delete_file( $tmp ); // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
+        $locked = flock( $fh, LOCK_EX );
+        if ( ! $locked ) {
+            acecrawl_sitemap_gen_storage_error( 'metadata-lock-acquire' );
+            return $before;
         }
+        // Read again while locked: the snapshot taken before waiting may be stale.
+        $file = $dir . '/' . $name . '.meta';
+        if ( is_file( $file ) ) {
+            $raw = @file_get_contents( $file );
+            $before = is_string( $raw ) ? json_decode( $raw, true ) : null;
+            if ( ! is_array( $before ) ) {
+                acecrawl_sitemap_gen_storage_error( 'metadata-invalid-existing-record' );
+                return array();
+            }
+        } else {
+            $before = array();
+        }
+        $value = (array) $mutate( $before );
+        $json = wp_json_encode( $value, JSON_UNESCAPED_SLASHES );
+        if ( ! acecrawl_sitemap_gen_save_bytes( $file, $json ) ) {
+            acecrawl_sitemap_gen_storage_error( 'metadata-save' );
+            return $before;
+        }
+        $committed = true;
+        return $value;
     } finally {
-        if ( $fh ) {
+        if ( $locked ) {
             flock( $fh, LOCK_UN );
-            fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- locked, atomic write inside a private plugin directory; WP_Filesystem cannot flock or rename atomically.
         }
+        fclose( $fh );
     }
-
-    return $value;
 }
 
 /* ------------------------------------------------------------ Dirty tracking */
@@ -1066,13 +1130,13 @@ function acecrawl_sitemap_gen_run( $args = array() ) {
         }
 
         // Tidy temp files left by a process that died mid-write.
-        foreach ( (array) glob( acecrawl_sitemap_gen_dir() . '/.*.tmp' ) as $tmp ) {
+        foreach ( array_merge( (array) glob( acecrawl_sitemap_gen_dir() . '/.*.tmp' ), (array) glob( acecrawl_sitemap_gen_dir() . '/.ace-sitemap-*' ) ) as $tmp ) {
             if ( @filemtime( $tmp ) < time() - HOUR_IN_SECONDS ) {
                 wp_delete_file( $tmp );
             }
         }
     } finally {
-        $state = acecrawl_sitemap_gen_update_state( function ( $state ) use ( $summary, $started ) {
+        acecrawl_sitemap_gen_update_state( function ( $state ) use ( $summary, $started ) {
             $state['worker_home'] = home_url( '/' );
             $state['last_run'] = array(
                 'at'        => time(),
@@ -1100,7 +1164,7 @@ function acecrawl_sitemap_gen_run( $args = array() ) {
     }
 
     if ( $summary['built'] > 0 || $summary['failed'] > 0 ) {
-        error_log( sprintf( 'Ace-Crawl-Enhancer sitemap pass: built %d, failed %d, remaining %d, %dms', $summary['built'], $summary['failed'], $summary['remaining'], $state['last_run']['ms'] ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
+        error_log( sprintf( 'Ace-Crawl-Enhancer sitemap pass: built %d, failed %d, remaining %d, %dms', $summary['built'], $summary['failed'], $summary['remaining'], (int) round( ( microtime( true ) - $started ) * 1000 ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
     }
 
     return $summary;

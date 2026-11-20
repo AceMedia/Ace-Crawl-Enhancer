@@ -4,7 +4,7 @@ Tags: seo, sitemap, schema, yoast, meta
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.103
+Stable tag: 1.0.104
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,11 @@ Settings and SEO metadata are stored in WordPress. Optional aggregate view track
 Open an issue at https://github.com/AceMedia/Ace-Crawl-Enhancer/issues using a fictional reproduction. Code contributions are by invitation. GPL rights to use, modify and redistribute still apply.
 
 == Changelog ==
+
+= 1.0.104 =
+* Keep the last valid sitemap metadata when a write, lock or replacement fails.
+* Publish complete files atomically and ensure both protective files exist independently.
+* Record bounded storage failure reasons without exposing raw metadata or file paths.
 
 = 1.0.103 =
 * Prevent overlapping sitemap cache rebuilds with atomic, owner-checked leases that work with or without a persistent object cache.
