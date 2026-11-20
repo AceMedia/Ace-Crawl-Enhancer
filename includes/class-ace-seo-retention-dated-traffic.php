@@ -81,7 +81,7 @@ class AceCrawl_Retention_Dated_Traffic {
      * they can honestly claim. Cached per period.
      */
     public static function feed( array $period ) {
-        $cache_key = 'ace_seo_dated_' . md5( $period['start'] . '|' . $period['end'] );
+        $cache_key = 'acecrawl_dated_' . md5( $period['start'] . '|' . $period['end'] );
         if ( isset( self::$runtime[ $cache_key ] ) ) {
             return self::$runtime[ $cache_key ];
         }

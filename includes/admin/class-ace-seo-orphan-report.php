@@ -89,7 +89,7 @@ class AceCrawlOrphanReport {
      * @return void
      */
     public static function ajax_report() {
-        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce' ) ) {
             wp_send_json( array( 'status' => 'error', 'message' => __( 'Invalid nonce', 'ace-crawl-enhancer' ) ) );
         }
 

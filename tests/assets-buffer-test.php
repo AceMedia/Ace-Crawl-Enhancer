@@ -49,8 +49,8 @@ asset_check( empty( $GLOBALS['scripts'] ), 'Export scripts are absent from unrel
 $GLOBALS['screen'] = new WP_Screen();
 ob_start(); AceCrawlPostColumns::print_export_script(); $export_output = ob_get_clean();
 asset_check( '' === trim( $export_output ), 'Export control queues assets without raw script tags.' );
-asset_check( isset( $GLOBALS['inline']['ace-seo-post-columns-script-1'] ), 'Post list export behaviour is queued on supported screens.' );
-file_put_contents( sys_get_temp_dir() . '/ace-review-export-script.js', $GLOBALS['inline']['ace-seo-post-columns-script-1'][0] );
+asset_check( isset( $GLOBALS['inline']['acecrawl-post-columns-script-1'] ), 'Post list export behaviour is queued on supported screens.' );
+file_put_contents( sys_get_temp_dir() . '/ace-review-export-script.js', $GLOBALS['inline']['acecrawl-post-columns-script-1'][0] );
 $frontend = new AceCrawlFrontend();
 asset_check( isset( $GLOBALS['hooks']['wp_template_enhancement_output_buffer'] ) && ! isset( $GLOBALS['hooks']['template_redirect'] ), 'Core owns the template buffer lifecycle.' );
 $before = ob_get_level();

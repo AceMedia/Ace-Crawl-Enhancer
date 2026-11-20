@@ -37,7 +37,7 @@ class AceCrawl_Dashboard_Ajax {
         }
         
         wp_enqueue_script(
-            'ace-seo-dashboard-ajax',
+            'acecrawl-dashboard-ajax',
             ACECRAWL_URL . 'assets/js/dashboard-ajax.js',
             array('jquery'),
             ACECRAWL_VERSION,
@@ -45,9 +45,9 @@ class AceCrawl_Dashboard_Ajax {
         );
         
         // Localize script with AJAX data
-        wp_localize_script('ace-seo-dashboard-ajax', 'aceSEODashboard', array(
+        wp_localize_script('acecrawl-dashboard-ajax', 'aceSEODashboard', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ace_seo_dashboard_nonce'),
+            'nonce' => wp_create_nonce('acecrawl_dashboard_nonce'),
             'batchSize' => self::BATCH_SIZE,
             'strings' => array(
                 'loading' => __('Loading...', 'ace-crawl-enhancer'),
@@ -66,7 +66,7 @@ class AceCrawl_Dashboard_Ajax {
      */
     public function ajax_load_dashboard_stats() {
         // Verify nonce
-        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -159,7 +159,7 @@ class AceCrawl_Dashboard_Ajax {
      */
     public function ajax_load_recent_activity() {
         // Verify nonce
-        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -230,7 +230,7 @@ class AceCrawl_Dashboard_Ajax {
      */
     public function ajax_load_content_analysis() {
         // Verify nonce
-        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -327,7 +327,7 @@ class AceCrawl_Dashboard_Ajax {
      */
     public function ajax_load_post_batch() {
         // Verify nonce
-        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce')) {
             wp_die('Invalid nonce');
         }
         
@@ -421,7 +421,7 @@ class AceCrawl_Dashboard_Ajax {
      */
     public function ajax_load_database_performance() {
         // Verify nonce
-        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce')) {
+        if (!wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce')) {
             wp_send_json(array(
                 'status' => 'error',
                 'message' => 'Invalid nonce'

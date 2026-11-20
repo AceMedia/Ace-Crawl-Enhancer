@@ -71,7 +71,7 @@ class AceCrawlTrending {
      * disambiguation page. Cached 24 h.
      */
     public static function resolve($title) {
-        $key = 'ace_wiki_t_' . md5($title);
+        $key = 'acecrawl_wiki_t_' . md5($title);
         $c = get_transient($key);
         if ($c !== false) return (string) $c;
         $r = self::get(sprintf(self::SUMMARY, rawurlencode($title)));
@@ -91,7 +91,7 @@ class AceCrawlTrending {
     public static function views($canonical) {
         $end   = gmdate('Ymd', time() - 2 * DAY_IN_SECONDS);
         $start = gmdate('Ymd', time() - 15 * DAY_IN_SECONDS);
-        $key = 'ace_wiki_v_' . md5($canonical . $end);
+        $key = 'acecrawl_wiki_v_' . md5($canonical . $end);
         $c = get_transient($key);
         if ($c !== false) return (array) $c;
         $r = self::get(sprintf(self::VIEWS, rawurlencode($canonical), $start, $end));

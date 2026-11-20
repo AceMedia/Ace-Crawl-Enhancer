@@ -139,7 +139,7 @@ class AceCrawlViewTracker {
             return;
         }
         $url = rest_url( 'ace-seo/v1/hit' );
-        AceCrawlAssets::inline_script( 'ace-seo-hit', sprintf(
+        AceCrawlAssets::inline_script( 'acecrawl-hit', sprintf(
             '(function(){try{var d=new FormData();d.append("p","%d");d.append("r",document.referrer||"");if(navigator.sendBeacon){navigator.sendBeacon(%s,d);}}catch(e){}})();',
             absint( $id ),
             wp_json_encode( esc_url_raw( $url ) )

@@ -41,7 +41,7 @@ class AceCrawlAiAssistant {
      * rate limit so lower roles can't burn paid OpenAI/DALL·E credit.
      */
     private function guard() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        check_ajax_referer( 'acecrawl_ai_nonce', 'nonce' );
 
         $capability = apply_filters( 'acecrawl_ai_capability', 'edit_posts' );
         if ( ! current_user_can( $capability ) ) {
@@ -60,7 +60,7 @@ class AceCrawlAiAssistant {
         // Hourly per-user cap on AI requests (0 disables the limit).
         $limit = (int) apply_filters( 'acecrawl_ai_rate_limit', 60 );
         if ( $limit > 0 && ! current_user_can( 'manage_options' ) ) {
-            $key   = 'ace_seo_ai_rl_' . get_current_user_id();
+            $key   = 'acecrawl_ai_rl_' . get_current_user_id();
             $count = (int) get_transient( $key );
             if ( $count >= $limit ) {
                 wp_send_json_error( 'AI request limit reached — try again in an hour.' );
@@ -518,7 +518,7 @@ class AceCrawlAiAssistant {
      * AJAX handler for saving image to media library
      */
     public function ajax_save_image_to_library() {
-        check_ajax_referer( 'ace_seo_ai_nonce', 'nonce' );
+        check_ajax_referer( 'acecrawl_ai_nonce', 'nonce' );
         
         if ( ! current_user_can( 'upload_files' ) ) {
             wp_send_json_error( 'Insufficient permissions to upload files' );

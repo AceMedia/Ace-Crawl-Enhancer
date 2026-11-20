@@ -202,8 +202,8 @@ class AceCrawlPostColumns {
         }
         $sheets = class_exists( 'AceCrawlSheets' ) && AceCrawlSheets::configured();
         ?>
-        <?php AceCrawlAssets::style( 'ace-seo-post-columns-style-1', 'assets/css/ace-seo-post-columns-style-1.css' ); ?>
-        <?php AceCrawlAssets::inline_script( 'ace-seo-post-columns-script-1', '
+        <?php AceCrawlAssets::style( 'acecrawl-post-columns-style-1', 'assets/css/ace-seo-post-columns-style-1.css' ); ?>
+        <?php AceCrawlAssets::inline_script( 'acecrawl-post-columns-script-1', '
         (function () {
             var bar = document.querySelector(\'.tablenav.top .actions:not(.bulkactions)\');
             if (!bar || !window.fetch || !window.Blob) { return; }

@@ -116,4 +116,4 @@ $o = AceCrawlRetentionActions::options();
         <?php AceCrawlRetentionReport::render_help(); ?>
     </section>
 </div>
-<?php AceCrawlAssets::style( 'ace-seo-retention-noscript', 'assets/css/ace-seo-retention-noscript.css' ); ?>
+<?php AceCrawlAssets::style( 'acecrawl-retention-noscript', 'assets/css/ace-seo-retention-noscript.css' ); ?>

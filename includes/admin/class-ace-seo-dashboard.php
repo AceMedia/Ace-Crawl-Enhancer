@@ -30,7 +30,7 @@ class AceCrawlDashboard {
         }
         
         wp_add_dashboard_widget(
-            'ace_seo_performance_overview',
+            'acecrawl_performance_overview',
             'Ace SEO - Performance Overview',
             array( $this, 'render_performance_widget' )
         );
@@ -172,7 +172,7 @@ class AceCrawlDashboard {
      * Add dashboard styles
      */
     private function add_dashboard_styles() {
-        AceCrawlAssets::inline_style( 'ace-seo-class-ace-seo-dashboard-style', '
+        AceCrawlAssets::inline_style( 'acecrawl-class-ace-seo-dashboard-style', '
         .ace-dashboard-performance {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
@@ -260,7 +260,7 @@ class AceCrawlDashboard {
      * Add dashboard script
      */
     private function add_dashboard_script() {
-        AceCrawlAssets::inline_script( 'ace-seo-class-ace-seo-dashboard-script', '
+        AceCrawlAssets::inline_script( 'acecrawl-class-ace-seo-dashboard-script', '
         function triggerPerformanceCheck() {
             var button = event.target;
             button.disabled = true;
@@ -271,7 +271,7 @@ class AceCrawlDashboard {
                 method: "POST",
                 data: {
                     action: "acecrawl_monitor_performance",
-                    nonce: "' . esc_js( wp_create_nonce( 'ace_seo_performance_test' ) ) . '"
+                    nonce: "' . esc_js( wp_create_nonce( 'acecrawl_performance_test' ) ) . '"
                 },
                 success: function(response) {
                     if (response.success) {

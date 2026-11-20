@@ -206,9 +206,9 @@ if (!defined('ABSPATH')) {
     </div>
 </div>
 
-<?php AceCrawlAssets::style( 'ace-seo-dashboard-style-1', 'assets/css/ace-seo-dashboard-style-1.css' ); ?>
+<?php AceCrawlAssets::style( 'acecrawl-dashboard-style-1', 'assets/css/ace-seo-dashboard-style-1.css' ); ?>
 
-<?php AceCrawlAssets::inline_script( 'ace-seo-dashboard-script-1', '
+<?php AceCrawlAssets::inline_script( 'acecrawl-dashboard-script-1', '
 jQuery(document).ready(function($) {
     $(\'#ace-optimize-database\').on(\'click\', function() {
         var $btn = $(this);
@@ -222,7 +222,7 @@ jQuery(document).ready(function($) {
             type: \'POST\',
             data: {
                 action: \'acecrawl_optimize_database\',
-                nonce: \'' . (esc_js( wp_create_nonce('ace_seo_optimize_db') )) . '\'
+                nonce: \'' . (esc_js( wp_create_nonce('acecrawl_optimize_db') )) . '\'
             },
             success: function(response) {
                 if (response.success) {
@@ -261,4 +261,4 @@ jQuery(document).ready(function($) {
 });
 ' ); ?>
 
-<?php AceCrawlAssets::script( 'ace-seo-dashboard-script-2', 'assets/js/ace-seo-dashboard-script-2.js' ); ?>
+<?php AceCrawlAssets::script( 'acecrawl-dashboard-script-2', 'assets/js/ace-seo-dashboard-script-2.js' ); ?>

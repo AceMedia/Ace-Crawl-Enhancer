@@ -177,11 +177,11 @@ class AceCrawl_Frontend_Performance {
         if (!is_user_logged_in()) {
             // Cache options that are commonly accessed
             wp_cache_add_multiple(array(
-                'ace_seo_site_title' => get_bloginfo('name'),
-                'ace_seo_site_description' => get_bloginfo('description'),
-                'ace_seo_home_url' => home_url(),
-                'ace_seo_site_icon' => get_site_icon_url()
-            ), 'ace_seo');
+                'acecrawl_site_title' => get_bloginfo('name'),
+                'acecrawl_site_description' => get_bloginfo('description'),
+                'acecrawl_home_url' => home_url(),
+                'acecrawl_site_icon' => get_site_icon_url()
+            ), 'acecrawl');
             
             // For single posts, preload featured image and author data
             if (is_singular()) {
@@ -239,7 +239,7 @@ class AceCrawl_Frontend_Performance {
      * Clear cache when post is updated
      */
     public static function clear_post_cache($post_id) {
-        wp_cache_delete('ace_seo_schema_' . $post_id, 'ace_seo');
+        wp_cache_delete('acecrawl_schema_' . $post_id, 'acecrawl');
     }
 }
 

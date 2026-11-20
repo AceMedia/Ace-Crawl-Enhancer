@@ -925,8 +925,8 @@ class AceCrawlEnhancer {
 
     public static function get_meta_value($post_id, $key) {
         // On frontend, try to use cached data first for better performance
-        if (!is_admin() && class_exists('ACE_SEO_Performance')) {
-            $cached_value = ACE_SEO_Performance::get_meta($post_id, $key);
+        if (!is_admin() && class_exists('AceCrawl_Frontend_Performance')) {
+            $cached_value = AceCrawl_Frontend_Performance::get_meta($post_id, $key);
             if ($cached_value !== null) {
                 return self::maybe_expand($post_id, $key, $cached_value, 'post');
             }
@@ -1265,7 +1265,7 @@ class AceCrawlEnhancer {
         
         // Enqueue admin CSS
         wp_enqueue_style(
-            'ace-seo-admin',
+            'acecrawl-admin',
             ACECRAWL_URL . 'assets/css/admin.css',
             [],
             ACECRAWL_VERSION
@@ -2951,7 +2951,7 @@ class AceCrawlEnhancer {
      *
      * Keeps the two rules the rest of this class already follows: URL-valued properties are
      * escaped with esc_url, and og:title / og:description carry data-ace-seo="1" so
-     * ACE_SEO_Frontend::filter_head_output() preserves them through the de-duplicating buffer.
+     * AceCrawlFrontend::filter_head_output() preserves them through the de-duplicating buffer.
      *
      * @param array $tags property => content, in emission order.
      */

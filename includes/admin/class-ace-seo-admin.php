@@ -90,7 +90,7 @@ class AceCrawlAdmin {
             return $bulk_actions;
         }
         
-        $bulk_actions['ace_seo_analyze_performance'] = 'Analyze PageSpeed Performance';
+        $bulk_actions['acecrawl_analyze_performance'] = 'Analyze PageSpeed Performance';
         return $bulk_actions;
     }
     
@@ -98,7 +98,7 @@ class AceCrawlAdmin {
      * Handle bulk actions
      */
     public function handle_bulk_actions($redirect_to, $action, $post_ids) {
-        if ($action !== 'ace_seo_analyze_performance') {
+        if ($action !== 'acecrawl_analyze_performance') {
             return $redirect_to;
         }
         
@@ -131,8 +131,8 @@ class AceCrawlAdmin {
         }
         
         $redirect_to = add_query_arg([
-            'ace_seo_bulk_performance' => $processed,
-            'ace_seo_bulk_errors' => $errors
+            'acecrawl_bulk_performance' => $processed,
+            'acecrawl_bulk_errors' => $errors
         ], $redirect_to);
         
         return $redirect_to;
@@ -191,9 +191,9 @@ class AceCrawlAdmin {
      * Show bulk action notices
      */
     public function bulk_action_notices() {
-        if (!empty($_REQUEST['ace_seo_bulk_performance'])) {
-            $processed = intval($_REQUEST['ace_seo_bulk_performance']);
-            $errors = intval($_REQUEST['ace_seo_bulk_errors'] ?? 0);
+        if (!empty($_REQUEST['acecrawl_bulk_performance'])) {
+            $processed = intval($_REQUEST['acecrawl_bulk_performance']);
+            $errors = intval($_REQUEST['acecrawl_bulk_errors'] ?? 0);
             
             $message = sprintf(
                 /* translators: %d: number. */ _n(

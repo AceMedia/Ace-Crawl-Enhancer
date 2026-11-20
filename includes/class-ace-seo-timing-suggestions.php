@@ -423,8 +423,8 @@ class AceCrawl_Timing_Suggestions {
         $suggestions = self::current();
         $o           = self::overview( $suggestions, $options );
         $computed    = self::computed_at();
-        wp_enqueue_script( 'ace-seo-timing-rules', ACECRAWL_URL . 'assets/js/timing-rules.js', array(), ACECRAWL_VERSION, true );
-        wp_localize_script( 'ace-seo-timing-rules', 'aceSeoTimingRules', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'acecrawl_timing_rules' ) ) );
+        wp_enqueue_script( 'acecrawl-timing-rules', ACECRAWL_URL . 'assets/js/timing-rules.js', array(), ACECRAWL_VERSION, true );
+        wp_localize_script( 'acecrawl-timing-rules', 'aceSeoTimingRules', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'acecrawl_timing_rules' ) ) );
         ?>
         <div id="ace-timing-overview" class="ace-timing-overview">
             <div class="ace-timing-kinds">

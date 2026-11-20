@@ -105,7 +105,7 @@ class AceCrawlGoogleData {
      * Clear cached Site Kit token data.
      */
     public function ajax_clear_sitekit_cache() {
-        check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_api_test', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
@@ -122,7 +122,7 @@ class AceCrawlGoogleData {
      * AJAX: Render compact dashboard Google status and metrics.
      */
     public function ajax_load_google_signals() {
-        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_dashboard_nonce' ) ) {
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_dashboard_nonce' ) ) {
             wp_die( 'Invalid nonce' );
         }
 
@@ -380,7 +380,7 @@ class AceCrawlGoogleData {
      * Run a GA4 Data API report.
      */
     private function run_ga4_report( $property_id, $request_body, $cache_ttl ) {
-        $cache_key = 'ace_seo_ga4_' . md5( $property_id . wp_json_encode( $request_body ) );
+        $cache_key = 'acecrawl_ga4_' . md5( $property_id . wp_json_encode( $request_body ) );
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
@@ -416,7 +416,7 @@ class AceCrawlGoogleData {
      * Run a Search Console Search Analytics query.
      */
     private function run_search_console_query( $property_id, $request_body, $cache_ttl ) {
-        $cache_key = 'ace_seo_gsc_' . md5( $property_id . wp_json_encode( $request_body ) );
+        $cache_key = 'acecrawl_gsc_' . md5( $property_id . wp_json_encode( $request_body ) );
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;

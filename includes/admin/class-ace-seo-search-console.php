@@ -325,7 +325,7 @@ class AceCrawlSearchConsole {
             return new WP_Error( 'gsc_bad_url', 'A URL to inspect is required.' );
         }
 
-        $cache_key = 'ace_seo_gsc_inspect_' . md5( $property . '|' . $url );
+        $cache_key = 'acecrawl_gsc_inspect_' . md5( $property . '|' . $url );
         $cached    = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
@@ -382,7 +382,7 @@ class AceCrawlSearchConsole {
         }
 
         $days      = max( 1, min( 90, (int) $days ) );
-        $cache_key = 'ace_seo_gsc_page_' . md5( $property . '|' . $url . '|' . $days );
+        $cache_key = 'acecrawl_gsc_page_' . md5( $property . '|' . $url . '|' . $days );
         $cached    = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
@@ -462,7 +462,7 @@ class AceCrawlSearchConsole {
         }
 
         $days      = max( 1, min( 90, (int) $days ) );
-        $cache_key = 'ace_seo_gsc_totals_' . md5( $property . '|' . $days );
+        $cache_key = 'acecrawl_gsc_totals_' . md5( $property . '|' . $days );
         $cached    = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;
@@ -591,7 +591,7 @@ class AceCrawlSearchConsole {
         if ( '' === $property ) {
             return new WP_Error( 'gsc_no_property', 'No Search Console property is configured in Site Kit.' );
         }
-        $cache_key = 'ace_seo_gsc_pages_' . md5( $property . '|' . $start . '|' . $end );
+        $cache_key = 'acecrawl_gsc_pages_' . md5( $property . '|' . $start . '|' . $end );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) && isset( $cached['rows'] ) ) {
             return $cached;
@@ -634,7 +634,7 @@ class AceCrawlSearchConsole {
         }
 
         $days      = max( 1, min( 480, (int) $days ) );
-        $cache_key = 'ace_seo_gsc_pages_' . md5( $property . '|' . $days );
+        $cache_key = 'acecrawl_gsc_pages_' . md5( $property . '|' . $days );
         $cached    = get_transient( $cache_key );
         if ( false !== $cached ) {
             return $cached;

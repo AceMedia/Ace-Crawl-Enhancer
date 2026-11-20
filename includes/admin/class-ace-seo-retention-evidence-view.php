@@ -164,7 +164,7 @@ final class AceCrawl_Retention_Evidence_View {
         $tiers = array_merge( AceCrawlRetentionReport::tier_labels(), array( 'unknown' => 'Not ready to judge' ) );
         $action_tools = array( 'consolidate' => 'redirect', 'noindex' => 'noindex' );
         ?>
-        <?php AceCrawlAssets::style( 'ace-seo-retention-evidence-view-style-1', 'assets/css/ace-seo-retention-evidence-view-style-1.css' ); ?>
+        <?php AceCrawlAssets::style( 'acecrawl-retention-evidence-view-style-1', 'assets/css/ace-seo-retention-evidence-view-style-1.css' ); ?>
         <section id="retention-evidence"><h2>Which next steps fit?</h2>
         <p>The group tells us what we know about an article. The next step tells us what might help. Use this guide to see how they fit together.</p>
         <div class="ace-evidence-legend" aria-label="Reference table key"><span style="background:#f0f0f1">— No change needed / not a good fit</span><span style="background:#edf5ee">✓ Still useful</span><span style="background:#fff8e5">△ Worth a look</span><span style="background:#ffdfb8">! A confirmed problem needs attention</span><span style="background:#f6f7f7">? We need more information</span></div>

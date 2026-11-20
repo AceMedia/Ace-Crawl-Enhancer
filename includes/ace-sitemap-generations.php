@@ -1117,7 +1117,7 @@ function acecrawl_sitemap_gen_note( $outcome ) {
     if ( wp_using_ext_object_cache() ) {
         // get + set: some object-cache drop-ins cannot incr their wrapped values. Approximate
         // under concurrency, which is fine for a diagnostic count.
-        wp_cache_set( 'serve_' . $outcome, (int) wp_cache_get( 'serve_' . $outcome, 'ace_sitemap_stats' ) + 1, 'ace_sitemap_stats', DAY_IN_SECONDS );
+        wp_cache_set( 'serve_' . $outcome, (int) wp_cache_get( 'serve_' . $outcome, 'acecrawl_sitemap_stats' ) + 1, 'acecrawl_sitemap_stats', DAY_IN_SECONDS );
     }
 }
 
@@ -1128,7 +1128,7 @@ function acecrawl_sitemap_gen_status() {
 
     $counts = array();
     foreach ( array( 'fresh', 'stale', 'cold', 'waited', 'unavailable', 'gone' ) as $outcome ) {
-        $counts[ $outcome ] = wp_using_ext_object_cache() ? (int) wp_cache_get( 'serve_' . $outcome, 'ace_sitemap_stats' ) : null;
+        $counts[ $outcome ] = wp_using_ext_object_cache() ? (int) wp_cache_get( 'serve_' . $outcome, 'acecrawl_sitemap_stats' ) : null;
     }
 
     $worker_busy = false;

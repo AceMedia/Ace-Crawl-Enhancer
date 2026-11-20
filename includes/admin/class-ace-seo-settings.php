@@ -104,7 +104,7 @@ class AceCrawlSettings {
         
         // General settings section
         add_settings_section(
-            'ace_seo_general_section',
+            'acecrawl_general_section',
             'General Settings',
             array( $this, 'general_section_callback' ),
             'acecrawl_general'
@@ -112,7 +112,7 @@ class AceCrawlSettings {
         
         // Social settings section
         add_settings_section(
-            'ace_seo_social_section',
+            'acecrawl_social_section',
             'Social Media Settings',
             array( $this, 'social_section_callback' ),
             'acecrawl_social'
@@ -120,7 +120,7 @@ class AceCrawlSettings {
         
         // Advanced settings section
         add_settings_section(
-            'ace_seo_advanced_section',
+            'acecrawl_advanced_section',
             'Advanced Settings',
             array( $this, 'advanced_section_callback' ),
             'acecrawl_advanced'
@@ -128,7 +128,7 @@ class AceCrawlSettings {
         
         // Compatibility settings section
         add_settings_section(
-            'ace_seo_compatibility_section',
+            'acecrawl_compatibility_section',
             'Yoast Compatibility',
             array( $this, 'compatibility_section_callback' ),
             'acecrawl_compatibility'
@@ -177,7 +177,7 @@ class AceCrawlSettings {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
         }
-        check_ajax_referer( 'ace_seo_yoast_tools', 'nonce' );
+        check_ajax_referer( 'acecrawl_yoast_tools', 'nonce' );
 
         wp_send_json_success( $this->get_yoast_key_counts() );
     }
@@ -186,7 +186,7 @@ class AceCrawlSettings {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
         }
-        check_ajax_referer( 'ace_seo_yoast_tools', 'nonce' );
+        check_ajax_referer( 'acecrawl_yoast_tools', 'nonce' );
 
         global $wpdb;
         $like = $wpdb->esc_like( '_yoast_wpseo_' ) . '%';
@@ -203,7 +203,7 @@ class AceCrawlSettings {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
         }
-        check_ajax_referer( 'ace_seo_yoast_tools', 'nonce' );
+        check_ajax_referer( 'acecrawl_yoast_tools', 'nonce' );
 
         global $wpdb;
         $ace_prefix = ACECRAWL_META_PREFIX;
@@ -294,7 +294,7 @@ class AceCrawlSettings {
         }
         
         wp_enqueue_style(
-            'ace-seo-admin',
+            'acecrawl-admin',
             ACECRAWL_URL . 'assets/css/admin.css',
             array(),
             ACECRAWL_VERSION
@@ -302,9 +302,9 @@ class AceCrawlSettings {
 
         if ( 'ace-seo_page_ace-seo-settings' === $hook ) {
             wp_enqueue_style(
-                'ace-seo-admin-redis',
+                'acecrawl-admin-redis',
                 ACECRAWL_URL . 'assets/css/admin-redis.css',
-                array( 'ace-seo-admin' ),
+                array( 'acecrawl-admin' ),
                 ACECRAWL_VERSION
             );
         }
@@ -324,11 +324,11 @@ class AceCrawlSettings {
         }
 
         // The suite-wide save bar on its own, for other Ace plugins' settings pages to enqueue.
-        if ( file_exists( ACECRAWL_PATH . 'build/savebar.js' ) && ! wp_script_is( 'ace-savebar', 'registered' ) ) {
-            wp_register_script( 'ace-savebar', ACECRAWL_URL . 'build/savebar.js', array( 'jquery' ), ACECRAWL_VERSION, true );
+        if ( file_exists( ACECRAWL_PATH . 'build/savebar.js' ) && ! wp_script_is( 'acecrawl-savebar', 'registered' ) ) {
+            wp_register_script( 'acecrawl-savebar', ACECRAWL_URL . 'build/savebar.js', array( 'jquery' ), ACECRAWL_VERSION, true );
         }
         wp_enqueue_script(
-            'ace-seo-admin',
+            'acecrawl-admin',
             ACECRAWL_URL . 'build/index.js',
             $script_deps,
             isset( $asset_data['version'] ) ? $asset_data['version'] : ACECRAWL_VERSION,
@@ -338,10 +338,10 @@ class AceCrawlSettings {
         wp_enqueue_media(); // For image selection
         
         // Localize script for AJAX
-        wp_localize_script('ace-seo-admin', 'acecrawl_admin', [
+        wp_localize_script('acecrawl-admin', 'acecrawl_admin', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'rest_url' => rest_url(),
-            'nonce' => wp_create_nonce('ace_seo_admin_nonce'),
+            'nonce' => wp_create_nonce('acecrawl_admin_nonce'),
             'rest_nonce' => wp_create_nonce('wp_rest'),
         ]);
     }
@@ -368,7 +368,7 @@ class AceCrawlSettings {
      */
     public function ajax_save_settings() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_admin_nonce')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_admin_nonce')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
         }
 
@@ -575,7 +575,7 @@ class AceCrawlSettings {
      */
     public function ajax_optimize_database_manual() {
         // Security check
-        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'ace_seo_optimize_db_manual')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ?? '' ) ), 'acecrawl_optimize_db_manual')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }
@@ -698,7 +698,7 @@ class AceCrawlSettings {
     public function ajax_batch_migrate_yoast_data() {
         // Security check
         $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!current_user_can('manage_options') || !wp_verify_nonce($nonce, 'ace_seo_batch_migrate')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($nonce, 'acecrawl_batch_migrate')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }
@@ -846,7 +846,7 @@ class AceCrawlSettings {
     public function ajax_get_migration_stats() {
         // Security check
         $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!current_user_can('manage_options') || !wp_verify_nonce($nonce, 'ace_seo_migration_stats')) {
+        if (!current_user_can('manage_options') || !wp_verify_nonce($nonce, 'acecrawl_migration_stats')) {
             wp_send_json_error('Insufficient permissions or invalid nonce');
             return;
         }

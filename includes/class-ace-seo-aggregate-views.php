@@ -127,8 +127,8 @@ class AceCrawlAggregateViews {
     }
     public static function enqueue() {
         if ( ! self::frontend() ) { return; }
-        wp_enqueue_script( 'ace-aggregate-views', ACECRAWL_URL . 'assets/js/aggregate-views.js', array(), ACECRAWL_VERSION, true );
-        wp_add_inline_script( 'ace-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
+        wp_enqueue_script( 'acecrawl-aggregate-views', ACECRAWL_URL . 'assets/js/aggregate-views.js', array(), ACECRAWL_VERSION, true );
+        wp_add_inline_script( 'acecrawl-aggregate-views', 'window.aceAggregateViewsConfig=' . wp_json_encode( array( 'endpoint' => rest_url( 'ace-seo/v1/aggregate-view' ), 'showPrivacy' => self::show_privacy() ), JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );
     }
     /** Optional visitor UI; counting and existing privacy signals are independent. */
     public static function show_privacy() {

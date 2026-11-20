@@ -97,7 +97,7 @@ class AceCrawlMetabox {
      */
     public function render_metabox( $post ) {
         // Add nonce for security
-        wp_nonce_field( 'ace_seo_save_meta', 'ace_seo_meta_nonce' );
+        wp_nonce_field( 'acecrawl_save_meta', 'acecrawl_meta_nonce' );
         
         // Include the metabox template
         include ACECRAWL_PATH . 'includes/admin/views/metabox.php';
@@ -108,7 +108,7 @@ class AceCrawlMetabox {
      */
     public function render_ai_analysis_metabox( $post ) {
         // Add nonce for AI requests
-        wp_nonce_field( 'ace_seo_ai_nonce', 'ace_seo_ai_nonce_field' );
+        wp_nonce_field( 'acecrawl_ai_nonce', 'acecrawl_ai_nonce_field' );
         ?>
         <div id="ace-ai-analysis-sidebar">
             <div class="ace-ai-analysis-actions">
@@ -188,7 +188,7 @@ class AceCrawlMetabox {
         </div>
         
         <!-- AI Nonce for AJAX requests -->
-        <input type="hidden" id="ace_seo_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('ace_seo_ai_nonce') ); ?>">
+        <input type="hidden" id="acecrawl_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('acecrawl_ai_nonce') ); ?>">
         <?php
     }
 
@@ -218,8 +218,8 @@ class AceCrawlMetabox {
                 Loading search performance...
             </div>
         </div>
-        <?php AceCrawlAssets::script( 'ace-seo-metabox-script-1', 'assets/js/ace-seo-metabox-script-1.js', array( 'ace-seo-admin' ) ); ?>
-        <?php AceCrawlAssets::style( 'ace-seo-metabox-style-1', 'assets/css/ace-seo-metabox-style-1.css' ); ?>
+        <?php AceCrawlAssets::script( 'acecrawl-metabox-script-1', 'assets/js/ace-seo-metabox-script-1.js', array( 'acecrawl-admin' ) ); ?>
+        <?php AceCrawlAssets::style( 'acecrawl-metabox-style-1', 'assets/css/ace-seo-metabox-style-1.css' ); ?>
         <?php
     }
 
@@ -228,8 +228,8 @@ class AceCrawlMetabox {
      */
     public function save_meta_fields( $post_id ) {
         // Security checks
-        if ( ! isset( $_POST['ace_seo_meta_nonce'] ) || 
-             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_seo_meta_nonce'] ?? '' ) ), 'ace_seo_save_meta' ) ) {
+        if ( ! isset( $_POST['acecrawl_meta_nonce'] ) ||
+             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['acecrawl_meta_nonce'] ?? '' ) ), 'acecrawl_save_meta' ) ) {
             return;
         }
         
@@ -354,7 +354,7 @@ class AceCrawlMetabox {
         
         // Enqueue styles
         wp_enqueue_style(
-            'ace-seo-admin',
+            'acecrawl-admin',
             ACECRAWL_URL . 'assets/css/admin.css',
             array(),
             ACECRAWL_VERSION
@@ -362,7 +362,7 @@ class AceCrawlMetabox {
         
         // Enqueue scripts
         wp_enqueue_script(
-            'ace-seo-admin',
+            'acecrawl-admin',
             ACECRAWL_URL . 'assets/js/admin.js',
             array( 'jquery', 'wp-api' ),
             ACECRAWL_VERSION,
@@ -370,7 +370,7 @@ class AceCrawlMetabox {
         );
         
         // Add inline script for template variable insertion
-        wp_add_inline_script( 'ace-seo-admin', '
+        wp_add_inline_script( 'acecrawl-admin', '
             jQuery(document).ready(function($) {
                 // Handle clicking on template variables
                 $(document).on("click", ".ace-variable-tag", function(e) {
@@ -455,11 +455,11 @@ class AceCrawlMetabox {
             }
         }
         
-        wp_localize_script( 'ace-seo-admin', 'aceSeoAdmin', array(
+        wp_localize_script( 'acecrawl-admin', 'aceSeoAdmin', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'restUrl' => rest_url( 'ace-seo/v1/' ),
             'nonce' => wp_create_nonce( 'wp_rest' ),
-            'performanceNonce' => wp_create_nonce( 'ace_seo_performance_test' ),
+            'performanceNonce' => wp_create_nonce( 'acecrawl_performance_test' ),
             'postId' => $current_id,
             'postUrl' => $current_url,
             'postTitle' => $current_title,
@@ -486,7 +486,7 @@ class AceCrawlMetabox {
      * Render SEO fields for taxonomy "Add New" form
      */
     public function render_taxonomy_add_fields( $taxonomy ) {
-        wp_nonce_field( 'ace_seo_taxonomy_save', 'ace_seo_taxonomy_nonce' );
+        wp_nonce_field( 'acecrawl_taxonomy_save', 'acecrawl_taxonomy_nonce' );
         ?>
         <div class="form-field ace-seo-taxonomy-fields">
             <h3><?php esc_html_e( 'SEO Settings', 'ace-crawl-enhancer' ); ?></h3>
@@ -601,7 +601,7 @@ class AceCrawlMetabox {
         // Only show Yoast notice if Yoast data exists but ACE data doesn't (not migrated yet)
         $show_yoast_notice = $has_yoast_data && !$has_ace_data;
         
-        wp_nonce_field( 'ace_seo_taxonomy_save', 'ace_seo_taxonomy_nonce' );
+        wp_nonce_field( 'acecrawl_taxonomy_save', 'acecrawl_taxonomy_nonce' );
         ?>
         <tr class="form-field ace-seo-taxonomy-section">
             <th colspan="2">
@@ -711,7 +711,7 @@ class AceCrawlMetabox {
                 <p class="description"><?php esc_html_e( '301 this term\'s archive to another term ID in the same taxonomy, or to an absolute URL. Pagination and feeds are carried across. Posts filed under this term keep their own URLs. Leave blank for no redirect.', 'ace-crawl-enhancer' ); ?></p>
             </td>
         </tr>
-        <?php AceCrawlAssets::script( 'ace-seo-metabox-script-2', 'assets/js/ace-seo-metabox-script-2.js' ); ?>
+        <?php AceCrawlAssets::script( 'acecrawl-metabox-script-2', 'assets/js/ace-seo-metabox-script-2.js' ); ?>
         <?php
     }
     
@@ -720,8 +720,8 @@ class AceCrawlMetabox {
      */
     public function save_taxonomy_fields( $term_id ) {
         // Verify nonce
-        if ( ! isset( $_POST['ace_seo_taxonomy_nonce'] ) || 
-             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_seo_taxonomy_nonce'] ?? '' ) ), 'ace_seo_taxonomy_save' ) ) {
+        if ( ! isset( $_POST['acecrawl_taxonomy_nonce'] ) ||
+             ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['acecrawl_taxonomy_nonce'] ?? '' ) ), 'acecrawl_taxonomy_save' ) ) {
             return;
         }
         

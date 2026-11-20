@@ -148,7 +148,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
             <div id="ace-redis-messages" style="display: none;"></div>
             
             <form id="ace-redis-settings-form" method="post" class="ace-redis-form">
-                <?php wp_nonce_field('ace_seo_admin_nonce', 'ace_seo_nonce'); ?>
+                <?php wp_nonce_field('acecrawl_admin_nonce', 'acecrawl_nonce'); ?>
                 
                 <!-- General Tab -->
                 <div id="general" class="tab-content active">
@@ -621,7 +621,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_sitemap_cache">Enable sitemap cache</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_sitemap_cache]" id="sitemap_enable_sitemap_cache" value="1" <?php checked(!empty($sitemap_options['enable_sitemap_cache']) && $redis_cache_present); ?> <?php disabled(!$redis_cache_present); ?> /><p class="description">Use Ace Redis Cache for sitemap object-cache storage and keep sitemap URLs out of Redis full-page cache.</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_enable_index_lastmod">Index lastmod</label></div><div class="setting-field"><input type="checkbox" name="acecrawl_sitemap_options[enable_index_lastmod]" id="sitemap_enable_index_lastmod" value="1" <?php checked(!empty($sitemap_options['enable_index_lastmod'])); ?> /><p class="description">Adds <code>lastmod</code> to the sitemap index for posts/pages/news entries only. Disabling reduces heavy cold-load queries on large sites while keeping per-URL <code>lastmod</code> in the actual post sitemaps.</p></div></div>
                         <div class="setting-row"><div class="setting-label"><label for="sitemap_cache_ttl">Sitemap cache TTL (seconds)</label></div><div class="setting-field"><input type="number" name="acecrawl_sitemap_options[sitemap_cache_ttl]" id="sitemap_cache_ttl" min="60" value="<?php echo esc_attr((int)($sitemap_options['sitemap_cache_ttl'] ?? 600)); ?>" class="small-text" <?php disabled(!$redis_cache_present); ?> /><p class="description">TTL for Redis-backed sitemap object cache and sitemap cache headers (minimum 60 seconds).</p></div></div>
-                        <div class="setting-row"><div class="setting-label"><label for="sitemap_purge_cache">Purge sitemap cache</label></div><div class="setting-field"><?php wp_nonce_field('acecrawl_sitemap_purge_cache', 'ace_sitemap_powertools_purge_cache_nonce'); ?><button type="button" name="acecrawl_sitemap_purge_cache" id="sitemap_purge_cache" class="button" <?php disabled(!$redis_cache_present); ?>>Purge sitemap cache</button><p class="description">Bumps the sitemap cache version so Ace Redis Cache rebuilds sitemap objects on the next request.</p><p class="description"><?php $cache_version = function_exists('acecrawl_sitemap_get_cache_version') ? (int) acecrawl_sitemap_get_cache_version() : 0; $cache_ttl = isset($sitemap_options['sitemap_cache_ttl']) ? (int) $sitemap_options['sitemap_cache_ttl'] : 0; if ($cache_ttl < 60) { $cache_ttl = 60; } echo 'Cache version: <code>' . esc_html($cache_version) . '</code> · TTL: <code>' . esc_html($cache_ttl) . 's</code> · Index lastmod: <code>' . esc_html(!empty($sitemap_options['enable_index_lastmod']) ? 'on' : 'off') . '</code>'; ?></p><div id="sitemap-purge-result" class="ace-optimization-result" style="display: none; margin-top: 10px;"></div></div></div>
+                        <div class="setting-row"><div class="setting-label"><label for="sitemap_purge_cache">Purge sitemap cache</label></div><div class="setting-field"><?php wp_nonce_field('acecrawl_sitemap_purge_cache', 'acecrawl_sitemap_purge_cache_nonce'); ?><button type="button" name="acecrawl_sitemap_purge_cache" id="sitemap_purge_cache" class="button" <?php disabled(!$redis_cache_present); ?>>Purge sitemap cache</button><p class="description">Bumps the sitemap cache version so Ace Redis Cache rebuilds sitemap objects on the next request.</p><p class="description"><?php $cache_version = function_exists('acecrawl_sitemap_get_cache_version') ? (int) acecrawl_sitemap_get_cache_version() : 0; $cache_ttl = isset($sitemap_options['sitemap_cache_ttl']) ? (int) $sitemap_options['sitemap_cache_ttl'] : 0; if ($cache_ttl < 60) { $cache_ttl = 60; } echo 'Cache version: <code>' . esc_html($cache_version) . '</code> · TTL: <code>' . esc_html($cache_ttl) . 's</code> · Index lastmod: <code>' . esc_html(!empty($sitemap_options['enable_index_lastmod']) ? 'on' : 'off') . '</code>'; ?></p><div id="sitemap-purge-result" class="ace-optimization-result" style="display: none; margin-top: 10px;"></div></div></div>
                         </fieldset>
 
                         <fieldset id="sitemaps-detected" class="ace-settings-group">
@@ -1063,7 +1063,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             </div>
                         </fieldset>
 
-                        <fieldset id="yoast-keys" class="ace-settings-group" data-yoast-tools="1" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-yoast-nonce="<?php echo esc_attr(wp_create_nonce('ace_seo_yoast_tools')); ?>">
+                        <fieldset id="yoast-keys" class="ace-settings-group" data-yoast-tools="1" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-yoast-nonce="<?php echo esc_attr(wp_create_nonce('acecrawl_yoast_tools')); ?>">
                             <legend><span class="dashicons dashicons-list-view" aria-hidden="true"></span>Yoast Meta Keys</legend>
                             <p>View remaining Yoast meta keys and optionally clean or rebuild them from ACE meta.</p>
                             <p>
@@ -1081,7 +1081,7 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
                             </p>
                             <p class="description">Recreate will remove existing Yoast keys first, then rebuild from ACE meta.</p>
                         </fieldset>
-                        <?php AceCrawlAssets::script( 'ace-seo-settings-script-1', 'assets/js/ace-seo-settings-script-1.js' ); ?>
+                        <?php AceCrawlAssets::script( 'acecrawl-settings-script-1', 'assets/js/ace-seo-settings-script-1.js' ); ?>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1092,15 +1092,15 @@ $render_template_tokens = static function ($target_id, $context = 'default') use
     </div> <!-- .ace-seo-container -->
 </div>
 
-<?php AceCrawlAssets::style( 'ace-seo-settings-style-1', 'assets/css/ace-seo-settings-style-1.css' ); ?>
+<?php AceCrawlAssets::style( 'acecrawl-settings-style-1', 'assets/css/ace-seo-settings-style-1.css' ); ?>
 
-<?php AceCrawlAssets::inline_script( 'ace-seo-settings-script-2', '
+<?php AceCrawlAssets::inline_script( 'acecrawl-settings-script-2', '
 jQuery(document).ready(function($) {
     var ajaxurl = window.ajaxurl || (window.acecrawl_admin && acecrawl_admin.ajax_url) || "' . (esc_js(admin_url('admin-ajax.php'))) . '";
-    var yoastNonce = \'' . (esc_js( wp_create_nonce('ace_seo_yoast_tools') )) . '\';
-    var migrationStatsNonce = \'' . (esc_js( wp_create_nonce('ace_seo_migration_stats') )) . '\';
-    var migrationBatchNonce = \'' . (esc_js( wp_create_nonce('ace_seo_batch_migrate') )) . '\';
-    var optimizeDbNonce = \'' . (esc_js( wp_create_nonce('ace_seo_optimize_db_manual') )) . '\';
+    var yoastNonce = \'' . (esc_js( wp_create_nonce('acecrawl_yoast_tools') )) . '\';
+    var migrationStatsNonce = \'' . (esc_js( wp_create_nonce('acecrawl_migration_stats') )) . '\';
+    var migrationBatchNonce = \'' . (esc_js( wp_create_nonce('acecrawl_batch_migrate') )) . '\';
+    var optimizeDbNonce = \'' . (esc_js( wp_create_nonce('acecrawl_optimize_db_manual') )) . '\';
     var adminNonce = \'' . (esc_js( wp_create_nonce('acecrawl_admin') )) . '\';
     var sitemapPurgeNonce = \'' . (esc_js( wp_create_nonce('acecrawl_sitemap_purge_cache') )) . '\';
 
@@ -1651,4 +1651,4 @@ jQuery(document).ready(function($) {
 });
 ' ); ?>
 
-<?php AceCrawlAssets::script( 'ace-seo-settings-script-3', 'assets/js/ace-seo-settings-script-3.js' ); ?>
+<?php AceCrawlAssets::script( 'acecrawl-settings-script-3', 'assets/js/ace-seo-settings-script-3.js' ); ?>

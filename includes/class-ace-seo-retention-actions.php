@@ -745,7 +745,7 @@ class AceCrawlRetentionActions {
         }
         $post = get_post( get_queried_object_id() );
         if ( $post && self::notice_applies( $post ) ) {
-            AceCrawlAssets::style( 'ace-seo-dated-notice', 'assets/css/ace-seo-dated-notice.css' );
+            AceCrawlAssets::style( 'acecrawl-dated-notice', 'assets/css/ace-seo-dated-notice.css' );
         }
     }
 

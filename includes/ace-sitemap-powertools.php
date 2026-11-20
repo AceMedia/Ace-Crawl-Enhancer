@@ -518,7 +518,7 @@ function acecrawl_sitemap_register_settings() {
     register_setting( 'acecrawl_sitemap_powertools', 'acecrawl_sitemap_options', 'acecrawl_sitemap_sanitize_options' );
 
     add_settings_section(
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         'Clean URLs',
         '__return_false',
         'ace-sitemap-powertools'
@@ -529,7 +529,7 @@ function acecrawl_sitemap_register_settings() {
         'Clean sitemap URLs',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'enable_custom_routes',
             'label' => 'Enable clean sitemap URLs (e.g. /sitemap.xml, /news-1.xml).',
@@ -542,7 +542,7 @@ function acecrawl_sitemap_register_settings() {
         'Serve clean routes',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'serve_custom_routes',
             'label' => 'Serve clean routes directly (fallback if rewrites fail).',
@@ -554,7 +554,7 @@ function acecrawl_sitemap_register_settings() {
         'Legacy redirects',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'enable_legacy_redirects',
             'label' => 'Redirect legacy wp-sitemap URLs to clean URLs.',
@@ -566,7 +566,7 @@ function acecrawl_sitemap_register_settings() {
         'Disable canonical redirects',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'disable_canonical_redirects',
             'label' => 'Prevent canonical redirects for sitemap URLs.',
@@ -578,7 +578,7 @@ function acecrawl_sitemap_register_settings() {
         'Root Tag Archive Fallback',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'enable_root_tag_archive_fallback',
             'label' => 'Allow root-level tag archives like /slug/ when there is no slug collision.',
@@ -590,7 +590,7 @@ function acecrawl_sitemap_register_settings() {
         'Root Tag Links',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'enable_root_tag_links',
             'label' => 'Generate root-level tag links when a tag slug is safe to use.',
@@ -602,7 +602,7 @@ function acecrawl_sitemap_register_settings() {
         'Tag Base Redirect',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_routing',
+        'acecrawl_sitemap_section_routing',
         array(
             'key' => 'enable_tag_base_redirect',
             'label' => 'Redirect /tag/slug/ requests to /slug/ when the root-level route is safe.',
@@ -610,7 +610,7 @@ function acecrawl_sitemap_register_settings() {
     );
 
     add_settings_section(
-        'ace_sitemap_powertools_section_providers',
+        'acecrawl_sitemap_section_providers',
         'Clean URL Mapping',
         '__return_false',
         'ace-sitemap-powertools'
@@ -621,7 +621,7 @@ function acecrawl_sitemap_register_settings() {
         'News URL',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_providers',
+        'acecrawl_sitemap_section_providers',
         array(
             'key' => 'enable_news_provider',
             'label' => 'Rename the posts sitemap URL to /news-*.xml (removes /posts-*.xml).',
@@ -633,7 +633,7 @@ function acecrawl_sitemap_register_settings() {
         'Authors URL',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_providers',
+        'acecrawl_sitemap_section_providers',
         array(
             'key' => 'enable_authors_provider',
             'label' => 'Rename the users sitemap URL to /authors-*.xml.',
@@ -645,7 +645,7 @@ function acecrawl_sitemap_register_settings() {
         'Categories URL',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_providers',
+        'acecrawl_sitemap_section_providers',
         array(
             'key' => 'enable_categories_route',
             'label' => 'Rename the categories sitemap URL to /categories-*.xml.',
@@ -657,7 +657,7 @@ function acecrawl_sitemap_register_settings() {
         'Tags URL',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_providers',
+        'acecrawl_sitemap_section_providers',
         array(
             'key' => 'enable_tags_route',
             'label' => 'Rename the tags sitemap URL to /tags-*.xml.',
@@ -665,7 +665,7 @@ function acecrawl_sitemap_register_settings() {
     );
 
     add_settings_section(
-        'ace_sitemap_powertools_section_display',
+        'acecrawl_sitemap_section_display',
         'Styles & Display',
         '__return_false',
         'ace-sitemap-powertools'
@@ -676,7 +676,7 @@ function acecrawl_sitemap_register_settings() {
         'Header branding',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_display',
+        'acecrawl_sitemap_section_display',
         array(
             'key' => 'enable_custom_header',
             'label' => 'Show logo, title, and description in the XSL header.',
@@ -684,7 +684,7 @@ function acecrawl_sitemap_register_settings() {
     );
 
     add_settings_section(
-        'ace_sitemap_powertools_section_detected',
+        'acecrawl_sitemap_section_detected',
         'Detected Plugin Sitemaps',
         '__return_false',
         'ace-sitemap-powertools'
@@ -695,7 +695,7 @@ function acecrawl_sitemap_register_settings() {
         'Third-Party Providers',
         'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_detected',
+        'acecrawl_sitemap_section_detected',
         array(
             'key' => 'excluded_sitemap_providers',
             'choices' => acecrawl_sitemap_detected_custom_providers(),
@@ -708,7 +708,7 @@ function acecrawl_sitemap_register_settings() {
         'Custom Taxonomy Sitemaps',
         'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_detected',
+        'acecrawl_sitemap_section_detected',
         array(
             'key' => 'excluded_sitemap_taxonomies',
             'choices' => acecrawl_sitemap_detected_custom_taxonomies(),
@@ -721,7 +721,7 @@ function acecrawl_sitemap_register_settings() {
         'Custom Post Type Sitemaps',
         'acecrawl_sitemap_field_detected_sitemaps',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_detected',
+        'acecrawl_sitemap_section_detected',
         array(
             'key' => 'excluded_sitemap_post_types',
             'choices' => acecrawl_sitemap_detected_custom_post_types(),
@@ -734,7 +734,7 @@ function acecrawl_sitemap_register_settings() {
         'Index link',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_display',
+        'acecrawl_sitemap_section_display',
         array(
             'key' => 'enable_index_link',
             'label' => 'Show a link back to the sitemap index on sub-sitemaps.',
@@ -746,7 +746,7 @@ function acecrawl_sitemap_register_settings() {
         'Most recent marker',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_display',
+        'acecrawl_sitemap_section_display',
         array(
             'key' => 'enable_recent_marker',
             'label' => 'Highlight page 1 as “most recent” when a sitemap has 5+ pages.',
@@ -754,7 +754,7 @@ function acecrawl_sitemap_register_settings() {
     );
 
     add_settings_section(
-        'ace_sitemap_powertools_section_performance',
+        'acecrawl_sitemap_section_performance',
         'Performance',
         '__return_false',
         'ace-sitemap-powertools'
@@ -765,7 +765,7 @@ function acecrawl_sitemap_register_settings() {
         'Post URLs per sitemap',
         'acecrawl_sitemap_field_number',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_performance',
+        'acecrawl_sitemap_section_performance',
         array(
             'key' => 'post_max_urls',
             'label' => 'Max URLs per posts sitemap. Uses a safe default of 250 when empty or set below 1.',
@@ -778,7 +778,7 @@ function acecrawl_sitemap_register_settings() {
         'Enable sitemap cache',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_performance',
+        'acecrawl_sitemap_section_performance',
         array(
             'key' => 'enable_sitemap_cache',
             'label' => 'Cache sitemap index and sitemap pages for faster cold loads.',
@@ -790,7 +790,7 @@ function acecrawl_sitemap_register_settings() {
         'Index lastmod',
         'acecrawl_sitemap_field_checkbox',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_performance',
+        'acecrawl_sitemap_section_performance',
         array(
             'key' => 'enable_index_lastmod',
             'label' => 'Include lastmod in sitemap index entries (posts/pages/news only).',
@@ -802,7 +802,7 @@ function acecrawl_sitemap_register_settings() {
         'Sitemap cache TTL (seconds)',
         'acecrawl_sitemap_field_number',
         'ace-sitemap-powertools',
-        'ace_sitemap_powertools_section_performance',
+        'acecrawl_sitemap_section_performance',
         array(
             'key' => 'sitemap_cache_ttl',
             'label' => 'Cache duration for sitemap index and pages (min 60 seconds).',
@@ -1367,10 +1367,10 @@ function acecrawl_sitemap_get_cache_version() {
     $version = 0;
 
     if ( acecrawl_sitemap_redis_cache_available() ) {
-        $version = (int) wp_cache_get( 'acecrawl_sitemap_cache_version', 'ace_sitemap_meta' );
+        $version = (int) wp_cache_get( 'acecrawl_sitemap_cache_version', 'acecrawl_sitemap_meta' );
         if ( $version < 1 ) {
             $version = 1;
-            wp_cache_set( 'acecrawl_sitemap_cache_version', $version, 'ace_sitemap_meta' );
+            wp_cache_set( 'acecrawl_sitemap_cache_version', $version, 'acecrawl_sitemap_meta' );
         }
     } else {
         $version = (int) get_option( 'acecrawl_sitemap_cache_version', 1 );
@@ -1381,10 +1381,10 @@ function acecrawl_sitemap_get_cache_version() {
 
 function acecrawl_sitemap_bump_cache_version() {
     if ( acecrawl_sitemap_redis_cache_available() ) {
-        $version = (int) wp_cache_incr( 'acecrawl_sitemap_cache_version', 1, 'ace_sitemap_meta' );
+        $version = (int) wp_cache_incr( 'acecrawl_sitemap_cache_version', 1, 'acecrawl_sitemap_meta' );
         if ( $version < 1 ) {
             $current = acecrawl_sitemap_get_cache_version();
-            wp_cache_set( 'acecrawl_sitemap_cache_version', $current + 1, 'ace_sitemap_meta' );
+            wp_cache_set( 'acecrawl_sitemap_cache_version', $current + 1, 'acecrawl_sitemap_meta' );
         }
         return;
     }
@@ -1399,17 +1399,9 @@ function acecrawl_sitemap_bump_cache_version_debounced( $scope ) {
         $scope = 'global';
     }
 
-    $lock_key = 'ace_sitemap_cache_bump_' . $scope;
-    if ( acecrawl_sitemap_redis_cache_available() ) {
-        if ( ! wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 15 ) ) {
-            return false;
-        }
-    } else {
-        if ( get_transient( $lock_key ) ) {
-            return false;
-        }
-
-        set_transient( $lock_key, 1, 15 );
+    // Keep this lease until expiry: it debounces repeated invalidations.
+    if ( ! acecrawl_sitemap_lock_acquire( 'bump:' . $scope, 15 ) ) {
+        return false;
     }
     acecrawl_sitemap_bump_cache_version();
     return true;
@@ -1495,7 +1487,7 @@ function acecrawl_sitemap_cache_get_stale( $key ) {
 
     if ( acecrawl_sitemap_redis_cache_available() ) {
         $found  = false;
-        $stale  = wp_cache_get( 'stale:' . $key, 'ace_sitemap', false, $found );
+        $stale  = wp_cache_get( 'stale:' . $key, 'acecrawl_sitemap', false, $found );
         return $found ? $stale : null;
     }
 
@@ -1510,29 +1502,85 @@ function acecrawl_sitemap_cache_get_stale( $key ) {
 }
 
 function acecrawl_sitemap_cache_lock_key( $key ) {
-    return 'ace_sitemap_cache_lock_' . md5( (string) $key );
+    return 'acecrawl_sitemap_cache_lock_' . md5( (string) $key );
 }
 
-function acecrawl_sitemap_cache_acquire_lock( $key ) {
-    $lock_key = acecrawl_sitemap_cache_lock_key( $key );
-    if ( acecrawl_sitemap_redis_cache_available() ) {
-        return wp_cache_add( $lock_key, 1, 'ace_sitemap_locks', 30 );
-    }
+/**
+ * Acquire a per-site lease, returning its owner token or false on contention/error.
+ *
+ * Use the options table's unique key on every installation, including those with a
+ * persistent object cache. WordPress has no portable atomic cache compare/delete;
+ * a cached get followed by delete can release a successor's lease. These private,
+ * non-autoloaded rows are accessed only through SQL, never the options cache.
+ * Database time avoids clock skew between PHP workers. An expired lease can be
+ * replaced only by a conditional write; a failed database write never grants it.
+ *
+ * @param string $key Lease scope.
+ * @param int    $ttl Lifetime in seconds (bounded to 1 second through 1 hour).
+ * @return string|false Owner token, or false.
+ */
+function acecrawl_sitemap_lock_acquire( $key, $ttl ) {
+    global $wpdb;
 
-    if ( get_transient( $lock_key ) ) {
+    if ( ! $wpdb ) {
         return false;
     }
-    set_transient( $lock_key, 1, 30 );
-    return true;
-}
 
-function acecrawl_sitemap_cache_release_lock( $key ) {
-    if ( acecrawl_sitemap_redis_cache_available() ) {
-        wp_cache_delete( acecrawl_sitemap_cache_lock_key( $key ), 'ace_sitemap_locks' );
-        return;
+    $name  = 'acecrawl_sitemap_lease_' . md5( (string) $key );
+    $token = wp_generate_uuid4();
+    $ttl   = max( 1, min( 3600, (int) $ttl ) );
+    $rows  = $wpdb->query( $wpdb->prepare(
+        "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, CONCAT(%s, ':', UNIX_TIMESTAMP() + %d), 'no')",
+        $name, $token, $ttl
+    ) );
+
+    if ( false === $rows ) {
+        return false;
+    }
+    if ( 1 === $rows ) {
+        return $token;
     }
 
-    delete_transient( acecrawl_sitemap_cache_lock_key( $key ) );
+    $rows = $wpdb->query( $wpdb->prepare(
+        "UPDATE {$wpdb->options} SET option_value = CONCAT(%s, ':', UNIX_TIMESTAMP() + %d) WHERE option_name = %s AND CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) <= UNIX_TIMESTAMP()",
+        $token, $ttl, $name
+    ) );
+    return 1 === $rows ? $token : false;
+}
+
+/** Release only the lease held by this owner, even if it has since expired. */
+function acecrawl_sitemap_lock_release( $key, $token ) {
+    global $wpdb;
+
+    if ( ! $wpdb || ! is_string( $token ) || '' === $token ) {
+        return false;
+    }
+
+    return 1 === $wpdb->query( $wpdb->prepare(
+        "DELETE FROM {$wpdb->options} WHERE option_name = %s AND SUBSTRING_INDEX(option_value, ':', 1) = %s",
+        'acecrawl_sitemap_lease_' . md5( (string) $key ), $token
+    ) );
+}
+
+/** Remove expired debounce leases during WordPress's daily transient cleanup. */
+function acecrawl_sitemap_lock_gc() {
+    global $wpdb;
+
+    if ( $wpdb ) {
+        $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s AND CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) <= UNIX_TIMESTAMP() LIMIT 1000",
+            $wpdb->esc_like( 'acecrawl_sitemap_lease_' ) . '%'
+        ) );
+    }
+}
+add_action( 'wp_scheduled_delete', 'acecrawl_sitemap_lock_gc' );
+
+function acecrawl_sitemap_cache_acquire_lock( $key ) {
+    return acecrawl_sitemap_lock_acquire( acecrawl_sitemap_cache_lock_key( $key ), 30 );
+}
+
+function acecrawl_sitemap_cache_release_lock( $key, $token ) {
+    return acecrawl_sitemap_lock_release( acecrawl_sitemap_cache_lock_key( $key ), $token );
 }
 
 function acecrawl_sitemap_cache_remember( $key, $callback, $fallback = null ) {
@@ -1548,7 +1596,8 @@ function acecrawl_sitemap_cache_remember( $key, $callback, $fallback = null ) {
     }
 
     $stale = acecrawl_sitemap_cache_get_stale( $key );
-    if ( ! acecrawl_sitemap_cache_acquire_lock( $key ) ) {
+    $lock = acecrawl_sitemap_cache_acquire_lock( $key );
+    if ( ! $lock ) {
         if ( null !== $stale ) {
             return $stale;
         }
@@ -1569,7 +1618,7 @@ function acecrawl_sitemap_cache_remember( $key, $callback, $fallback = null ) {
         acecrawl_sitemap_cache_set( $key, $value );
         return $value;
     } finally {
-        acecrawl_sitemap_cache_release_lock( $key );
+        acecrawl_sitemap_cache_release_lock( $key, $lock );
     }
 }
 
@@ -1603,14 +1652,14 @@ function acecrawl_sitemap_purge_cache() {
         return;
     }
 
-    $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'ace_sitemap_cache_%'" );
+    $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'acecrawl_sitemap_cache_%'" );
     acecrawl_sitemap_bump_cache_version();
 }
 
 /**
  * Garbage-collect the DB-backed sitemap cache.
  *
- * Historically these `ace_sitemap_cache_*` rows were written to wp_options as a
+ * Historically these `acecrawl_sitemap_cache_*` rows were written to wp_options as a
  * fallback when no persistent object cache was present, with no expiry or cleanup —
  * which let wp_options bloat to multiple GB. Deletes are batched with a bounded loop
  * so a large backlog can't hold a long table lock or run away. cache_set() no longer
@@ -1630,7 +1679,7 @@ function acecrawl_sitemap_gc_option_cache() {
     $deleted     = 0;
 
     for ( $i = 0; $i < $max_batches; $i++ ) {
-        $rows = $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'ace_sitemap_cache_%' LIMIT {$batch}" );
+        $rows = $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'acecrawl_sitemap_cache_%' LIMIT {$batch}" );
         if ( ! $rows ) {
             break;
         }
@@ -1638,7 +1687,7 @@ function acecrawl_sitemap_gc_option_cache() {
     }
 
     if ( $deleted > 0 && function_exists( 'error_log' ) ) {
-        error_log( sprintf( 'Ace-Crawl-Enhancer: removed %d legacy ace_sitemap_cache_* option rows.', $deleted ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
+        error_log( sprintf( 'Ace-Crawl-Enhancer: removed %d legacy acecrawl_sitemap_cache_* option rows.', $deleted ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- operational log for a background failure the site owner needs to see.
     }
 
     return $deleted;
@@ -1667,7 +1716,7 @@ function acecrawl_sitemap_maybe_purge_legacy_cache() {
 add_action( 'admin_init', 'acecrawl_sitemap_maybe_purge_legacy_cache' );
 
 function acecrawl_sitemap_cache_option_key( $key ) {
-    return 'ace_sitemap_cache_' . md5( (string) $key );
+    return 'acecrawl_sitemap_cache_' . md5( (string) $key );
 }
 
 function acecrawl_sitemap_cache_get( $key ) {
@@ -1676,7 +1725,7 @@ function acecrawl_sitemap_cache_get( $key ) {
     }
 
     $found = false;
-    $cached = wp_cache_get( $key, 'ace_sitemap', false, $found );
+    $cached = wp_cache_get( $key, 'acecrawl_sitemap', false, $found );
     if ( $found ) {
         return $cached;
     }
@@ -1705,8 +1754,8 @@ function acecrawl_sitemap_cache_set( $key, $value ) {
     }
 
     $ttl = acecrawl_sitemap_get_cache_ttl();
-    wp_cache_set( $key, $value, 'ace_sitemap', $ttl );
-    wp_cache_set( 'stale:' . $key, $value, 'ace_sitemap', max( $ttl * 2, $ttl + 60 ) );
+    wp_cache_set( $key, $value, 'acecrawl_sitemap', $ttl );
+    wp_cache_set( 'stale:' . $key, $value, 'acecrawl_sitemap', max( $ttl * 2, $ttl + 60 ) );
 
     // NOTE: we deliberately do NOT fall back to update_option() here. cache_enabled()
     // already requires a persistent object cache (redis_cache_available()), so this is
@@ -1769,7 +1818,7 @@ function acecrawl_sitemap_handle_purge_cache_request() {
         return;
     }
 
-    if ( empty( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ace_sitemap_powertools_purge_cache_nonce'] ?? '' ) ), 'acecrawl_sitemap_purge_cache' ) ) {
+    if ( empty( $_POST['acecrawl_sitemap_purge_cache_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['acecrawl_sitemap_purge_cache_nonce'] ?? '' ) ), 'acecrawl_sitemap_purge_cache' ) ) {
         return;
     }
 
@@ -2401,11 +2450,11 @@ function acecrawl_sitemap_render_html_header( $title, $count, $context ) {
         wp_enqueue_style( $handle, $theme_link, array(), ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
         $style_handles[] = $handle;
     }
-    wp_register_style( 'ace-seo-sitemap-human', false, $style_handles, ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
-    wp_enqueue_style( 'ace-seo-sitemap-human' );
-    wp_add_inline_style( 'ace-seo-sitemap-human', wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) );
+    wp_register_style( 'acecrawl-sitemap-human', false, $style_handles, ACECRAWL_SITEMAP_POWERTOOLS_VERSION );
+    wp_enqueue_style( 'acecrawl-sitemap-human' );
+    wp_add_inline_style( 'acecrawl-sitemap-human', wp_strip_all_tags( $font_face . "\n" . $theme_css . "\n" . $css . "\n" . $overrides ) );
     // This standalone document has no wp_head(): print only its registered dependencies.
-    wp_print_styles( array( 'ace-seo-sitemap-human' ) );
+    wp_print_styles( array( 'acecrawl-sitemap-human' ) );
     echo '</head><body><div id="sitemap">';
     echo wp_kses_post( $header_html );
     echo '<div id="sitemap__content"><p class="text">' . esc_html( $summary ) . '</p>';

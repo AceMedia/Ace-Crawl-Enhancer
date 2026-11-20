@@ -196,8 +196,8 @@ class AceCrawlRedirects {
 
     public static function assets( $hook ) {
         if ( false === strpos( $hook, 'ace-seo-redirects' ) && ! in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) { return; }
-        wp_enqueue_style( 'ace-seo-redirects', ACECRAWL_URL . 'assets/css/redirects.css', array(), ACECRAWL_VERSION );
-        wp_enqueue_script( 'ace-seo-redirects', ACECRAWL_URL . 'assets/js/redirects.js', array(), ACECRAWL_VERSION, true );
+        wp_enqueue_style( 'acecrawl-redirects', ACECRAWL_URL . 'assets/css/redirects.css', array(), ACECRAWL_VERSION );
+        wp_enqueue_script( 'acecrawl-redirects', ACECRAWL_URL . 'assets/js/redirects.js', array(), ACECRAWL_VERSION, true );
     }
 
     public static function notice() {

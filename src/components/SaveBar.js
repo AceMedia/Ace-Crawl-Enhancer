@@ -11,7 +11,7 @@
  *      `data-ace-savebar-autosave="0"` keeps it out of auto-save; `data-ace-savebar-reload="1"`
  *      reloads the page once it has saved (for server-rendered state).
  *
- * Shared by the Ace plugin suite: the built file is registered as the `ace-savebar` script handle and
+ * Shared by the Ace plugin suite: the built file is registered as the `acecrawl-savebar` script handle and
  * exposed as `window.AceSaveBar`, so other plugins enqueue it rather than ship their own buttons.
  *
  * @package AceCrawlEnhancer

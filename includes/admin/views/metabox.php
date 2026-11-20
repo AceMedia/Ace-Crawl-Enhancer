@@ -689,7 +689,7 @@ function acecrawl_safe_placeholder($content, $max_chars = 155) {
 <input type="hidden" id="yoast_wpseo_content_score" name="yoast_wpseo_content_score" value="<?php echo esc_attr(AceCrawlEnhancer::get_meta_value($post_id, 'content_score')); ?>">
 
 <!-- AI Nonce for AJAX requests -->
-<input type="hidden" id="ace_seo_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('ace_seo_ai_nonce') ); ?>">
+<input type="hidden" id="acecrawl_ai_nonce" value="<?php echo esc_attr( wp_create_nonce('acecrawl_ai_nonce') ); ?>">
 
 <?php 
 // Render AI suggestions modal

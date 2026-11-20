@@ -44,7 +44,7 @@ class AceCrawlPageSpeed {
      * Test page performance via AJAX
      */
     public function test_page_performance() {
-        check_ajax_referer( 'ace_seo_performance_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_performance_test', 'nonce' );
         
         if ( ! current_user_can( 'edit_posts' ) ) {
             wp_die( 'Insufficient permissions' );
@@ -89,7 +89,7 @@ class AceCrawlPageSpeed {
      * Get comprehensive PageSpeed report
      */
     public function get_pagespeed_report() {
-        check_ajax_referer( 'ace_seo_performance_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_performance_test', 'nonce' );
         
         $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) );
         
@@ -123,7 +123,7 @@ class AceCrawlPageSpeed {
      * Monitor site performance
      */
     public function monitor_site_performance() {
-        check_ajax_referer( 'ace_seo_performance_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_performance_test', 'nonce' );
         
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'Insufficient permissions' );

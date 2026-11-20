@@ -107,7 +107,7 @@ class AceCrawlSiteKit {
         $required_scopes = array_values( array_filter( (array) $required_scopes ) );
         sort( $required_scopes );
 
-        $cache_key = 'ace_seo_sitekit_token_' . md5( implode( '|', $required_scopes ) );
+        $cache_key = 'acecrawl_sitekit_token_' . md5( implode( '|', $required_scopes ) );
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;

@@ -567,7 +567,7 @@ class AceCrawlRetentionReport {
             return new WP_Error( 'ga4_no_property', 'Site Kit has no Analytics property connected.' );
         }
 
-        $cache_key = 'ace_seo_ga4_paths_' . md5( $property . '|' . $start . '|' . $end );
+        $cache_key = 'acecrawl_ga4_paths_' . md5( $property . '|' . $start . '|' . $end );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) && isset( $cached['rows'] ) ) {
             return $cached;
@@ -638,7 +638,7 @@ class AceCrawlRetentionReport {
         if ( '' === $property ) {
             return '';
         }
-        $cache_key = 'ace_seo_ga4_first_' . md5( $property );
+        $cache_key = 'acecrawl_ga4_first_' . md5( $property );
         $cached    = get_transient( $cache_key );
         if ( is_string( $cached ) ) {
             return $cached;
@@ -1466,7 +1466,7 @@ class AceCrawlRetentionReport {
         // Built once per run and kept for the rest of it: 30,000 permalinks cost a cron tick over a
         // minute and a half each time, and the links phase asks on every tick.
         $p        = self::progress();
-        $key      = 'ace_seo_retention_lookup_' . md5( (string) ( $p['started'] ?? '' ) . wp_json_encode( $settings ) );
+        $key      = 'acecrawl_retention_lookup_' . md5( (string) ( $p['started'] ?? '' ) . wp_json_encode( $settings ) );
         $lookup   = get_transient( $key );
         if ( is_array( $lookup ) ) {
             return $lookup;
@@ -2030,7 +2030,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function ajax_rows() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'acecrawl_retention_live', 'nonce', false ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         ob_start();
@@ -2088,7 +2088,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function ajax_progress() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'acecrawl_retention_live', 'nonce', false ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         wp_send_json_success( self::progress_payload() );
@@ -2101,7 +2101,7 @@ class AceCrawlRetentionReport {
     }
 
     public static function ajax_dismiss() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'ace_seo_retention_live', 'nonce', false ) ) {
+        if ( ! current_user_can( 'manage_options' ) || ! check_ajax_referer( 'acecrawl_retention_live', 'nonce', false ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
         $hash  = sanitize_key( wp_unslash( $_POST['hash'] ?? '' ) );
@@ -2267,8 +2267,8 @@ class AceCrawlRetentionReport {
 
             <?php
             $live = self::progress_payload();
-            wp_enqueue_script( 'ace-seo-retention-dashboard', ACECRAWL_URL . 'assets/js/retention-dashboard.js', array(), ACECRAWL_VERSION, true );
-            wp_localize_script( 'ace-seo-retention-dashboard', 'aceSeoRetentionLive', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ace_seo_retention_live' ), 'labels' => self::phase_labels(), 'states' => array( 'idle' => self::state_label( 'idle' ), 'queued' => self::state_label( 'queued' ), 'running' => self::state_label( 'running' ), 'interrupted' => self::state_label( 'interrupted' ), 'error' => self::state_label( 'error' ), 'done' => self::state_label( 'done' ) ) ) );
+            wp_enqueue_script( 'acecrawl-retention-dashboard', ACECRAWL_URL . 'assets/js/retention-dashboard.js', array(), ACECRAWL_VERSION, true );
+            wp_localize_script( 'acecrawl-retention-dashboard', 'aceSeoRetentionLive', array( 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'acecrawl_retention_live' ), 'labels' => self::phase_labels(), 'states' => array( 'idle' => self::state_label( 'idle' ), 'queued' => self::state_label( 'queued' ), 'running' => self::state_label( 'running' ), 'interrupted' => self::state_label( 'interrupted' ), 'error' => self::state_label( 'error' ), 'done' => self::state_label( 'done' ) ) ) );
             ?>
             <div class="ace-retention-layout">
             <div class="ace-retention-main">

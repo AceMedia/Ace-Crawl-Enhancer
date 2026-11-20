@@ -1338,7 +1338,7 @@
                 content: content,
                 current_title: title,
                 focus_keyword: focusKeyword,
-                nonce: $('#ace_seo_ai_nonce').val(),
+                nonce: $('#acecrawl_ai_nonce').val(),
                 post_id: (typeof aceSeoAdmin !== 'undefined' && aceSeoAdmin.postId) ? aceSeoAdmin.postId : ($('input#post_ID').val() || 0)
             };
         },
@@ -2010,7 +2010,7 @@
                     type: 'POST',
                     data: {
                         action: 'acecrawl_regenerate_image',
-                        nonce: $('#ace_seo_ai_nonce').val(),
+                        nonce: $('#acecrawl_ai_nonce').val(),
                         prompt: customPrompt,
                         platform: platform
                     },
@@ -2148,7 +2148,7 @@
                     type: 'POST',
                     data: {
                         action: 'acecrawl_save_image_to_library',
-                        nonce: $('#ace_seo_ai_nonce').val(),
+                        nonce: $('#acecrawl_ai_nonce').val(),
                         image_url: imageUrl,
                         post_id: aceSeoAdmin.postId || 0,
                         filename: 'ai-' + fieldType.replace('_', '-') + '-' + Date.now() + '.png'
@@ -2281,7 +2281,7 @@
                 type: 'POST',
                 data: {
                     action: 'acecrawl_generate_more_images',
-                    nonce: $('#ace_seo_ai_nonce').val(),
+                    nonce: $('#acecrawl_ai_nonce').val(),
                     platform: platform,
                     ...contentData
                 },
@@ -2318,7 +2318,7 @@
                 type: 'POST',
                 data: {
                     action: 'acecrawl_generate_more_images',
-                    nonce: $('#ace_seo_ai_nonce').val(),
+                    nonce: $('#acecrawl_ai_nonce').val(),
                     platform: platform,
                     custom_prompt: customPrompt
                 },

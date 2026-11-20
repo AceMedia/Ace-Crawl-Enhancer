@@ -35,13 +35,13 @@ class AceCrawlRetentionPanel {
         $deps = array( 'wp-plugins', 'wp-element', 'wp-components', 'wp-api-fetch', 'wp-data' );
         $deps[] = wp_script_is( 'wp-editor', 'registered' ) ? 'wp-editor' : 'wp-edit-post';
         wp_enqueue_script(
-            'ace-seo-retention-panel',
+            'acecrawl-retention-panel',
             ACECRAWL_URL . 'assets/js/retention-panel.js',
             $deps,
             ACECRAWL_VERSION,
             true
         );
-        wp_add_inline_script( 'ace-seo-retention-panel', 'window.aceSeoRetentionPanel = ' . wp_json_encode( array(
+        wp_add_inline_script( 'acecrawl-retention-panel', 'window.aceSeoRetentionPanel = ' . wp_json_encode( array(
             'postId'    => (int) $post->ID,
             'tier'      => $tier,
             'tierLabel' => AceCrawlRetentionReport::tier_labels()[ $tier ] ?? $tier,
@@ -108,7 +108,7 @@ class AceCrawlRetentionPanel {
         if ( '/' === $path ) {
             return array();
         }
-        $key    = 'ace_seo_links_in_' . $post->ID;
+        $key    = 'acecrawl_links_in_' . $post->ID;
         $cached = get_transient( $key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -139,7 +139,7 @@ class AceCrawlRetentionPanel {
             return array( 'available' => false, 'message' => 'Site Kit has no Analytics property connected.' );
         }
         $path   = wp_make_link_relative( get_permalink( $post ) );
-        $key    = 'ace_seo_ga4_src_' . md5( $property . '|' . $path );
+        $key    = 'acecrawl_ga4_src_' . md5( $property . '|' . $path );
         $cached = get_transient( $key );
         if ( is_array( $cached ) ) {
             return $cached;

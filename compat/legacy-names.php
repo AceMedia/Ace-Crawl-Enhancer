@@ -1088,6 +1088,10 @@ final class AceCrawlLegacyNames {
 
 	/** Everything else, once the plugin's own code has loaded. */
 	public static function boot() {
+		// Handle aliases also apply to source sites that already converted their stored names.
+		foreach ( array( 'admin_enqueue_scripts', 'wp_enqueue_scripts', 'admin_print_scripts', 'wp_print_scripts', 'wp_print_styles', 'admin_print_footer_scripts', 'wp_print_footer_scripts' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'assets' ), false !== strpos( $hook, 'enqueue' ) ? PHP_INT_MAX : 0 );
+		}
 		if ( ! self::$active ) {
 			return;
 		}
@@ -1099,6 +1103,26 @@ final class AceCrawlLegacyNames {
 		add_action( 'admin_init', array( __CLASS__, 'names' ), 0 );
 		spl_autoload_register( array( __CLASS__, 'alias_class' ) );
 		self::hooks();
+	}
+
+	/** Source-only registry aliases for themes and plugins still enqueueing the old handles. */
+	public static function assets() {
+		foreach ( array( 'wp_scripts', 'wp_styles' ) as $global ) {
+			$registry = $GLOBALS[ $global ] ?? null;
+			if ( ! is_object( $registry ) || ! isset( $registry->registered ) ) {
+				continue;
+			}
+			foreach ( $registry->registered as $handle => $dependency ) {
+				if ( 0 !== strpos( $handle, 'acecrawl-' ) ) {
+					continue;
+				}
+				$suffix = substr( $handle, strlen( 'acecrawl-' ) );
+				$old = in_array( $suffix, array( 'savebar', 'aggregate-views' ), true ) ? 'ace-' . $suffix : 'ace-seo-' . $suffix;
+				if ( ! isset( $registry->registered[ $old ] ) ) {
+					$registry->add( $old, false, array( $handle ), null );
+				}
+			}
+		}
 	}
 
 	/** Old constants, classes and functions, for whatever has loaded so far. */

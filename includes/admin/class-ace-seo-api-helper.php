@@ -31,7 +31,7 @@ class AceCrawlApiHelper {
      * Test API connection via AJAX
      */
     public function test_api_connection() {
-        check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_api_test', 'nonce' );
         
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'Insufficient permissions' );
@@ -58,7 +58,7 @@ class AceCrawlApiHelper {
      * Validate OpenAI API key
      */
     public function validate_openai_key() {
-        check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_api_test', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
@@ -73,7 +73,7 @@ class AceCrawlApiHelper {
      * Validate PageSpeed API key
      */
     public function validate_pagespeed_key() {
-        check_ajax_referer( 'ace_seo_api_test', 'nonce' );
+        check_ajax_referer( 'acecrawl_api_test', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => 'Not allowed.' ), 403 );
         }
@@ -483,7 +483,7 @@ class AceCrawlApiHelper {
         $api_key = self::get_pagespeed_key();
 
         $strategy = in_array( $strategy, array( 'mobile', 'desktop' ), true ) ? $strategy : 'mobile';
-        $cache_key = 'ace_seo_pagespeed_' . md5( $url . '|' . $strategy . '|' . ( $api_key !== '' ? 'manual' : 'sitekit' ) );
+        $cache_key = 'acecrawl_pagespeed_' . md5( $url . '|' . $strategy . '|' . ( $api_key !== '' ? 'manual' : 'sitekit' ) );
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;

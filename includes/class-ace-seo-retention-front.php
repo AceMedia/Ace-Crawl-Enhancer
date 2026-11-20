@@ -134,7 +134,7 @@ class AceCrawlRetentionFront {
     }
 
     public static function print_style() {
-        AceCrawlAssets::inline_style( 'ace-seo-light', 'body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
+        AceCrawlAssets::inline_style( 'acecrawl-light', 'body.ace-seo-light .wp-block-columns>.wp-block-column:only-child{flex-basis:100%!important}'
             . '.ace-seo-continue{margin:2em 0 0;padding:1em 1.25em;border:1px solid rgba(127,127,127,.35);border-radius:.4em}'
             . '.ace-seo-continue__label{margin:0 0 .25em;font-size:.85em;text-transform:uppercase;letter-spacing:.04em;opacity:.75}'
             . '.ace-seo-continue a{font-weight:600}' );
@@ -213,7 +213,7 @@ class AceCrawlRetentionFront {
      */
     public static function print_continue_script() {
         ?>
-        <?php AceCrawlAssets::script( 'ace-seo-retention-front-script-1', 'assets/js/ace-seo-retention-front-script-1.js', array() ); ?>
+        <?php AceCrawlAssets::script( 'acecrawl-retention-front-script-1', 'assets/js/ace-seo-retention-front-script-1.js', array() ); ?>
         <?php
     }
 
