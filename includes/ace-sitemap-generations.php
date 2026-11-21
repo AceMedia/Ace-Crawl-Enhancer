@@ -45,6 +45,34 @@ const ACECRAWL_SITEMAP_GEN_FORMAT      = 1;
 
 /* ------------------------------------------------------------------ Store */
 
+/**
+ * Write bytes with operation-local PHP 8.6 diagnostics and an older-runtime fallback.
+ * Never consume or clear global stream errors, or record paths and native messages.
+ * The caller still decides whether complete bytes can be published atomically.
+ */
+function acecrawl_sitemap_gen_write_bytes( $file, $bytes, $flags = 0 ) {
+    $codes   = array();
+    $context = null;
+    if ( PHP_VERSION_ID >= 80600 && class_exists( 'StreamError' ) ) {
+        $context = stream_context_create( array( 'stream' => array(
+            'error_mode'    => \StreamErrorMode::Error,
+            'error_store'   => \StreamErrorStore::None,
+            'error_handler' => static function ( array $errors ) use ( &$codes ) {
+                foreach ( $errors as $error ) {
+                    if ( $error instanceof \StreamError && count( $codes ) < 8 ) {
+                        $codes[ $error->code->name ] = true;
+                    }
+                }
+            },
+        ) ) );
+    }
+    $written = @file_put_contents( $file, $bytes, $flags, $context );
+    if ( false === $written || strlen( $bytes ) !== $written ) {
+        acecrawl_sitemap_gen_storage_error( 'write_failed', array( 'stream_error_codes' => array_keys( $codes ) ) );
+    }
+    return $written;
+}
+
 /** Save complete bytes in the target directory, retaining the last good file on failure. */
 function acecrawl_sitemap_gen_save_bytes( $file, $bytes ) {
     if ( ! is_string( $bytes ) ) {
@@ -60,7 +88,7 @@ function acecrawl_sitemap_gen_save_bytes( $file, $bytes ) {
             return false;
         }
         $mode = is_file( $file ) ? @fileperms( $file ) : ( 0666 & ~umask() );
-        if ( false === $mode || strlen( $bytes ) !== @file_put_contents( $tmp, $bytes ) ) {
+        if ( false === $mode || strlen( $bytes ) !== acecrawl_sitemap_gen_write_bytes( $tmp, $bytes ) ) {
             return false;
         }
         if ( ! @chmod( $tmp, $mode & 0777 ) || ! @rename( $tmp, $file ) ) {
@@ -83,6 +111,17 @@ function acecrawl_sitemap_gen_storage_error( $reason, array $diagnostic = array(
         foreach ( array( 'json_error_code', 'line', 'column' ) as $key ) {
             if ( isset( $diagnostic[ $key ] ) && is_int( $diagnostic[ $key ] ) && $diagnostic[ $key ] >= 0 ) {
                 $detail .= ' ' . $key . '=' . $diagnostic[ $key ];
+            }
+        }
+        if ( ! empty( $diagnostic['stream_error_codes'] ) && is_array( $diagnostic['stream_error_codes'] ) ) {
+            $codes = array();
+            foreach ( array_slice( $diagnostic['stream_error_codes'], 0, 8 ) as $code ) {
+                if ( is_string( $code ) && preg_match( '/\\A[A-Za-z]{1,40}\\z/', $code ) ) {
+                    $codes[] = $code;
+                }
+            }
+            if ( $codes ) {
+                $detail .= ' stream_errors=' . implode( ',', $codes );
             }
         }
         error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason . $detail );
@@ -218,7 +257,7 @@ function acecrawl_sitemap_gen_write( array $artifact ) {
     }
 
     $tmp = dirname( $file ) . '/.' . basename( $file ) . '.' . wp_generate_password( 8, false ) . '.tmp';
-    if ( strlen( $json ) !== (int) @file_put_contents( $tmp, $json, LOCK_EX ) ) {
+    if ( strlen( $json ) !== acecrawl_sitemap_gen_write_bytes( $tmp, $json, LOCK_EX ) ) {
         wp_delete_file( $tmp );
         return false;
     }
