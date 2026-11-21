@@ -106,11 +106,12 @@ class AceCrawlExport {
         if ( ! class_exists( 'AceCrawlRetentionReport' ) || empty( $row['tier'] ) ) {
             return '';
         }
-        static $labels = null, $tiers = null;
-        if ( null === $labels ) {
-            $labels = AceCrawlRetentionReport::rank_labels();
-            $tiers  = AceCrawlRetentionReport::tier_labels();
+        static $blogs = array();
+        $blog_id = get_current_blog_id();
+        if ( ! array_key_exists( $blog_id, $blogs ) ) {
+            $blogs[ $blog_id ] = array( AceCrawlRetentionReport::rank_labels(), AceCrawlRetentionReport::tier_labels() );
         }
+        list( $labels, $tiers ) = $blogs[ $blog_id ];
         $rank = (string) get_post_meta( $id, AceCrawlRetentionReport::META_RANK, true );
         if ( 'retained' === $row['tier'] && '' !== $rank ) {
             return $labels[ $rank ] ?? $rank;
