@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once dirname( __DIR__ ) . '/ace-json.php';
+
 class AceCrawlApiHelper {
     
     /**
@@ -529,26 +531,28 @@ class AceCrawlApiHelper {
 
         $response_code = wp_remote_retrieve_response_code( $response );
         $body = wp_remote_retrieve_body( $response );
-        $decoded = json_decode( $body, true );
+        $json = acecrawl_json_array_result( $body );
+        $decoded = $json['value'];
 
         if ( $response_code < 200 || $response_code >= 300 ) {
-            $message = is_array( $decoded ) && isset( $decoded['error']['message'] )
-                ? $decoded['error']['message']
-                : 'PageSpeed Insights request failed with HTTP ' . $response_code . '.';
-
-            return new WP_Error( 'pagespeed_request_failed', $message, array( 'status' => $response_code ) );
+            $detail = array( 'status' => $response_code );
+            if ( ! $json['ok'] ) { $detail['json_error'] = $json['error']; }
+            return new WP_Error( 'pagespeed_request_failed', 'PageSpeed Insights request failed with HTTP ' . $response_code . '.', $detail );
         }
 
-        if ( ! is_array( $decoded ) ) {
-            return new WP_Error( 'pagespeed_invalid_response', 'PageSpeed Insights returned an invalid response.' );
+        if ( ! $json['ok'] ) {
+            $message = 'PageSpeed Insights returned invalid JSON or an unexpected JSON structure.';
+            if ( isset( $json['error']['line'], $json['error']['column'] ) ) {
+                $message .= ' Line ' . $json['error']['line'] . ', column ' . $json['error']['column'] . '.';
+            }
+            return new WP_Error( 'pagespeed_invalid_response', $message, array( 'json_error' => $json['error'] ) );
         }
 
         if ( ! isset( $decoded['lighthouseResult'] ) ) {
-            $message = isset( $decoded['error']['message'] )
-                ? $decoded['error']['message']
-                : 'PageSpeed Insights did not return a Lighthouse report for this URL.';
-
-            return new WP_Error( 'pagespeed_missing_lighthouse', $message, $decoded );
+            return new WP_Error( 'pagespeed_missing_lighthouse', 'PageSpeed Insights did not return a Lighthouse report for this URL.' );
+        }
+        if ( ! is_array( $decoded['lighthouseResult'] ) || ! isset( $decoded['lighthouseResult']['categories'] ) || ! is_array( $decoded['lighthouseResult']['categories'] ) ) {
+            return new WP_Error( 'pagespeed_invalid_response', 'PageSpeed Insights returned an unexpected Lighthouse report structure.' );
         }
 
         set_transient( $cache_key, $decoded, 10 * MINUTE_IN_SECONDS );

@@ -37,6 +37,7 @@
   "build/savebar.js",
   "build/style-index-rtl.css",
   "build/style-index.css",
+  "includes/ace-json.php",
   "includes/ace-seo-discourage.php",
   "includes/ace-sitemap-generations.php",
   "includes/ace-sitemap-powertools.php",

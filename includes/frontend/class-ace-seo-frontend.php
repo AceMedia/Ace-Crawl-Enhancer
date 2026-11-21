@@ -588,7 +588,12 @@ class AceCrawlFrontend {
 
     private function get_publisher_schema() {
         // Memoize: schema is constant within a single request.
-        static $cached = null;
+        static $publishers = array();
+        $blog_id = get_current_blog_id();
+        if ( ! array_key_exists( $blog_id, $publishers ) ) {
+            $publishers[ $blog_id ] = null;
+        }
+        $cached =& $publishers[ $blog_id ];
         if ( $cached !== null ) {
             return $cached;
         }
@@ -654,11 +659,12 @@ class AceCrawlFrontend {
 
     /** Per-request cache for acecrawl_options to avoid repeated get_option() calls. */
     private function get_seo_options() {
-        static $options = null;
-        if ( $options === null ) {
-            $options = get_option( 'acecrawl_options', [] );
+        static $options = array();
+        $blog_id = get_current_blog_id();
+        if ( ! array_key_exists( $blog_id, $options ) ) {
+            $options[ $blog_id ] = get_option( 'acecrawl_options', [] );
         }
-        return $options;
+        return $options[ $blog_id ];
     }
 
     private function get_person_publisher_schema($options) {

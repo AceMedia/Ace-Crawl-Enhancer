@@ -35,6 +35,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once __DIR__ . '/ace-json.php';
+
 const ACECRAWL_SITEMAP_GEN_HOOK        = 'acecrawl_sitemap_regenerate';
 const ACECRAWL_SITEMAP_GEN_SEQ_OPTION  = 'seq';
 const ACECRAWL_SITEMAP_GEN_STATE       = 'state';
@@ -73,11 +75,17 @@ function acecrawl_sitemap_gen_save_bytes( $file, $bytes ) {
 }
 
 /** Report a bounded reason only, never file paths, raw metadata or URLs. */
-function acecrawl_sitemap_gen_storage_error( $reason ) {
+function acecrawl_sitemap_gen_storage_error( $reason, array $diagnostic = array() ) {
     static $reported = array();
     if ( ! isset( $reported[ $reason ] ) ) {
         $reported[ $reason ] = true;
-        error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason );
+        $detail = '';
+        foreach ( array( 'json_error_code', 'line', 'column' ) as $key ) {
+            if ( isset( $diagnostic[ $key ] ) && is_int( $diagnostic[ $key ] ) && $diagnostic[ $key ] >= 0 ) {
+                $detail .= ' ' . $key . '=' . $diagnostic[ $key ];
+            }
+        }
+        error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason . $detail );
     }
 }
 
@@ -89,7 +97,12 @@ function acecrawl_sitemap_gen_storage_error( $reason ) {
  * back to the previous object-cache behaviour.
  */
 function acecrawl_sitemap_gen_dir() {
-    static $dir = null;
+    static $directories = array();
+    $blog_id = get_current_blog_id();
+    if ( ! array_key_exists( $blog_id, $directories ) ) {
+        $directories[ $blog_id ] = null;
+    }
+    $dir =& $directories[ $blog_id ];
     if ( null !== $dir ) {
         return $dir;
     }
@@ -300,7 +313,8 @@ function acecrawl_sitemap_gen_meta_update( $name, callable $mutate, &$committed 
             $raw = @file_get_contents( $file );
             $before = is_string( $raw ) ? json_decode( $raw, true ) : null;
             if ( ! is_array( $before ) ) {
-                acecrawl_sitemap_gen_storage_error( 'metadata-invalid-existing-record' );
+                $json = acecrawl_json_array_result( $raw );
+                acecrawl_sitemap_gen_storage_error( 'metadata-invalid-existing-record', $json['error'] ?: array() );
                 return array();
             }
         } else {
@@ -347,9 +361,14 @@ function acecrawl_sitemap_gen_seqs() {
  * @param string|null $key       Artifact key the change is confined to.
  */
 function acecrawl_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $key = null ) {
-    static $pending = array(); // scope => true for a scope-wide mark, false for partial.
-    static $keys    = array();
-    static $hooked  = false;
+    static $blogs = array();
+    $blog_id = get_current_blog_id();
+    if ( ! isset( $blogs[ $blog_id ] ) ) {
+        $blogs[ $blog_id ] = array( 'pending' => array(), 'keys' => array(), 'hooked' => false );
+    }
+    $pending =& $blogs[ $blog_id ]['pending']; // scope => true for a scope-wide mark, false for partial.
+    $keys    =& $blogs[ $blog_id ]['keys'];
+    $hooked  =& $blogs[ $blog_id ]['hooked'];
 
     if ( ! acecrawl_sitemap_gen_enabled() ) {
         return;
@@ -368,8 +387,18 @@ function acecrawl_sitemap_gen_mark_dirty( $scope = 'all', $flush_now = false, $k
     if ( ! $flush_now ) {
         if ( ! $hooked ) {
             $hooked = true;
-            add_action( 'shutdown', function () {
-                acecrawl_sitemap_gen_mark_dirty( null, true );
+            add_action( 'shutdown', function () use ( $blog_id ) {
+                $switched = get_current_blog_id() !== $blog_id;
+                if ( $switched ) {
+                    switch_to_blog( $blog_id );
+                }
+                try {
+                    acecrawl_sitemap_gen_mark_dirty( null, true );
+                } finally {
+                    if ( $switched ) {
+                        restore_current_blog();
+                    }
+                }
             }, 1 );
         }
         return;

@@ -1186,9 +1186,10 @@ class AceCrawlRetentionReport {
     /** @return array post ID => views (ga4) or [clicks, impressions] (gsc); empty when absent. */
     private static function period( $source, $days ) {
         static $cache = array();
-        $key = $source . '_' . $days;
+        $option = $source . '_' . $days;
+        $key = get_current_blog_id() . '|' . $option;
         if ( ! isset( $cache[ $key ] ) ) {
-            $v             = get_option( self::PERIOD_OPTION . $key, array() );
+            $v             = get_option( self::PERIOD_OPTION . $option, array() );
             $cache[ $key ] = is_array( $v ) ? $v : array();
         }
         return $cache[ $key ];
@@ -1459,7 +1460,12 @@ class AceCrawlRetentionReport {
 
     /** path => post ID for every candidate, so a link can be attributed without a query each. */
     private static function candidate_lookup( array $settings ) {
-        static $lookup = null;
+        static $blogs = array();
+        $blog_id = get_current_blog_id();
+        if ( ! array_key_exists( $blog_id, $blogs ) ) {
+            $blogs[ $blog_id ] = null;
+        }
+        $lookup =& $blogs[ $blog_id ];
         if ( null !== $lookup ) {
             return $lookup;
         }
@@ -1495,7 +1501,12 @@ class AceCrawlRetentionReport {
      * site) — otherwise every inbound link on such a copy would be attributed to nobody.
      */
     private static function internal_hosts() {
-        static $hosts = null;
+        static $blogs = array();
+        $blog_id = get_current_blog_id();
+        if ( ! array_key_exists( $blog_id, $blogs ) ) {
+            $blogs[ $blog_id ] = null;
+        }
+        $hosts =& $blogs[ $blog_id ];
         if ( null === $hosts ) {
             $own   = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
             $extra = (array) apply_filters( 'acecrawl_retention_internal_hosts', array() );
