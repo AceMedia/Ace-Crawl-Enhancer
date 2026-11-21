@@ -1220,7 +1220,12 @@ function acecrawl_sitemap_register_news_provider( $wp_sitemaps ) {
 add_action( 'wp_sitemaps_init', 'acecrawl_sitemap_register_news_provider' );
 
 function acecrawl_sitemap_custom_routes() {
-    static $cache = null;
+    static $blogs = array();
+    $blog_id = get_current_blog_id();
+    if ( ! array_key_exists( $blog_id, $blogs ) ) {
+        $blogs[ $blog_id ] = null;
+    }
+    $cache =& $blogs[ $blog_id ];
 
     if ( null !== $cache ) {
         return $cache;
@@ -3623,7 +3628,12 @@ function acecrawl_sitemap_parse_loc( $loc ) {
 }
 
 function acecrawl_sitemap_route_lookup() {
-    static $cache = null;
+    static $blogs = array();
+    $blog_id = get_current_blog_id();
+    if ( ! array_key_exists( $blog_id, $blogs ) ) {
+        $blogs[ $blog_id ] = null;
+    }
+    $cache =& $blogs[ $blog_id ];
 
     if ( null !== $cache ) {
         return $cache;
@@ -3749,7 +3759,7 @@ function acecrawl_sitemap_get_index_entry_lastmod( $provider, $subtype, $page ) 
         $page = 1;
     }
 
-    $key = $provider . '|' . (string) $subtype . '|' . $page;
+    $key = get_current_blog_id() . '|' . $provider . '|' . (string) $subtype . '|' . $page;
     if ( array_key_exists( $key, $cache ) ) {
         return $cache[ $key ];
     }
@@ -3786,10 +3796,11 @@ function acecrawl_sitemap_get_index_entry_lastmod( $provider, $subtype, $page ) 
         $map = $post_type && acecrawl_sitemap_stable_pages_supported( $post_type ) ? acecrawl_sitemap_stored_page_map( $post_type ) : null;
         if ( $map ) {
             static $page_lastmods = array();
-            if ( ! isset( $page_lastmods[ $post_type ] ) ) {
-                $page_lastmods[ $post_type ] = wp_list_pluck( acecrawl_sitemap_page_counts( $post_type, $map ), 'm' );
+            $page_map_key = get_current_blog_id() . '|' . $post_type;
+            if ( ! isset( $page_lastmods[ $page_map_key ] ) ) {
+                $page_lastmods[ $page_map_key ] = wp_list_pluck( acecrawl_sitemap_page_counts( $post_type, $map ), 'm' );
             }
-            $m = $page_lastmods[ $post_type ][ $page - 1 ] ?? '';
+            $m = $page_lastmods[ $page_map_key ][ $page - 1 ] ?? '';
             if ( $m && '0000-00-00 00:00:00' !== $m ) {
                 $cache[ $key ] = get_date_from_gmt( $m, 'c' );
                 return $cache[ $key ];
@@ -3812,7 +3823,7 @@ function acecrawl_sitemap_get_index_entry_lastmod( $provider, $subtype, $page ) 
 function acecrawl_sitemap_get_max_pages_for_route( $provider, $subtype ) {
     static $cache = array();
 
-    $key = $provider . '|' . (string) $subtype;
+    $key = get_current_blog_id() . '|' . $provider . '|' . (string) $subtype;
     if ( isset( $cache[ $key ] ) ) {
         return $cache[ $key ];
     }

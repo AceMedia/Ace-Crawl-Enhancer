@@ -2303,7 +2303,8 @@ class AceCrawlEnhancer {
     public static function get_taxonomy_meta($term_id, $taxonomy, $key) {
         // Per-request cache: this is called multiple times per page for title, desc, etc.
         static $meta_cache = [];
-        $cache_key = "{$term_id}:{$taxonomy}:{$key}";
+        $blog_id = get_current_blog_id();
+        $cache_key = "{$blog_id}:{$term_id}:{$taxonomy}:{$key}";
         if ( array_key_exists( $cache_key, $meta_cache ) ) {
             return self::maybe_expand($term_id, $key, $meta_cache[ $cache_key ], $taxonomy);
         }
@@ -2314,12 +2315,11 @@ class AceCrawlEnhancer {
         // If no ACE meta exists, check for Yoast data and migrate it
         if (empty($value)) {
             // Cache the (potentially large) option for the duration of the request.
-            static $yoast_tax_meta_loaded = false;
-            static $yoast_tax_meta = [];
-            if ( ! $yoast_tax_meta_loaded ) {
-                $yoast_tax_meta        = get_option( 'wpseo_taxonomy_meta', [] );
-                $yoast_tax_meta_loaded = true;
+            static $yoast_by_blog = array();
+            if ( ! array_key_exists( $blog_id, $yoast_by_blog ) ) {
+                $yoast_by_blog[ $blog_id ] = get_option( 'wpseo_taxonomy_meta', [] );
             }
+            $yoast_tax_meta = $yoast_by_blog[ $blog_id ];
             
             if (isset($yoast_tax_meta[$taxonomy][$term_id])) {
                 // Map ACE keys to Yoast keys
