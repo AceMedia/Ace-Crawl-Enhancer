@@ -44,6 +44,8 @@ function remove_tree($path) {
 try {
     $source = \getenv('ACECRAWL_METADATA_SOURCE') ?: \dirname(__DIR__) . '/includes/ace-sitemap-generations.php';
     $code = \preg_replace('/^<\?php\s*/', '', \file_get_contents($source), 1);
+    require_once \dirname(__DIR__) . '/includes/ace-json.php';
+    $code = \str_replace("require_once __DIR__ . '/ace-json.php';", '', $code);
     eval('namespace AceCrawl_Metadata_Test;' . $code);
     \mkdir($root . '/uploads/ace-sitemaps', 0755, true);
     \file_put_contents($root . '/uploads/ace-sitemaps/index.php', '<?php // Existing protective file.');
@@ -77,6 +79,8 @@ try {
         check($committed === false && $result === [] && $mutations === 0 && \file_get_contents($file) === $bad, 'corrupt/scalar record is retained and never advertised as a new generation');
     }
     check($messages && !\preg_match('/seq|last_success|\.meta|\/tmp\//', \implode("\n", $messages)), 'failure diagnostics contain bounded reasons without paths or raw metadata');
+    check(\strpos(\implode("\n", $messages), 'json_error_code=4') !== false, 'invalid metadata reports the safe JSON parser code');
+    if (PHP_VERSION_ID >= 80600) check((bool) \preg_match('/json_error_code=4 line=[1-9][0-9]* column=[1-9][0-9]*/', \implode("\n", $messages)), 'PHP 8.6 metadata diagnostic includes native location');
     if (\function_exists('pcntl_fork')) {
         \file_put_contents($file, '{"seq":0}'); $children = [];
         for ($i=0; $i<2; ++$i) {

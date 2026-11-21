@@ -35,6 +35,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+require_once __DIR__ . '/ace-json.php';
+
 const ACECRAWL_SITEMAP_GEN_HOOK        = 'acecrawl_sitemap_regenerate';
 const ACECRAWL_SITEMAP_GEN_SEQ_OPTION  = 'seq';
 const ACECRAWL_SITEMAP_GEN_STATE       = 'state';
@@ -73,11 +75,17 @@ function acecrawl_sitemap_gen_save_bytes( $file, $bytes ) {
 }
 
 /** Report a bounded reason only, never file paths, raw metadata or URLs. */
-function acecrawl_sitemap_gen_storage_error( $reason ) {
+function acecrawl_sitemap_gen_storage_error( $reason, array $diagnostic = array() ) {
     static $reported = array();
     if ( ! isset( $reported[ $reason ] ) ) {
         $reported[ $reason ] = true;
-        error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason );
+        $detail = '';
+        foreach ( array( 'json_error_code', 'line', 'column' ) as $key ) {
+            if ( isset( $diagnostic[ $key ] ) && is_int( $diagnostic[ $key ] ) && $diagnostic[ $key ] >= 0 ) {
+                $detail .= ' ' . $key . '=' . $diagnostic[ $key ];
+            }
+        }
+        error_log( 'Ace-Crawl-Enhancer sitemap storage failure: ' . $reason . $detail );
     }
 }
 
@@ -300,7 +308,8 @@ function acecrawl_sitemap_gen_meta_update( $name, callable $mutate, &$committed 
             $raw = @file_get_contents( $file );
             $before = is_string( $raw ) ? json_decode( $raw, true ) : null;
             if ( ! is_array( $before ) ) {
-                acecrawl_sitemap_gen_storage_error( 'metadata-invalid-existing-record' );
+                $json = acecrawl_json_array_result( $raw );
+                acecrawl_sitemap_gen_storage_error( 'metadata-invalid-existing-record', $json['error'] ?: array() );
                 return array();
             }
         } else {
